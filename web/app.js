@@ -1,4 +1,4 @@
-const DATA_PATH = '../itinerary_structured.json';
+const DATA_PATH = './itinerary_structured.json';
 
 async function loadData() {
   const res = await fetch(DATA_PATH);
