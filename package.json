@@ -1,0 +1,17 @@
+{
+  "name": "rtw-trip",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build:data": "node scripts/build-data.js",
+    "parse": "node scripts/parse-itinerary.js",
+    "geocode": "node scripts/geocode.js",
+    "start": "npm run build:data",
+    "serve": "npx http-server -c-1 -p 5173 | cat"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

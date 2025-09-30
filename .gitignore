@@ -1,0 +1,8 @@
+web/config.js
+data/geocache.json
+data/trip.json
+data/trip.raw.json
+data/unresolved.json
+.env
+node_modules
+

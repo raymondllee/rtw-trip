@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTW Trip Map</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1 id="trip-title">Round The World Trip</h1>
+    <div class="controls">
+      <div class="filters">
+        <label>
+          Leg:
+          <select id="leg-filter">
+            <option value="all" selected>All</option>
+          </select>
+        </label>
+        <label>
+          <input type="checkbox" id="routing-toggle"> Show Routing
+        </label>
+      </div>
+      <span id="summary"></span>
+    </div>
+  </header>
+  <main class="main-content">
+    <div id="map"></div>
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h3>Trip Planning</h3>
+        <div class="destination-count"></div>
+      </div>
+      <div class="planning-controls">
+        <button id="recalculate-btn" class="primary">Recalculate Dates</button>
+        <button id="export-btn">Export</button>
+        <button id="reset-btn">Reset</button>
+      </div>
+      <div class="destination-list" id="destination-list">
+        <!-- Destinations will be populated here -->
+      </div>
+    </aside>
+  </main>
+
+  <script src="./config.js"></script>
+  <script type="module" src="./app-planning.js"></script>
+  <script async src="https://maps.googleapis.com/maps/api/js?key=" crossorigin="anonymous"></script>
+</body>
+<script>
+  // Inject API key into the Google Maps script src once config is available
+  (function waitForConfig(){
+    if (!window.RTW_CONFIG || !window.RTW_CONFIG.googleMapsApiKey) {
+      return setTimeout(waitForConfig, 50);
+    }
+    const scripts = document.getElementsByTagName('script');
+    for (let i = 0; i < scripts.length; i++) {
+      const s = scripts[i];
+      if (s.src && s.src.includes('maps.googleapis.com/maps/api/js?key=')) {
+        const key = encodeURIComponent(window.RTW_CONFIG.googleMapsApiKey);
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${key}`;
+      }
+    }
+  })();
+</script>
+</html>
+
+

@@ -1,0 +1,321 @@
+**V2: The Global Expedition: Integrated Itinerary & Granular Cost Breakdown with Per Day Costs (June - December 2026)**
+=====
+  - **Travelers:** Ray, Sally, Ivy 
+  - **Duration:** Approximately 6.5 Months (June 12, 2026 - December 24, 2026) 
+  - **Origin & Return:** San Francisco, USA 
+  - **Cost Estimates:** All figures are estimates for 3 people, using higher-end mid-range pricing.
+  - **I. Asia Leg: Diving, Culture & Mountains (June 12 - October 9, 2026 - 117 Days) $81,200 (Per Day: $694)**
+    - **A. Southeast Asia & Diving Focus (June 12 - July 18, 2026 - 37 Days) **$29,165 (Per Day: $788.24)****
+      - **Focus:** Epic diving, vibrant cultures, and efficient island hopping.
+      - **Accommodation Style:** Higher-end mid-range hotels/resorts.
+      - **June 12 - June 18: Bali, Indonesia (7 Days)**
+        - Itinerary:
+          - **June 12:** Depart San Francisco (SFO) for Denpasar (DPS), Bali.
+          - **June 13:** Arrive in Denpasar (DPS) due to time difference. Transfer to hotel. Check-in.
+          - **June 14-18:** Explore Bali's cultural heart (Ubud), stunning beaches, rice paddies, and enjoy initial diving/snorkeling.
+        - Cost Breakdown (for 3 people):
+          - **Flights (SFO-DPS):** Assumption: $1,500 per person. **Total: $4,500**
+          - **Accommodation:** Assumption: $200 per night. **Total: $1,400** (7 nights)
+          - **Food & Incidentals:** Assumption: $75 per person per day. **Total: $1,575** (3 people x 7 days x $75)
+          - **Ground Transportation:** Assumption: $100 for airport transfers + $200 for local transit/taxis. **Total: $300**
+        - **Sub-segment Total: $7,775** (Per Day: $1,110.71)
+      - **June 19 - June 25: Raja Ampat, Indonesia (7 Days)**
+        - Itinerary:
+          - **June 19:** Fly from Denpasar (DPS) to Sorong (SOQ). Transfer to Raja Ampat. Check into dive resort.
+          - **June 20-25:** Immerse yourselves in world-class diving, exploring pristine coral gardens, unique marine life, and iconic limestone karsts.
+        - Cost Breakdown (for 3 people):
+          - **Flights (DPS-SOQ):** Assumption: $400 per person. **Total: $1,200**
+          - **Accommodation:** Assumption: $400 per night (often includes some meals/diving). **Total: $2,800** (7 nights)
+          - **Food & Incidentals:** Assumption: $60 per person per day (for extras). **Total: $1,260** (3 people x 7 days x $60)
+          - **Ground Transportation:** Assumption: $100 for local transfers. **Total: $100**
+        - **Sub-segment Total: $5,360** (Per Day: $765.71)
+      - **June 26 - July 2: Palau (7 Days)**
+        - Itinerary:
+          - **June 26:** Fly from Sorong (SOQ) to Koror (ROR), Palau. Transfer to hotel.
+          - **June 27-July 2:** Continue your diving adventures, including the unique Jellyfish Lake, Rock Islands, German Channel, and Blue Corner.
+        - Cost Breakdown (for 3 people):
+          - **Flights (SOQ-ROR):** Assumption: $700 per person. **Total: $2,100**
+          - **Accommodation:** Assumption: $300 per night. **Total: $2,100** (7 nights)
+          - **Food & Incidentals:** Assumption: $90 per person per day. **Total: $1,890** (3 people x 7 days x $90)
+          - **Ground Transportation:** Assumption: $250 for local transfers/taxis. **Total: $250**
+        - **Sub-segment Total: $6,340** (Per Day: $905.71)
+      - **July 3 - July 11: Philippines (9 Days)**
+        - Itinerary:
+          - **July 3:** Fly from Koror (ROR) to Manila (MNL), Philippines. Transfer to hotel.
+          - **July 4-11:** Explore the Philippines, focusing on its incredible diving spots and vibrant local culture. _(+2 days downtime)_
+        - Cost Breakdown (for 3 people):
+          - **Flights (ROR-MNL):** Assumption: $400 per person. **Total: $1,200**
+          - **Accommodation:** Assumption: $150 per night. **Total: $1,350** (9 nights)
+          - **Food & Incidentals:** Assumption: $60 per person per day. **Total: $1,620** (3 people x 9 days x $60)
+          - **Ground Transportation:** Assumption: $350 for internal flights/ferries/transfers for diving. **Total: $350**
+        - **Sub-segment Total: $4,520** (Per Day: $502.22)
+      - **July 12 - July 13: Singapore (2 Days)**
+        - Itinerary:
+          - **July 12:** Fly from Manila (MNL) to Singapore (SIN). Transfer to hotel.
+          - **July 13:** Quick exploration of Singapore's highlights – Gardens by the Bay, Marina Bay Sands, vibrant food scene.
+        - Cost Breakdown (for 3 people):
+          - **Flights (MNL-SIN):** Assumption: $200 per person. **Total: $600**
+          - **Accommodation:** Assumption: $250 per night. **Total: $500** (2 nights)
+          - **Food & Incidentals:** Assumption: $100 per person per day. **Total: $600** (3 people x 2 days x $100)
+          - **Ground Transportation:** Assumption: $100 for local transit/taxis. **Total: $100**
+        - **Sub-segment Total: $1,800** (Per Day: $900.00)
+      - **July 14 - July 17: Borneo (Malaysia) (4 Days)**
+        - Itinerary:
+          - **July 14:** Fly from Singapore (SIN) to Kuala Lumpur (KUL), then connect to Kota Kinabalu (BKI), Borneo. Transfer to hotel.
+          - **July 15-17:** Experience Borneo's unique wildlife (orangutans, proboscis monkeys) and lush rainforests.
+        - Cost Breakdown (for 3 people):
+          - **Flights (SIN-KUL-BKI):** Assumption: $100 (SIN-KUL) + $200 (KUL-BKI) per person. **Total: $900**
+          - **Accommodation:** Assumption: $150 per night. **Total: $600** (4 nights)
+          - **Food & Incidentals:** Assumption: $60 per person per day. **Total: $720** (3 people x 4 days x $60)
+          - **Ground Transportation:** Assumption: $200 for local tours/transfers. **Total: $200**
+        - **Sub-segment Total: $2,420** (Per Day: $605.00)
+      - **July 18: Kuala Lumpur, Malaysia (1 Day)**
+        - Itinerary:
+          - **July 18:** Fly from Kota Kinabalu (BKI) back to Kuala Lumpur (KUL). Check into hotel. Prepare for onward travel.
+        - Cost Breakdown (for 3 people):
+          - **Flights (BKI-KUL):** Assumption: $200 per person. **Total: $600**
+          - **Accommodation:** Assumption: $120 per night. **Total: $120** (1 night)
+          - **Food & Incidentals:** Assumption: $60 per person per day. **Total: $180** (3 people x 1 day x $60)
+          - **Ground Transportation:** Assumption: $50 for airport transfers. **Total: $50**
+        - **Sub-segment Total: $950** (Per Day: $950.00)
+      - **TOTAL FOR SOUTHEAST ASIA & DIVING FOCUS:** **$29,165 (Per Day: $788.24)**
+    - **B. East Asia (July 19 - September 12, 2026 - 56 Days) **$33,385 (Per Day: $596.16)****
+      - **Focus:** Modern cities, rich history, and diverse cultural experiences.
+      - **Accommodation Style:** Higher-end mid-range hotels.
+      - **July 19 - July 21: Taiwan (3 Days)**
+        - Itinerary:
+          - **July 19:** Fly from Kuala Lumpur (KUL) to Taipei (TPE), Taiwan. Transfer to hotel.
+          - **July 20-21:** Explore Taipei's vibrant night markets, iconic landmarks like Taipei 101, and cultural sites.
+        - Cost Breakdown (for 3 people):
+          - **Flights (KUL-TPE):** Assumption: $250 per person. **Total: $750**
+          - **Accommodation:** Assumption: $200 per night. **Total: $600** (3 nights)
+          - **Food & Incidentals:** Assumption: $75 per person per day. **Total: $675** (3 people x 3 days x $75)
+          - **Ground Transportation:** Assumption: $150 for local transit/airport transfers. **Total: $150**
+        - **Sub-segment Total: $2,175** (Per Day: $725.00)
+      - **July 22 - August 13: Japan (23 Days)**
+        - Itinerary:
+          - **July 22:** Fly from Taipei (TPE) to Tokyo (NRT), Japan. Transfer to hotel.
+          - **July 23-August 13:** Immerse yourselves in Japan's unique blend of tradition and modernity. Explore Tokyo, Kyoto, Osaka, and potentially other regions via the efficient rail network. _(+2 days downtime)_
+        - Cost Breakdown (for 3 people):
+          - **Flights (TPE-NRT):** Assumption: $300 per person. **Total: $900**
+          - **Accommodation:** Assumption: $250 per night. **Total: $5,750** (23 nights)
+          - **Food & Incidentals:** Assumption: $100 per person per day. **Total: $6,900** (3 people x 23 days x $100)
+          - **Ground Transportation:** Assumption: $1,500 for Japan Rail Pass/local transit. **Total: $1,500**
+        - **Sub-segment Total: $15,050** (Per Day: $654.35)
+      - **August 14 - August 20: Korea (7 Days / 1 Week)**
+        - Itinerary:
+          - **August 14:** Fly from Tokyo (NRT) to Seoul (ICN), Korea. Transfer to hotel.
+          - **August 15-20:** Discover Seoul's dynamic energy, historical palaces, bustling markets, and K-culture.
+        - Cost Breakdown (for 3 people):
+          - **Flights (NRT-ICN):** Assumption: $200 per person. **Total: $600**
+          - **Accommodation:** Assumption: $200 per night. **Total: $1,400** (7 nights)
+          - **Food & Incidentals:** Assumption: $90 per person per day. **Total: $1,890** (3 people x 7 days x $90)
+          - **Ground Transportation:** Assumption: $400 for local transit/airport transfers. **Total: $400**
+        - **Sub-segment Total: $4,290** (Per Day: $612.86)
+      - **August 21 - September 12: China (23 Days)**
+        - Itinerary:
+          - **August 21:** Fly from Seoul (ICN) to Beijing (PEK), China. Transfer to hotel.
+          - **August 22-September 12:** Explore China's vast landscapes and ancient wonders. Visit Beijing (Great Wall, Forbidden City), Shanghai, and potentially other regions like Xi'an (Terracotta Army) or Guilin (Li River). _(+2 days downtime)_
+        - Cost Breakdown (for 3 people):
+          - **Flights (ICN-PEK):** Assumption: $250 per person. **Total: $750**
+          - **Accommodation:** Assumption: $200 per night. **Total: $4,600** (23 nights)
+          - **Food & Incidentals:** Assumption: $80 per person per day. **Total: $5,520** (3 people x 23 days x $80)
+          - **Ground Transportation:** Assumption: $1,000 for internal flights/trains/local transit. **Total: $1,000**
+        - **Sub-segment Total: $11,870** (Per Day: $516.09)
+      - **TOTAL FOR EAST ASIA:** **$33,385 (Per Day: $596.16)**
+    - **C. South Asia (September 13 - October 6, 2026 - 24 Days) **$18,650 (Per Day: $777.08)****
+      - **Focus:** Himalayan adventures, spiritual journeys, and cultural immersion.
+      - **Accommodation Style:** Higher-end mid-range hotels/trekking lodges.
+      - **September 13 - September 25: Nepal (13 Days)**
+        - Itinerary:
+          - **September 13:** Fly from Beijing (PEK) to Kathmandu (KTM), Nepal. Transfer to hotel.
+          - **September 14-25:** Explore Kathmandu Valley's UNESCO World Heritage sites. Fly to Pokhara (PKR) and embark on a 7-day Annapurna Base Camp (ABC) trek with a guide and porter, experiencing the stunning Himalayan scenery. _(+3 days downtime)_
+        - Cost Breakdown (for 3 people):
+          - **Flights (PEK-KTM & KTM-PKR return):** Assumption: $300 (PEK-KTM) + $150 (KTM-PKR return) per person. **Total: $1,350**
+          - **Accommodation (City):** Assumption: $150 per night. **Total: $900** (6 nights)
+          - **Trekking Package (7-day ABC):** Assumption: $150 per person per day (includes guide, porter, permits, teahouse accommodation/food during trek). **Total: $3,150** (3 people x 7 days x $150)
+          - **Food & Incidentals (City days):** Assumption: $70 per person per day. **Total: $1,260** (3 people x 6 days x $70)
+          - **Ground Transportation:** Assumption: $200 for local transit/airport transfers. **Total: $200**
+        - **Sub-segment Total: $6,860** (Per Day: $527.69)
+      - **September 26 - October 5: Bhutan (10 Days)**
+        - Itinerary:
+          - **September 26:** Fly from Kathmandu (KTM) to Paro (PBH), Bhutan. Transfer to hotel.
+          - **September 27-October 5:** Experience the unique culture and breathtaking landscapes of Bhutan, the Land of the Thunder Dragon. This will be part of an all-inclusive package, including visits to monasteries (like Tiger's Nest), fortresses, and local villages.
+        - Cost Breakdown (for 3 people):
+          - **Flights (KTM-PBH return):** Assumption: $400 per person. **Total: $1,200**
+          - **Accommodation & Package (All-inclusive):** Assumption: $750 per day (minimum daily tariff includes accommodation, food, guide, transport). **Total: $7,500** (10 days x $750)
+          - **Food & Incidentals (for extras):** Assumption: $50 per person per day. **Total: $1,500** (3 people x 10 days x $50)
+          - **Ground Transportation:** Included in package.
+        - **Sub-segment Total: $10,200** (Per Day: $1,020.00)
+      - **October 6 - October 9: Kathmandu, Nepal (Buffer Days - 4 Days)**
+        - Itinerary:
+          - **October 6:** Fly from Paro (PBH) back to Kathmandu (KTM). Transfer to hotel.
+          - **October 7-9:** Flexible time for relaxation, last-minute souvenir shopping, or deeper exploration of Kathmandu. Prepare for your journey to Europe.
+        - Cost Breakdown (for 3 people):
+          - **Flights:** Covered by return from Bhutan.
+          - **Accommodation:** Assumption: $150 per night. **Total: $600** (4 nights)
+          - **Food & Incidentals:** Assumption: $70 per person per day. **Total: $840** (3 people x 4 days x $70)
+          - **Ground Transportation:** Assumption: $150 for local transit/airport transfers. **Total: $150**
+        - **Sub-segment Total: $1,590** (Per Day: $397.50)
+      - **TOTAL FOR SOUTH ASIA:** **$18,650 (Per Day: $777.08)**
+  - **II. Europe Leg: Nordic Wonders & Arctic Lights (October 10 - October 30, 2026 - 21 Days) **$19,430 (Per Day: $925.24)****
+    - **Focus:** Scandinavian charm, Northern Lights, Arctic Circle, and unique Icelandic landscapes.
+    - **Accommodation Style:** Higher-end mid-range hotels/guesthouses.
+    - **October 10 - October 12: Copenhagen, Denmark (3 Days)**
+      - Itinerary:
+        - **October 10:** Fly from Kathmandu (KTM) to Copenhagen (CPH), Denmark. Transfer to hotel.
+        - **October 11-12:** Explore Copenhagen's iconic Nyhavn, Tivoli Gardens, and vibrant city life.
+      - Cost Breakdown (for 3 people):
+        - **Flights (KTM-CPH):** Assumption: $600 per person. **Total: $1,800**
+        - **Accommodation:** Assumption: $300 per night. **Total: $900** (3 nights)
+        - **Food & Incidentals:** Assumption: $100 per person per day. **Total: $900** (3 people x 3 days x $100)
+        - **Ground Transportation:** Assumption: $150 for local transit/taxis. **Total: $150**
+      - **Sub-segment Total: $3,750** (Per Day: $1,250.00)
+    - **October 13 - October 14: Stockholm, Sweden (2 Days)**
+      - Itinerary:
+        - **October 13:** Fly from Copenhagen (CPH) to Stockholm (ARN), Sweden. Transfer to hotel.
+        - **October 14:** Quick exploration of Stockholm's highlights, such as Gamla Stan (Old Town) and the Vasa Museum.
+      - Cost Breakdown (for 3 people):
+        - **Flights (CPH-ARN):** Assumption: $100 per person. **Total: $300**
+        - **Accommodation:** Assumption: $200 per night. **Total: $400** (2 nights)
+        - **Food & Incidentals:** Assumption: $90 per person per day. **Total: $540** (3 people x 2 days x $90)
+        - **Ground Transportation:** Assumption: $100 for local transit/taxis. **Total: $100**
+      - **Sub-segment Total: $1,340** (Per Day: $670.00)
+    - **October 15 - October 21: Northern Norway (7 Days)**
+      - Itinerary:
+        - **October 15:** Fly from Stockholm (ARN) to Tromsø (TOS), Norway. Transfer to hotel.
+        - **October 16-21:** Dedicate this time to chasing the Northern Lights, crossing the Arctic Circle, and enjoying Arctic activities like dog sledding or fjord cruises.
+      - Cost Breakdown (for 3 people):
+        - **Flights (ARN-TOS):** Assumption: $250 per person. **Total: $750**
+        - **Accommodation:** Assumption: $250 per night. **Total: $1,750** (7 nights)
+        - **Food & Incidentals:** Assumption: $100 per person per day. **Total: $2,100** (3 people x 7 days x $100)
+        - **Activity Costs:** Assumption: $200 per person for tours. **Total: $600**
+        - **Ground Transportation:** Assumption: $300 for local tours/transfers. **Total: $300**
+      - **Sub-segment Total: $5,500** (Per Day: $785.71)
+    - **October 22 - October 28: Iceland (7 Days)**
+      - Itinerary:
+        - **October 22:** Fly from Tromsø (TOS) to Reykjavik (KEF), Iceland. Pick up your rented 4x4 vehicle.
+        - **October 23-28:** Explore Iceland's dramatic landscapes, including the Golden Circle, South Coast waterfalls, black sand beaches, and the Blue Lagoon. Enjoy the autonomy of self-driving.
+      - Cost Breakdown (for 3 people):
+        - **Flights (TOS-KEF):** Assumption: $300 per person. **Total: $900**
+        - **Accommodation:** Assumption: $250 per night. **Total: $1,750** (7 nights)
+        - **Food & Incidentals:** Assumption: $110 per person per day. **Total: $2,310** (3 people x 7 days x $110)
+        - **Activity Costs:** Assumption: $150 per person for tours. **Total: $450**
+        - **Ground Transportation:** Assumption: $1,500 for 4x4 car rental + fuel. **Total: $1,500**
+      - **Sub-segment Total: $6,910** (Per Day: $987.14)
+    - **October 29 - October 30: Travel to Africa (2 Days)**
+      - Itinerary:
+        - **October 29:** Fly from Reykjavik (KEF) to a connecting hub (e.g., Amsterdam AMS) for Africa. Overnight layover.
+        - **October 30:** Continue travel to Africa.
+      - Cost Breakdown (for 3 people):
+        - **Flights (KEF-AMS):** Assumption: $400 per person. **Total: $1,200**
+        - **Accommodation:** Assumption: $150 per night. **Total: $150** (1 night)
+        - **Food & Incidentals:** Assumption: $80 per person per day. **Total: $480** (3 people x 2 days x $80)
+        - **Ground Transportation:** Assumption: $100 for airport transfers. **Total: $100**
+      - **Sub-segment Total: $1,930** (Per Day: $965.00)
+    - **TOTAL FOR EUROPE LEG:** **$19,430 (Per Day: $925.24)**
+  - **III. Africa Leg: Safari, Summit & Gorillas (October 31 - November 20, 2026 - 21 Days) **$56,350 (Per Day: $2,683.33)****
+    - **Focus:** Iconic East African adventures – Great Migration, Kilimanjaro, and Gorilla Trekking.
+    - **Accommodation Style:** Higher-end mid-range safari lodges, mountain camps, and gorilla lodges.
+    - **October 31 - November 6: Great Migration Safari, Tanzania (7 Days)**
+      - Itinerary:
+        - **October 31:** Arrive at Kilimanjaro (JRO), Tanzania. Transfer to safari lodge.
+        - **November 1-6:** Embark on an unforgettable safari in the Serengeti and Ngorongoro Crater, aiming to witness the Great Migration. This is a comprehensive package including accommodation, meals, guide, and vehicle.
+      - Cost Breakdown (for 3 people):
+        - **Flights (AMS-JRO):** Assumption: $700 per person. **Total: $2,100**
+        - **Safari Package:** Assumption: $1,250 per person per day (includes accommodation, food, guide, vehicle, park fees). **Total: $26,250** (3 people x 7 days x $1,250)
+        - **Food & Incidentals (for extras):** Assumption: $50 per person per day. **Total: $1,050** (3 people x 7 days x $50)
+        - **Ground Transportation:** Included in safari package.
+      - **Sub-segment Total: $29,400** (Per Day: $4,200.00)
+    - **November 7 - November 13: Kilimanjaro Climb, Tanzania (7 Days)**
+      - Itinerary:
+        - **November 7:** Begin your guided Kilimanjaro climb (e.g., Machame route). This is a comprehensive package including guides, porters, food, and mountain accommodation.
+        - **November 13:** Complete your descent from Kilimanjaro. Overnight in a hotel near the base.
+      - Cost Breakdown (for 3 people):
+        - **Kilimanjaro Climb Package:** Assumption: $4,000 per person (includes guides, porters, food, accommodation, park fees). **Total: $12,000**
+        - **Accommodation (Pre/Post Climb):** Assumption: $150 per night. **Total: $300** (2 nights)
+        - **Food & Incidentals (for extras):** Assumption: $50 per person per day. **Total: $1,050** (3 people x 7 days x $50)
+        - **Ground Transportation:** Included in climb package.
+      - **Sub-segment Total: $13,350** (Per Day: $1,907.14)
+    - **November 14 - November 20: Gorilla Trekking, Rwanda (7 Days)**
+      - Itinerary:
+        - **November 14:** Fly from Tanzania (JRO) to Kigali (KGL), Rwanda. Transfer to your gorilla trekking lodge.
+        - **November 15-20:** Experience the incredible gorilla trekking in Volcanoes National Park. This includes your gorilla permits and dedicated ground transportation. Allow for buffer days around the trek.
+      - Cost Breakdown (for 3 people):
+        - **Flights (JRO-KGL):** Assumption: $300 per person. **Total: $900**
+        - **Gorilla Permit:** Assumption: $1,500 per person. **Total: $4,500**
+        - **Accommodation:** Assumption: $200 per night. **Total: $1,400** (7 nights)
+        - **Food & Incidentals:** Assumption: $70 per person per day. **Total: $1,470** (3 people x 7 days x $70)
+        - **Ground Transportation:** Assumption: $1,000 for private driver/guide. **Total: $1,000**
+      - **Sub-segment Total: $9,270** (Per Day: $1,324.29)
+    - **TOTAL FOR AFRICA LEG:** **$56,350 (Per Day: $2,683.33)**
+  - **IV. South America Leg: Rio, Amazon & Galapagos (November 21 - December 11, 2026 - 21 Days) **$30,890 (Per Day: $1,470.95)****
+    - **Focus:** Vibrant city life, immersive rainforest experience, and unique wildlife encounters.
+    - **Accommodation Style:** Higher-end mid-range hotels, Amazon River Cruise, Galapagos Cruise/Lodge.
+    - **November 21 - November 24: Rio de Janeiro, Brazil (4 Days)**
+      - Itinerary:
+        - **November 21:** Fly from Kigali (KGL), Rwanda to Rio de Janeiro (GIG), Brazil. Transfer to hotel.
+        - **November 22-24:** Explore Rio's iconic Christ the Redeemer, Sugarloaf Mountain, and famous beaches.
+      - Cost Breakdown (for 3 people):
+        - **Flights (KGL-GIG):** Assumption: $1,000 per person. **Total: $3,000**
+        - **Accommodation:** Assumption: $250 per night. **Total: $1,000** (4 nights)
+        - **Food & Incidentals:** Assumption: $80 per person per day. **Total: $960** (3 people x 4 days x $80)
+        - **Ground Transportation:** Assumption: $200 for airport transfers, local transit. **Total: $200**
+      - **Sub-segment Total: $5,160** (Per Day: $1,290.00)
+    - **November 25 - November 30: Amazon River Cruise, Brazil (6 Days / 5 Nights)**
+      - Itinerary:
+        - **November 25:** Fly from Rio de Janeiro (GIG) to Manaus (MAO), Brazil. Transfer to your Amazon River Cruise.
+        - **November 26-30:** Embark on a multi-day Amazon River Cruise, exploring the rainforest from the comfort of your vessel, with daily excursions.
+      - Cost Breakdown (for 3 people):
+        - **Flights (GIG-MAO):** Assumption: $200 per person. **Total: $600**
+        - **Amazon River Cruise Package:** Assumption: $550 per person per day (includes accommodation, all meals, excursions, transfers). **Total: $8,250** (3 people x 5 days x $550)
+        - **Food & Incidentals (for extras):** Assumption: $40 per person per day. **Total: $600** (3 people x 5 days x $40)
+        - **Ground Transportation:** Assumption: $100 for airport transfers in Manaus. **Total: $100**
+      - **Sub-segment Total: $9,550** (Per Day: $1,591.67)
+    - **December 1 - December 7: Galapagos Islands, Ecuador (7 Days / 6 Nights)**
+      - Itinerary:
+        - **December 1:** Fly from Manaus (MAO) to Quito (UIO), Ecuador. Overnight near airport.
+        - **December 2:** Fly from Quito (UIO) to Baltra (GPS), Galapagos. Begin your Galapagos tour/cruise.
+        - **December 3-7:** Immerse yourselves in the unparalleled wildlife and unique ecosystems of the Galapagos Islands. This will be a comprehensive cruise or land-based tour package.
+      - Cost Breakdown (for 3 people):
+        - **Flights (MAO-UIO & UIO-GPS):** Assumption: $300 (MAO-UIO) + $400 (UIO-GPS) per person. **Total: $2,100**
+        - **Accommodation (Ecuador Overnight):** Assumption: $100 per night. **Total: $100** (1 night)
+        - **Galapagos Tour/Cruise Package:** Assumption: $650 per person per day (includes accommodation, food, activities, guide). **Total: $9,750** (3 people x 5 days x $650)
+        - **Food & Incidentals (for extras):** Assumption: $50 per person per day. **Total: $750** (3 people x 5 days x $50)
+        - **Ground Transportation:** Assumption: $100 for airport transfers in Ecuador/Galapagos. **Total: $100**
+      - **Sub-segment Total: $12,800** (Per Day: $1,828.57)
+    - **December 8 - December 11: Buenos Aires, Argentina (4 Days)**
+      - Itinerary:
+        - **December 8:** Fly from Galapagos (GPS) via Quito (UIO) to Buenos Aires (EZE), Argentina. Transfer to hotel.
+        - **December 9-11:** Enjoy the vibrant culture of Buenos Aires. This serves as your direct lead-in to the Antarctica expedition.
+      - Cost Breakdown (for 3 people):
+        - **Flights (GPS-EZE):** Assumption: $600 per person. **Total: $1,800**
+        - **Accommodation:** Assumption: $200 per night. **Total: $600** (3 nights)
+        - **Food & Incidentals:** Assumption: $70 per person per day. **Total: $630** (3 people x 3 days x $70)
+        - **Ground Transportation:** Assumption: $150 for local transit/airport transfers. **Total: $150**
+      - **Sub-segment Total: $3,380** (Per Day: $845.00)
+    - **TOTAL FOR SOUTH AMERICA LEG:** **$30,890 (Per Day: $1,470.95)**
+  - **V. Antarctica Leg: The White Continent (December 12 - December 24, 2026 - 13 Days) **$60,062.50 (Per Day: $4,620.19)****
+    - **Focus:** The ultimate polar expedition to the Antarctic Peninsula.
+    - **Accommodation Style:** National Geographic Expedition Ship.
+    - **December 12 - December 23: Antarctica Expedition (12 Days)**
+      - Itinerary:
+        - **December 12:** Lindblad-provided hotel in Buenos Aires.
+        - **December 13:** Lindblad-provided flight from Buenos Aires (EZE) to Ushuaia (USH). Embark on the National Geographic Endurance.
+        - **December 14-22:** Experience the awe-inspiring landscapes and wildlife of Antarctica, including Zodiac cruises, landings, and expert lectures.
+        - **December 23:** Disembark in Ushuaia (USH). Lindblad-provided flight from Ushuaia (USH) to Buenos Aires (EZE). Overnight in Buenos Aires.
+      - Cost Breakdown (for 3 people):
+        - **Antarctica Expedition Package:** Assumption: Based on your provided invoice. **Total: $52,422.50** (Includes expedition, EZE-USH/USH-EZE flights, and 1 night BA hotel pre-cruise).
+        - **Food & Incidentals (for extras):** Assumption: $50 per person per day. **Total: $1,800** (3 people x 12 days x $50)
+      - **Sub-segment Total: $54,222.50** (Per Day: $4,518.54)
+    - **December 24: Return Home (1 Day)**
+      - Itinerary:
+        - **December 24:** Fly from Buenos Aires (EZE) to San Francisco (SFO), USA. Arrive home, concluding your Global Expedition.
+      - Cost Breakdown (for 3 people):
+        - **Flights (EZE-SFO):** Assumption: $1,800 per person. **Total: $5,400**
+        - **Food & Incidentals:** Assumption: $80 per person per day. **Total: $240** (3 people x 1 day x $80)
+        - **Ground Transportation:** Assumption: $200 for airport transfers in BA and SFO. **Total: $200**
+      - **Sub-segment Total: $5,840** (Per Day: $5,840.00)
+    - **TOTAL FOR ANTARCTICA LEG:** **$60,062.50 (Per Day: $4,620.19)**
+  - **Overall Grand Total Estimated Cost:** **$244,332.50 ($81,444 / person)**
+  - √
