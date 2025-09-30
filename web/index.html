@@ -36,11 +36,103 @@
         <button id="export-btn">Export</button>
         <button id="reset-btn">Reset</button>
       </div>
+      <div class="scenario-controls">
+        <div class="scenario-actions">
+          <select id="scenario-selector">
+            <option value="">Select a scenario...</option>
+          </select>
+          <button id="save-scenario-btn" class="primary">Save Scenario</button>
+        </div>
+        <div class="scenario-management">
+          <button id="manage-scenarios-btn">Manage Scenarios</button>
+          <button id="import-scenarios-btn">Import</button>
+          <button id="export-scenarios-btn">Export All</button>
+        </div>
+      </div>
       <div class="destination-list" id="destination-list">
         <!-- Destinations will be populated here -->
       </div>
     </aside>
   </main>
+
+  <!-- Add Destination Modal -->
+  <div id="add-destination-modal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <h3>Add New Destination</h3>
+      <form class="modal-form" id="add-destination-form">
+        <div class="form-group">
+          <label for="location-search">Location</label>
+          <input type="text" id="location-search" class="form-input" placeholder="Search for a place..." autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="duration-input">Duration (days)</label>
+          <input type="number" id="duration-input" class="form-input" value="3" min="1" max="365">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-add-btn">Cancel</button>
+          <button type="submit" class="btn-primary" id="confirm-add-btn">Add Destination</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Save Scenario Modal -->
+  <div id="save-scenario-modal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <h3>Save Scenario</h3>
+      <form class="modal-form" id="save-scenario-form">
+        <div class="form-group">
+          <label for="scenario-name">Scenario Name</label>
+          <input type="text" id="scenario-name" class="form-input" placeholder="e.g., Conservative Plan, Adventure Route..." required>
+        </div>
+        <div class="form-group">
+          <label for="scenario-description">Description (optional)</label>
+          <textarea id="scenario-description" class="form-input" rows="3" placeholder="Brief description of this scenario..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-save-scenario-btn">Cancel</button>
+          <button type="submit" class="btn-primary">Save Scenario</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Manage Scenarios Modal -->
+  <div id="manage-scenarios-modal" class="modal-overlay" style="display: none;">
+    <div class="modal" style="min-width: 500px;">
+      <h3>Manage Scenarios</h3>
+      <div class="scenario-list" id="scenario-list">
+        <!-- Scenarios will be populated here -->
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="close-manage-scenarios-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Scenarios Modal -->
+  <div id="import-scenarios-modal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <h3>Import Scenarios</h3>
+      <div class="modal-form">
+        <div class="form-group">
+          <label for="scenario-file">Select JSON file</label>
+          <input type="file" id="scenario-file" accept=".json" class="form-input">
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="overwrite-scenarios"> 
+            Overwrite existing scenarios
+          </label>
+          <small style="color: #666; font-size: 12px;">If unchecked, scenarios with duplicate names will be renamed</small>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-import-btn">Cancel</button>
+          <button type="button" class="btn-primary" id="confirm-import-btn">Import</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="./config.js"></script>
   <!-- Production fallback for environment variables -->
@@ -50,25 +142,20 @@
       document.write('<script src="./config.production.js"><\/script>');
     }
   </script>
-  <script type="module" src="./app-planning.js"></script>
-  <script async src="https://maps.googleapis.com/maps/api/js?key=" crossorigin="anonymous"></script>
-</body>
-<script>
-  // Inject API key into the Google Maps script src once config is available
-  (function waitForConfig(){
-    if (!window.RTW_CONFIG || !window.RTW_CONFIG.googleMapsApiKey) {
-      return setTimeout(waitForConfig, 50);
-    }
-    const scripts = document.getElementsByTagName('script');
-    for (let i = 0; i < scripts.length; i++) {
-      const s = scripts[i];
-      if (s.src && s.src.includes('maps.googleapis.com/maps/api/js?key=')) {
-        const key = encodeURIComponent(window.RTW_CONFIG.googleMapsApiKey);
-        s.src = `https://maps.googleapis.com/maps/api/js?key=${key}`;
+  <script type="module" src="./app-final.js"></script>
+  <script>
+    // Load Google Maps with API key after config is available
+    (function loadGoogleMaps(){
+      if (!window.RTW_CONFIG || !window.RTW_CONFIG.googleMapsApiKey) {
+        return setTimeout(loadGoogleMaps, 50);
       }
-    }
-  })();
-</script>
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.RTW_CONFIG.googleMapsApiKey)}&libraries=places&loading=async`;
+      script.async = true;
+      document.head.appendChild(script);
+    })();
+  </script>
+</body>
 </html>
 
 
