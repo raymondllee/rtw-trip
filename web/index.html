@@ -18,7 +18,7 @@
           </select>
         </label>
         <label>
-          <input type="checkbox" id="routing-toggle"> Show Routing
+          <input type="checkbox" id="routing-toggle"> Show Transport
         </label>
       </div>
       <span id="summary"></span>
@@ -26,6 +26,7 @@
   </header>
   <main class="main-content">
     <div id="map"></div>
+    <div id="sidebar-resizer" class="sidebar-resizer"></div>
     <aside class="sidebar">
       <div class="sidebar-header">
         <h3>Trip Planning</h3>
@@ -51,6 +52,28 @@
       </div>
       <div class="destination-list" id="destination-list">
         <!-- Destinations will be populated here -->
+      </div>
+
+      <!-- AI Travel Concierge Chat - Integrated in Sidebar -->
+      <div id="chat-resizer" class="chat-resizer"></div>
+      <div class="sidebar-chat">
+        <div class="chat-header-sidebar">
+          <h4>AI Travel Concierge</h4>
+          <button id="toggle-chat-sidebar" class="toggle-chat-btn">▼</button>
+        </div>
+        <div id="chat-container-sidebar" class="chat-container-sidebar">
+          <div id="chat-messages-sidebar" class="chat-messages-sidebar">
+            <div class="chat-message bot">
+              <div class="message-content">
+                Hi! I can help you modify your itinerary. Try asking me to add destinations, change durations, or remove stops.
+              </div>
+            </div>
+          </div>
+          <form id="chat-form-sidebar" class="chat-form-sidebar">
+            <input type="text" id="chat-input-sidebar" placeholder="Ask to modify your trip..." autocomplete="off" required>
+            <button type="submit" id="chat-send-btn-sidebar">→</button>
+          </form>
+        </div>
       </div>
     </aside>
   </main>
@@ -121,7 +144,7 @@
         </div>
         <div class="form-group">
           <label>
-            <input type="checkbox" id="overwrite-scenarios"> 
+            <input type="checkbox" id="overwrite-scenarios">
             Overwrite existing scenarios
           </label>
           <small style="color: #666; font-size: 12px;">If unchecked, scenarios with duplicate names will be renamed</small>
@@ -142,6 +165,8 @@
       document.write('<script src="./config.production.js"><\/script>');
     }
   </script>
+  <script src="./sidebar-resize.js"></script>
+  <script src="./chat.js"></script>
   <script type="module" src="./app-final.js"></script>
   <script>
     // Load Google Maps with API key after config is available
@@ -150,7 +175,7 @@
         return setTimeout(loadGoogleMaps, 50);
       }
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.RTW_CONFIG.googleMapsApiKey)}&libraries=places&loading=async`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.RTW_CONFIG.googleMapsApiKey)}&libraries=places,geometry&loading=async`;
       script.async = true;
       document.head.appendChild(script);
     })();

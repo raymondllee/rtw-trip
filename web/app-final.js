@@ -217,10 +217,160 @@ function getActivityColor(activityType) {
   return colors[activityType] || '#7f8c8d';
 }
 
+function getTransportationIcon(transportMode) {
+  const icons = {
+    'plane': '✈️',
+    'train': '🚂', 
+    'car': '🚗',
+    'bus': '🚌',
+    'ferry': '🚢',
+    'walking': '🚶'
+  };
+  return icons[transportMode] || '✈️'; // Default to plane for international travel
+}
+
+// Known flight costs from the itinerary (per person)
+const knownFlightCosts = {
+  'SFO-DPS': 1500,
+  'DPS-SOQ': 400,
+  'SOQ-ROR': 700,
+  'ROR-MNL': 400,
+  'MNL-SIN': 200,
+  'SIN-KUL': 100,
+  'KUL-BKI': 200,
+  'BKI-KUL': 200,
+  'KUL-TPE': 250,
+  'TPE-NRT': 300,
+  'NRT-ICN': 200,
+  'ICN-PEK': 250,
+  'PEK-KTM': 300,
+  'KTM-PBH': 400,
+  'KTM-CPH': 600,
+  'CPH-ARN': 100,
+  'ARN-TOS': 250,
+  'TOS-KEF': 300,
+  'KEF-AMS': 400,
+  'AMS-JRO': 700,
+  'JRO-KGL': 300,
+  'KGL-GIG': 1000,
+  'GIG-MAO': 200,
+  'MAO-UIO': 300,
+  'UIO-GPS': 400,
+  'GPS-EZE': 600,
+  'EZE-SFO': 1800
+};
+
+function getTransportationCost(fromLocation, toLocation, transportMode, distance) {
+  // Check for known flight costs first
+  const fromCode = getAirportCode(fromLocation);
+  const toCode = getAirportCode(toLocation);
+  const routeKey = `${fromCode}-${toCode}`;
+  
+  if (knownFlightCosts[routeKey]) {
+    return knownFlightCosts[routeKey] * 3; // Times 3 for 3 people
+  }
+  
+  // Estimate based on transport mode and distance
+  const distanceKm = distance / 1000;
+  let costPerPerson = 0;
+  
+  switch (transportMode) {
+    case 'plane':
+      if (distanceKm > 8000) costPerPerson = 1200; // Long haul international
+      else if (distanceKm > 3000) costPerPerson = 600; // Medium haul
+      else if (distanceKm > 1000) costPerPerson = 300; // Regional
+      else costPerPerson = 150; // Domestic short
+      break;
+    case 'train':
+      costPerPerson = Math.max(50, distanceKm * 0.15); // ~$0.15 per km
+      break;
+    case 'bus':
+      costPerPerson = Math.max(20, distanceKm * 0.08); // ~$0.08 per km
+      break;
+    case 'car':
+      costPerPerson = Math.max(30, distanceKm * 0.12); // ~$0.12 per km (rental + gas)
+      break;
+    case 'ferry':
+      costPerPerson = Math.max(25, distanceKm * 0.20); // ~$0.20 per km
+      break;
+    case 'walking':
+      costPerPerson = 0;
+      break;
+    default:
+      costPerPerson = 100; // Default estimate
+  }
+  
+  return Math.round(costPerPerson * 3); // Times 3 for 3 people
+}
+
+function getAirportCode(location) {
+  // Map cities to airport codes based on the itinerary
+  const airportCodes = {
+    'San Francisco': 'SFO',
+    'Denpasar': 'DPS',
+    'Bali': 'DPS',
+    'Sorong': 'SOQ',
+    'Raja Ampat': 'SOQ',
+    'Koror': 'ROR',
+    'Palau': 'ROR',
+    'Manila': 'MNL',
+    'Singapore': 'SIN',
+    'Kuala Lumpur': 'KUL',
+    'Kota Kinabalu': 'BKI',
+    'Taipei': 'TPE',
+    'Tokyo': 'NRT',
+    'Seoul': 'ICN',
+    'Beijing': 'PEK',
+    'Kathmandu': 'KTM',
+    'Paro': 'PBH',
+    'Copenhagen': 'CPH',
+    'Stockholm': 'ARN',
+    'Tromsø': 'TOS',
+    'Reykjavik': 'KEF',
+    'Amsterdam': 'AMS',
+    'Kilimanjaro': 'JRO',
+    'Kigali': 'KGL',
+    'Rio de Janeiro': 'GIG',
+    'Manaus': 'MAO',
+    'Quito': 'UIO',
+    'Galápagos': 'GPS',
+    'Buenos Aires': 'EZE'
+  };
+  
+  return airportCodes[location.city] || airportCodes[location.name] || 'XXX';
+}
+
+function getTransportationMode(fromLocation, toLocation, index) {
+  // Logic to determine transport mode based on distance and location types
+  const distance = google.maps.geometry.spherical.computeDistanceBetween(
+    new google.maps.LatLng(fromLocation.coordinates.lat, fromLocation.coordinates.lng),
+    new google.maps.LatLng(toLocation.coordinates.lat, toLocation.coordinates.lng)
+  );
+  
+  // If locations have explicit transport mode, use it
+  if (toLocation.transport_from_previous) {
+    return toLocation.transport_from_previous;
+  }
+  
+  // Auto-detect based on distance and geography
+  if (distance > 1000000) { // >1000km = likely flight
+    return 'plane';
+  } else if (distance > 500000) { // 500-1000km = could be train/bus/plane
+    return fromLocation.country === toLocation.country ? 'train' : 'plane';
+  } else if (distance > 100000) { // 100-500km = likely train/bus
+    return 'train';
+  } else if (distance > 20000) { // 20-100km = likely car/bus
+    return 'car';
+  } else {
+    return 'walking';
+  }
+}
+
 function addMarkersAndPath(map, locations, showRouting = false) {
   const info = new google.maps.InfoWindow();
   const markers = [];
   const pathCoords = [];
+  const coordIndex = [];
   let activeMarker = null;
   let routingElements = [];
 
@@ -228,7 +378,8 @@ function addMarkersAndPath(map, locations, showRouting = false) {
     const ll = toLatLng(loc);
     if (!ll) return;
     pathCoords.push(ll);
-    
+    coordIndex.push(idx);
+
     const marker = new google.maps.Marker({
       position: ll,
       map,
@@ -258,68 +409,91 @@ function addMarkersAndPath(map, locations, showRouting = false) {
     markers.push(marker);
   });
 
-  // Add routing path
+  // Add path with transportation icons
   if (pathCoords.length >= 2) {
     if (showRouting) {
-      const directionsService = new google.maps.DirectionsService();
-      const directionsRenderer = new google.maps.DirectionsRenderer({
-        suppressMarkers: true,
-        polylineOptions: {
-          strokeColor: '#1e88e5',
-          strokeOpacity: 0.7,
-          strokeWeight: 3
-        }
-      });
-      directionsRenderer.setMap(map);
-      routingElements.push(directionsRenderer);
-      
-      if (pathCoords.length <= 10) {
-        const waypoints = pathCoords.slice(1, -1).map(coord => ({
-          location: coord,
-          stopover: false
-        }));
+      // Show path with transportation mode icons
+      for (let i = 0; i < pathCoords.length - 1; i++) {
+        const fromLocation = locations[coordIndex[i]];
+        const toLocation = locations[coordIndex[i + 1]];
         
-        directionsService.route({
-          origin: pathCoords[0],
-          destination: pathCoords[pathCoords.length - 1],
-          waypoints: waypoints,
-          travelMode: google.maps.TravelMode.TRANSIT,
-          optimizeWaypoints: false
-        }, (result, status) => {
-          if (status === 'OK') {
-            directionsRenderer.setDirections(result);
-          } else {
-            directionsRenderer.setMap(null);
-            const polyline = new google.maps.Polyline({
-              path: pathCoords,
-              geodesic: true,
-              strokeColor: '#1e88e5',
-              strokeOpacity: 0.7,
-              strokeWeight: 3
-            });
-            polyline.setMap(map);
-            routingElements.push(polyline);
-          }
-        });
-      } else {
-        directionsRenderer.setMap(null);
+        // Create polyline segment
         const polyline = new google.maps.Polyline({
-          path: pathCoords,
+          path: [pathCoords[i], pathCoords[i + 1]],
           geodesic: true,
           strokeColor: '#1e88e5',
-          strokeOpacity: 0.7,
-          strokeWeight: 3
+          strokeOpacity: 0.8,
+          strokeWeight: 2
         });
         polyline.setMap(map);
         routingElements.push(polyline);
+        
+        // Add transportation icon at midpoint with cost information
+        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+          pathCoords[i], 
+          pathCoords[i + 1]
+        );
+        const transportMode = getTransportationMode(fromLocation, toLocation, i);
+        const cost = getTransportationCost(fromLocation, toLocation, transportMode, distance);
+        const costText = cost > 0 ? `$${cost.toLocaleString()}` : 'Free';
+        
+        const midpoint = google.maps.geometry.spherical.interpolate(
+          pathCoords[i], 
+          pathCoords[i + 1], 
+          0.5
+        );
+        
+        const transportMarker = new google.maps.Marker({
+          position: midpoint,
+          map: map,
+          icon: {
+            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+              <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="16" cy="16" r="14" fill="white" stroke="#1e88e5" stroke-width="2"/>
+                <text x="16" y="14" text-anchor="middle" font-size="12">${getTransportationIcon(transportMode)}</text>
+                <text x="16" y="26" text-anchor="middle" font-size="8" fill="#1e88e5" font-weight="bold">${costText}</text>
+              </svg>
+            `)}`,
+            scaledSize: new google.maps.Size(32, 32),
+            anchor: new google.maps.Point(16, 16)
+          },
+          title: `${fromLocation.name} → ${toLocation.name}\nTravel by ${transportMode}\nCost: ${costText} (3 people)\nDistance: ${Math.round(distance/1000)}km`,
+          zIndex: 1000
+        });
+        
+        // Add click handler to show detailed cost breakdown
+        transportMarker.addListener('click', () => {
+          const fromCode = getAirportCode(fromLocation);
+          const toCode = getAirportCode(toLocation);
+          const routeKey = `${fromCode}-${toCode}`;
+          const isKnownCost = knownFlightCosts[routeKey];
+          
+          const infoContent = `
+            <div style="max-width: 250px;">
+              <h4 style="margin: 0 0 8px 0;">${getTransportationIcon(transportMode)} ${fromLocation.name} → ${toLocation.name}</h4>
+              <p style="margin: 4px 0;"><strong>Transport:</strong> ${transportMode.charAt(0).toUpperCase() + transportMode.slice(1)}</p>
+              <p style="margin: 4px 0;"><strong>Distance:</strong> ${Math.round(distance/1000)}km</p>
+              <p style="margin: 4px 0;"><strong>Total Cost:</strong> ${costText} (3 people)</p>
+              <p style="margin: 4px 0;"><strong>Per Person:</strong> $${Math.round(cost/3).toLocaleString()}</p>
+              ${isKnownCost ? '<p style="margin: 4px 0; font-size: 12px; color: #1e88e5;">✓ From original itinerary</p>' : '<p style="margin: 4px 0; font-size: 12px; color: #888;">~ Estimated cost</p>'}
+            </div>
+          `;
+          
+          info.setContent(infoContent);
+          info.setPosition(midpoint);
+          info.open(map);
+        });
+        
+        routingElements.push(transportMarker);
       }
     } else {
+      // Simple path without transportation icons
       const polyline = new google.maps.Polyline({
         path: pathCoords,
         geodesic: true,
         strokeColor: '#1e88e5',
         strokeOpacity: 0.7,
-        strokeWeight: 3
+        strokeWeight: 2
       });
       polyline.setMap(map);
       routingElements.push(polyline);
@@ -388,6 +562,7 @@ function addMarkersAndPath(map, locations, showRouting = false) {
 async function initMapApp() {
   const originalData = await loadData();
   let workingData = JSON.parse(JSON.stringify(originalData));
+  let currentScenarioName = null; // Track the currently loaded scenario
   const scenarioManager = new ScenarioManager();
   const tripTitle = document.getElementById('trip-title');
   
@@ -437,24 +612,84 @@ async function initMapApp() {
       scenarioManager.autosave(workingData);
     }, 2000); // Auto-save after 2 seconds of inactivity
   }
-  
+
+  function recalculateTripMetadata() {
+    const locations = workingData.locations || [];
+    if (!locations.length) return;
+
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const toDate = (value) => (value ? new Date(value + 'T00:00:00Z') : null);
+
+    const first = locations[0];
+    const last = locations[locations.length - 1];
+
+    const firstDate = toDate(first.arrival_date) || toDate(first.departure_date);
+    const lastDate = toDate(last.departure_date) || toDate(last.arrival_date);
+
+    if (firstDate) {
+      workingData.trip = workingData.trip || {};
+      workingData.trip.start_date = formatDate(firstDate);
+    }
+    if (lastDate) {
+      workingData.trip = workingData.trip || {};
+      workingData.trip.end_date = formatDate(lastDate);
+      if (firstDate) {
+        const span = Math.max(1, Math.round((lastDate - firstDate) / msPerDay) + 1);
+        workingData.trip.total_days = span;
+      }
+    }
+
+    if (Array.isArray(workingData.legs)) {
+      workingData.legs.forEach((leg) => {
+        const legRegions = leg.regions || [];
+        const legLocations = locations.filter((loc) => legRegions.includes(loc.region));
+
+        if (!legLocations.length) {
+          return;
+        }
+
+        const legFirst = legLocations[0];
+        const legLast = legLocations[legLocations.length - 1];
+
+        const legStart = toDate(legFirst.arrival_date) || toDate(legFirst.departure_date);
+        const legEnd = toDate(legLast.departure_date) || toDate(legLast.arrival_date);
+
+        if (legStart) leg.start_date = formatDate(legStart);
+        if (legEnd) {
+          leg.end_date = formatDate(legEnd);
+          if (legStart) {
+            const durationDays = Math.max(
+              1,
+              Math.round((legEnd - legStart) / msPerDay) + 1
+            );
+            leg.duration_days = durationDays;
+          }
+        }
+      });
+    }
+  }
+
   function recalculateDates(locations, startDate) {
     if (!startDate) startDate = workingData.trip?.start_date || '2026-06-12';
-    
+
     let currentDate = new Date(startDate + 'T00:00:00Z');
-    
+
     locations.forEach((loc, idx) => {
       if (idx === 0) {
         loc.arrival_date = formatDate(currentDate);
         loc.departure_date = formatDate(addDays(currentDate, (loc.duration_days || 1) - 1));
       } else {
-        currentDate = addDays(new Date(locations[idx - 1].departure_date + 'T00:00:00Z'), 1);
+        const previousDeparture = locations[idx - 1].departure_date;
+        if (previousDeparture) {
+          currentDate = addDays(new Date(previousDeparture + 'T00:00:00Z'), 1);
+        }
         loc.arrival_date = formatDate(currentDate);
         loc.departure_date = formatDate(addDays(currentDate, (loc.duration_days || 1) - 1));
       }
       currentDate = new Date(loc.departure_date + 'T00:00:00Z');
     });
-    
+
+    recalculateTripMetadata();
     triggerAutosave();
   }
   
@@ -557,6 +792,7 @@ async function initMapApp() {
               <textarea class="editable-notes" placeholder="Add notes..." data-location-id="${loc.id}">${notes}</textarea>
             </div>
           </div>
+          <button class="delete-destination-btn" data-index="${idx}" title="Delete destination">×</button>
         </div>
       `);
       
@@ -575,12 +811,22 @@ async function initMapApp() {
       item.addEventListener('click', (e) => {
         if (e.target.classList.contains('editable-duration') || 
             e.target.classList.contains('editable-notes') || 
-            e.target.classList.contains('drag-handle')) return;
+            e.target.classList.contains('drag-handle') ||
+            e.target.classList.contains('delete-destination-btn')) return;
         if (highlightLocationFn) {
           const marker = currentMarkers[idx];
           const location = locations[idx];
           highlightLocationFn(idx, marker, location);
         }
+      });
+    });
+
+    // Add click handlers for delete buttons
+    destinationList.querySelectorAll('.delete-destination-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const index = parseInt(e.target.dataset.index);
+        deleteDestination(index);
       });
     });
     
@@ -833,11 +1079,61 @@ async function initMapApp() {
     render(legFilter.value, routingToggle.checked);
     closeAddDestinationModal();
   }
+
+  function deleteDestination(index) {
+    // Don't allow deletion if only one destination remains
+    if (workingData.locations.length <= 1) {
+      alert('Cannot delete the last destination. Your trip must have at least one destination.');
+      return;
+    }
+
+    const location = workingData.locations[index];
+    const confirmMessage = `Are you sure you want to delete "${location.name}"?\n\nThis action cannot be undone.`;
+    
+    if (confirm(confirmMessage)) {
+      // Remove the destination
+      workingData.locations.splice(index, 1);
+      
+      // Recalculate dates for all remaining destinations
+      recalculateDates(workingData.locations);
+      
+      // Re-render the map and sidebar
+      render(legFilter.value, routingToggle.checked);
+    }
+  }
+
+  function updateSaveButton() {
+    const saveBtn = document.getElementById('save-scenario-btn');
+    if (currentScenarioName) {
+      saveBtn.textContent = `Update "${currentScenarioName}"`;
+      saveBtn.title = `Update the current scenario: ${currentScenarioName}`;
+    } else {
+      saveBtn.textContent = 'Save Scenario';
+      saveBtn.title = 'Save current trip as a new scenario';
+    }
+  }
   
   // Scenario management functions
   function openSaveScenarioModal() {
-    document.getElementById('save-scenario-modal').style.display = 'flex';
-    document.getElementById('scenario-name').focus();
+    const modal = document.getElementById('save-scenario-modal');
+    const nameInput = document.getElementById('scenario-name');
+    const descriptionInput = document.getElementById('scenario-description');
+    
+    // If we're updating an existing scenario, pre-populate the form
+    if (currentScenarioName) {
+      const scenario = scenarioManager.loadScenario(currentScenarioName);
+      if (scenario) {
+        nameInput.value = scenario.name;
+        descriptionInput.value = scenario.description || '';
+      }
+    } else {
+      // Clear the form for new scenarios
+      nameInput.value = '';
+      descriptionInput.value = '';
+    }
+    
+    modal.style.display = 'flex';
+    nameInput.focus();
   }
   
   function closeSaveScenarioModal() {
@@ -890,9 +1186,12 @@ async function initMapApp() {
     const scenario = scenarioManager.loadScenario(name);
     if (scenario) {
       workingData = JSON.parse(JSON.stringify(scenario.data));
+      currentScenarioName = name;
       render(legFilter.value, routingToggle.checked);
+      updateChatContext(legFilter.value);
       closeManageScenariosModal();
       document.getElementById('scenario-selector').value = name;
+      updateSaveButton(); // Update the save button text
     }
   };
   
@@ -934,7 +1233,10 @@ async function initMapApp() {
   document.getElementById('reset-btn').addEventListener('click', () => {
     if (confirm('Reset all changes to original itinerary?')) {
       workingData = JSON.parse(JSON.stringify(originalData));
+      currentScenarioName = null;
+      document.getElementById('scenario-selector').value = '';
       render(legFilter.value, routingToggle.checked);
+      updateSaveButton(); // Update the save button text
     }
   });
   
@@ -970,8 +1272,13 @@ async function initMapApp() {
       const scenario = scenarioManager.loadScenario(e.target.value);
       if (scenario) {
         workingData = JSON.parse(JSON.stringify(scenario.data));
+        currentScenarioName = e.target.value;
         render(legFilter.value, routingToggle.checked);
+        updateSaveButton(); // Update the save button text
       }
+    } else {
+      currentScenarioName = null;
+      updateSaveButton(); // Update the save button text
     }
   });
   
@@ -1016,11 +1323,27 @@ async function initMapApp() {
       return;
     }
     
+    // Check if we're updating an existing scenario
+    const isUpdate = currentScenarioName && name === currentScenarioName;
+    
+    // If the name already exists and it's not the current scenario, ask for confirmation
+    if (!isUpdate && scenarioManager.loadScenario(name)) {
+      if (!confirm(`A scenario named "${name}" already exists. Do you want to overwrite it?`)) {
+        return;
+      }
+    }
+    
     const success = scenarioManager.saveScenario(name, description, workingData);
     if (success) {
+      currentScenarioName = name; // Update current scenario name
       closeSaveScenarioModal();
       updateScenarioSelector();
+      updateSaveButton(); // Update the save button text
       document.getElementById('scenario-selector').value = name;
+      
+      if (isUpdate) {
+        alert(`Scenario "${name}" has been updated successfully.`);
+      }
     } else {
       alert('Failed to save scenario. Please try again.');
     }
@@ -1082,7 +1405,174 @@ async function initMapApp() {
     }
   });
   
-  render('all');
+  // Initialize the save button text
+  updateSaveButton();
+
+  // Handler for when the agent modifies the itinerary
+  function ensureLocationDefaults(destination) {
+    const clone = JSON.parse(JSON.stringify(destination || {}));
+    if (!clone.id) {
+      clone.id = generateNewLocationId();
+    }
+
+    if (!clone.coordinates || typeof clone.coordinates.lat !== 'number' || typeof clone.coordinates.lng !== 'number') {
+      clone.coordinates = {
+        lat: Number(clone.coordinates?.lat) || 0,
+        lng: Number(clone.coordinates?.lng) || 0,
+      };
+    }
+
+    if (!Array.isArray(clone.highlights)) {
+      clone.highlights = [];
+    }
+
+    if (clone.notes == null) {
+      clone.notes = '';
+    }
+
+    if (!clone.region) {
+      const match = (workingData.locations || []).find(loc => loc.country && loc.country === clone.country && loc.region);
+      clone.region = match?.region || 'Custom';
+    }
+
+    if (!clone.activity_type) {
+      clone.activity_type = 'custom exploration';
+    }
+
+    return clone;
+  }
+
+  function handleItineraryChanges(changes) {
+    console.log('🔧 handleItineraryChanges called with:', changes);
+    console.log('📍 Current workingData.locations count:', workingData.locations?.length || 0);
+
+    changes.forEach(change => {
+      console.log(`🎯 Processing change type: ${change.type}`, change);
+      switch (change.type) {
+        case 'add':
+          addDestinationToItinerary(change.destination, change.insert_after);
+          break;
+        case 'remove':
+          removeDestinationFromItinerary(change.destination_name);
+          break;
+        case 'update_duration':
+          updateDestinationDuration(change.destination_name, change.new_duration_days);
+          break;
+        case 'update':
+          updateDestinationDetails(change.destination_name, change.updates);
+          break;
+        default:
+          console.warn('⚠️ Unknown change type:', change.type);
+          break;
+      }
+    });
+
+    console.log('📍 After changes, workingData.locations count:', workingData.locations?.length || 0);
+    console.log('🔄 Recalculating dates and re-rendering...');
+    recalculateDates(workingData.locations);
+    render(legFilter.value, routingToggle.checked);
+    updateChatContext(legFilter.value);
+    console.log('✅ Re-render complete');
+  }
+
+  function addDestinationToItinerary(destination, insertAfter) {
+    const locations = workingData.locations || [];
+    console.log('➕ addDestinationToItinerary - Before:', {
+      destinationRaw: destination,
+      insertAfter,
+      currentCount: locations.length
+    });
+
+    const hydratedDestination = ensureLocationDefaults(destination);
+    console.log('💧 Hydrated destination:', hydratedDestination);
+
+    // Find insert position
+    let insertIndex = locations.length;
+    if (insertAfter) {
+      const afterIndex = locations.findIndex(loc =>
+        loc.name === insertAfter || loc.city === insertAfter
+      );
+      if (afterIndex !== -1) {
+        insertIndex = afterIndex + 1;
+      }
+      console.log(`🔍 Insert after "${insertAfter}" -> index ${insertIndex}`);
+    }
+
+    locations.splice(insertIndex, 0, hydratedDestination);
+    console.log(`✅ Added ${hydratedDestination.name} at position ${insertIndex}, new count: ${locations.length}`);
+  }
+
+  function removeDestinationFromItinerary(destinationName) {
+    const locations = workingData.locations || [];
+    const index = locations.findIndex(loc =>
+      loc.name === destinationName || loc.city === destinationName
+    );
+
+    if (index !== -1) {
+      locations.splice(index, 1);
+      console.log(`Removed ${destinationName}`);
+    }
+  }
+
+  function updateDestinationDuration(destinationName, newDuration) {
+    const locations = workingData.locations || [];
+    const location = locations.find(loc =>
+      loc.name === destinationName || loc.city === destinationName
+    );
+
+    if (location) {
+      location.duration_days = newDuration;
+      console.log(`Updated ${destinationName} duration to ${newDuration} days`);
+    }
+  }
+
+  function updateDestinationDetails(destinationName, updates) {
+    const locations = workingData.locations || [];
+    const location = locations.find(loc =>
+      loc.name === destinationName || loc.city === destinationName
+    );
+
+    if (location) {
+      Object.assign(location, updates);
+      console.log(`Updated ${destinationName}:`, updates);
+    }
+  }
+
+  // Initialize AI Travel Concierge Chat
+  let chatInstance = null;
+  if (window.TravelConciergeChat) {
+    chatInstance = new window.TravelConciergeChat(handleItineraryChanges);
+  }
+
+  // Function to update chat context
+  function updateChatContext(legName) {
+    if (!chatInstance) return;
+
+    const legData = workingData.legs?.find(l => l.name === legName);
+    const filtered = filterByLeg(workingData, legName);
+
+    console.log(`Updating chat context for leg: ${legName}, destinations: ${filtered.length}`);
+
+    // Pass full location objects instead of just names
+    chatInstance.updateContext(
+      legName,
+      filtered, // Pass the full location objects
+      legData?.start_date,
+      legData?.end_date
+    );
+  }
+
+  // Update chat context when leg filter changes
+  legFilter.addEventListener('change', function(e) {
+    updateChatContext(e.target.value);
+  });
+
+  // Initialize chat context with 'all' on load
+  render('all', routingToggle.checked);
+  if (chatInstance) {
+    // Give it a moment for render to complete
+    setTimeout(() => updateChatContext('all'), 100);
+  }
 }
 
 window.addEventListener('load', () => {
