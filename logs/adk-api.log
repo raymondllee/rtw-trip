@@ -1,0 +1,177 @@
+/Users/ray/Documents/GitHub/rtw-trip/python/agents/travel-concierge/.venv/lib/python3.13/site-packages/google/adk/cli/fast_api.py:177: UserWarning: [EXPERIMENTAL] InMemoryCredentialService: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  credential_service = InMemoryCredentialService()
+/Users/ray/Documents/GitHub/rtw-trip/python/agents/travel-concierge/.venv/lib/python3.13/site-packages/google/adk/auth/credential_service/in_memory_credential_service.py:33: UserWarning: [EXPERIMENTAL] BaseCredentialService: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  super().__init__()
+INFO:     Started server process [27146]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:59813 - "GET /docs HTTP/1.1" 200 OK
+2025-10-02 10:32:18,791 - INFO - adk_web_server.py:680 - New session created: session_602b7fd0ebd2
+INFO:     127.0.0.1:59868 - "POST /apps/travel_concierge/users/web_user/sessions/session_602b7fd0ebd2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59869 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 10:32:18,800 - INFO - envs.py:47 - Loaded .env file for travel_concierge at /Users/ray/Documents/GitHub/rtw-trip/python/agents/travel-concierge/.env
+2025-10-02 10:32:18,800 - INFO - envs.py:47 - Loaded .env file for travel_concierge at /Users/ray/Documents/GitHub/rtw-trip/python/agents/travel-concierge/.env
+2025-10-02 10:32:18,815 - INFO - agent_loader.py:126 - Found root_agent in travel_concierge.agent
+/Users/ray/Documents/GitHub/rtw-trip/python/agents/travel-concierge/.venv/lib/python3.13/site-packages/google/adk/cli/adk_web_server.py:450: UserWarning: [EXPERIMENTAL] App: This feature is experimental and may change or be removed in future versions without notice. It may introduce breaking changes at any time.
+  agentic_app = App(
+2025-10-02 10:32:18,852 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:32:18,852 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:32:21,496 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:32:21,506 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:32:21,506 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature', 'function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:32:21,519 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:32:21,519 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:32:23,752 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:32:23,753 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:32:23,754 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature', 'function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:32:23,772 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:32:23,772 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:32:33,278 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:32:33,281 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:32:33,302 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:32:33,302 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:32:36,037 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:32:36,039 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:32:36,039 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:36:20,658 - INFO - adk_web_server.py:680 - New session created: session_1e75913d908b
+
+Loading Initial State: {'state': {'user_profile': {'passport_nationality': 'US Citizen', 'seat_preference': 'window', 'food_preference': 'vegan', 'allergies': [], 'likes': [], 'dislikes': [], 'price_sensitivity': [], 'home': {'event_type': 'home', 'address': '6420 Sequence Dr #400, San Diego, CA 92121, United States', 'local_prefer_mode': 'drive'}}, 'itinerary': {}, 'origin': '', 'destination': '', 'start_date': '', 'end_date': '', 'outbound_flight_selection': '', 'outbound_seat_number': '', 'return_flight_selection': '', 'return_seat_number': '', 'hotel_selection': '', 'room_selection': '', 'poi': '', 'itinerary_datetime': '', 'itinerary_start_date': '', 'itinerary_end_date': ''}}
+
+INFO:     127.0.0.1:61079 - "POST /apps/travel_concierge/users/web_user/sessions/session_1e75913d908b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61080 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 10:36:20,681 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:36:20,681 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:36:25,000 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:36:25,005 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:36:25,005 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature', 'function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:36:25,028 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:36:25,028 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:36:26,736 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:36:26,739 - INFO - google_llm.py:175 - Response received from the model.
+
+Loading Initial State: {'state': {'user_profile': {'passport_nationality': 'US Citizen', 'seat_preference': 'window', 'food_preference': 'vegan', 'allergies': [], 'likes': [], 'dislikes': [], 'price_sensitivity': [], 'home': {'event_type': 'home', 'address': '6420 Sequence Dr #400, San Diego, CA 92121, United States', 'local_prefer_mode': 'drive'}}, 'itinerary': {}, 'origin': '', 'destination': '', 'start_date': '', 'end_date': '', 'outbound_flight_selection': '', 'outbound_seat_number': '', 'return_flight_selection': '', 'return_seat_number': '', 'hotel_selection': '', 'room_selection': '', 'poi': '', 'itinerary_datetime': '', 'itinerary_start_date': '', 'itinerary_end_date': ''}}
+
+[itinerary] No itinerary cached in state. Scanning history…
+[itinerary] DEBUG tool_context type: <class 'google.adk.tools.tool_context.ToolContext'>
+[itinerary] DEBUG tool_context attrs: ['actions', 'agent_name', 'function_call_id', 'get_auth_response', 'invocation_id', 'list_artifacts', 'load_artifact', 'load_credential', 'request_confirmation', 'request_credential', 'save_artifact', 'save_credential', 'search_memory', 'state', 'tool_confirmation', 'user_content']
+[itinerary] DEBUG state: <google.adk.sessions.state.State object at 0x1112cf530>
+[itinerary] DEBUG session: None
+[itinerary] WARNING: No session id found, falling back to default_session
+INFO:     127.0.0.1:61322 - "POST /apps/travel_concierge/users/web_user/sessions/session_1e75913d908b HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:61323 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 10:36:54,342 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:36:54,342 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:37:09,536 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:37:09,539 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:37:09,539 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+
+Loading Initial State: {'state': {'user_profile': {'passport_nationality': 'US Citizen', 'seat_preference': 'window', 'food_preference': 'vegan', 'allergies': [], 'likes': [], 'dislikes': [], 'price_sensitivity': [], 'home': {'event_type': 'home', 'address': '6420 Sequence Dr #400, San Diego, CA 92121, United States', 'local_prefer_mode': 'drive'}}, 'itinerary': {}, 'origin': '', 'destination': '', 'start_date': '', 'end_date': '', 'outbound_flight_selection': '', 'outbound_seat_number': '', 'return_flight_selection': '', 'return_seat_number': '', 'hotel_selection': '', 'room_selection': '', 'poi': '', 'itinerary_datetime': '', 'itinerary_start_date': '', 'itinerary_end_date': ''}}
+
+INFO:     127.0.0.1:61810 - "POST /apps/travel_concierge/users/web_user/sessions/session_1e75913d908b HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:61811 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 10:38:09,194 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:38:09,195 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:38:11,580 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:38:11,583 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:38:11,583 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature', 'function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:38:11,601 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:38:11,601 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:38:13,000 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:38:13,003 - INFO - google_llm.py:175 - Response received from the model.
+
+Loading Initial State: {'state': {'user_profile': {'passport_nationality': 'US Citizen', 'seat_preference': 'window', 'food_preference': 'vegan', 'allergies': [], 'likes': [], 'dislikes': [], 'price_sensitivity': [], 'home': {'event_type': 'home', 'address': '6420 Sequence Dr #400, San Diego, CA 92121, United States', 'local_prefer_mode': 'drive'}}, 'itinerary': {}, 'origin': '', 'destination': '', 'start_date': '', 'end_date': '', 'outbound_flight_selection': '', 'outbound_seat_number': '', 'return_flight_selection': '', 'return_seat_number': '', 'hotel_selection': '', 'room_selection': '', 'poi': '', 'itinerary_datetime': '', 'itinerary_start_date': '', 'itinerary_end_date': ''}}
+
+[itinerary] No itinerary cached in state. Scanning history…
+[itinerary] DEBUG tool_context type: <class 'google.adk.tools.tool_context.ToolContext'>
+[itinerary] DEBUG tool_context attrs: ['actions', 'agent_name', 'function_call_id', 'get_auth_response', 'invocation_id', 'list_artifacts', 'load_artifact', 'load_credential', 'request_confirmation', 'request_credential', 'save_artifact', 'save_credential', 'search_memory', 'state', 'tool_confirmation', 'user_content']
+[itinerary] DEBUG state: <google.adk.sessions.state.State object at 0x1112cf350>
+[itinerary] DEBUG session: None
+[itinerary] WARNING: No session id found, falling back to default_session
+INFO:     127.0.0.1:62298 - "POST /apps/travel_concierge/users/web_user/sessions/session_1e75913d908b HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:62299 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 10:39:21,518 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:39:21,518 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:39:26,197 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:39:26,200 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:39:26,200 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+
+Loading Initial State: {'state': {'user_profile': {'passport_nationality': 'US Citizen', 'seat_preference': 'window', 'food_preference': 'vegan', 'allergies': [], 'likes': [], 'dislikes': [], 'price_sensitivity': [], 'home': {'event_type': 'home', 'address': '6420 Sequence Dr #400, San Diego, CA 92121, United States', 'local_prefer_mode': 'drive'}}, 'itinerary': {}, 'origin': '', 'destination': '', 'start_date': '', 'end_date': '', 'outbound_flight_selection': '', 'outbound_seat_number': '', 'return_flight_selection': '', 'return_seat_number': '', 'hotel_selection': '', 'room_selection': '', 'poi': '', 'itinerary_datetime': '', 'itinerary_start_date': '', 'itinerary_end_date': ''}}
+
+INFO:     127.0.0.1:62538 - "POST /apps/travel_concierge/users/web_user/sessions/session_1e75913d908b HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:62539 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 10:39:56,297 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:39:56,297 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:40:03,227 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:40:03,228 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:40:03,228 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+
+Loading Initial State: {'state': {'user_profile': {'passport_nationality': 'US Citizen', 'seat_preference': 'window', 'food_preference': 'vegan', 'allergies': [], 'likes': [], 'dislikes': [], 'price_sensitivity': [], 'home': {'event_type': 'home', 'address': '6420 Sequence Dr #400, San Diego, CA 92121, United States', 'local_prefer_mode': 'drive'}}, 'itinerary': {}, 'origin': '', 'destination': '', 'start_date': '', 'end_date': '', 'outbound_flight_selection': '', 'outbound_seat_number': '', 'return_flight_selection': '', 'return_seat_number': '', 'hotel_selection': '', 'room_selection': '', 'poi': '', 'itinerary_datetime': '', 'itinerary_start_date': '', 'itinerary_end_date': ''}}
+
+INFO:     127.0.0.1:63716 - "POST /apps/travel_concierge/users/web_user/sessions/session_1e75913d908b HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:63717 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 10:42:50,662 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:42:50,662 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:42:59,265 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:42:59,268 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:42:59,268 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature', 'function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:42:59,290 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:42:59,291 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:43:01,118 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:43:01,121 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:43:01,121 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:43:01,937 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:43:01,938 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:43:03,867 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:43:03,871 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:43:03,872 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:43:04,463 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:43:04,463 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:43:05,984 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:43:05,989 - INFO - google_llm.py:175 - Response received from the model.
+
+Loading Initial State: {'state': {'user_profile': {'passport_nationality': 'US Citizen', 'seat_preference': 'window', 'food_preference': 'vegan', 'allergies': [], 'likes': [], 'dislikes': [], 'price_sensitivity': [], 'home': {'event_type': 'home', 'address': '6420 Sequence Dr #400, San Diego, CA 92121, United States', 'local_prefer_mode': 'drive'}}, 'itinerary': {}, 'origin': '', 'destination': '', 'start_date': '', 'end_date': '', 'outbound_flight_selection': '', 'outbound_seat_number': '', 'return_flight_selection': '', 'return_seat_number': '', 'hotel_selection': '', 'room_selection': '', 'poi': '', 'itinerary_datetime': '', 'itinerary_start_date': '', 'itinerary_end_date': ''}}
+
+[itinerary] No itinerary cached in state. Scanning history…
+[itinerary] DEBUG tool_context type: <class 'google.adk.tools.tool_context.ToolContext'>
+[itinerary] DEBUG tool_context attrs: ['actions', 'agent_name', 'function_call_id', 'get_auth_response', 'invocation_id', 'list_artifacts', 'load_artifact', 'load_credential', 'request_confirmation', 'request_credential', 'save_artifact', 'save_credential', 'search_memory', 'state', 'tool_confirmation', 'user_content']
+[itinerary] DEBUG state: <google.adk.sessions.state.State object at 0x1112cfdd0>
+[itinerary] DEBUG session: None
+[itinerary] WARNING: No session id found, falling back to default_session
+[itinerary] No itinerary cached in state. Scanning history…
+[geocode] Geocoding new destination: El Nido, Palawan, El Nido, Philippines
+[geocode] ✅ Geocoded 'El Nido, Palawan, El Nido, Philippines' via Google Places: 11.1989164, 119.4231658
+[itinerary] DEBUG tool_context type: <class 'google.adk.tools.tool_context.ToolContext'>
+[itinerary] DEBUG tool_context attrs: ['actions', 'agent_name', 'function_call_id', 'get_auth_response', 'invocation_id', 'list_artifacts', 'load_artifact', 'load_credential', 'request_confirmation', 'request_credential', 'save_artifact', 'save_credential', 'search_memory', 'state', 'tool_confirmation', 'user_content']
+[itinerary] DEBUG state: <google.adk.sessions.state.State object at 0x11136c770>
+[itinerary] DEBUG session: None
+[itinerary] WARNING: No session id found, falling back to default_session
+[itinerary] No itinerary cached in state. Scanning history…
+[geocode] Geocoding new destination: Coron, Palawan, Coron, Philippines
+[geocode] ✅ Geocoded 'Coron, Palawan, Coron, Philippines' via Google Places: 11.9283293, 120.2397336
+[itinerary] DEBUG tool_context type: <class 'google.adk.tools.tool_context.ToolContext'>
+[itinerary] DEBUG tool_context attrs: ['actions', 'agent_name', 'function_call_id', 'get_auth_response', 'invocation_id', 'list_artifacts', 'load_artifact', 'load_credential', 'request_confirmation', 'request_credential', 'save_artifact', 'save_credential', 'search_memory', 'state', 'tool_confirmation', 'user_content']
+[itinerary] DEBUG state: <google.adk.sessions.state.State object at 0x11136d970>
+[itinerary] DEBUG session: None
+[itinerary] WARNING: No session id found, falling back to default_session
+INFO:     127.0.0.1:64116 - "POST /apps/travel_concierge/users/web_user/sessions/session_1e75913d908b HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:64117 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 10:43:49,787 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:43:49,788 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:43:54,059 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:43:54,061 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:43:54,061 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature', 'function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:43:54,081 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:43:54,081 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:43:55,995 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:43:55,999 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:43:55,999 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:43:56,029 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:43:56,030 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:43:58,376 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:43:58,378 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 10:43:58,378 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 10:43:58,395 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 10:43:58,396 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 10:44:00,184 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 10:44:00,185 - INFO - google_llm.py:175 - Response received from the model.

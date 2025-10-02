@@ -714,6 +714,12 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
+.chat-header-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .chat-header-sidebar h4 {
   margin: 0;
   font-size: 14px;
@@ -732,6 +738,21 @@ input[type="checkbox"] {
 
 .toggle-chat-btn.collapsed {
   transform: rotate(-90deg);
+}
+
+.undock-chat-btn, .dock-chat-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.undock-chat-btn:hover, .dock-chat-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .chat-container-sidebar {
@@ -755,7 +776,6 @@ input[type="checkbox"] {
   gap: 8px;
   background: #f5f5f5;
   min-height: 150px;
-  max-height: 300px;
 }
 
 .chat-message {
@@ -806,15 +826,40 @@ input[type="checkbox"] {
   font-style: italic;
 }
 
+.chat-input-resizer {
+  height: 4px;
+  background: #ddd;
+  cursor: row-resize;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.chat-input-resizer:hover {
+  background: #1e88e5;
+}
+
+.chat-input-resizer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
+  bottom: -2px;
+}
+
 .chat-form-sidebar {
   display: flex;
   gap: 6px;
   padding: 10px 12px;
   background: white;
   border-top: 1px solid #e0e0e0;
+  min-height: 60px;
+  max-height: 200px;
+  flex-shrink: 0;
 }
 
-#chat-input-sidebar {
+#chat-input-sidebar, #floating-chat-input {
   flex: 1;
   padding: 8px 12px;
   border: 1px solid #ddd;
@@ -822,13 +867,17 @@ input[type="checkbox"] {
   font-size: 13px;
   outline: none;
   transition: border-color 0.2s;
+  resize: vertical;
+  min-height: 36px;
+  max-height: 180px;
+  font-family: inherit;
 }
 
-#chat-input-sidebar:focus {
+#chat-input-sidebar:focus, #floating-chat-input:focus {
   border-color: #1e88e5;
 }
 
-#chat-send-btn-sidebar {
+#chat-send-btn-sidebar, #floating-send-btn {
   padding: 8px 16px;
   background: #1e88e5;
   color: white;
@@ -839,15 +888,124 @@ input[type="checkbox"] {
   font-weight: 500;
   transition: background 0.2s;
   min-width: 40px;
+  align-self: flex-end;
 }
 
-#chat-send-btn-sidebar:hover {
+#chat-send-btn-sidebar:hover, #floating-send-btn:hover {
   background: #1976d2;
 }
 
-#chat-send-btn-sidebar:disabled {
+#chat-send-btn-sidebar:disabled, #floating-send-btn:disabled {
   background: #ccc;
   cursor: not-allowed;
+}
+
+/* Floating Chat Window */
+.floating-chat {
+  position: fixed;
+  top: 20%;
+  right: 50px;
+  width: 400px;
+  height: 500px;
+  min-width: 300px;
+  min-height: 300px;
+  max-width: 800px;
+  max-height: 80vh;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.floating-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #1e88e5;
+  color: white;
+  cursor: move;
+  user-select: none;
+}
+
+.floating-chat-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Resize Handles */
+.resize-handle {
+  position: absolute;
+  background: transparent;
+  z-index: 10;
+}
+
+.resize-handle-n {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.resize-handle-s {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.resize-handle-e {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.resize-handle-w {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.resize-handle-ne {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.resize-handle-nw {
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.resize-handle-se {
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.resize-handle-sw {
+  bottom: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
 }
 
 

@@ -59,7 +59,10 @@
       <div class="sidebar-chat">
         <div class="chat-header-sidebar">
           <h4>AI Travel Concierge</h4>
-          <button id="toggle-chat-sidebar" class="toggle-chat-btn">▼</button>
+          <div class="chat-header-controls">
+            <button id="undock-chat-btn" class="undock-chat-btn" title="Undock chat">⬈</button>
+            <button id="toggle-chat-sidebar" class="toggle-chat-btn">▼</button>
+          </div>
         </div>
         <div id="chat-container-sidebar" class="chat-container-sidebar">
           <div id="chat-messages-sidebar" class="chat-messages-sidebar">
@@ -69,6 +72,7 @@
               </div>
             </div>
           </div>
+          <div id="chat-input-resizer" class="chat-input-resizer"></div>
           <form id="chat-form-sidebar" class="chat-form-sidebar">
             <input type="text" id="chat-input-sidebar" placeholder="Ask to modify your trip..." autocomplete="off" required>
             <button type="submit" id="chat-send-btn-sidebar">→</button>
@@ -155,6 +159,39 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Floating Chat Window (hidden by default) -->
+  <div id="floating-chat" class="floating-chat" style="display: none;">
+    <div class="floating-chat-header">
+      <h4>AI Travel Concierge</h4>
+      <div class="chat-header-controls">
+        <button id="dock-chat-btn" class="dock-chat-btn" title="Dock chat">⬋</button>
+        <button id="toggle-floating-chat" class="toggle-chat-btn">▼</button>
+      </div>
+    </div>
+    <div id="floating-chat-container" class="chat-container-sidebar">
+      <div id="floating-chat-messages" class="chat-messages-sidebar">
+        <div class="chat-message bot">
+          <div class="message-content">
+            Hi! I can help you modify your itinerary. Try asking me to add destinations, change durations, or remove stops.
+          </div>
+        </div>
+      </div>
+      <div id="floating-input-resizer" class="chat-input-resizer"></div>
+      <form id="floating-chat-form" class="chat-form-sidebar">
+        <input type="text" id="floating-chat-input" placeholder="Ask to modify your trip..." autocomplete="off" required>
+        <button type="submit" id="floating-send-btn">→</button>
+      </form>
+    </div>
+    <div class="resize-handle resize-handle-n"></div>
+    <div class="resize-handle resize-handle-s"></div>
+    <div class="resize-handle resize-handle-e"></div>
+    <div class="resize-handle resize-handle-w"></div>
+    <div class="resize-handle resize-handle-ne"></div>
+    <div class="resize-handle resize-handle-nw"></div>
+    <div class="resize-handle resize-handle-se"></div>
+    <div class="resize-handle resize-handle-sw"></div>
   </div>
 
   <script src="./config.js"></script>

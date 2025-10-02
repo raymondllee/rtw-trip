@@ -213,8 +213,54 @@ def _lookup_geocache(name: str, city: Optional[str], country: Optional[str]) -> 
     return None
 
 
-def _geocode_location(name: str, city: Optional[str], country: Optional[str]) -> Optional[Dict[str, float]]:
-    """Best-effort geocode for destinations that are not yet cached."""
+def _geocode_with_google_places(name: str, city: Optional[str], country: Optional[str]) -> Optional[Dict[str, float]]:
+    """Geocode using Google Places API (primary method)."""
+
+    query_parts = [part for part in [name, city, country] if part]
+    if not query_parts:
+        return None
+
+    query = ", ".join(dict.fromkeys(query_parts))
+    places_api_key = os.getenv("GOOGLE_PLACES_API_KEY")
+
+    if not places_api_key:
+        print("[geocode] No Google Places API key found, skipping Places geocoding")
+        return None
+
+    try:
+        places_url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
+        params = {
+            "input": query,
+            "inputtype": "textquery",
+            "fields": "geometry,formatted_address,name",
+            "key": places_api_key,
+        }
+
+        response = requests.get(places_url, params=params, timeout=10)
+        if response.status_code != 200:
+            print(f"[geocode] Google Places API error: {response.status_code}")
+            return None
+
+        data = response.json()
+        if data.get("candidates") and len(data["candidates"]) > 0:
+            candidate = data["candidates"][0]
+            location = candidate.get("geometry", {}).get("location", {})
+            if "lat" in location and "lng" in location:
+                print(f"[geocode] ✅ Geocoded '{query}' via Google Places: {location['lat']}, {location['lng']}")
+                return {
+                    "lat": float(location["lat"]),
+                    "lng": float(location["lng"]),
+                    "source": "google_places",
+                    "formatted_address": candidate.get("formatted_address", ""),
+                }
+    except Exception as exc:
+        print(f"[geocode] Google Places error for '{query}': {exc}")
+
+    return None
+
+
+def _geocode_with_nominatim(name: str, city: Optional[str], country: Optional[str]) -> Optional[Dict[str, float]]:
+    """Geocode using OpenStreetMap Nominatim (fallback method)."""
 
     query_parts = [part for part in [name, city, country] if part]
     if not query_parts:
@@ -233,13 +279,34 @@ def _geocode_location(name: str, city: Optional[str], country: Optional[str]) ->
         payload = response.json()
         if isinstance(payload, list) and payload:
             top = payload[0]
+            print(f"[geocode] ✅ Geocoded '{query}' via Nominatim: {top['lat']}, {top['lon']}")
             return {
                 "lat": float(top["lat"]),
                 "lng": float(top["lon"]),
                 "source": "nominatim",
             }
     except Exception as exc:  # pragma: no cover - network failures are tolerated
-        print(f"[geocode] Unable to geocode '{query}': {exc}")
+        print(f"[geocode] Nominatim error for '{query}': {exc}")
+    return None
+
+
+def _geocode_location(name: str, city: Optional[str], country: Optional[str]) -> Optional[Dict[str, float]]:
+    """Best-effort geocode for destinations that are not yet cached.
+
+    Tries Google Places API first, then falls back to Nominatim.
+    """
+
+    # Try Google Places API first (more accurate and reliable)
+    result = _geocode_with_google_places(name, city, country)
+    if result:
+        return result
+
+    # Fall back to Nominatim
+    result = _geocode_with_nominatim(name, city, country)
+    if result:
+        return result
+
+    print(f"[geocode] ❌ Failed to geocode: {name}, {city}, {country}")
     return None
 
 
@@ -258,6 +325,7 @@ def _build_destination_payload(
     duration_days: int,
     activity_type: Optional[str],
     description: Optional[str],
+    notes: Optional[str] = None,
     itinerary: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Compose a destination dict that mirrors the frontend expectations."""
@@ -265,18 +333,37 @@ def _build_destination_payload(
     reference = _lookup_reference(name, city)
 
     coordinates = None
+    source = None
+
+    # Priority 1: Use reference data from existing itinerary
     if reference and reference.get("coordinates"):
         coordinates = {
             "lat": reference["coordinates"].get("lat"),
             "lng": reference["coordinates"].get("lng"),
             "source": "reference",
         }
+        source = "reference"
+        print(f"[geocode] Using reference coordinates for '{name}': {coordinates['lat']}, {coordinates['lng']}")
+
+    # Priority 2: Check geocache
     if not coordinates:
         coordinates = _lookup_geocache(name, city, country)
+        if coordinates:
+            source = coordinates.get("source", "geocache")
+            print(f"[geocode] Using cached coordinates for '{name}': {coordinates['lat']}, {coordinates['lng']}")
+
+    # Priority 3: Geocode with Google Places or Nominatim
     if not coordinates:
+        print(f"[geocode] Geocoding new destination: {name}, {city}, {country}")
         coordinates = _geocode_location(name, city, country)
+        if coordinates:
+            source = coordinates.get("source", "geocoded")
+
+    # Fallback: Default to 0,0
     if not coordinates:
         coordinates = {"lat": 0.0, "lng": 0.0, "source": "fallback"}
+        source = "fallback"
+        print(f"[geocode] ⚠️ Warning: No coordinates found for '{name}', using fallback (0,0)")
 
     region = reference.get("region") if reference else None
     if not region:
@@ -302,7 +389,7 @@ def _build_destination_payload(
         or (reference.get("description") if reference else None)
         or f"Visit {name}",
         "highlights": list(reference.get("highlights", [])) if reference else [],
-        "notes": reference.get("notes") if reference else "",
+        "notes": notes or (reference.get("notes") if reference else ""),
         "arrival_date": None,
         "departure_date": None,
     }
@@ -383,10 +470,23 @@ def add_destination(
     duration_days: int,
     activity_type: Optional[str] = None,
     description: Optional[str] = None,
+    notes: Optional[str] = None,
     insert_after: Optional[str] = None,
     tool_context: ToolContext = None,
 ):
-    """Add a new destination to the user's itinerary."""
+    """Add a new destination to the user's itinerary.
+
+    Args:
+        name: Name of the destination
+        city: City name
+        country: Country name
+        duration_days: Number of days to stay
+        activity_type: Type of activities (e.g., 'diving', 'cultural', 'trekking')
+        description: Brief description of the destination
+        notes: Additional notes, tips, or important information about the destination
+        insert_after: Name of destination to insert after (optional)
+        tool_context: ADK tool context
+    """
 
     try:
         itinerary = _extract_itinerary(tool_context)
@@ -397,6 +497,7 @@ def add_destination(
             duration_days=duration_days,
             activity_type=activity_type,
             description=description,
+            notes=notes,
             itinerary=itinerary,
         )
 
@@ -517,9 +618,22 @@ def update_destination(
     duration_days: Optional[int] = None,
     activity_type: Optional[str] = None,
     description: Optional[str] = None,
+    notes: Optional[str] = None,
     tool_context: ToolContext = None,
 ):
-    """Patch mutable fields on a destination."""
+    """Patch mutable fields on a destination.
+
+    Args:
+        destination_name: Current name of the destination to update
+        name: New name (optional)
+        city: New city (optional)
+        country: New country (optional)
+        duration_days: New duration in days (optional)
+        activity_type: New activity type (optional)
+        description: New description (optional)
+        notes: New or additional notes (optional)
+        tool_context: ADK tool context
+    """
 
     try:
         itinerary = _extract_itinerary(tool_context)
@@ -538,6 +652,8 @@ def update_destination(
             updates["activity_type"] = activity_type
         if description is not None:
             updates["description"] = description
+        if notes is not None:
+            updates["notes"] = notes
 
         response = requests.post(
             f"{ITINERARY_API_URL}/update",
@@ -566,3 +682,45 @@ def update_destination(
 
     except Exception as exc:
         return {"status": "error", "message": f"Error updating destination: {exc}"}
+
+
+def append_destination_notes(
+    destination_name: str,
+    additional_notes: str,
+    tool_context: ToolContext = None,
+):
+    """Append additional notes to a destination's existing notes.
+
+    This is useful for adding context without overwriting existing information.
+
+    Args:
+        destination_name: Name of the destination
+        additional_notes: Notes to append to existing notes
+        tool_context: ADK tool context
+    """
+
+    try:
+        itinerary = _extract_itinerary(tool_context)
+
+        # Find the destination and get existing notes
+        existing_notes = ""
+        for loc in itinerary.get("locations", []):
+            if loc.get("name") == destination_name or loc.get("city") == destination_name:
+                existing_notes = loc.get("notes", "")
+                break
+
+        # Combine existing and new notes
+        if existing_notes:
+            combined_notes = f"{existing_notes}\n\n{additional_notes}"
+        else:
+            combined_notes = additional_notes
+
+        # Use the update function to save the combined notes
+        return update_destination(
+            destination_name=destination_name,
+            notes=combined_notes,
+            tool_context=tool_context,
+        )
+
+    except Exception as exc:
+        return {"status": "error", "message": f"Error appending notes: {exc}"}

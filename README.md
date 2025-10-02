@@ -1,8 +1,8 @@
 # RTW Trip Planning App
 
-An interactive around-the-world trip planning application with Google Maps visualization, featuring an itinerary for a 6.5-month global expedition across Asia, Europe, Africa, South America, and Antarctica.
+An interactive around-the-world trip planning application with Google Maps visualization and AI-powered travel concierge assistance. Features an itinerary for a 6.5-month global expedition across Asia, Europe, Africa, South America, and Antarctica.
 
-![RTW Trip Map](https://img.shields.io/badge/Status-Live-brightgreen) ![Google Maps](https://img.shields.io/badge/Google%20Maps-API-blue) ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow)
+![RTW Trip Map](https://img.shields.io/badge/Status-Live-brightgreen) ![Google Maps](https://img.shields.io/badge/Google%20Maps-API-blue) ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow) ![AI](https://img.shields.io/badge/AI-Travel%20Concierge-purple)
 
 ## 🌍 Features
 
@@ -13,6 +13,9 @@ An interactive around-the-world trip planning application with Google Maps visua
 - **Leg-based filtering** (Asia, Europe, Africa, South America, Antarctica)
 - **Routing visualization** with Google Directions API
 - **Responsive design** for desktop and mobile
+- **🤖 AI Travel Concierge** - Chat-based travel assistance with specialized agents
+- **📍 Real-time Itinerary Updates** - Modify your trip with AI assistance
+- **🔍 Smart Trip Planning** - Get personalized recommendations and booking help
 
 ## 🚀 Live Demo
 
@@ -30,121 +33,259 @@ Visit the live application: [RTW Trip Map](https://raymondllee.github.io/rtw-tri
 
 ### Prerequisites
 
-- Node.js 18+ 
-- Google Cloud Platform account
-- Google Maps JavaScript API key
-- Google OAuth 2.0 Client ID (optional, for authentication)
+- **Node.js 18+**
+- **Python 3.11+**
+- **Poetry** (Python package manager)
+- **Google Cloud Platform account**
+- **Google Maps JavaScript API key**
+- **Google OAuth 2.0 Client ID** (optional, for authentication)
+- **Google Agent Development Kit (ADK)**
 
-### 1. Clone the Repository
+### Quick Start with Scripts ⚡
+
+**For the full application with AI features:**
 
 ```bash
+# Clone the repository
 git clone https://github.com/raymondllee/rtw-trip.git
 cd rtw-trip
+
+# Start everything with one command
+./start-travel-concierge.sh
 ```
 
-### 2. Install Dependencies
+**To stop all services:**
+```bash
+./stop-travel-concierge.sh
+```
+
+### Manual Setup 🔧
+
+#### 1. Install Frontend Dependencies
 
 ```bash
 npm install
 ```
 
-### 3. Configure API Keys
+#### 2. Set Up AI Travel Concierge
 
-Create `web/config.js` with your Google Cloud credentials:
+```bash
+cd python/agents/travel-concierge
+
+# Install Python dependencies with Poetry
+poetry install
+
+# Activate the virtual environment
+eval $(poetry env activate)
+```
+
+#### 3. Configure API Keys
+
+**Frontend Configuration** - Create `web/config.js`:
 
 ```javascript
 window.RTW_CONFIG = {
   // Your Google Maps JavaScript API key
   googleMapsApiKey: "YOUR_GOOGLE_MAPS_API_KEY_HERE",
-  
+
   // Your Google OAuth 2.0 Client ID (optional)
   googleOAuthClientId: "YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com"
 };
 ```
 
-### 4. Set up Google Cloud APIs
-
-1. **Enable required APIs** in Google Cloud Console:
-   - Maps JavaScript API
-   - Directions API (for routing)
-   - Geocoding API (for location lookup)
-
-2. **Create API key** with restrictions:
-   - Application restrictions: HTTP referrers
-   - Add your domain: `localhost:5173`, `raymondllee.github.io`
-   - API restrictions: Maps JavaScript API, Directions API, Geocoding API
-
-3. **OAuth 2.0 setup** (optional):
-   - Create OAuth 2.0 Client ID
-   - Add authorized origins: `http://localhost:5173`, `https://raymondllee.github.io`
-
-### 5. Run Development Server
+**AI Concierge Configuration** - Copy `python/agents/travel-concierge/.env.example` to `.env`:
 
 ```bash
+# Choose Model Backend: 0 -> ML Dev, 1 -> Vertex
+GOOGLE_GENAI_USE_VERTEXAI=1
+
+# Vertex backend config
+GOOGLE_CLOUD_PROJECT=YOUR_CLOUD_PROJECT_ID
+GOOGLE_CLOUD_LOCATION=us-central1
+
+# Places API
+GOOGLE_PLACES_API_KEY=YOUR_PLACES_API_KEY
+
+# Sample Scenario Path (optional)
+TRAVEL_CONCIERGE_SCENARIO=travel_concierge/profiles/itinerary_empty_default.json
+```
+
+#### 4. Set up Google Cloud APIs
+
+1. **Enable required APIs** in Google Cloud Console:
+   - **For Frontend:** Maps JavaScript API, Directions API, Geocoding API
+   - **For AI Features:** Vertex AI API, Places API
+
+2. **Create API keys** with appropriate restrictions
+
+3. **Authenticate Google Cloud**:
+   ```bash
+   gcloud auth application-default login
+   ```
+
+#### 5. Start the Application
+
+**Option 1: Use the startup script (recommended):**
+```bash
+./start-travel-concierge.sh
+```
+
+**Option 2: Start manually:**
+```bash
+# Terminal 1: Frontend server
 npm run serve
+
+# Terminal 2: Flask API server
+cd python/agents/travel-concierge
+source venv/bin/activate
+python api_server.py
+
+# Terminal 3: ADK AI server
+cd python/agents/travel-concierge
+eval $(poetry env activate)
+adk api_server travel_concierge
 ```
 
 Open http://localhost:5173/web/ in your browser.
+
+### What's Running?
+
+- **Frontend** (Port 5173): Interactive map and UI
+- **Flask API** (Port 5001): Backend API and itinerary management
+- **ADK API** (Port 8000): AI travel concierge agents
 
 ## 📁 Project Structure
 
 ```
 rtw-trip/
-├── web/                    # Frontend application
-│   ├── index.html         # Main HTML file
-│   ├── app.js             # Map application logic
-│   ├── styles.css         # Styling
-│   └── config.js          # API configuration (not in repo)
-├── scripts/               # Build tools
-│   ├── parse-itinerary.js # Markdown parser
-│   ├── geocode.js         # Location geocoding
-│   └── build-data.js      # Build orchestrator
-├── data/                  # Generated data files
-│   ├── overrides.json     # Location overrides
-│   └── geocache.json      # Geocoding cache
-├── itineary.md           # Source itinerary
-├── itinerary_structured.json # Structured trip data
-└── package.json          # Dependencies and scripts
+├── web/                           # Frontend application
+│   ├── index.html                 # Main HTML file
+│   ├── app.js                     # Map application logic
+│   ├── styles.css                 # Styling
+│   ├── config.js                  # API configuration (not in repo)
+│   ├── chat.js                    # AI chat interface
+│   ├── sidebar-resize.js          # Responsive sidebar
+│   └── app-final.js               # Complete application logic
+├── python/agents/travel-concierge # AI Travel Concierge
+│   ├── travel_concierge/          # Agent modules
+│   │   ├── sub_agents/            # Specialized travel agents
+│   │   │   ├── inspiration/       # Destination inspiration
+│   │   │   ├── planning/          # Trip planning
+│   │   │   ├── booking/           # Booking assistance
+│   │   │   ├── pre_trip/          # Pre-trip preparation
+│   │   │   ├── in_trip/           # In-trip assistance
+│   │   │   └── post_trip/         # Post-trip feedback
+│   │   ├── tools/                 # Agent tools
+│   │   └── shared_libraries/      # Common utilities
+│   ├── api_server.py              # Flask API server
+│   ├── requirements-api.txt       # Python dependencies
+│   ├── pyproject.toml            # Poetry configuration
+│   └── .env.example              # Environment variables template
+├── scripts/                       # Build tools
+│   ├── parse-itinerary.js         # Markdown parser
+│   ├── geocode.js                 # Location geocoding
+│   └── build-data.js              # Build orchestrator
+├── data/                          # Generated data files
+│   ├── overrides.json             # Location overrides
+│   └── geocache.json              # Geocoding cache
+├── logs/                          # Application logs
+├── itineary.md                    # Source itinerary
+├── itinerary_structured.json      # Structured trip data
+├── start-travel-concierge.sh      # Startup script
+├── stop-travel-concierge.sh       # Stop script
+└── package.json                   # Dependencies and scripts
 ```
 
 ## 🔧 Available Scripts
 
-- `npm run serve` - Start development server
+### Frontend Scripts
+- `npm run serve` - Start frontend development server (port 5173)
 - `npm run build:data` - Parse and geocode itinerary data
 - `npm run parse` - Parse itinerary markdown only
 - `npm run geocode` - Geocode locations only
 
+### Application Scripts
+- `./start-travel-concierge.sh` - Start all services (frontend + backend + AI)
+- `./stop-travel-concierge.sh` - Stop all running services
+
+### AI Concierge Scripts (in python/agents/travel-concierge/)
+- `poetry install` - Install Python dependencies
+- `eval $(poetry env activate)` - Activate virtual environment
+- `adk run travel_concierge` - Run AI concierge in CLI mode
+- `adk web` - Start ADK web interface
+- `adk api_server travel_concierge` - Start ADK API server (port 8000)
+- `python api_server.py` - Start Flask API server (port 5001)
+
+## 🤖 AI Travel Concierge Features
+
+The AI Travel Concierge is powered by Google's Agent Development Kit and consists of specialized agents for different travel needs:
+
+### Available Agents
+
+- **🎨 Inspiration Agent** - Get destination ideas and travel inspiration
+- **📋 Planning Agent** - Detailed trip planning with flights, hotels, and activities
+- **💳 Booking Agent** - Assistance with booking payments and confirmations
+- **🎒 Pre-Trip Agent** - Visa requirements, travel advisories, packing lists
+- **🗺️ In-Trip Agent** - Real-time assistance during your journey
+- **📝 Post-Trip Agent** - Feedback collection and preference learning
+
+### AI Tools & Capabilities
+
+- **Google Places API** - Location discovery and recommendations
+- **Google Search** - Real-time travel information and research
+- **MCP Integration** - Airbnb search and booking tools
+- **Memory System** - Remembers your preferences and trip details
+- **Itinerary Management** - Add, remove, and modify destinations in real-time
+
+### Using the AI Concierge
+
+1. **Chat Interface** - Click the chat button in the web app
+2. **Context-Aware** - Agents know your current trip plans
+3. **Real-Time Updates** - Changes appear instantly on your map
+4. **Multi-Agent Collaboration** - Agents work together for complex tasks
+
+### Example Conversations
+
+```
+"Need some destination ideas for Southeast Asia"
+"Find flights to Tokyo from JFK on April 20th for 4 days"
+"What should I pack for my trip to Peru?"
+"Help me find an Airbnb in San Diego for next weekend"
+"Add 2 more days to my Bangkok stop"
+```
+
 ## 🌐 Deployment
 
-### GitHub Pages (Automatic)
+### Frontend Only (GitHub Pages)
 
-The app is automatically deployed to GitHub Pages when you push to the `main` branch.
+The frontend map interface is automatically deployed to GitHub Pages:
 
 **URL**: https://raymondllee.github.io/rtw-trip/
 
-### Manual Deployment
+*Note: AI features are not available in the GitHub Pages deployment.*
 
-1. **Build the data**:
+### Full Application Deployment
+
+For the complete application with AI features:
+
+1. **Deploy Frontend**:
    ```bash
    npm run build:data
+   # Deploy web/ directory to your hosting provider
    ```
 
-2. **Deploy to any static host**:
-   - Copy the `web/` directory contents
-   - Ensure `config.js` has production API keys
-   - Upload to your hosting provider
+2. **Deploy Backend Services**:
+   - **Flask API Server** - Deploy to any Python hosting service
+   - **ADK API Server** - Deploy to Google Cloud Run or similar
+   - Configure environment variables for API keys
 
-### Environment Variables (Production)
-
-For production deployments, you can use environment variables instead of `config.js`:
-
-```javascript
-// In your deployment environment
-window.RTW_CONFIG = {
-  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
-  googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID
-};
-```
+3. **Environment Variables**:
+   ```javascript
+   window.RTW_CONFIG = {
+     googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+     googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID
+   };
+   ```
 
 ## 🗺️ Data Sources
 
@@ -190,25 +331,84 @@ Edit `web/styles.css` to customize:
 
 ### Common Issues
 
-1. **Map not loading**: Check API key in `config.js`
-2. **Geocoding fails**: Verify Geocoding API is enabled
+#### Frontend Issues
+1. **Map not loading**: Check API key in `web/config.js`
+2. **Geocoding fails**: Verify Geocoding API is enabled in Google Cloud
 3. **Routing not working**: Ensure Directions API is enabled
 4. **CORS errors**: Check API key restrictions
 
-### Debug Mode
+#### AI Concierge Issues
+1. **AI not responding**: Check that all three servers are running
+2. **Connection refused**: Run `./start-travel-concierge.sh` to restart services
+3. **ADK server errors**: Check `logs/adk-api.log` for error details
+4. **Flask server errors**: Check `logs/flask-api.log` for error details
+5. **Google Cloud errors**: Verify Vertex AI API is enabled and credentials are set
 
-Add `?debug=true` to the URL to see console logs:
-```
-http://localhost:5173/web/?debug=true
+#### Debugging Steps
+
+1. **Check server status**:
+   ```bash
+   curl http://localhost:5173/web/  # Frontend
+   curl http://localhost:5001/health  # Flask API
+   curl http://localhost:8000/docs    # ADK API
+   ```
+
+2. **View logs**:
+   ```bash
+   tail -f logs/frontend.log    # Frontend server
+   tail -f logs/flask-api.log   # Flask API server
+   tail -f logs/adk-api.log     # ADK API server
+   ```
+
+3. **Restart services**:
+   ```bash
+   ./stop-travel-concierge.sh
+   ./start-travel-concierge.sh
+   ```
+
+4. **Debug mode in browser**:
+   ```
+   http://localhost:5173/web/?debug=true
+   ```
+
+### Port Conflicts
+
+If you experience port conflicts, the startup script will automatically kill processes on ports 5173, 5001, and 8000. You can also manually clear them:
+
+```bash
+lsof -ti:5173 | xargs kill -9  # Frontend
+lsof -ti:5001 | xargs kill -9  # Flask API
+lsof -ti:8000 | xargs kill -9  # ADK API
 ```
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/new-feature`
-3. Commit changes: `git commit -am 'Add new feature'`
-4. Push to branch: `git push origin feature/new-feature`
-5. Submit a pull request
+We welcome contributions! Here are some areas where you can help:
+
+### Areas for Contribution
+
+- **🤖 AI Agent Improvements**: Enhance travel concierge agents
+- **🗺️ Map Features**: Add new visualization capabilities
+- **📱 UI/UX**: Improve the interface and user experience
+- **🔧 Integration**: Connect to additional travel APIs
+- **📚 Documentation**: Improve guides and add examples
+
+### Development Setup
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/new-feature`
+3. **Set up your environment**: Run `./start-travel-concierge.sh`
+4. **Make your changes**: Test with all features working
+5. **Commit changes**: `git commit -am 'Add new feature'`
+6. **Push to branch**: `git push origin feature/new-feature`
+7. **Submit a pull request**
+
+### Code Style
+
+- **Frontend**: Use modern ES6+ JavaScript
+- **Python**: Follow PEP 8 standards
+- **Documentation**: Update README for new features
+- **Testing**: Ensure all services start correctly
 
 ## 📄 License
 
@@ -216,16 +416,36 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Google Maps Platform for mapping services
-- OpenStreetMap/Nominatim for geocoding
-- The incredible destinations featured in this itinerary
+- **Google Maps Platform** for mapping services and APIs
+- **Google Agent Development Kit** for AI agent framework
+- **OpenStreetMap/Nominatim** for geocoding services
+- **Poetry** for Python dependency management
+- The incredible destinations and cultures featured in this itinerary
 
 ## 📞 Support
 
 For questions or issues:
-- Create an issue on GitHub
-- Contact: [raymondllee@users.noreply.github.com](mailto:raymondllee@users.noreply.github.com)
+
+- **🐛 Bug Reports**: Create an issue on GitHub with detailed description
+- **💡 Feature Requests**: Submit an issue with "enhancement" label
+- **📧 General Questions**: Create a discussion on GitHub
+- **📧 Direct Contact**: [raymondllee@users.noreply.github.com](mailto:raymondllee@users.noreply.github.com)
+
+### Quick Help Commands
+
+```bash
+# Start the application
+./start-travel-concierge.sh
+
+# Check if everything is working
+curl http://localhost:5173/web/ && echo "Frontend ✅"
+curl http://localhost:5001/health && echo "Flask API ✅"
+curl http://localhost:8000/docs && echo "ADK API ✅"
+
+# Stop everything
+./stop-travel-concierge.sh
+```
 
 ---
 
-**Happy Travels!** ✈️🌍🗺️
+**Happy Travels!** ✈️🌍🗺️🤖
