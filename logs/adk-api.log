@@ -175,3 +175,80 @@ INFO:     127.0.0.1:64117 - "POST /run_sse HTTP/1.1" 200 OK
 2025-10-02 10:43:58,396 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
 2025-10-02 10:44:00,184 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
 2025-10-02 10:44:00,185 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 13:46:52,784 - INFO - adk_web_server.py:680 - New session created: session_878343f86ede
+
+Loading Initial State: {'state': {'user_profile': {'passport_nationality': 'US Citizen', 'seat_preference': 'window', 'food_preference': 'vegan', 'allergies': [], 'likes': [], 'dislikes': [], 'price_sensitivity': [], 'home': {'event_type': 'home', 'address': '6420 Sequence Dr #400, San Diego, CA 92121, United States', 'local_prefer_mode': 'drive'}}, 'itinerary': {}, 'origin': '', 'destination': '', 'start_date': '', 'end_date': '', 'outbound_flight_selection': '', 'outbound_seat_number': '', 'return_flight_selection': '', 'return_seat_number': '', 'hotel_selection': '', 'room_selection': '', 'poi': '', 'itinerary_datetime': '', 'itinerary_start_date': '', 'itinerary_end_date': ''}}
+
+[itinerary] No itinerary cached in state. Scanning history…
+[itinerary] DEBUG tool_context type: <class 'google.adk.tools.tool_context.ToolContext'>
+[itinerary] DEBUG tool_context attrs: ['actions', 'agent_name', 'function_call_id', 'get_auth_response', 'invocation_id', 'list_artifacts', 'load_artifact', 'load_credential', 'request_confirmation', 'request_credential', 'save_artifact', 'save_credential', 'search_memory', 'state', 'tool_confirmation', 'user_content']
+[itinerary] DEBUG state: <google.adk.sessions.state.State object at 0x11136d2b0>
+[itinerary] DEBUG session: None
+[itinerary] WARNING: No session id found, falling back to default_session
+[itinerary] No itinerary cached in state. Scanning history…
+[itinerary] DEBUG tool_context type: <class 'google.adk.tools.tool_context.ToolContext'>
+[itinerary] DEBUG tool_context attrs: ['actions', 'agent_name', 'function_call_id', 'get_auth_response', 'invocation_id', 'list_artifacts', 'load_artifact', 'load_credential', 'request_confirmation', 'request_credential', 'save_artifact', 'save_credential', 'search_memory', 'state', 'tool_confirmation', 'user_content']
+[itinerary] DEBUG state: <google.adk.sessions.state.State object at 0x11136d790>
+[itinerary] DEBUG session: None
+[itinerary] WARNING: No session id found, falling back to default_session
+[itinerary] No itinerary cached in state. Scanning history…
+[itinerary] DEBUG tool_context type: <class 'google.adk.tools.tool_context.ToolContext'>
+[itinerary] DEBUG tool_context attrs: ['actions', 'agent_name', 'function_call_id', 'get_auth_response', 'invocation_id', 'list_artifacts', 'load_artifact', 'load_credential', 'request_confirmation', 'request_credential', 'save_artifact', 'save_credential', 'search_memory', 'state', 'tool_confirmation', 'user_content']
+[itinerary] DEBUG state: <google.adk.sessions.state.State object at 0x11136e570>
+[itinerary] DEBUG session: None
+[itinerary] WARNING: No session id found, falling back to default_session
+INFO:     127.0.0.1:50274 - "POST /apps/travel_concierge/users/web_user/sessions/session_878343f86ede HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50275 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 13:46:52,814 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 13:46:52,815 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 13:46:55,052 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 13:46:55,059 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 13:46:55,059 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature', 'function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 13:46:55,587 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 13:46:55,588 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 13:46:56,776 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 13:46:56,781 - INFO - google_llm.py:175 - Response received from the model.
+
+Loading Initial State: {'state': {'user_profile': {'passport_nationality': 'US Citizen', 'seat_preference': 'window', 'food_preference': 'vegan', 'allergies': [], 'likes': [], 'dislikes': [], 'price_sensitivity': [], 'home': {'event_type': 'home', 'address': '6420 Sequence Dr #400, San Diego, CA 92121, United States', 'local_prefer_mode': 'drive'}}, 'itinerary': {}, 'origin': '', 'destination': '', 'start_date': '', 'end_date': '', 'outbound_flight_selection': '', 'outbound_seat_number': '', 'return_flight_selection': '', 'return_seat_number': '', 'hotel_selection': '', 'room_selection': '', 'poi': '', 'itinerary_datetime': '', 'itinerary_start_date': '', 'itinerary_end_date': ''}}
+
+[itinerary] No itinerary cached in state. Scanning history…
+[geocode] Geocoding new destination: Ubud, Ubud, Indonesia
+[geocode] ✅ Geocoded 'Ubud, Indonesia' via Google Places: -8.5068536, 115.2624778
+[itinerary] DEBUG tool_context type: <class 'google.adk.tools.tool_context.ToolContext'>
+[itinerary] DEBUG tool_context attrs: ['actions', 'agent_name', 'function_call_id', 'get_auth_response', 'invocation_id', 'list_artifacts', 'load_artifact', 'load_credential', 'request_confirmation', 'request_credential', 'save_artifact', 'save_credential', 'search_memory', 'state', 'tool_confirmation', 'user_content']
+[itinerary] DEBUG state: <google.adk.sessions.state.State object at 0x11136f710>
+[itinerary] DEBUG session: None
+[itinerary] WARNING: No session id found, falling back to default_session
+INFO:     127.0.0.1:50327 - "POST /apps/travel_concierge/users/web_user/sessions/session_878343f86ede HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:50328 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 13:47:11,555 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 13:47:11,556 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 13:47:13,372 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 13:47:13,380 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 13:47:13,381 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature', 'function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 13:47:14,048 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 13:47:14,049 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 13:47:15,124 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 13:47:15,133 - INFO - google_llm.py:175 - Response received from the model.
+
+Loading Initial State: {'state': {'user_profile': {'passport_nationality': 'US Citizen', 'seat_preference': 'window', 'food_preference': 'vegan', 'allergies': [], 'likes': [], 'dislikes': [], 'price_sensitivity': [], 'home': {'event_type': 'home', 'address': '6420 Sequence Dr #400, San Diego, CA 92121, United States', 'local_prefer_mode': 'drive'}}, 'itinerary': {}, 'origin': '', 'destination': '', 'start_date': '', 'end_date': '', 'outbound_flight_selection': '', 'outbound_seat_number': '', 'return_flight_selection': '', 'return_seat_number': '', 'hotel_selection': '', 'room_selection': '', 'poi': '', 'itinerary_datetime': '', 'itinerary_start_date': '', 'itinerary_end_date': ''}}
+
+[itinerary] No itinerary cached in state. Scanning history…
+[geocode] Geocoding new destination: Lombok, Mataram, Indonesia
+[geocode] ✅ Geocoded 'Lombok, Mataram, Indonesia' via Google Places: -8.5769951, 116.1004894
+[itinerary] DEBUG tool_context type: <class 'google.adk.tools.tool_context.ToolContext'>
+[itinerary] DEBUG tool_context attrs: ['actions', 'agent_name', 'function_call_id', 'get_auth_response', 'invocation_id', 'list_artifacts', 'load_artifact', 'load_credential', 'request_confirmation', 'request_credential', 'save_artifact', 'save_credential', 'search_memory', 'state', 'tool_confirmation', 'user_content']
+[itinerary] DEBUG state: <google.adk.sessions.state.State object at 0x1113f4650>
+[itinerary] DEBUG session: None
+[itinerary] WARNING: No session id found, falling back to default_session
+INFO:     127.0.0.1:50396 - "POST /apps/travel_concierge/users/web_user/sessions/session_878343f86ede HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:50397 - "POST /run_sse HTTP/1.1" 200 OK
+2025-10-02 13:47:29,836 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 13:47:29,836 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 13:47:32,020 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 13:47:32,035 - INFO - google_llm.py:175 - Response received from the model.
+2025-10-02 13:47:32,035 - WARNING - types.py:5697 - Warning: there are non-text parts in the response: ['thought_signature', 'function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+2025-10-02 13:47:32,788 - INFO - google_llm.py:122 - Sending out request, model: gemini-2.5-flash, backend: GoogleLLMVariant.VERTEX_AI, stream: False
+2025-10-02 13:47:32,788 - INFO - models.py:8217 - AFC is enabled with max remote calls: 10.
+2025-10-02 13:47:34,211 - INFO - _client.py:1740 - HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/pdf-extract-393514/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2025-10-02 13:47:34,222 - INFO - google_llm.py:175 - Response received from the model.

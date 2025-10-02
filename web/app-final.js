@@ -1,133 +1,6 @@
+import { FirestoreScenarioManager } from './firestore-scenario-manager.js';
+
 const DATA_PATH = '../itinerary_structured.json';
-
-// Scenario Management System
-class ScenarioManager {
-  constructor() {
-    this.storageKey = 'rtw-scenarios';
-    this.autosaveKey = 'rtw-autosave';
-  }
-
-  // Load all scenarios from localStorage
-  loadScenarios() {
-    try {
-      const scenarios = localStorage.getItem(this.storageKey);
-      return scenarios ? JSON.parse(scenarios) : {};
-    } catch (error) {
-      console.error('Error loading scenarios:', error);
-      return {};
-    }
-  }
-
-  // Save scenarios to localStorage
-  saveScenarios(scenarios) {
-    try {
-      localStorage.setItem(this.storageKey, JSON.stringify(scenarios));
-      return true;
-    } catch (error) {
-      console.error('Error saving scenarios:', error);
-      return false;
-    }
-  }
-
-  // Save a new scenario
-  saveScenario(name, description, data) {
-    const scenarios = this.loadScenarios();
-    scenarios[name] = {
-      name,
-      description: description || '',
-      data: JSON.parse(JSON.stringify(data)), // Deep copy
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    return this.saveScenarios(scenarios);
-  }
-
-  // Load a specific scenario
-  loadScenario(name) {
-    const scenarios = this.loadScenarios();
-    return scenarios[name] || null;
-  }
-
-  // Delete a scenario
-  deleteScenario(name) {
-    const scenarios = this.loadScenarios();
-    delete scenarios[name];
-    return this.saveScenarios(scenarios);
-  }
-
-  // Get list of scenario names
-  getScenarioNames() {
-    const scenarios = this.loadScenarios();
-    return Object.keys(scenarios).sort();
-  }
-
-  // Auto-save current state
-  autosave(data) {
-    try {
-      localStorage.setItem(this.autosaveKey, JSON.stringify({
-        data: JSON.parse(JSON.stringify(data)),
-        timestamp: new Date().toISOString()
-      }));
-    } catch (error) {
-      console.error('Error auto-saving:', error);
-    }
-  }
-
-  // Load auto-saved state
-  loadAutosave() {
-    try {
-      const autosave = localStorage.getItem(this.autosaveKey);
-      return autosave ? JSON.parse(autosave) : null;
-    } catch (error) {
-      console.error('Error loading autosave:', error);
-      return null;
-    }
-  }
-
-  // Export all scenarios as JSON
-  exportScenarios() {
-    const scenarios = this.loadScenarios();
-    const exportData = {
-      scenarios,
-      exportedAt: new Date().toISOString(),
-      version: '1.0'
-    };
-    return JSON.stringify(exportData, null, 2);
-  }
-
-  // Import scenarios from JSON
-  importScenarios(jsonData, overwrite = false) {
-    try {
-      const importData = JSON.parse(jsonData);
-      if (!importData.scenarios) {
-        throw new Error('Invalid scenario file format');
-      }
-
-      const currentScenarios = overwrite ? {} : this.loadScenarios();
-      const importedScenarios = importData.scenarios;
-      
-      // Handle duplicates if not overwriting
-      Object.keys(importedScenarios).forEach(name => {
-        let finalName = name;
-        let counter = 1;
-        
-        while (!overwrite && currentScenarios[finalName]) {
-          finalName = `${name} (${counter})`;
-          counter++;
-        }
-        
-        currentScenarios[finalName] = importedScenarios[name];
-        currentScenarios[finalName].name = finalName;
-        currentScenarios[finalName].updatedAt = new Date().toISOString();
-      });
-
-      return this.saveScenarios(currentScenarios);
-    } catch (error) {
-      console.error('Error importing scenarios:', error);
-      return false;
-    }
-  }
-}
 
 async function loadData() {
   const res = await fetch(DATA_PATH);
@@ -562,16 +435,30 @@ function addMarkersAndPath(map, locations, showRouting = false) {
 async function initMapApp() {
   const originalData = await loadData();
   let workingData = JSON.parse(JSON.stringify(originalData));
-  let currentScenarioName = null; // Track the currently loaded scenario
-  const scenarioManager = new ScenarioManager();
+  let currentScenarioId = null; // Track the currently loaded scenario ID
+  let currentScenarioName = null; // Track the currently loaded scenario name
+  const scenarioManager = new FirestoreScenarioManager();
   const tripTitle = document.getElementById('trip-title');
-  
-  // Check for autosaved data
-  const autosave = scenarioManager.loadAutosave();
-  if (autosave && confirm('Found auto-saved changes. Would you like to restore them?')) {
-    workingData = autosave.data;
+
+  // Try to load the last active scenario from Firestore
+  try {
+    const scenarios = await scenarioManager.listScenarios();
+    if (scenarios.length > 0) {
+      // Load most recently updated scenario
+      const lastScenario = scenarios[0];
+      const latestVersion = await scenarioManager.getLatestVersion(lastScenario.id);
+      if (latestVersion && latestVersion.itineraryData) {
+        workingData = latestVersion.itineraryData;
+        currentScenarioId = lastScenario.id;
+        currentScenarioName = lastScenario.name;
+        console.log(`Loaded last active scenario: ${lastScenario.name}`);
+      }
+    }
+  } catch (error) {
+    console.warn('Could not load from Firestore, using default data:', error);
+    // Fall back to original data if Firestore fails
   }
-  
+
   tripTitle.textContent = workingData.trip?.title || 'Round The World Trip';
 
   const map = new google.maps.Map(document.getElementById('map'), {
@@ -605,11 +492,27 @@ async function initMapApp() {
   
   // Auto-save timer
   let autosaveTimer = null;
-  
-  function triggerAutosave() {
+
+  async function triggerAutosave() {
     if (autosaveTimer) clearTimeout(autosaveTimer);
-    autosaveTimer = setTimeout(() => {
-      scenarioManager.autosave(workingData);
+    autosaveTimer = setTimeout(async () => {
+      try {
+        // If we don't have a scenario yet, create a default one
+        if (!currentScenarioId) {
+          const defaultScenario = await scenarioManager.getOrCreateScenario(
+            'My Trip',
+            'Auto-saved trip planning'
+          );
+          currentScenarioId = defaultScenario.id;
+          currentScenarioName = defaultScenario.name;
+        }
+
+        // Save as new version
+        await scenarioManager.saveVersion(currentScenarioId, workingData, false);
+        console.log('Auto-saved to Firestore');
+      } catch (error) {
+        console.error('Auto-save failed:', error);
+      }
     }, 2000); // Auto-save after 2 seconds of inactivity
   }
 
@@ -728,25 +631,31 @@ async function initMapApp() {
     }
   }
   
-  function updateScenarioSelector() {
+  async function updateScenarioSelector() {
     const selector = document.getElementById('scenario-selector');
     const currentValue = selector.value;
-    
+
     // Clear existing options except the first one
     selector.innerHTML = '<option value="">Select a scenario...</option>';
-    
-    // Add scenarios
-    const scenarioNames = scenarioManager.getScenarioNames();
-    scenarioNames.forEach(name => {
-      const option = document.createElement('option');
-      option.value = name;
-      option.textContent = name;
-      selector.appendChild(option);
-    });
-    
-    // Restore selection if it still exists
-    if (currentValue && scenarioNames.includes(currentValue)) {
-      selector.value = currentValue;
+
+    try {
+      // Load scenarios from Firestore
+      const scenarios = await scenarioManager.listScenarios();
+      scenarios.forEach(scenario => {
+        const option = document.createElement('option');
+        option.value = scenario.id;
+        option.textContent = scenario.name;
+        selector.appendChild(option);
+      });
+
+      // Restore selection if it still exists
+      if (currentValue && scenarios.some(s => s.id === currentValue)) {
+        selector.value = currentValue;
+      } else if (currentScenarioId) {
+        selector.value = currentScenarioId;
+      }
+    } catch (error) {
+      console.error('Error loading scenarios:', error);
     }
   }
   
@@ -1114,24 +1023,28 @@ async function initMapApp() {
   }
   
   // Scenario management functions
-  function openSaveScenarioModal() {
+  async function openSaveScenarioModal() {
     const modal = document.getElementById('save-scenario-modal');
     const nameInput = document.getElementById('scenario-name');
     const descriptionInput = document.getElementById('scenario-description');
-    
+
     // If we're updating an existing scenario, pre-populate the form
-    if (currentScenarioName) {
-      const scenario = scenarioManager.loadScenario(currentScenarioName);
-      if (scenario) {
-        nameInput.value = scenario.name;
-        descriptionInput.value = scenario.description || '';
+    if (currentScenarioId) {
+      try {
+        const scenario = await scenarioManager.getScenario(currentScenarioId);
+        if (scenario) {
+          nameInput.value = scenario.name;
+          descriptionInput.value = scenario.description || '';
+        }
+      } catch (error) {
+        console.error('Error loading scenario:', error);
       }
     } else {
       // Clear the form for new scenarios
       nameInput.value = '';
       descriptionInput.value = '';
     }
-    
+
     modal.style.display = 'flex';
     nameInput.focus();
   }
@@ -1151,55 +1064,174 @@ async function initMapApp() {
     document.getElementById('manage-scenarios-modal').style.display = 'none';
   }
   
-  function updateScenarioList() {
+  async function updateScenarioList() {
     const scenarioList = document.getElementById('scenario-list');
-    const scenarios = scenarioManager.loadScenarios();
-    const scenarioNames = Object.keys(scenarios).sort();
-    
-    if (scenarioNames.length === 0) {
-      scenarioList.innerHTML = '<div class="empty-scenarios">No saved scenarios yet.</div>';
-      return;
+
+    try {
+      const scenarios = await scenarioManager.listScenarios();
+
+      if (scenarios.length === 0) {
+        scenarioList.innerHTML = '<div class="empty-scenarios">No saved scenarios yet.</div>';
+        return;
+      }
+
+      const scenarioItems = await Promise.all(
+        scenarios.map(async (scenario) => {
+          const createdDate = scenario.createdAt?.toDate ? scenario.createdAt.toDate().toLocaleDateString() : 'Unknown';
+          const latestVersion = await scenarioManager.getLatestVersion(scenario.id);
+          const locationCount = latestVersion?.itineraryData?.locations?.length || 0;
+
+          return `
+            <div class="scenario-item">
+              <div class="scenario-info">
+                <div class="scenario-name">${scenario.name}</div>
+                <div class="scenario-meta">${locationCount} destinations • v${scenario.currentVersion || 1} • Created ${createdDate}</div>
+                ${scenario.description ? `<div class="scenario-description">${scenario.description}</div>` : ''}
+              </div>
+              <div class="scenario-actions-btn">
+                <button class="btn-load" onclick="loadScenarioById('${scenario.id}')">Load</button>
+                <button class="btn-versions" onclick="showVersionHistory('${scenario.id}')">History</button>
+                <button class="btn-delete" onclick="deleteScenarioById('${scenario.id}')">Delete</button>
+              </div>
+            </div>
+          `;
+        })
+      );
+
+      scenarioList.innerHTML = scenarioItems.join('');
+    } catch (error) {
+      console.error('Error loading scenarios:', error);
+      scenarioList.innerHTML = '<div class="empty-scenarios">Error loading scenarios.</div>';
     }
-    
-    scenarioList.innerHTML = scenarioNames.map(name => {
-      const scenario = scenarios[name];
-      const createdDate = new Date(scenario.createdAt).toLocaleDateString();
-      const locationCount = scenario.data.locations?.length || 0;
-      
-      return `
-        <div class="scenario-item">
-          <div class="scenario-info">
-            <div class="scenario-name">${scenario.name}</div>
-            <div class="scenario-meta">${locationCount} destinations • Created ${createdDate}</div>
-            ${scenario.description ? `<div class="scenario-description">${scenario.description}</div>` : ''}
+  }
+
+  window.loadScenarioById = async function(scenarioId) {
+    try {
+      const scenario = await scenarioManager.getScenario(scenarioId);
+      const latestVersion = await scenarioManager.getLatestVersion(scenarioId);
+
+      if (scenario && latestVersion) {
+        workingData = JSON.parse(JSON.stringify(latestVersion.itineraryData));
+        currentScenarioId = scenarioId;
+        currentScenarioName = scenario.name;
+        render(legFilter.value, routingToggle.checked);
+        updateChatContext(legFilter.value);
+        closeManageScenariosModal();
+        document.getElementById('scenario-selector').value = scenarioId;
+        updateSaveButton();
+      }
+    } catch (error) {
+      console.error('Error loading scenario:', error);
+      alert('Failed to load scenario');
+    }
+  };
+
+  window.deleteScenarioById = async function(scenarioId) {
+    if (confirm('Delete this scenario and all its versions?')) {
+      try {
+        await scenarioManager.deleteScenario(scenarioId);
+        await updateScenarioList();
+        await updateScenarioSelector();
+
+        // If we deleted the current scenario, reset
+        if (currentScenarioId === scenarioId) {
+          currentScenarioId = null;
+          currentScenarioName = null;
+          updateSaveButton();
+        }
+      } catch (error) {
+        console.error('Error deleting scenario:', error);
+        alert('Failed to delete scenario');
+      }
+    }
+  };
+
+  window.showVersionHistory = async function(scenarioId) {
+    try {
+      const scenario = await scenarioManager.getScenario(scenarioId);
+      const versions = await scenarioManager.getVersionHistory(scenarioId);
+
+      if (!versions || versions.length === 0) {
+        alert('No version history available for this scenario.');
+        return;
+      }
+
+      // Create version history display
+      const versionItems = versions.map(version => {
+        const createdDate = version.createdAt?.toDate ? version.createdAt.toDate().toLocaleString() : 'Unknown';
+        const versionLabel = version.isNamed ? `📌 v${version.versionNumber} - ${version.versionName}` : `v${version.versionNumber}`;
+        const locationCount = version.itineraryData?.locations?.length || 0;
+
+        return `
+          <div class="version-item" style="padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; hover: background: #f5f5f5;"
+               onclick="revertToVersion('${scenarioId}', ${version.versionNumber})">
+            <div style="font-weight: bold; margin-bottom: 4px;">${versionLabel}</div>
+            <div style="font-size: 12px; color: #666;">${locationCount} destinations • ${createdDate}</div>
           </div>
-          <div class="scenario-actions-btn">
-            <button class="btn-load" onclick="loadScenarioByName('${name}')">Load</button>
-            <button class="btn-delete" onclick="deleteScenarioByName('${name}')">Delete</button>
+        `;
+      }).join('');
+
+      // Show in a simple dialog
+      const message = `Version History for "${scenario.name}"\n\nClick a version to revert to it:\n\n${versionItems}`;
+
+      // Create custom modal for version history
+      const existingModal = document.getElementById('version-history-modal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+
+      const modal = document.createElement('div');
+      modal.id = 'version-history-modal';
+      modal.className = 'modal-overlay';
+      modal.style.cssText = 'display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;';
+      modal.innerHTML = `
+        <div class="modal-content" style="background: white; padding: 24px; border-radius: 8px; max-width: 600px; max-height: 80vh; overflow-y: auto; width: 90%;">
+          <h3 style="margin-top: 0;">Version History: ${scenario.name}</h3>
+          <p style="color: #666; font-size: 14px;">Click a version to revert to it</p>
+          <div class="version-list">
+            ${versionItems}
+          </div>
+          <div style="margin-top: 20px; text-align: right;">
+            <button onclick="document.getElementById('version-history-modal').remove()" style="padding: 8px 16px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
           </div>
         </div>
       `;
-    }).join('');
-  }
-  
-  window.loadScenarioByName = function(name) {
-    const scenario = scenarioManager.loadScenario(name);
-    if (scenario) {
-      workingData = JSON.parse(JSON.stringify(scenario.data));
-      currentScenarioName = name;
-      render(legFilter.value, routingToggle.checked);
-      updateChatContext(legFilter.value);
-      closeManageScenariosModal();
-      document.getElementById('scenario-selector').value = name;
-      updateSaveButton(); // Update the save button text
+
+      document.body.appendChild(modal);
+
+      // Close on outside click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+    } catch (error) {
+      console.error('Error showing version history:', error);
+      alert('Failed to load version history');
     }
   };
-  
-  window.deleteScenarioByName = function(name) {
-    if (confirm(`Delete scenario "${name}"?`)) {
-      scenarioManager.deleteScenario(name);
-      updateScenarioList();
-      updateScenarioSelector();
+
+  window.revertToVersion = async function(scenarioId, versionNumber) {
+    if (!confirm(`Revert to version ${versionNumber}? This will create a new version with the old data.`)) {
+      return;
+    }
+
+    try {
+      const newVersion = await scenarioManager.revertToVersion(scenarioId, versionNumber);
+
+      // Close version history modal
+      const modal = document.getElementById('version-history-modal');
+      if (modal) modal.remove();
+
+      // Reload the scenario to show reverted state
+      if (currentScenarioId === scenarioId) {
+        await window.loadScenarioById(scenarioId);
+      }
+
+      alert(`Reverted to version ${versionNumber}. New version ${newVersion.versionNumber} created.`);
+    } catch (error) {
+      console.error('Error reverting version:', error);
+      alert('Failed to revert to version');
     }
   };
   
@@ -1254,6 +1286,29 @@ async function initMapApp() {
   // Scenario controls
   document.getElementById('save-scenario-btn').addEventListener('click', openSaveScenarioModal);
   document.getElementById('manage-scenarios-btn').addEventListener('click', openManageScenariosModal);
+
+  // Migration button - migrate localStorage to Firestore
+  document.getElementById('migrate-localstorage-btn').addEventListener('click', async () => {
+    if (!confirm('Migrate your localStorage scenarios to Firestore cloud storage?\n\nThis will copy (not move) your scenarios to the cloud.\nYour localStorage data will remain untouched.')) {
+      return;
+    }
+
+    try {
+      const migrated = await scenarioManager.migrateFromLocalStorage();
+
+      if (migrated.length === 0) {
+        alert('No localStorage scenarios found to migrate.');
+      } else {
+        alert(`Successfully migrated ${migrated.length} scenario(s) to Firestore:\n\n${migrated.join('\n')}\n\nRefreshing to load your scenarios...`);
+        await updateScenarioSelector();
+        await updateScenarioList();
+      }
+    } catch (error) {
+      console.error('Migration failed:', error);
+      alert('Failed to migrate scenarios. Check console for details.');
+    }
+  });
+
   document.getElementById('export-scenarios-btn').addEventListener('click', () => {
     const dataStr = scenarioManager.exportScenarios();
     const dataBlob = new Blob([dataStr], {type: 'application/json'});
@@ -1267,18 +1322,17 @@ async function initMapApp() {
   document.getElementById('import-scenarios-btn').addEventListener('click', openImportScenariosModal);
   
   // Scenario selector
-  document.getElementById('scenario-selector').addEventListener('change', (e) => {
+  document.getElementById('scenario-selector').addEventListener('change', async (e) => {
     if (e.target.value) {
-      const scenario = scenarioManager.loadScenario(e.target.value);
-      if (scenario) {
-        workingData = JSON.parse(JSON.stringify(scenario.data));
-        currentScenarioName = e.target.value;
-        render(legFilter.value, routingToggle.checked);
-        updateSaveButton(); // Update the save button text
+      try {
+        await window.loadScenarioById(e.target.value);
+      } catch (error) {
+        console.error('Error loading scenario:', error);
       }
     } else {
+      currentScenarioId = null;
       currentScenarioName = null;
-      updateSaveButton(); // Update the save button text
+      updateSaveButton();
     }
   });
   
@@ -1312,39 +1366,50 @@ async function initMapApp() {
     }
   });
   
-  document.getElementById('save-scenario-form').addEventListener('submit', (e) => {
+  document.getElementById('save-scenario-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     const name = document.getElementById('scenario-name').value.trim();
     const description = document.getElementById('scenario-description').value.trim();
-    
+
     if (!name) {
       alert('Please enter a scenario name.');
       return;
     }
-    
-    // Check if we're updating an existing scenario
-    const isUpdate = currentScenarioName && name === currentScenarioName;
-    
-    // If the name already exists and it's not the current scenario, ask for confirmation
-    if (!isUpdate && scenarioManager.loadScenario(name)) {
-      if (!confirm(`A scenario named "${name}" already exists. Do you want to overwrite it?`)) {
-        return;
+
+    try {
+      let scenario;
+
+      if (currentScenarioId) {
+        // Update existing scenario - save as new named version
+        scenario = await scenarioManager.getScenario(currentScenarioId);
+        if (scenario) {
+          // Save as named version
+          await scenarioManager.saveVersion(
+            currentScenarioId,
+            workingData,
+            true,
+            `Named: ${name}`
+          );
+        }
+      } else {
+        // Create new scenario
+        scenario = await scenarioManager.getOrCreateScenario(name, description);
+        currentScenarioId = scenario.id;
+        currentScenarioName = name;
+
+        // Save initial version
+        await scenarioManager.saveVersion(currentScenarioId, workingData, true, 'Initial version');
       }
-    }
-    
-    const success = scenarioManager.saveScenario(name, description, workingData);
-    if (success) {
-      currentScenarioName = name; // Update current scenario name
+
       closeSaveScenarioModal();
-      updateScenarioSelector();
-      updateSaveButton(); // Update the save button text
-      document.getElementById('scenario-selector').value = name;
-      
-      if (isUpdate) {
-        alert(`Scenario "${name}" has been updated successfully.`);
-      }
-    } else {
+      await updateScenarioSelector();
+      updateSaveButton();
+      document.getElementById('scenario-selector').value = currentScenarioId;
+
+      alert(`Scenario "${name}" has been saved successfully.`);
+    } catch (error) {
+      console.error('Error saving scenario:', error);
       alert('Failed to save scenario. Please try again.');
     }
   });
