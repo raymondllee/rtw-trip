@@ -1,4 +1,5 @@
 web/config.js
+web/firebase-config.js
 data/geocache.json
 data/trip.json
 data/trip.raw.json
