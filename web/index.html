@@ -10,17 +10,6 @@
   <header class="app-header">
     <h1 id="trip-title">Round The World Trip</h1>
     <div class="controls">
-      <div class="filters">
-        <label>
-          Leg:
-          <select id="leg-filter">
-            <option value="all" selected>All</option>
-          </select>
-        </label>
-        <label>
-          <input type="checkbox" id="routing-toggle"> Show Transport
-        </label>
-      </div>
       <span id="summary"></span>
     </div>
   </header>
@@ -32,25 +21,64 @@
         <h3>Trip Planning</h3>
         <div class="destination-count"></div>
       </div>
-      <div class="planning-controls">
-        <button id="recalculate-btn" class="primary">Recalculate Dates</button>
-        <button id="export-btn">Export</button>
-        <button id="reset-btn">Reset</button>
-      </div>
-      <div class="scenario-controls">
-        <div class="scenario-actions">
-          <select id="scenario-selector">
-            <option value="">Select a scenario...</option>
+
+      <!-- Leg Filter Section -->
+      <div class="leg-filter-section">
+        <label for="leg-filter" class="leg-filter-label">
+          <span>Itinerary View:</span>
+          <select id="leg-filter" class="leg-filter-select">
+            <option value="all" selected>All Legs</option>
           </select>
-          <button id="save-scenario-btn" class="primary">Save Scenario</button>
+        </label>
+        <label for="sub-leg-filter" class="leg-filter-label" id="sub-leg-filter-container" style="display: none;">
+          <span>Sub-Region:</span>
+          <select id="sub-leg-filter" class="leg-filter-select">
+            <option value="">All Destinations</option>
+          </select>
+        </label>
+        <label class="transport-toggle">
+          <input type="checkbox" id="routing-toggle">
+          <span>Show Transport</span>
+        </label>
+      </div>
+
+      <!-- Scenario Controls -->
+      <div class="scenario-section">
+        <div class="scenario-header">
+          <label for="scenario-selector" class="scenario-label">Scenario</label>
+          <div class="save-indicator" id="save-indicator">Saved ✓</div>
         </div>
-        <div class="scenario-management">
-          <button id="manage-scenarios-btn">Manage Scenarios</button>
-          <button id="migrate-localstorage-btn" title="Migrate localStorage scenarios to Firestore">Migrate to Cloud</button>
-          <button id="import-scenarios-btn">Import</button>
-          <button id="export-scenarios-btn">Export All</button>
+        <div class="scenario-controls">
+          <select id="scenario-selector" class="scenario-selector">
+            <option value="">Unsaved Changes</option>
+            <option value="__new__">+ New Scenario</option>
+            <option disabled>──────────</option>
+          </select>
+          <button id="scenario-actions-btn" class="scenario-actions-btn" title="Scenario actions">⋯</button>
         </div>
       </div>
+
+      <!-- Scenario Actions Dropdown -->
+      <div class="scenario-actions-dropdown" id="scenario-actions-dropdown" style="display: none;">
+        <button id="duplicate-scenario-btn" class="dropdown-item">
+          <span class="icon">📋</span>
+          <span>Duplicate</span>
+        </button>
+        <button id="manage-scenarios-btn" class="dropdown-item">
+          <span class="icon">⚙️</span>
+          <span>Manage All</span>
+        </button>
+        <div class="dropdown-divider"></div>
+        <button id="import-scenarios-btn" class="dropdown-item">
+          <span class="icon">📥</span>
+          <span>Import</span>
+        </button>
+        <button id="export-scenario-btn" class="dropdown-item">
+          <span class="icon">📤</span>
+          <span>Export</span>
+        </button>
+      </div>
+
       <div class="destination-list" id="destination-list">
         <!-- Destinations will be populated here -->
       </div>
@@ -61,6 +89,8 @@
         <div class="chat-header-sidebar">
           <h4>AI Travel Concierge</h4>
           <div class="chat-header-controls">
+            <button id="new-chat-btn" class="chat-action-btn" title="New chat">+</button>
+            <button id="chat-history-btn" class="chat-action-btn" title="Chat history">📝</button>
             <button id="undock-chat-btn" class="undock-chat-btn" title="Undock chat">⬈</button>
             <button id="toggle-chat-sidebar" class="toggle-chat-btn">▼</button>
           </div>
@@ -195,6 +225,17 @@
     <div class="resize-handle resize-handle-sw"></div>
   </div>
 
+  <!-- Chat History Panel -->
+  <div id="chat-history-panel" class="chat-history-panel hidden">
+    <div class="chat-history-header">
+      <h3>Chat History</h3>
+      <button id="close-history-btn" class="close-history-btn">✕</button>
+    </div>
+    <div id="chat-history-list" class="chat-history-list">
+      <!-- Chat history items will be populated here -->
+    </div>
+  </div>
+
   <script src="./config.js"></script>
   <!-- Production fallback for environment variables -->
   <script>
@@ -204,7 +245,7 @@
     }
   </script>
   <script src="./sidebar-resize.js"></script>
-  <script src="./chat.js"></script>
+  <script type="module" src="./chat.js"></script>
   <script type="module" src="./app-final.js"></script>
   <script>
     // Load Google Maps with API key after config is available

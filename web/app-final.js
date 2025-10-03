@@ -1,6 +1,6 @@
 import { FirestoreScenarioManager } from './firestore-scenario-manager.js';
 
-const DATA_PATH = '../itinerary_structured.json';
+const DATA_PATH = './itinerary_structured.json';
 
 async function loadData() {
   const res = await fetch(DATA_PATH);
@@ -54,17 +54,38 @@ function groupLegs(data) {
   return Array.from(set);
 }
 
+function getSubLegsForLeg(data, legName) {
+  const leg = data.legs?.find(l => l.name === legName);
+  return leg?.sub_legs || [];
+}
+
 function filterByLeg(data, legName) {
   if (!legName || legName === 'all') return data.locations || [];
-  
+
   const leg = data.legs?.find(l => l.name === legName);
   if (!leg) return data.locations || [];
-  
+
   return (data.locations || []).filter(location => {
     if (!location.arrival_date && !location.departure_date) return false;
     const locDate = location.arrival_date || location.departure_date;
     return locDate >= leg.start_date && locDate <= leg.end_date;
   });
+}
+
+function filterBySubLeg(data, legName, subLegName) {
+  if (!subLegName) return filterByLeg(data, legName);
+
+  const leg = data.legs?.find(l => l.name === legName);
+  if (!leg) return [];
+
+  const subLeg = leg.sub_legs?.find(sl => sl.name === subLegName);
+  if (!subLeg) return [];
+
+  // Filter locations by country (geographic relationship)
+  const subLegCountries = subLeg.countries || [];
+  return (data.locations || []).filter(location =>
+    location.country && subLegCountries.includes(location.country)
+  );
 }
 
 function getActivityColor(activityType) {
@@ -440,6 +461,21 @@ async function initMapApp() {
   const scenarioManager = new FirestoreScenarioManager();
   const tripTitle = document.getElementById('trip-title');
 
+  // Helper function to merge sub_legs from template into loaded data
+  function mergeSubLegsFromTemplate(data) {
+    if (originalData.legs && data.legs) {
+      data.legs = data.legs.map(leg => {
+        const originalLeg = originalData.legs.find(ol => ol.name === leg.name);
+        if (originalLeg?.sub_legs) {
+          return { ...leg, sub_legs: originalLeg.sub_legs };
+        }
+        return leg;
+      });
+      console.log(`✅ Merged sub_legs from template (${originalData.legs.filter(l => l.sub_legs).length} legs with sub_legs)`);
+    }
+    return data;
+  }
+
   // Try to load the last active scenario from Firestore
   try {
     const scenarios = await scenarioManager.listScenarios();
@@ -448,7 +484,7 @@ async function initMapApp() {
       const lastScenario = scenarios[0];
       const latestVersion = await scenarioManager.getLatestVersion(lastScenario.id);
       if (latestVersion && latestVersion.itineraryData) {
-        workingData = latestVersion.itineraryData;
+        workingData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
         currentScenarioId = lastScenario.id;
         currentScenarioName = lastScenario.name;
         console.log(`Loaded last active scenario: ${lastScenario.name}`);
@@ -473,6 +509,15 @@ async function initMapApp() {
   computeBounds(map, locations);
 
   const legFilter = document.getElementById('leg-filter');
+  const subLegFilter = document.getElementById('sub-leg-filter');
+  const subLegFilterContainer = document.getElementById('sub-leg-filter-container');
+
+  console.log('🔧 Sub-leg UI elements:', {
+    legFilter: !!legFilter,
+    subLegFilter: !!subLegFilter,
+    subLegFilterContainer: !!subLegFilterContainer
+  });
+
   const legs = groupLegs(workingData);
   legs.forEach(legName => {
     const opt = document.createElement('option');
@@ -480,6 +525,41 @@ async function initMapApp() {
     opt.textContent = legName;
     legFilter.appendChild(opt);
   });
+
+  function populateSubLegs(legName) {
+    console.log(`🔍 populateSubLegs called with: ${legName}`);
+    console.log(`  workingData.legs:`, workingData.legs);
+
+    // Clear existing sub-leg options
+    subLegFilter.innerHTML = '<option value="">All Destinations</option>';
+
+    if (!legName || legName === 'all') {
+      console.log('  ⚠️ Hiding sub-leg filter (no leg or "all" selected)');
+      subLegFilterContainer.style.display = 'none';
+      return;
+    }
+
+    const leg = workingData.legs?.find(l => l.name === legName);
+    console.log(`  🔎 Found leg:`, leg);
+    console.log(`  🔎 Leg has sub_legs:`, leg?.sub_legs);
+
+    const subLegs = getSubLegsForLeg(workingData, legName);
+    console.log(`  📊 Found ${subLegs.length} sub-legs:`, subLegs.map(sl => sl?.name));
+
+    if (subLegs.length > 0) {
+      subLegs.forEach(subLeg => {
+        const opt = document.createElement('option');
+        opt.value = subLeg.name;
+        opt.textContent = subLeg.name;
+        subLegFilter.appendChild(opt);
+      });
+      console.log('  ✅ Showing sub-leg filter');
+      subLegFilterContainer.style.display = 'block';
+    } else {
+      console.log('  ⚠️ No sub-legs found, hiding filter');
+      subLegFilterContainer.style.display = 'none';
+    }
+  }
 
   let currentMarkers = [];
   let currentRoutingElements = [];
@@ -596,7 +676,7 @@ async function initMapApp() {
     triggerAutosave();
   }
   
-  function render(legName, useRouting = false, triggerAutoSave = true) {
+  function render(legName, subLegName = null, useRouting = false, triggerAutoSave = true) {
     currentMarkers.forEach(m => m.setMap(null));
     currentMarkers = [];
 
@@ -607,7 +687,9 @@ async function initMapApp() {
     });
     currentRoutingElements = [];
 
-    const filtered = filterByLeg(workingData, legName);
+    const filtered = subLegName
+      ? filterBySubLeg(workingData, legName, subLegName)
+      : filterByLeg(workingData, legName);
     currentLocations = filtered;
     const { markers, highlightLocation, routingElements } = addMarkersAndPath(map, filtered, useRouting);
     currentMarkers = markers;
@@ -622,10 +704,19 @@ async function initMapApp() {
     if (triggerAutoSave) {
       autoSaveScenario();
     }
-    
+
     const summary = document.getElementById('summary');
     if (legName === 'all') {
       summary.textContent = `${filtered.length} stops • ${workingData.trip?.duration || ''} • ${workingData.trip?.total_cost || ''}`;
+    } else if (subLegName) {
+      const leg = workingData.legs?.find(l => l.name === legName);
+      const subLeg = leg?.sub_legs?.find(sl => sl.name === subLegName);
+      if (subLeg) {
+        const startDate = formatDateRange(subLeg.start_date, subLeg.end_date);
+        summary.textContent = `${filtered.length} stops • ${subLegName} • ${startDate}`;
+      } else {
+        summary.textContent = `${filtered.length} stops`;
+      }
     } else {
       const leg = workingData.legs?.find(l => l.name === legName);
       if (leg) {
@@ -842,7 +933,7 @@ async function initMapApp() {
             workingData.locations.splice(newInsertIndex, 0, movedLocation);
             
             recalculateDates(workingData.locations);
-            render(legFilter.value, routingToggle.checked);
+            render(legFilter.value, subLegFilter.value, routingToggle.checked);
           }
         }
       });
@@ -859,7 +950,7 @@ async function initMapApp() {
         if (globalLocation) {
           globalLocation.duration_days = newDuration;
           recalculateDates(workingData.locations);
-          render(legFilter.value, routingToggle.checked);
+          render(legFilter.value, subLegFilter.value, routingToggle.checked);
         }
       });
       
@@ -1020,7 +1111,7 @@ async function initMapApp() {
     
     workingData.locations.splice(insertIndex, 0, newLocation);
     recalculateDates(workingData.locations);
-    render(legFilter.value, routingToggle.checked);
+    render(legFilter.value, subLegFilter.value, routingToggle.checked);
     closeAddDestinationModal();
   }
 
@@ -1042,7 +1133,7 @@ async function initMapApp() {
       recalculateDates(workingData.locations);
       
       // Re-render the map and sidebar
-      render(legFilter.value, routingToggle.checked);
+      render(legFilter.value, subLegFilter.value, routingToggle.checked);
     }
   }
 
@@ -1135,11 +1226,11 @@ async function initMapApp() {
       const latestVersion = await scenarioManager.getLatestVersion(scenarioId);
 
       if (scenario && latestVersion) {
-        workingData = JSON.parse(JSON.stringify(latestVersion.itineraryData));
+        workingData = mergeSubLegsFromTemplate(JSON.parse(JSON.stringify(latestVersion.itineraryData)));
         currentScenarioId = scenarioId;
         currentScenarioName = scenario.name;
-        render(legFilter.value, routingToggle.checked);
-        updateChatContext(legFilter.value);
+        render(legFilter.value, subLegFilter.value, routingToggle.checked);
+        updateChatContext(legFilter.value, subLegFilter.value);
         closeManageScenariosModal();
         document.getElementById('scenario-selector').value = scenarioId;
       }
@@ -1272,10 +1363,19 @@ async function initMapApp() {
   const routingToggle = document.getElementById('routing-toggle');
   
   function updateMap() {
-    render(legFilter.value, routingToggle.checked);
+    const legName = legFilter.value;
+    const subLegName = subLegFilter.value || null;
+    render(legName, subLegName, routingToggle.checked);
   }
-  
-  legFilter.addEventListener('change', updateMap);
+
+  legFilter.addEventListener('change', function(e) {
+    populateSubLegs(e.target.value);
+    subLegFilter.value = ''; // Reset sub-leg selection
+    updateMap();
+    updateChatContext(e.target.value, null);
+  });
+
+  subLegFilter.addEventListener('change', updateMap);
   routingToggle.addEventListener('change', updateMap);
   
   // Export scenario button
@@ -1608,8 +1708,15 @@ async function initMapApp() {
   }
 
   function handleItineraryChanges(changes) {
+    // ⚠️ CRITICAL NOTE: This function is called as a workaround for non-deterministic AI behavior.
+    // Even when the AI chat claims it cannot access the itinerary, the backend may still
+    // process and apply changes that are detected via polling. This function ensures those
+    // changes are applied to the UI regardless of the AI's response message.
+    console.log('🚨 !!! ITINERARY CHANGES DETECTED !!!');
+    console.log('🚨 !!! This might be causing the app reset !!!');
     console.log('🔧 handleItineraryChanges called with:', changes);
     console.log('📍 Current workingData.locations count:', workingData.locations?.length || 0);
+    console.trace('🚨 Stack trace for handleItineraryChanges call:');
 
     changes.forEach(change => {
       console.log(`🎯 Processing change type: ${change.type}`, change);
@@ -1635,8 +1742,8 @@ async function initMapApp() {
     console.log('📍 After changes, workingData.locations count:', workingData.locations?.length || 0);
     console.log('🔄 Recalculating dates and re-rendering...');
     recalculateDates(workingData.locations);
-    render(legFilter.value, routingToggle.checked);
-    updateChatContext(legFilter.value);
+    render(legFilter.value, subLegFilter.value, routingToggle.checked);
+    updateChatContext(legFilter.value, subLegFilter.value);
     console.log('✅ Re-render complete');
   }
 
@@ -1710,33 +1817,51 @@ async function initMapApp() {
   }
 
   // Function to update chat context
-  function updateChatContext(legName) {
-    if (!chatInstance) return;
+  function updateChatContext(legName, subLegName = null) {
+    if (!chatInstance) {
+      console.log('⚠️ updateChatContext called but chatInstance is null');
+      return;
+    }
+
+    console.log('🔧 updateChatContext called with:', { legName, subLegName });
+    console.log('🔧 workingData has locations:', workingData.locations?.length || 0);
+    console.log('🔧 workingData has legs:', workingData.legs?.length || 0);
 
     const legData = workingData.legs?.find(l => l.name === legName);
-    const filtered = filterByLeg(workingData, legName);
+    console.log('🔧 legData found:', !!legData, legData?.name || 'null');
 
-    console.log(`Updating chat context for leg: ${legName}, destinations: ${filtered.length}`);
+    const filtered = subLegName
+      ? filterBySubLeg(workingData, legName, subLegName)
+      : filterByLeg(workingData, legName);
+
+    console.log('🔧 filtered destinations count:', filtered.length);
+    console.log('🔧 filtered destinations sample:', filtered.slice(0, 2));
+
+    const subLegData = subLegName ? legData?.sub_legs?.find(sl => sl.name === subLegName) : null;
+
+    console.log(`🔧 Updating chat context for leg: ${legName}${subLegName ? ` / ${subLegName}` : ''}, destinations: ${filtered.length}`);
 
     // Pass full location objects instead of just names
     chatInstance.updateContext(
       legName,
       filtered, // Pass the full location objects
-      legData?.start_date,
-      legData?.end_date
+      subLegData?.start_date || legData?.start_date,
+      subLegData?.end_date || legData?.end_date,
+      subLegName // Pass sub-leg name
     );
   }
 
-  // Update chat context when leg filter changes
-  legFilter.addEventListener('change', function(e) {
-    updateChatContext(e.target.value);
+  // Update chat context when leg filter changes - now handled in leg filter change event above
+  // Update chat context when sub-leg filter changes
+  subLegFilter.addEventListener('change', function() {
+    updateChatContext(legFilter.value, subLegFilter.value || null);
   });
 
   // Initialize chat context with 'all' on load
-  render('all', routingToggle.checked);
+  render('all', null, routingToggle.checked);
   if (chatInstance) {
     // Give it a moment for render to complete
-    setTimeout(() => updateChatContext('all'), 100);
+    setTimeout(() => updateChatContext('all', null), 100);
   }
 }
 

@@ -1,4 +1,7 @@
 // AI Travel Concierge Chat Module
+import { db } from './firebase-config.js';
+import { collection, addDoc, doc, setDoc, getDoc, getDocs, query, orderBy, limit, updateDoc, deleteDoc, Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+
 const CHAT_API_URL = 'http://localhost:5001/api/chat';
 const CHANGES_API_URL = 'http://localhost:5001/api/itinerary/changes';
 
@@ -11,6 +14,16 @@ class TravelConciergeChat {
     this.onItineraryChange = onItineraryChange; // Callback to notify parent of changes
     this.pollInterval = null;
     this.isFloating = false;
+    this.currentChatId = null; // Current chat conversation ID
+    this.messages = []; // In-memory message history
+    this.firestoreEnabled = true; // Enable Firestore persistence (will be disabled on errors)
+
+    // ⚠️ KNOWN ISSUE: Non-deterministic behavior in AI responses
+    // The AI backend sometimes responds with "I don't have access to your itinerary"
+    // even when complete context data is properly sent. This appears to be a backend
+    // processing issue where the AI intermittently fails to parse or utilize the
+    // itinerary context data. Changes may still be applied asynchronously via polling
+    // despite the error response. This behavior needs investigation in the Python backend.
 
     this.initElements();
     this.attachEventListeners();
@@ -47,6 +60,35 @@ class TravelConciergeChat {
     this.floatingSendBtn = document.getElementById('floating-send-btn');
     this.dockBtn = document.getElementById('dock-chat-btn');
     this.toggleFloatingBtn = document.getElementById('toggle-floating-chat');
+
+    // Chat history elements
+    this.newChatBtn = document.getElementById('new-chat-btn');
+    this.historyBtn = document.getElementById('chat-history-btn');
+    this.closeHistoryBtn = document.getElementById('close-history-btn');
+
+    // Debug: check if elements are found
+    console.log('🔍 Chat elements initialized:', {
+      chatInput: !!this.chatInput,
+      chatForm: !!this.chatForm,
+      sendBtn: !!this.sendBtn,
+      chatInputDisabled: this.chatInput?.disabled
+    });
+
+    // Ensure inputs are enabled on initialization
+    if (this.chatInput) {
+      this.chatInput.disabled = false;
+    }
+    if (this.sendBtn) {
+      this.sendBtn.disabled = false;
+    }
+    if (this.floatingChatInput) {
+      this.floatingChatInput.disabled = false;
+    }
+    if (this.floatingSendBtn) {
+      this.floatingSendBtn.disabled = false;
+    }
+
+    this.normalizeExistingMessages();
   }
 
   attachEventListeners() {
@@ -69,6 +111,14 @@ class TravelConciergeChat {
       this.dockChat();
     });
     this.toggleFloatingBtn?.addEventListener('click', () => this.toggleFloatingChat());
+
+    // Chat history listeners
+    this.newChatBtn?.addEventListener('click', () => {
+      this.clearChat();
+      this.createNewChat();
+    });
+    this.historyBtn?.addEventListener('click', () => this.showChatHistory());
+    this.closeHistoryBtn?.addEventListener('click', () => this.hideChatHistory());
   }
 
   toggleChat() {
@@ -97,8 +147,9 @@ class TravelConciergeChat {
     this.stopPollingForChanges();
   }
 
-  updateContext(legName, destinationsData, startDate, endDate) {
+  updateContext(legName, destinationsData, startDate, endDate, subLegName = null) {
     this.currentLeg = legName;
+    this.currentSubLeg = subLegName;
     this.currentDestinationsData = destinationsData; // Full location objects
     this.currentStartDate = startDate;
     this.currentEndDate = endDate;
@@ -150,8 +201,19 @@ class TravelConciergeChat {
   }
 
   syncMessages(source, target) {
-    // Copy all messages from source to target
-    target.innerHTML = source.innerHTML;
+    if (!source || !target) return;
+
+    const isFloatingTarget = target === this.floatingChatMessages;
+    target.innerHTML = '';
+
+    Array.from(source.children).forEach(child => {
+      const isFloatingSource = source === this.floatingChatMessages;
+      const baseId = this.assignMessageIdentifiers(child, isFloatingSource);
+      const clone = child.cloneNode(true);
+      clone.dataset.messageId = baseId;
+      this.assignMessageIdentifiers(clone, isFloatingTarget);
+      target.appendChild(clone);
+    });
   }
 
   initFloatingChat() {
@@ -297,15 +359,77 @@ class TravelConciergeChat {
     });
   }
 
-  async handleSubmit(e, isFloating = false) {
-    e.preventDefault();
+  generateMessageId() {
+    return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
 
-    const input = isFloating ? this.floatingChatInput : this.chatInput;
+  getDomMessageId(baseId, isFloating) {
+    return `${baseId}-${isFloating ? 'floating' : 'sidebar'}`;
+  }
+
+  assignMessageIdentifiers(messageElement, isFloating) {
+    if (!messageElement) return null;
+
+    let baseId = messageElement.dataset?.messageId;
+    if (!baseId) {
+      baseId = this.generateMessageId();
+      messageElement.dataset.messageId = baseId;
+    }
+
+    messageElement.id = this.getDomMessageId(baseId, isFloating);
+    return baseId;
+  }
+
+  normalizeExistingMessages() {
+    [this.chatMessages, this.floatingChatMessages].forEach(container => {
+      if (!container) return;
+      const isFloating = container === this.floatingChatMessages;
+      Array.from(container.querySelectorAll('.chat-message')).forEach(msg => {
+        this.assignMessageIdentifiers(msg, isFloating);
+      });
+    });
+  }
+
+  resetChatMessages(container) {
+    if (!container) return;
+    const isFloating = container === this.floatingChatMessages;
+    Array.from(container.querySelectorAll('.chat-message')).forEach((msg, index) => {
+      if (index === 0) {
+        this.assignMessageIdentifiers(msg, isFloating);
+      } else {
+        msg.remove();
+      }
+    });
+  }
+
+  async handleSubmit(e, isFloating = false) {
+    console.log('🚨 handleSubmit called');
+
+    try {
+      e.preventDefault();
+      e.stopPropagation();
+
+      console.log('🚨 === CHAT SUBMIT START ===');
+      console.log('🚨 Current app state before sending:', {
+        currentMarkers: window.currentMarkers?.length || 0,
+        currentLocations: window.currentLocations?.length || 0,
+        workingDataLocations: window.workingData?.locations?.length || 0
+      });
+
+      const input = isFloating ? this.floatingChatInput : this.chatInput;
     const messages = isFloating ? this.floatingChatMessages : this.chatMessages;
     const sendBtn = isFloating ? this.floatingSendBtn : this.sendBtn;
 
     const message = input.value.trim();
     if (!message) return;
+
+    // Ensure we have a chat session before adding messages
+    if (!this.currentChatId) {
+      console.log('🆘 No currentChatId, creating new chat before sending message');
+      await this.createNewChat();
+    } else {
+      console.log('✅ Using existing chat session:', this.currentChatId);
+    }
 
     // Add user message to UI
     this.addMessage(message, 'user', false, isFloating);
@@ -332,6 +456,7 @@ class TravelConciergeChat {
       // Build rich context from current leg with full destination details
       const context = {
         leg_name: this.currentLeg || 'All',
+        sub_leg_name: this.currentSubLeg || null,
         start_date: this.currentStartDate || '',
         end_date: this.currentEndDate || '',
         destinations: (this.currentDestinationsData || []).map(loc => ({
@@ -347,14 +472,20 @@ class TravelConciergeChat {
         }))
       };
 
-      console.log('Sending chat request with context:', context);
+      console.log('🚀 Sending chat request with context:');
+      console.log('   Leg:', context.leg_name);
+      console.log('   Sub-Leg:', context.sub_leg_name);
+      console.log('   Destinations count:', context.destinations.length);
+      console.log('   Destinations data:', context.destinations);
+      console.log('   CurrentDestinationsData source:', this.currentDestinationsData);
+      console.log('   Full context:', context);
 
       const payload = {
         message,
         context,
         session_id: this.sessionId,
-        // Always send initialize_itinerary flag on first message (when no session ID)
-        initialize_itinerary: !this.sessionId
+        // Only send initialize_itinerary flag on actual first message (no session and no chat history)
+        initialize_itinerary: !this.sessionId && this.messages.length === 0
       };
 
       console.log('Session ID:', this.sessionId, 'Initialize:', payload.initialize_itinerary);
@@ -403,6 +534,7 @@ class TravelConciergeChat {
       if (data.session_id) {
         console.log(`🔑 Setting session ID: ${data.session_id} (was: ${this.sessionId})`);
         this.sessionId = data.session_id;
+        this.persistSessionId(this.sessionId);
       } else {
         console.warn('⚠️ No session_id in response!', data);
       }
@@ -414,6 +546,8 @@ class TravelConciergeChat {
       this.removeMessage(loadingMsgId, isFloating);
 
       // Add bot response
+      // ⚠️ NOTE: AI responses may be inconsistent. The AI might claim it cannot access the itinerary
+      // even when complete context data was sent. Backend investigation needed for this non-deterministic behavior.
       this.addMessage(data.response || 'Sorry, I could not generate a response.', 'bot', false, isFloating);
 
       // Sync messages to the other view
@@ -453,15 +587,30 @@ class TravelConciergeChat {
       }
     } finally {
       this.setLoading(false, isFloating);
+      console.log('🚨 === CHAT SUBMIT END ===');
+      setTimeout(() => {
+        console.log('🚨 App state after sending:', {
+          currentMarkers: window.currentMarkers?.length || 0,
+          currentLocations: window.currentLocations?.length || 0,
+          workingDataLocations: window.workingData?.locations?.length || 0
+        });
+      }, 1000);
+    }
+    } catch (error) {
+      console.error('🔥 CRITICAL ERROR in handleSubmit - this might be causing the page reload:', error);
+      console.error('🔥 Error details:', error.message, error.stack);
+      alert(`An error occurred while sending your message: ${error.message}`);
+      this.setLoading(false, isFloating);
     }
   }
 
-  addMessage(text, sender = 'bot', isLoading = false, isFloating = false) {
+  addMessage(text, sender = 'bot', isLoading = false, isFloating = false, saveToFirestore = true) {
     // Generate ID without periods (replace decimal point with underscore)
-    const messageId = `msg-${Date.now()}-${Math.random()}`.replace(/\./g, '_');
+    const baseMessageId = this.generateMessageId();
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${sender}${isLoading ? ' loading' : ''}`;
-    messageDiv.id = messageId;
+    messageDiv.dataset.messageId = baseMessageId;
+    messageDiv.id = this.getDomMessageId(baseMessageId, isFloating);
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
@@ -475,13 +624,22 @@ class TravelConciergeChat {
     // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-    return messageId;
+    // Save to Firestore (unless it's a loading message) - but make it optional to avoid permission errors
+    if (saveToFirestore && !isLoading && this.firestoreEnabled) {
+      this.saveMessage(text, sender).catch(err => {
+        console.warn('Failed to save message to Firestore (continuing without persistence):', err);
+        // Disable Firestore for this session to avoid repeated errors
+        this.firestoreEnabled = false;
+      });
+    }
+
+    return baseMessageId;
   }
 
   getMessageElement(messageId, isFloating = false) {
     const messagesContainer = isFloating ? this.floatingChatMessages : this.chatMessages;
-    // Use getElementById on the container's ownerDocument or just find by ID directly
-    return document.getElementById(messageId);
+    if (!messagesContainer) return null;
+    return messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
   }
 
   removeMessage(messageId, isFloating = false) {
@@ -502,44 +660,333 @@ class TravelConciergeChat {
   }
 
   clearChat() {
-    // Keep only the welcome message
-    const messages = this.chatMessages.querySelectorAll('.chat-message:not(:first-child)');
-    messages.forEach(msg => msg.remove());
+    this.resetChatMessages(this.chatMessages);
+    this.resetChatMessages(this.floatingChatMessages);
     this.sessionId = null;
+    this.currentChatId = null;
+    this.messages = [];
+  }
+
+  // ==================== CHAT HISTORY METHODS ====================
+
+  /**
+   * Create a new chat in Firestore
+   */
+  async createNewChat() {
+    console.log('🆕 Creating new chat - current state:', {
+      currentChatId: this.currentChatId,
+      messagesCount: this.messages?.length || 0,
+      sessionId: this.sessionId
+    });
+
+    try {
+      const chatRef = await addDoc(collection(db, 'chatHistory'), {
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+        legName: this.currentLeg || 'All',
+        subLegName: this.currentSubLeg || null,
+        title: 'New Chat',
+        messageCount: 0
+      });
+
+      this.currentChatId = chatRef.id;
+      this.messages = [];
+      console.log('📝 Created new chat:', this.currentChatId);
+      console.log('🆕 Chat state after creation:', {
+        currentChatId: this.currentChatId,
+        messagesCount: this.messages?.length || 0,
+        sessionId: this.sessionId
+      });
+      return chatRef.id;
+    } catch (error) {
+      console.error('🔥 Error creating new chat:', error);
+      console.trace('Stack trace for createNewChat error:');
+      return null;
+    }
+  }
+
+  /**
+   * Save a message to Firestore
+   */
+  async saveMessage(text, sender) {
+    if (!this.currentChatId) {
+      console.warn('⚠️ No currentChatId when saving message - this should not happen');
+      return;
+    }
+
+    console.log('💾 Saving message to Firestore:', { text, sender, chatId: this.currentChatId });
+
+    try {
+      const message = {
+        text,
+        sender,
+        timestamp: Timestamp.now()
+      };
+
+      this.messages.push(message);
+
+      // Update chat document with new message
+      const chatRef = doc(db, 'chatHistory', this.currentChatId);
+
+      // Generate title from first user message
+      let title = 'New Chat';
+      if (sender === 'user' && this.messages.filter(m => m.sender === 'user').length === 1) {
+        title = text.substring(0, 50) + (text.length > 50 ? '...' : '');
+      } else {
+        const chatDoc = await getDoc(chatRef);
+        if (chatDoc.exists()) {
+          title = chatDoc.data().title || 'New Chat';
+        }
+      }
+
+      await setDoc(chatRef, {
+        messages: this.messages.map(m => ({
+          text: m.text,
+          sender: m.sender,
+          timestamp: m.timestamp
+        })),
+        updatedAt: Timestamp.now(),
+        legName: this.currentLeg || 'All',
+        subLegName: this.currentSubLeg || null,
+        title: title,
+        messageCount: this.messages.length,
+        sessionId: this.sessionId || null
+      }, { merge: true });
+
+      console.log('💾 Saved message to chat:', this.currentChatId);
+    } catch (error) {
+      console.error('Error saving message:', error);
+    }
+  }
+
+  async persistSessionId(sessionId) {
+    if (!this.currentChatId) return;
+
+    try {
+      const chatRef = doc(db, 'chatHistory', this.currentChatId);
+      await updateDoc(chatRef, { sessionId: sessionId || null });
+      console.log('🗂️ Persisted session ID for chat:', this.currentChatId, sessionId);
+    } catch (error) {
+      console.error('Error persisting session ID:', error);
+    }
+  }
+
+  /**
+   * Load a chat from Firestore
+   */
+  async loadChat(chatId) {
+    try {
+      const chatRef = doc(db, 'chatHistory', chatId);
+      const chatDoc = await getDoc(chatRef);
+
+      if (!chatDoc.exists()) {
+        console.error('Chat not found:', chatId);
+        return false;
+      }
+
+      const chatData = chatDoc.data();
+      this.currentChatId = chatId;
+      this.messages = chatData.messages || [];
+      this.sessionId = chatData.sessionId || null;
+
+      // Clear current chat UI
+      this.chatMessages.innerHTML = '';
+      this.floatingChatMessages.innerHTML = '';
+
+      // Render messages
+      this.messages.forEach(msg => {
+        this.addMessage(msg.text, msg.sender, false, false, false);
+      });
+
+      // Sync to floating chat
+      this.syncMessages(this.chatMessages, this.floatingChatMessages);
+
+      console.log('📂 Loaded chat:', chatId, 'with', this.messages.length, 'messages');
+      return true;
+    } catch (error) {
+      console.error('Error loading chat:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all chat histories from Firestore
+   */
+  async getChatHistories() {
+    try {
+      const q = query(
+        collection(db, 'chatHistory'),
+        orderBy('updatedAt', 'desc'),
+        limit(50)
+      );
+
+      const querySnapshot = await getDocs(q);
+      const chats = [];
+
+      querySnapshot.forEach((doc) => {
+        chats.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+
+      console.log('📚 Retrieved', chats.length, 'chat histories');
+      return chats;
+    } catch (error) {
+      console.error('Error getting chat histories:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Delete a chat from Firestore
+   */
+  async deleteChat(chatId) {
+    try {
+      await deleteDoc(doc(db, 'chatHistory', chatId));
+      console.log('🗑️ Deleted chat:', chatId);
+
+      if (this.currentChatId === chatId) {
+        this.clearChat();
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Show chat history panel
+   */
+  async showChatHistory() {
+    const historyPanel = document.getElementById('chat-history-panel');
+    const historyList = document.getElementById('chat-history-list');
+
+    if (!historyPanel || !historyList) {
+      console.error('Chat history UI elements not found');
+      return;
+    }
+
+    // Show loading state
+    historyList.innerHTML = '<div class="loading">Loading chat history...</div>';
+    historyPanel.classList.remove('hidden');
+
+    // Load chat histories
+    const chats = await this.getChatHistories();
+
+    if (chats.length === 0) {
+      historyList.innerHTML = '<div class="empty-state">No chat history yet</div>';
+      return;
+    }
+
+    // Render chat list
+    historyList.innerHTML = '';
+    chats.forEach(chat => {
+      const chatItem = document.createElement('div');
+      chatItem.className = 'chat-history-item';
+      chatItem.innerHTML = `
+        <div class="chat-history-info">
+          <div class="chat-history-title">${chat.title || 'Untitled Chat'}</div>
+          <div class="chat-history-meta">
+            ${chat.legName || 'All Legs'} • ${chat.messageCount || 0} messages • ${this.formatDate(chat.updatedAt)}
+          </div>
+        </div>
+        <div class="chat-history-actions">
+          <button class="chat-history-load-btn" data-chat-id="${chat.id}">Load</button>
+          <button class="chat-history-delete-btn" data-chat-id="${chat.id}">Delete</button>
+        </div>
+      `;
+
+      // Add event listeners
+      const loadBtn = chatItem.querySelector('.chat-history-load-btn');
+      const deleteBtn = chatItem.querySelector('.chat-history-delete-btn');
+
+      loadBtn.addEventListener('click', async () => {
+        await this.loadChat(chat.id);
+        historyPanel.classList.add('hidden');
+      });
+
+      deleteBtn.addEventListener('click', async () => {
+        if (confirm('Are you sure you want to delete this chat?')) {
+          await this.deleteChat(chat.id);
+          await this.showChatHistory(); // Refresh list
+        }
+      });
+
+      historyList.appendChild(chatItem);
+    });
+  }
+
+  /**
+   * Hide chat history panel
+   */
+  hideChatHistory() {
+    const historyPanel = document.getElementById('chat-history-panel');
+    if (historyPanel) {
+      historyPanel.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Format timestamp for display
+   */
+  formatDate(timestamp) {
+    if (!timestamp) return '';
+
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+
+    return date.toLocaleDateString();
   }
 
   startPollingForChanges() {
     // Poll for itinerary changes every 2 seconds when chat is active
+    // ⚠️ WORKAROUND: Due to non-deterministic AI responses, we rely on polling to detect changes
+    // that the AI may have applied even when it claims it cannot access the itinerary.
     if (this.pollInterval) {
-      console.log('⚠️ Polling already active');
+      // console.log('⚠️ Polling already active');
       return; // Already polling
     }
 
-    console.log('🔄 Starting polling for itinerary changes...');
+    // console.log('🔄 Starting polling for itinerary changes...');
     this.pollInterval = setInterval(async () => {
       try {
-        // Always check default_session first, then the actual session ID
-        const sessionIds = this.sessionId ? ['default_session', this.sessionId] : ['default_session'];
+        // Poll the active session queue; fall back to default until one exists
+        const sessionIds = this.sessionId ? [this.sessionId] : ['default_session'];
 
         for (const sid of sessionIds) {
           const response = await fetch(`${CHANGES_API_URL}/${sid}`);
           if (!response.ok) {
-            console.log(`Poll failed for session ${sid}: ${response.status}`);
+            // console.log(`Poll failed for session ${sid}: ${response.status}`);
             continue;
           }
 
           const data = await response.json();
-          console.log(`Poll response for session ${sid}:`, data);
-          console.log(`  - data.status: ${data.status}`);
-          console.log(`  - data.changes: ${data.changes}`);
-          console.log(`  - data.changes.length: ${data.changes?.length}`);
+          // console.log(`Poll response for session ${sid}:`, data);
+          // console.log(`  - data.status: ${data.status}`);
+          // console.log(`  - data.changes: ${data.changes}`);
+          // console.log(`  - data.changes.length: ${data.changes?.length}`);
 
           if (data.status === 'success' && data.changes && data.changes.length > 0) {
+            console.log(`🚨 !!! POLLING RECEIVED CHANGES !!!`);
+            console.log(`🚨 This might be causing the app reset!`);
             console.log(`✅ Received ${data.changes.length} itinerary changes from session ${sid}:`, data.changes);
+            console.trace('🚨 Stack trace for polling changes:');
 
             // Notify parent to apply changes
             if (this.onItineraryChange) {
-              console.log('📞 Calling onItineraryChange callback with changes:', data.changes);
+              // console.log('📞 Calling onItineraryChange callback with changes:', data.changes);
               this.onItineraryChange(data.changes);
             } else {
               console.warn('⚠️ No onItineraryChange callback registered!');
@@ -559,6 +1006,18 @@ class TravelConciergeChat {
     }
   }
 }
+
+// Global error handler to catch any unhandled errors that might cause page reload
+window.addEventListener('error', function(event) {
+  console.error('🔥 GLOBAL ERROR CAUGHT - this might be causing the page reload:', event.error);
+  console.error('🔥 Error details:', event.error.message, event.error.stack);
+  event.preventDefault();
+});
+
+window.addEventListener('unhandledrejection', function(event) {
+  console.error('🔥 UNHANDLED PROMISE REJECTION - this might be causing the page reload:', event.reason);
+  event.preventDefault();
+});
 
 // Export for use in main app
 window.TravelConciergeChat = TravelConciergeChat;
