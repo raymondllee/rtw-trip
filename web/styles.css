@@ -288,80 +288,203 @@ html, body {
   background: #d32f2f;
 }
 
-.planning-controls {
-  padding: 6px 12px;
+/* Leg Filter Section */
+.leg-filter-section {
+  padding: 8px 12px;
+  border-bottom: 1px solid #eee;
+  background: #fafbfc;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.leg-filter-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.leg-filter-select {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  font-size: 13px;
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+.leg-filter-select:focus {
+  outline: none;
+  border-color: #1e88e5;
+  box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.1);
+}
+
+.transport-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+}
+
+.transport-toggle input[type="checkbox"] {
+  cursor: pointer;
+}
+
+/* Scenario Section */
+.scenario-section {
+  padding: 10px 12px;
   border-bottom: 1px solid #eee;
   background: #f8f9fa;
+}
+
+.scenario-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.scenario-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.save-indicator {
+  font-size: 11px;
+  color: #27ae60;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.save-indicator.show {
+  opacity: 1;
+}
+
+.scenario-controls {
   display: flex;
   gap: 4px;
-  align-items: center;
+  align-items: stretch;
 }
 
-.planning-controls button {
-  padding: 4px 8px;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-  background: white;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 500;
+.scenario-selector {
   flex: 1;
+  padding: 7px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.planning-controls button:hover {
-  background: #f5f5f5;
-}
-
-.planning-controls button.primary {
-  background: #1e88e5;
-  color: white;
+.scenario-selector:hover {
   border-color: #1e88e5;
 }
 
-.planning-controls button.primary:hover {
-  background: #1565c0;
+.scenario-selector:focus {
+  outline: none;
+  border-color: #1e88e5;
+  box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.1);
 }
 
-/* Scenario management styles */
-.scenario-controls {
-  padding: 6px 12px;
-  border-bottom: 1px solid #eee;
-  background: #fafafa;
-}
-
-.scenario-actions {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-
-.scenario-actions select {
-  flex: 1;
-  padding: 4px 6px;
+.scenario-actions-btn {
+  padding: 7px 10px;
   border: 1px solid #ddd;
-  border-radius: 3px;
+  border-radius: 4px;
   background: white;
-  font-size: 11px;
-}
-
-.scenario-management {
-  display: flex;
-  gap: 4px;
-}
-
-.scenario-management button {
-  padding: 3px 6px;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-  background: white;
+  color: #666;
+  font-size: 16px;
+  font-weight: bold;
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 500;
-  flex: 1;
+  transition: all 0.2s;
+  line-height: 1;
 }
 
-.scenario-management button:hover {
+.scenario-actions-btn:hover {
+  background: #e9ecef;
+  border-color: #999;
+  color: #333;
+}
+
+.scenario-actions-btn.active {
+  background: #e3f2fd;
+  border-color: #1e88e5;
+  color: #1e88e5;
+}
+
+/* Scenario Actions Dropdown */
+.scenario-section {
+  position: relative;
+}
+
+.scenario-actions-dropdown {
+  position: fixed;
+  margin-top: 2px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10000 !important;
+  min-width: 200px;
+  padding: 4px 0;
+}
+
+.scenario-actions-dropdown[style*="display: block"] {
+  display: block !important;
+}
+
+.scenario-actions-dropdown .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  transition: background 0.2s;
+}
+
+.scenario-actions-dropdown .dropdown-item:hover {
   background: #f5f5f5;
+}
+
+.scenario-actions-dropdown .dropdown-item .icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.scenario-actions-dropdown .dropdown-divider {
+  height: 1px;
+  background: #eee;
+  margin: 4px 0;
+}
+
+/* Position the dropdown relative to sidebar */
+.sidebar {
+  position: relative;
 }
 
 /* Scenario list styles */

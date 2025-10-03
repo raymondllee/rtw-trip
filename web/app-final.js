@@ -596,17 +596,17 @@ async function initMapApp() {
     triggerAutosave();
   }
   
-  function render(legName, useRouting = false) {
+  function render(legName, useRouting = false, triggerAutoSave = true) {
     currentMarkers.forEach(m => m.setMap(null));
     currentMarkers = [];
-    
+
     currentRoutingElements.forEach(element => {
       if (element && element.setMap) {
         element.setMap(null);
       }
     });
     currentRoutingElements = [];
-    
+
     const filtered = filterByLeg(workingData, legName);
     currentLocations = filtered;
     const { markers, highlightLocation, routingElements } = addMarkersAndPath(map, filtered, useRouting);
@@ -614,9 +614,14 @@ async function initMapApp() {
     currentRoutingElements = routingElements || [];
     highlightLocationFn = highlightLocation;
     computeBounds(map, filtered);
-    
+
     updateSidebar(filtered);
     updateScenarioSelector();
+
+    // Trigger auto-save if scenario is loaded
+    if (triggerAutoSave) {
+      autoSaveScenario();
+    }
     
     const summary = document.getElementById('summary');
     if (legName === 'all') {
@@ -635,8 +640,12 @@ async function initMapApp() {
     const selector = document.getElementById('scenario-selector');
     const currentValue = selector.value;
 
-    // Clear existing options except the first one
-    selector.innerHTML = '<option value="">Select a scenario...</option>';
+    // Reset to default options
+    selector.innerHTML = `
+      <option value="">Unsaved Changes</option>
+      <option value="__new__">+ New Scenario</option>
+      <option disabled>──────────</option>
+    `;
 
     try {
       // Load scenarios from Firestore
@@ -649,7 +658,7 @@ async function initMapApp() {
       });
 
       // Restore selection if it still exists
-      if (currentValue && scenarios.some(s => s.id === currentValue)) {
+      if (currentValue && currentValue !== '__new__' && scenarios.some(s => s.id === currentValue)) {
         selector.value = currentValue;
       } else if (currentScenarioId) {
         selector.value = currentScenarioId;
@@ -657,6 +666,32 @@ async function initMapApp() {
     } catch (error) {
       console.error('Error loading scenarios:', error);
     }
+  }
+
+  // Auto-save functionality
+  let autoSaveTimeout = null;
+
+  function showSaveIndicator() {
+    const indicator = document.getElementById('save-indicator');
+    indicator.classList.add('show');
+    setTimeout(() => {
+      indicator.classList.remove('show');
+    }, 2000);
+  }
+
+  async function autoSaveScenario() {
+    if (!currentScenarioId || !currentScenarioName) return;
+
+    clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = setTimeout(async () => {
+      try {
+        // Save as a new auto-version (isNamed = false)
+        await scenarioManager.saveVersion(currentScenarioId, workingData, false);
+        showSaveIndicator();
+      } catch (error) {
+        console.error('Auto-save failed:', error);
+      }
+    }, 1000); // Debounce by 1 second
   }
   
   function updateSidebar(locations) {
@@ -1011,17 +1046,6 @@ async function initMapApp() {
     }
   }
 
-  function updateSaveButton() {
-    const saveBtn = document.getElementById('save-scenario-btn');
-    if (currentScenarioName) {
-      saveBtn.textContent = `Update "${currentScenarioName}"`;
-      saveBtn.title = `Update the current scenario: ${currentScenarioName}`;
-    } else {
-      saveBtn.textContent = 'Save Scenario';
-      saveBtn.title = 'Save current trip as a new scenario';
-    }
-  }
-  
   // Scenario management functions
   async function openSaveScenarioModal() {
     const modal = document.getElementById('save-scenario-modal');
@@ -1118,7 +1142,6 @@ async function initMapApp() {
         updateChatContext(legFilter.value);
         closeManageScenariosModal();
         document.getElementById('scenario-selector').value = scenarioId;
-        updateSaveButton();
       }
     } catch (error) {
       console.error('Error loading scenario:', error);
@@ -1137,7 +1160,6 @@ async function initMapApp() {
         if (currentScenarioId === scenarioId) {
           currentScenarioId = null;
           currentScenarioName = null;
-          updateSaveButton();
         }
       } catch (error) {
         console.error('Error deleting scenario:', error);
@@ -1256,83 +1278,165 @@ async function initMapApp() {
   legFilter.addEventListener('change', updateMap);
   routingToggle.addEventListener('change', updateMap);
   
-  // Planning controls
-  document.getElementById('recalculate-btn').addEventListener('click', () => {
-    recalculateDates(workingData.locations);
-    render(legFilter.value, routingToggle.checked);
-  });
-  
-  document.getElementById('reset-btn').addEventListener('click', () => {
-    if (confirm('Reset all changes to original itinerary?')) {
-      workingData = JSON.parse(JSON.stringify(originalData));
-      currentScenarioName = null;
-      document.getElementById('scenario-selector').value = '';
-      render(legFilter.value, routingToggle.checked);
-      updateSaveButton(); // Update the save button text
-    }
-  });
-  
-  document.getElementById('export-btn').addEventListener('click', () => {
+  // Export scenario button
+  document.getElementById('export-scenario-btn').addEventListener('click', () => {
     const dataStr = JSON.stringify(workingData, null, 2);
     const dataBlob = new Blob([dataStr], {type: 'application/json'});
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'updated_itinerary.json';
+    const scenarioName = currentScenarioName || 'itinerary';
+    link.download = `${scenarioName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
   });
   
+  // Scenario actions dropdown toggle
+  console.log('Setting up scenario actions button...');
+  const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+  const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+  console.log('Found elements:', { btn: scenarioActionsBtn, dropdown: scenarioActionsDropdown });
+
+  if (scenarioActionsBtn && scenarioActionsDropdown) {
+    console.log('Adding click listener to scenario actions button');
+    scenarioActionsBtn.addEventListener('click', (e) => {
+      console.log('Scenario actions button clicked!');
+      e.stopPropagation();
+      const isVisible = scenarioActionsDropdown.style.display !== 'none';
+      console.log('Is visible?', isVisible, 'Current display:', scenarioActionsDropdown.style.display);
+
+      if (isVisible) {
+        scenarioActionsDropdown.style.display = 'none';
+        scenarioActionsBtn.classList.remove('active');
+      } else {
+        // Position the dropdown below the button using fixed positioning
+        const rect = scenarioActionsBtn.getBoundingClientRect();
+        scenarioActionsDropdown.style.top = (rect.bottom + 2) + 'px';
+        // Align dropdown to the right edge of the button
+        scenarioActionsDropdown.style.right = (window.innerWidth - rect.right) + 'px';
+        scenarioActionsDropdown.style.left = 'auto';
+        scenarioActionsDropdown.style.display = 'block';
+        scenarioActionsBtn.classList.add('active');
+      }
+      console.log('New display:', scenarioActionsDropdown.style.display);
+    });
+  } else {
+    console.error('Scenario actions button or dropdown not found!', {
+      btn: scenarioActionsBtn,
+      dropdown: scenarioActionsDropdown
+    });
+  }
+
+  // Close dropdown when clicking outside
+  if (scenarioActionsBtn && scenarioActionsDropdown) {
+    document.addEventListener('click', (e) => {
+      if (!scenarioActionsDropdown.contains(e.target) &&
+          !scenarioActionsBtn.contains(e.target)) {
+        scenarioActionsDropdown.style.display = 'none';
+        scenarioActionsBtn.classList.remove('active');
+      }
+    });
+  }
+
+
   // Scenario controls
-  document.getElementById('save-scenario-btn').addEventListener('click', openSaveScenarioModal);
   document.getElementById('manage-scenarios-btn').addEventListener('click', openManageScenariosModal);
 
-  // Migration button - migrate localStorage to Firestore
-  document.getElementById('migrate-localstorage-btn').addEventListener('click', async () => {
-    if (!confirm('Migrate your localStorage scenarios to Firestore cloud storage?\n\nThis will copy (not move) your scenarios to the cloud.\nYour localStorage data will remain untouched.')) {
-      return;
-    }
+  // Duplicate scenario button
+  document.getElementById('duplicate-scenario-btn').addEventListener('click', async () => {
+    const baseName = currentScenarioName || 'Current Itinerary';
+    const newName = prompt(`Enter name for duplicated scenario:`, `${baseName} (Copy)`);
+
+    if (!newName || newName.trim() === '') return;
+
+    // Close dropdown
+    scenarioActionsDropdown.style.display = 'none';
+    scenarioActionsBtn.classList.remove('active');
 
     try {
-      const migrated = await scenarioManager.migrateFromLocalStorage();
+      // Save current working data as a new scenario
+      const scenarioData = {
+        name: newName.trim(),
+        description: `Duplicated from ${baseName}`,
+        data: JSON.parse(JSON.stringify(workingData)),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-      if (migrated.length === 0) {
-        alert('No localStorage scenarios found to migrate.');
-      } else {
-        alert(`Successfully migrated ${migrated.length} scenario(s) to Firestore:\n\n${migrated.join('\n')}\n\nRefreshing to load your scenarios...`);
-        await updateScenarioSelector();
-        await updateScenarioList();
-      }
+      const newScenarioId = await scenarioManager.saveScenario(scenarioData);
+      currentScenarioId = newScenarioId;
+      currentScenarioName = newName.trim();
+
+      await updateScenarioSelector();
+      document.getElementById('scenario-selector').value = currentScenarioId;
+
+      alert(`Scenario "${newName.trim()}" has been created successfully.`);
     } catch (error) {
-      console.error('Migration failed:', error);
-      alert('Failed to migrate scenarios. Check console for details.');
+      console.error('Error duplicating scenario:', error);
+      alert('Failed to duplicate scenario. Check console for details.');
     }
   });
 
-  document.getElementById('export-scenarios-btn').addEventListener('click', () => {
-    const dataStr = scenarioManager.exportScenarios();
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'rtw-scenarios.json';
-    link.click();
-    URL.revokeObjectURL(url);
-  });
   document.getElementById('import-scenarios-btn').addEventListener('click', openImportScenariosModal);
   
   // Scenario selector
   document.getElementById('scenario-selector').addEventListener('change', async (e) => {
-    if (e.target.value) {
+    const value = e.target.value;
+
+    if (value === '__new__') {
+      // Create new empty scenario
+      const scenarioName = prompt('Enter name for new scenario:');
+
+      if (!scenarioName || scenarioName.trim() === '') {
+        // User cancelled - revert selection
+        e.target.value = currentScenarioId || '';
+        return;
+      }
+
       try {
-        await window.loadScenarioById(e.target.value);
+        // Create empty scenario data
+        const emptyData = {
+          trip: {
+            title: 'New Trip',
+            start_date: new Date().toISOString().split('T')[0],
+            duration: '0 days',
+            total_cost: '$0'
+          },
+          locations: [],
+          legs: []
+        };
+
+        const scenarioData = {
+          name: scenarioName.trim(),
+          description: 'New empty scenario',
+          data: emptyData
+        };
+
+        const newScenarioId = await scenarioManager.saveScenario(scenarioData);
+
+        // Load the new scenario
+        workingData = JSON.parse(JSON.stringify(emptyData));
+        currentScenarioId = newScenarioId;
+        currentScenarioName = scenarioName.trim();
+
+        await updateScenarioSelector();
+        document.getElementById('scenario-selector').value = currentScenarioId;
+        render(legFilter.value, routingToggle.checked, false);
+      } catch (error) {
+        console.error('Error creating new scenario:', error);
+        alert('Failed to create new scenario. Check console for details.');
+        e.target.value = currentScenarioId || '';
+      }
+    } else if (value) {
+      try {
+        await window.loadScenarioById(value);
       } catch (error) {
         console.error('Error loading scenario:', error);
       }
     } else {
+      // User selected "Unsaved Changes" - this represents the current unsaved state
       currentScenarioId = null;
       currentScenarioName = null;
-      updateSaveButton();
     }
   });
   
@@ -1404,7 +1508,6 @@ async function initMapApp() {
 
       closeSaveScenarioModal();
       await updateScenarioSelector();
-      updateSaveButton();
       document.getElementById('scenario-selector').value = currentScenarioId;
 
       alert(`Scenario "${name}" has been saved successfully.`);
@@ -1469,9 +1572,6 @@ async function initMapApp() {
       closeImportScenariosModal();
     }
   });
-  
-  // Initialize the save button text
-  updateSaveButton();
 
   // Handler for when the agent modifies the itinerary
   function ensureLocationDefaults(destination) {
