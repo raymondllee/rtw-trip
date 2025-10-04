@@ -1,6 +1,7 @@
 // AI Travel Concierge Chat Module
 import { db } from './firebase-config.js';
 import { collection, addDoc, doc, setDoc, getDoc, getDocs, query, orderBy, limit, updateDoc, deleteDoc, Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+import { StatePersistence } from './state-persistence.js';
 
 const CHAT_API_URL = 'http://localhost:5001/api/chat';
 const CHANGES_API_URL = 'http://localhost:5001/api/itinerary/changes';
@@ -17,6 +18,7 @@ class TravelConciergeChat {
     this.currentChatId = null; // Current chat conversation ID
     this.messages = []; // In-memory message history
     this.firestoreEnabled = true; // Enable Firestore persistence (will be disabled on errors)
+    this.statePersistence = new StatePersistence();
 
     // ⚠️ KNOWN ISSUE: Non-deterministic behavior in AI responses
     // The AI backend sometimes responds with "I don't have access to your itinerary"
@@ -35,6 +37,36 @@ class TravelConciergeChat {
       console.log('💡 Chat container is visible on init, starting polling...');
       this.isOpen = true;
       this.startPollingForChanges();
+    }
+
+    // Restore chat state from localStorage
+    this.restoreChatState();
+  }
+
+  /**
+   * Restore chat state from localStorage (session ID and last chat)
+   */
+  async restoreChatState() {
+    const savedState = this.statePersistence.getState();
+    console.log('📂 Restoring chat state:', savedState);
+
+    if (savedState.sessionId) {
+      this.sessionId = savedState.sessionId;
+      console.log('✅ Restored session ID:', this.sessionId);
+    }
+
+    if (savedState.chatId) {
+      try {
+        const loaded = await this.loadChat(savedState.chatId);
+        if (loaded) {
+          console.log('✅ Restored chat:', savedState.chatId);
+        } else {
+          console.warn('⚠️ Failed to restore chat, it may have been deleted');
+          this.statePersistence.saveChatState(null, [], null);
+        }
+      } catch (error) {
+        console.error('Error restoring chat:', error);
+      }
     }
   }
 
@@ -65,6 +97,10 @@ class TravelConciergeChat {
     this.newChatBtn = document.getElementById('new-chat-btn');
     this.historyBtn = document.getElementById('chat-history-btn');
     this.closeHistoryBtn = document.getElementById('close-history-btn');
+
+    // Chat title elements
+    this.chatTitleDisplay = document.getElementById('chat-title-display');
+    this.chatTitleDisplayFloating = document.getElementById('chat-title-display-floating');
 
     // Debug: check if elements are found
     console.log('🔍 Chat elements initialized:', {
@@ -119,6 +155,10 @@ class TravelConciergeChat {
     });
     this.historyBtn?.addEventListener('click', () => this.showChatHistory());
     this.closeHistoryBtn?.addEventListener('click', () => this.hideChatHistory());
+
+    // Chat title editing listeners
+    this.chatTitleDisplay?.addEventListener('click', () => this.startEditingTitle(false));
+    this.chatTitleDisplayFloating?.addEventListener('click', () => this.startEditingTitle(true));
   }
 
   toggleChat() {
@@ -148,11 +188,20 @@ class TravelConciergeChat {
   }
 
   updateContext(legName, destinationsData, startDate, endDate, subLegName = null) {
+    console.log('🔄 updateContext called:', {
+      legName,
+      subLegName,
+      destinationsCount: destinationsData?.length || 0,
+      oldDestinationsCount: this.currentDestinationsData?.length || 0
+    });
+
     this.currentLeg = legName;
     this.currentSubLeg = subLegName;
     this.currentDestinationsData = destinationsData; // Full location objects
     this.currentStartDate = startDate;
     this.currentEndDate = endDate;
+
+    console.log('✅ Chat context updated - now has', this.currentDestinationsData?.length || 0, 'destinations');
   }
 
   undockChat() {
@@ -535,6 +584,9 @@ class TravelConciergeChat {
         console.log(`🔑 Setting session ID: ${data.session_id} (was: ${this.sessionId})`);
         this.sessionId = data.session_id;
         this.persistSessionId(this.sessionId);
+
+        // Save session ID to state persistence
+        this.statePersistence.saveChatState(this.currentChatId, this.messages, this.sessionId);
       } else {
         console.warn('⚠️ No session_id in response!', data);
       }
@@ -665,6 +717,12 @@ class TravelConciergeChat {
     this.sessionId = null;
     this.currentChatId = null;
     this.messages = [];
+
+    // Reset title to default
+    this.updateChatTitle('AI Travel Concierge');
+
+    // Clear chat state from persistence
+    this.statePersistence.saveChatState(null, [], null);
   }
 
   // ==================== CHAT HISTORY METHODS ====================
@@ -697,6 +755,10 @@ class TravelConciergeChat {
         messagesCount: this.messages?.length || 0,
         sessionId: this.sessionId
       });
+
+      // Save chat state
+      this.statePersistence.saveChatState(this.currentChatId, this.messages, this.sessionId);
+
       return chatRef.id;
     } catch (error) {
       console.error('🔥 Error creating new chat:', error);
@@ -801,6 +863,12 @@ class TravelConciergeChat {
       // Sync to floating chat
       this.syncMessages(this.chatMessages, this.floatingChatMessages);
 
+      // Update the displayed title
+      this.updateChatTitle(chatData.title || 'New Chat');
+
+      // Save chat state
+      this.statePersistence.saveChatState(this.currentChatId, this.messages, this.sessionId);
+
       console.log('📂 Loaded chat:', chatId, 'with', this.messages.length, 'messages');
       return true;
     } catch (error) {
@@ -848,6 +916,8 @@ class TravelConciergeChat {
 
       if (this.currentChatId === chatId) {
         this.clearChat();
+        // Clear chat state from persistence
+        this.statePersistence.saveChatState(null, [], null);
       }
 
       return true;
@@ -888,9 +958,15 @@ class TravelConciergeChat {
       chatItem.className = 'chat-history-item';
       chatItem.innerHTML = `
         <div class="chat-history-info">
-          <div class="chat-history-title">${chat.title || 'Untitled Chat'}</div>
+          <div class="chat-history-title-container">
+            <div class="chat-history-title" data-chat-id="${chat.id}">${chat.title || 'Untitled Chat'}</div>
+            <button class="chat-history-ai-title-btn" data-chat-id="${chat.id}" title="Generate AI title">🤖</button>
+          </div>
           <div class="chat-history-meta">
-            ${chat.legName || 'All Legs'} • ${chat.messageCount || 0} messages • ${this.formatDate(chat.updatedAt)}
+            ${chat.legName || 'All Legs'} • ${chat.messageCount || 0} messages
+          </div>
+          <div class="chat-history-time">
+            Last active: ${this.formatDate(chat.updatedAt, true)}
           </div>
         </div>
         <div class="chat-history-actions">
@@ -902,6 +978,8 @@ class TravelConciergeChat {
       // Add event listeners
       const loadBtn = chatItem.querySelector('.chat-history-load-btn');
       const deleteBtn = chatItem.querySelector('.chat-history-delete-btn');
+      const titleElement = chatItem.querySelector('.chat-history-title');
+      const aiTitleBtn = chatItem.querySelector('.chat-history-ai-title-btn');
 
       loadBtn.addEventListener('click', async () => {
         await this.loadChat(chat.id);
@@ -914,6 +992,9 @@ class TravelConciergeChat {
           await this.showChatHistory(); // Refresh list
         }
       });
+
+      titleElement.addEventListener('click', () => this.startEditingChatTitle(chat.id, titleElement));
+      aiTitleBtn.addEventListener('click', () => this.generateAITitle(chat.id, titleElement));
 
       historyList.appendChild(chatItem);
     });
@@ -932,7 +1013,7 @@ class TravelConciergeChat {
   /**
    * Format timestamp for display
    */
-  formatDate(timestamp) {
+  formatDate(timestamp, detailed = false) {
     if (!timestamp) return '';
 
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -942,12 +1023,300 @@ class TravelConciergeChat {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (detailed) {
+      // Return detailed date/time for conversation list
+      const timeStr = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      const dateStr = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      });
 
-    return date.toLocaleDateString();
+      if (diffMins < 1) return `Just now`;
+      if (diffMins < 60) return `${diffMins}m ago • ${timeStr}`;
+      if (diffHours < 24) return `${diffHours}h ago • ${timeStr}`;
+      if (diffDays < 7) return `${diffDays}d ago • ${dateStr}`;
+
+      return `${dateStr} • ${timeStr}`;
+    } else {
+      // Return simple relative time for other uses
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+
+      return date.toLocaleDateString();
+    }
+  }
+
+  /**
+   * Update the displayed chat title
+   */
+  updateChatTitle(title) {
+    const displayTitle = title || 'AI Travel Concierge';
+    if (this.chatTitleDisplay) {
+      this.chatTitleDisplay.textContent = displayTitle;
+    }
+    if (this.chatTitleDisplayFloating) {
+      this.chatTitleDisplayFloating.textContent = displayTitle;
+    }
+  }
+
+  /**
+   * Start editing the chat title
+   */
+  startEditingTitle(isFloating = false) {
+    if (!this.currentChatId) return;
+
+    const titleElement = isFloating ? this.chatTitleDisplayFloating : this.chatTitleDisplay;
+    if (!titleElement || titleElement.classList.contains('editing')) return;
+
+    const currentTitle = titleElement.textContent;
+    titleElement.classList.add('editing');
+    titleElement.contentEditable = true;
+    titleElement.focus();
+
+    // Select all text
+    const range = document.createRange();
+    range.selectNodeContents(titleElement);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    // Handle save/cancel
+    const saveTitle = () => {
+      titleElement.contentEditable = false;
+      titleElement.classList.remove('editing');
+
+      const newTitle = titleElement.textContent.trim();
+      if (newTitle && newTitle !== currentTitle) {
+        this.saveChatTitle(newTitle);
+      } else {
+        titleElement.textContent = currentTitle; // Restore if empty or unchanged
+      }
+    };
+
+    const cancelEdit = (e) => {
+      if (e.key === 'Escape') {
+        titleElement.textContent = currentTitle;
+        titleElement.contentEditable = false;
+        titleElement.classList.remove('editing');
+        titleElement.blur();
+      }
+    };
+
+    titleElement.addEventListener('blur', saveTitle, { once: true });
+    titleElement.addEventListener('keydown', cancelEdit);
+    titleElement.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        titleElement.blur(); // This will trigger the save
+      }
+    });
+  }
+
+  /**
+   * Save the updated chat title to Firestore
+   */
+  async saveChatTitle(newTitle) {
+    if (!this.currentChatId || !newTitle.trim()) return;
+
+    try {
+      const chatRef = doc(db, 'chatHistory', this.currentChatId);
+      await updateDoc(chatRef, {
+        title: newTitle.trim(),
+        updatedAt: Timestamp.now()
+      });
+
+      // Update in-memory messages title if first message
+      if (this.messages.length > 0) {
+        const firstUserMessage = this.messages.find(m => m.sender === 'user');
+        if (firstUserMessage) {
+          // Update the title in memory (optional, for consistency)
+          console.log('Updated chat title to:', newTitle);
+        }
+      }
+
+      this.updateChatTitle(newTitle);
+      console.log('✅ Saved chat title:', newTitle);
+    } catch (error) {
+      console.error('Error saving chat title:', error);
+      // Revert the title display on error
+      this.updateChatTitle(this.getCurrentChatTitle());
+    }
+  }
+
+  /**
+   * Generate an AI title for a chat conversation
+   */
+  async generateAITitle(chatId, titleElement) {
+    if (!chatId || !titleElement) return;
+
+    // Show loading state
+    const originalTitle = titleElement.textContent;
+    titleElement.textContent = '🤖 Generating title...';
+    titleElement.style.opacity = '0.7';
+
+    try {
+      // Fetch the chat data from Firestore
+      const chatRef = doc(db, 'chatHistory', chatId);
+      const chatDoc = await getDoc(chatRef);
+
+      if (!chatDoc.exists()) {
+        throw new Error('Chat not found');
+      }
+
+      const chatData = chatDoc.data();
+      const messages = chatData.messages || [];
+
+      if (messages.length === 0) {
+        throw new Error('No messages to analyze');
+      }
+
+      // Call the backend API to generate title
+      const response = await fetch('http://localhost:5001/api/generate-title', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: messages.map(msg => ({
+            text: msg.text,
+            sender: msg.sender
+          })),
+          currentTitle: chatData.title || 'Untitled Chat'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const generatedTitle = data.title || 'Generated Title';
+
+      // Save the generated title to Firestore
+      await this.saveChatHistoryTitle(chatId, generatedTitle);
+
+      // Update the display
+      titleElement.textContent = generatedTitle;
+      titleElement.style.opacity = '1';
+
+      // If this is the current chat, update the display too
+      if (chatId === this.currentChatId) {
+        this.updateChatTitle(generatedTitle);
+      }
+
+      console.log('✅ AI generated title:', generatedTitle);
+
+    } catch (error) {
+      console.error('Error generating AI title:', error);
+
+      // Show error state and revert
+      titleElement.textContent = originalTitle;
+      titleElement.style.opacity = '1';
+
+      // Optionally show error message to user
+      if (error.message.includes('Failed to fetch')) {
+        titleElement.textContent = '❌ Backend unavailable';
+        setTimeout(() => {
+          titleElement.textContent = originalTitle;
+        }, 2000);
+      } else {
+        titleElement.textContent = '❌ Generation failed';
+        setTimeout(() => {
+          titleElement.textContent = originalTitle;
+        }, 2000);
+      }
+    }
+  }
+
+  /**
+   * Start editing a chat title from the history list
+   */
+  startEditingChatTitle(chatId, titleElement) {
+    if (titleElement.classList.contains('editing')) return;
+
+    const currentTitle = titleElement.textContent;
+    titleElement.classList.add('editing');
+    titleElement.contentEditable = true;
+    titleElement.focus();
+
+    // Select all text
+    const range = document.createRange();
+    range.selectNodeContents(titleElement);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    // Handle save/cancel
+    const saveTitle = async () => {
+      titleElement.contentEditable = false;
+      titleElement.classList.remove('editing');
+
+      const newTitle = titleElement.textContent.trim();
+      if (newTitle && newTitle !== currentTitle) {
+        await this.saveChatHistoryTitle(chatId, newTitle);
+
+        // If this is the current chat, update the display too
+        if (chatId === this.currentChatId) {
+          this.updateChatTitle(newTitle);
+        }
+      } else {
+        titleElement.textContent = currentTitle; // Restore if empty or unchanged
+      }
+    };
+
+    const cancelEdit = (e) => {
+      if (e.key === 'Escape') {
+        titleElement.textContent = currentTitle;
+        titleElement.contentEditable = false;
+        titleElement.classList.remove('editing');
+        titleElement.blur();
+      }
+    };
+
+    titleElement.addEventListener('blur', saveTitle, { once: true });
+    titleElement.addEventListener('keydown', cancelEdit);
+    titleElement.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        titleElement.blur(); // This will trigger the save
+      }
+    });
+  }
+
+  /**
+   * Save a chat title from the history list to Firestore
+   */
+  async saveChatHistoryTitle(chatId, newTitle) {
+    if (!chatId || !newTitle.trim()) return;
+
+    try {
+      const chatRef = doc(db, 'chatHistory', chatId);
+      await updateDoc(chatRef, {
+        title: newTitle.trim(),
+        updatedAt: Timestamp.now()
+      });
+
+      console.log('✅ Saved chat history title:', chatId, newTitle);
+    } catch (error) {
+      console.error('Error saving chat history title:', error);
+      throw error; // Re-throw so the calling function can handle it
+    }
+  }
+
+  /**
+   * Get current chat title from Firestore data
+   */
+  getCurrentChatTitle() {
+    // This would need to be called when loading a chat
+    // For now, return the current display text
+    return this.chatTitleDisplay?.textContent || 'AI Travel Concierge';
   }
 
   startPollingForChanges() {

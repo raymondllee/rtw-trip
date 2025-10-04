@@ -24,18 +24,20 @@
 
       <!-- Leg Filter Section -->
       <div class="leg-filter-section">
-        <label for="leg-filter" class="leg-filter-label">
-          <span>Itinerary View:</span>
-          <select id="leg-filter" class="leg-filter-select">
-            <option value="all" selected>All Legs</option>
-          </select>
-        </label>
-        <label for="sub-leg-filter" class="leg-filter-label" id="sub-leg-filter-container" style="display: none;">
-          <span>Sub-Region:</span>
-          <select id="sub-leg-filter" class="leg-filter-select">
-            <option value="">All Destinations</option>
-          </select>
-        </label>
+        <div class="leg-filters-row">
+          <label for="leg-filter" class="leg-filter-label">
+            <span>Itinerary View:</span>
+            <select id="leg-filter" class="leg-filter-select">
+              <option value="all" selected>All Legs</option>
+            </select>
+          </label>
+          <label for="sub-leg-filter" class="leg-filter-label" id="sub-leg-filter-container" style="display: none;">
+            <span>Sub-Region:</span>
+            <select id="sub-leg-filter" class="leg-filter-select">
+              <option value="">All Destinations</option>
+            </select>
+          </label>
+        </div>
         <label class="transport-toggle">
           <input type="checkbox" id="routing-toggle">
           <span>Show Transport</span>
@@ -87,7 +89,7 @@
       <div id="chat-resizer" class="chat-resizer"></div>
       <div class="sidebar-chat">
         <div class="chat-header-sidebar">
-          <h4>AI Travel Concierge</h4>
+          <h4><span id="chat-title-display" class="chat-title-display">AI Travel Concierge</span></h4>
           <div class="chat-header-controls">
             <button id="new-chat-btn" class="chat-action-btn" title="New chat">+</button>
             <button id="chat-history-btn" class="chat-action-btn" title="Chat history">📝</button>
@@ -195,7 +197,7 @@
   <!-- Floating Chat Window (hidden by default) -->
   <div id="floating-chat" class="floating-chat" style="display: none;">
     <div class="floating-chat-header">
-      <h4>AI Travel Concierge</h4>
+      <h4><span id="chat-title-display-floating" class="chat-title-display">AI Travel Concierge</span></h4>
       <div class="chat-header-controls">
         <button id="dock-chat-btn" class="dock-chat-btn" title="Dock chat">⬋</button>
         <button id="toggle-floating-chat" class="toggle-chat-btn">▼</button>

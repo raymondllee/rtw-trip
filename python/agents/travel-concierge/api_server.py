@@ -67,6 +67,8 @@ def chat():
     # Build context-aware message - keep it concise to avoid timeouts
     if context and context.get('destinations'):
         destinations = context.get('destinations', [])
+        leg_name = context.get('leg_name', 'Unknown')
+        sub_leg_name = context.get('sub_leg_name', None)
 
         # Create compact itinerary JSON for tool parsing
         itinerary_json = json.dumps({
@@ -74,15 +76,26 @@ def chat():
             "trip": {
                 "start_date": context.get('start_date', ''),
                 "end_date": context.get('end_date', ''),
-                "leg_name": context.get('leg_name', 'Current Leg')
+                "leg_name": leg_name,
+                "sub_leg_name": sub_leg_name
             }
         }, separators=(',', ':'))  # Compact JSON without spaces
 
         # Just get the destination names for user-friendly summary
         dest_names = [d.get('name', 'Unknown') if isinstance(d, dict) else d for d in destinations]
 
+        # Add context about filtering to help LLM understand scope
+        if sub_leg_name:
+            scope_info = f"{sub_leg_name} ({len(destinations)} destinations)"
+        elif leg_name and leg_name != 'All':
+            scope_info = f"{leg_name} ({len(destinations)} destinations)"
+        else:
+            scope_info = f"Full itinerary ({len(destinations)} destinations)"
+
         context_prompt = f"""
-I'm planning a trip: {context.get('leg_name', 'Unknown')} leg ({len(destinations)} destinations: {', '.join(dest_names[:3])}{'...' if len(dest_names) > 3 else ''})
+I'm planning a trip. Currently viewing: {scope_info}
+
+Destinations: {', '.join(dest_names[:5])}{'...' if len(dest_names) > 5 else ''}
 
 CURRENT_ITINERARY_DATA:
 ```json
@@ -175,11 +188,40 @@ User question: {message}
                 try:
                     event = json.loads(json_string)
 
+                    # Log the full event for debugging
+                    print(f"\n{'='*80}")
+                    print(f"📨 SSE EVENT RECEIVED:")
+                    print(f"{'='*80}")
+                    print(json.dumps(event, indent=2))
+                    print(f"{'='*80}\n")
+
                     # Extract text from agent response
                     if "content" in event and "parts" in event["content"]:
                         for part in event["content"]["parts"]:
                             if "text" in part:
                                 response_text += part["text"]
+                                print(f"💬 AGENT TEXT: {part['text']}")
+
+                            # Log function/tool calls
+                            if "function_call" in part:
+                                func_call = part["function_call"]
+                                print(f"\n🔧 TOOL CALL:")
+                                print(f"   Tool: {func_call.get('name', 'unknown')}")
+                                print(f"   Args: {json.dumps(func_call.get('args', {}), indent=6)}")
+
+                            # Log function responses
+                            if "function_response" in part:
+                                func_resp = part["function_response"]
+                                print(f"\n✅ TOOL RESPONSE:")
+                                print(f"   Tool: {func_resp.get('name', 'unknown')}")
+                                resp_data = func_resp.get('response', {})
+                                print(f"   Response: {json.dumps(resp_data, indent=6)[:500]}...")
+
+                            # Log thought signatures (reasoning)
+                            if "thought_signature" in part:
+                                print(f"\n💭 AGENT REASONING:")
+                                print(f"   {json.dumps(part['thought_signature'], indent=6)}")
+
                 except json.JSONDecodeError:
                     continue
 
@@ -349,6 +391,165 @@ def get_changes(session_id):
         'status': 'success',
         'changes': []
     })
+
+@app.route('/api/generate-title', methods=['POST'])
+def generate_title():
+    """
+    Generate an AI title for a chat conversation based on the message history.
+
+    Expected request body:
+    {
+        "messages": [
+            {"text": "user message", "sender": "user"},
+            {"text": "bot response", "sender": "bot"}
+        ],
+        "currentTitle": "Current chat title (optional)"
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+
+        messages = data.get('messages', [])
+        current_title = data.get('currentTitle', 'Untitled Chat')
+
+        if not messages:
+            return jsonify({'error': 'No messages provided'}), 400
+
+        # Create a summary of the conversation for title generation
+        # Focus on user messages to understand the main topics
+        user_messages = [msg['text'] for msg in messages if msg['sender'] == 'user']
+
+        if not user_messages:
+            # If no user messages, use the first bot message
+            user_messages = [messages[0]['text'] if messages else 'General conversation']
+
+        # Create a conversation summary
+        conversation_text = "\n".join([f"- {msg}" for msg in user_messages[:5]])  # Limit to first 5 user messages
+
+        # Create a temporary session for title generation
+        temp_session_id = f"title_generation_{uuid.uuid4().hex[:8]}"
+
+        # Prepare the prompt for title generation
+        title_prompt = f"""Based on the following conversation messages, generate a short, descriptive title (maximum 5 words) that captures the main topic or theme of this travel-related conversation.
+
+Current title: {current_title}
+
+Conversation summary:
+{conversation_text}
+
+Requirements:
+- Generate a short, catchy title (2-5 words maximum)
+- Make it travel-related if applicable
+- Focus on the main destination, activity, or travel topic
+- Use descriptive and engaging language
+- Output ONLY the title, no quotes or extra text
+
+Examples of good titles:
+- "Japan Trip Planning"
+- "Beach Vacation Ideas"
+- "Europe Itinerary Help"
+- "Travel Insurance Questions"
+- "Flight Booking Advice"
+
+Please generate an appropriate title:"""
+
+        # Create session and generate title
+        session_endpoint = f"{ADK_API_URL}/apps/{APP_NAME}/users/{USER_ID}/sessions/{temp_session_id}"
+
+        try:
+            # Create session
+            session_resp = requests.post(session_endpoint)
+            if session_resp.status_code != 200:
+                print(f"Failed to create session for title generation: {session_resp.text}")
+                # Fallback: return a simple generated title
+                fallback_title = generate_fallback_title(user_messages)
+                return jsonify({'title': fallback_title})
+
+            # Send message to ADK
+            adk_payload = {
+                "session_id": temp_session_id,
+                "app_name": APP_NAME,
+                "user_id": USER_ID,
+                "new_message": {
+                    "role": "user",
+                    "parts": [{"text": title_prompt}],
+                },
+            }
+
+            adk_response = requests.post(
+                f"{ADK_API_URL}/apps/{APP_NAME}/users/{USER_ID}/sessions/{temp_session_id}/run",
+                json=adk_payload,
+                headers={"Content-Type": "application/json"}
+            )
+
+            if adk_response.status_code == 200:
+                response_data = adk_response.json()
+
+                # Extract the AI response
+                if ('candidates' in response_data and
+                    response_data['candidates'] and
+                    len(response_data['candidates']) > 0 and
+                    'content' in response_data['candidates'][0] and
+                    'parts' in response_data['candidates'][0]['content'] and
+                    len(response_data['candidates'][0]['content']['parts']) > 0):
+
+                    ai_response = response_data['candidates'][0]['content']['parts'][0].get('text', '').strip()
+
+                    # Clean up the response - remove quotes and extra whitespace
+                    generated_title = ai_response.strip('"').strip().strip("'").strip()
+
+                    # Ensure it's not too long
+                    if len(generated_title) > 50:
+                        generated_title = ' '.join(generated_title.split()[:5])
+
+                    print(f"✅ Generated AI title: {generated_title}")
+                    return jsonify({'title': generated_title})
+                else:
+                    print(f"Unexpected ADK response format: {response_data}")
+                    fallback_title = generate_fallback_title(user_messages)
+                    return jsonify({'title': fallback_title})
+            else:
+                print(f"ADK API error: {adk_response.status_code} - {adk_response.text}")
+                fallback_title = generate_fallback_title(user_messages)
+                return jsonify({'title': fallback_title})
+
+        except Exception as e:
+            print(f"Error calling ADK for title generation: {e}")
+            fallback_title = generate_fallback_title(user_messages)
+            return jsonify({'title': fallback_title})
+
+    except Exception as e:
+        print(f"Error in generate_title endpoint: {e}")
+        return jsonify({'error': 'Failed to generate title'}), 500
+
+def generate_fallback_title(user_messages):
+    """Generate a simple fallback title based on user messages"""
+    if not user_messages:
+        return "Travel Planning"
+
+    # Simple keyword-based title generation
+    first_message = user_messages[0].lower()
+
+    # Look for destination keywords
+    destinations = ['japan', 'thailand', 'europe', 'asia', 'america', 'france', 'italy', 'spain',
+                   'china', 'india', 'brazil', 'mexico', 'canada', 'australia', 'uk', 'germany']
+
+    for dest in destinations:
+        if dest in first_message:
+            return f"{dest.title()} Trip Planning"
+
+    # Look for activity keywords
+    activities = ['flight', 'hotel', 'booking', 'itinerary', 'visa', 'insurance', 'transport',
+                 'accommodation', 'restaurant', 'tour', 'museum', 'beach', 'mountain', 'city']
+
+    for activity in activities:
+        if activity in first_message:
+            return f"{activity.title()} Questions"
+
+    # Default title
+    return "Travel Planning"
 
 @app.route('/health', methods=['GET'])
 def health():
