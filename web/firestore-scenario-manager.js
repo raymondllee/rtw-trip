@@ -309,6 +309,22 @@ export class FirestoreScenarioManager {
   }
 
   /**
+   * Save a new scenario with initial data
+   * Returns the scenario ID
+   */
+  async saveScenario(scenarioData) {
+    const { name, description, data } = scenarioData;
+
+    // Create the scenario
+    const scenario = await this.getOrCreateScenario(name, description || '');
+
+    // Save the initial version
+    await this.saveVersion(scenario.id, data, true, 'Initial version');
+
+    return scenario.id;
+  }
+
+  /**
    * Migrate localStorage scenarios to Firestore
    */
   async migrateFromLocalStorage() {

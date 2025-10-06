@@ -7,6 +7,7 @@
     "build:data": "node scripts/build-data.js",
     "parse": "node scripts/parse-itinerary.js",
     "geocode": "node scripts/geocode.js",
+    "validate": "node scripts/validate-destinations.cjs",
     "start": "npm run build:data",
     "serve": "npx http-server -c-1 -p 5173 | cat"
   },
