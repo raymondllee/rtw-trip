@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Itinerary Summary</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f5f5;
+      overflow-x: hidden;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .header {
+      background: white;
+      border-bottom: 1px solid #ddd;
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      color: #1e88e5;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background: #1e88e5;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #1565c0;
+    }
+
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+      border: 1px solid #ddd;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 2rem auto;
+      background: white;
+      padding: 3rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      overflow-x: hidden;
+      max-width: calc(100vw - 4rem);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 3rem;
+      color: #666;
+    }
+
+    .loading::after {
+      content: '...';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+
+    .error {
+      background: #ffebee;
+      color: #c62828;
+      padding: 1rem;
+      border-radius: 4px;
+      margin: 1rem 0;
+      border-left: 4px solid #c62828;
+    }
+
+    .summary-content {
+      font-size: 1rem;
+      line-height: 1.8;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+
+    .summary-content h1 {
+      font-size: 2rem;
+      color: #1e88e5;
+      margin: 2rem 0 1rem 0;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #1e88e5;
+    }
+
+    .summary-content h2 {
+      font-size: 1.5rem;
+      color: #333;
+      margin: 1.5rem 0 0.75rem 0;
+    }
+
+    .summary-content h3 {
+      font-size: 1.2rem;
+      color: #555;
+      margin: 1rem 0 0.5rem 0;
+    }
+
+    .summary-content p {
+      margin: 0.75rem 0;
+    }
+
+    .summary-content ul, .summary-content ol {
+      margin: 0.75rem 0 0.75rem 2rem;
+    }
+
+    .summary-content li {
+      margin: 0.5rem 0;
+    }
+
+    .summary-content strong {
+      color: #1e88e5;
+      font-weight: 600;
+    }
+
+    .summary-content code {
+      background: #f5f5f5;
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    .summary-content pre {
+      background: #f5f5f5;
+      padding: 1rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin: 1rem 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: pre-wrap;
+      max-width: 100%;
+    }
+
+    .summary-content blockquote {
+      border-left: 4px solid #1e88e5;
+      padding-left: 1rem;
+      margin: 1rem 0;
+      color: #666;
+      font-style: italic;
+    }
+
+    .summary-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      max-width: 100%;
+      overflow-x: auto;
+      display: block;
+      white-space: nowrap;
+    }
+
+    .summary-content th,
+    .summary-content td {
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      text-align: left;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+      max-width: 200px;
+    }
+
+    .summary-content th {
+      background: #f5f5f5;
+      font-weight: 600;
+    }
+
+    /* Responsive table */
+    @media (max-width: 768px) {
+      .summary-content table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+
+      .summary-content th,
+      .summary-content td {
+        min-width: 120px;
+        white-space: normal;
+      }
+    }
+
+    .meta-info {
+      background: #f9f9f9;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .meta-info div {
+      margin: 0.25rem 0;
+    }
+
+    /* Responsive styles */
+    @media (max-width: 768px) {
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
+      .header-actions {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .container {
+        margin: 1rem;
+        padding: 1.5rem;
+        max-width: calc(100vw - 2rem);
+      }
+
+      .summary-content {
+        font-size: 0.9rem;
+        overflow-x: hidden;
+      }
+
+      .summary-content h1 {
+        font-size: 1.5rem;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+
+      .summary-content h2 {
+        font-size: 1.3rem;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+
+      .summary-content h3 {
+        font-size: 1.1rem;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+
+      .meta-info {
+        font-size: 0.8rem;
+      }
+
+      .summary-content table {
+        font-size: 0.8rem;
+      }
+
+      .summary-content th,
+      .summary-content td {
+        padding: 0.5rem;
+        max-width: 150px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .header {
+        padding: 1rem;
+      }
+
+      .header-content {
+        padding: 0;
+      }
+
+      .header-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+        width: 100%;
+      }
+
+      .btn {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .container {
+        margin: 0.5rem;
+        padding: 1rem;
+        max-width: calc(100vw - 1rem);
+      }
+
+      .summary-content {
+        font-size: 0.85rem;
+        overflow-x: hidden;
+      }
+
+      .summary-content h1 {
+        font-size: 1.3rem;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+
+      .summary-content h2 {
+        font-size: 1.2rem;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+
+      .summary-content h3 {
+        font-size: 1rem;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+
+      .summary-content table {
+        font-size: 0.75rem;
+      }
+
+      .summary-content th,
+      .summary-content td {
+        padding: 0.4rem;
+        max-width: 100px;
+      }
+
+      .summary-content pre {
+        font-size: 0.8rem;
+        padding: 0.75rem;
+      }
+    }
+
+    /* Print styles */
+    @media print {
+      body {
+        background: white;
+      }
+
+      .header,
+      .header-actions {
+        display: none;
+      }
+
+      .container {
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .summary-content {
+        font-size: 11pt;
+      }
+
+      .summary-content h1 {
+        font-size: 18pt;
+        page-break-after: avoid;
+      }
+
+      .summary-content h2 {
+        font-size: 14pt;
+        page-break-after: avoid;
+      }
+
+      .summary-content h3 {
+        font-size: 12pt;
+        page-break-after: avoid;
+      }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <h1>Itinerary Summary</h1>
+      <div class="header-actions">
+        <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
+        <button class="btn btn-secondary" id="save-btn">💾 Save to Scenario</button>
+        <a href="index.html" class="btn btn-primary">← Back to Map</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="loading" class="loading">
+      Generating your itinerary summary
+    </div>
+    <div id="error" class="error" style="display: none;"></div>
+    <div id="meta-info" class="meta-info" style="display: none;"></div>
+    <div id="summary-content" class="summary-content" style="display: none;"></div>
+  </div>
+
+  <script type="module">
+    import { db } from './firebase-config.js';
+    import { doc, updateDoc, getDoc, Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+
+    const API_URL = 'http://localhost:5001';
+
+    // Get summary data from URL params or sessionStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    const summaryId = urlParams.get('id');
+    const scenarioId = urlParams.get('scenario');
+
+    let currentSummary = null;
+    let currentScenarioId = scenarioId;
+
+    async function loadExistingSummary(id) {
+      // Load a previously saved summary from sessionStorage or Firebase
+      if (id === 'saved' && currentScenarioId) {
+        // Load saved summary from Firestore
+        try {
+          const scenarioDoc = await getDoc(doc(db, 'scenarios', currentScenarioId));
+          if (scenarioDoc.exists() && scenarioDoc.data().summary) {
+            return {
+              summary: scenarioDoc.data().summary.markdown,
+              itinerary_data: scenarioDoc.data().summary.metadata,
+              generatedAt: scenarioDoc.data().summaryGeneratedAt?.toDate()
+            };
+          }
+        } catch (error) {
+          console.error('Error loading saved summary from Firestore:', error);
+        }
+        return null;
+      }
+
+      const saved = sessionStorage.getItem(`summary_${id}`);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+      return null;
+    }
+
+    async function generateSummary(itineraryData) {
+      try {
+        const response = await fetch(`${API_URL}/api/itinerary/summary`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            itinerary: itineraryData
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          return result;
+        } else {
+          throw new Error(result.error || 'Failed to generate summary');
+        }
+      } catch (error) {
+        console.error('Error generating summary:', error);
+        throw error;
+      }
+    }
+
+    async function displaySummary(summaryData) {
+      const loadingEl = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const metaEl = document.getElementById('meta-info');
+      const contentEl = document.getElementById('summary-content');
+
+      loadingEl.style.display = 'none';
+
+      if (summaryData.error) {
+        errorEl.textContent = summaryData.error;
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      // Display metadata
+      const generatedTime = summaryData.generatedAt || new Date();
+      if (summaryData.itinerary_data) {
+        const meta = summaryData.itinerary_data;
+        metaEl.innerHTML = `
+          <div><strong>Generated:</strong> ${generatedTime.toLocaleString()}</div>
+          <div><strong>Locations:</strong> ${meta.locations_count || 0}</div>
+          <div><strong>Legs:</strong> ${meta.legs_count || 0}</div>
+          ${meta.cost_summary?.total_cost ? `<div><strong>Total Cost:</strong> $${meta.cost_summary.total_cost.toLocaleString()}</div>` : ''}
+        `;
+        metaEl.style.display = 'block';
+      } else if (summaryData.generatedAt) {
+        // If we have a saved summary with just the generation time
+        metaEl.innerHTML = `
+          <div><strong>Generated:</strong> ${generatedTime.toLocaleString()}</div>
+          <div><strong>Type:</strong> Saved Summary</div>
+        `;
+        metaEl.style.display = 'block';
+      }
+
+      // Convert markdown to HTML and display
+      const summaryMarkdown = summaryData.summary || summaryData.text || '';
+      const summaryHtml = marked.parse(summaryMarkdown);
+      contentEl.innerHTML = summaryHtml;
+      contentEl.style.display = 'block';
+
+      currentSummary = {
+        markdown: summaryMarkdown,
+        html: summaryHtml,
+        metadata: summaryData.itinerary_data,
+        generatedAt: new Date().toISOString()
+      };
+    }
+
+    async function saveSummaryToScenario() {
+      if (!currentSummary || !currentScenarioId) {
+        alert('No summary or scenario to save to');
+        return;
+      }
+
+      try {
+        const scenarioRef = doc(db, 'scenarios', currentScenarioId);
+        const scenarioDoc = await getDoc(scenarioRef);
+
+        if (!scenarioDoc.exists()) {
+          alert('Scenario not found');
+          return;
+        }
+
+        await updateDoc(scenarioRef, {
+          summary: currentSummary,
+          summaryGeneratedAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        });
+
+        alert('Summary saved to scenario!');
+      } catch (error) {
+        console.error('Error saving summary:', error);
+        alert('Failed to save summary: ' + error.message);
+      }
+    }
+
+    // Initialize
+    async function init() {
+      try {
+        // Check if we have a saved summary
+        if (summaryId) {
+          const saved = await loadExistingSummary(summaryId);
+          if (saved) {
+            await displaySummary(saved);
+            return;
+          }
+        }
+
+        // Otherwise, get itinerary data from sessionStorage
+        const itineraryDataStr = sessionStorage.getItem('summaryItineraryData');
+        if (!itineraryDataStr) {
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('error').textContent = 'No itinerary data found. Please generate from the main page.';
+          document.getElementById('error').style.display = 'block';
+          return;
+        }
+
+        const itineraryData = JSON.parse(itineraryDataStr);
+
+        // Store scenario ID if provided
+        const storedScenarioId = sessionStorage.getItem('summaryScenarioId');
+        if (storedScenarioId) {
+          currentScenarioId = storedScenarioId;
+        }
+
+        // Generate the summary
+        const result = await generateSummary(itineraryData);
+        await displaySummary(result);
+
+        // Save to sessionStorage for future reference
+        const summaryKey = `summary_${Date.now()}`;
+        sessionStorage.setItem(summaryKey, JSON.stringify(result));
+      } catch (error) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').textContent = 'Error: ' + error.message;
+        document.getElementById('error').style.display = 'block';
+      }
+    }
+
+    // Event listeners
+    document.getElementById('save-btn').addEventListener('click', saveSummaryToScenario);
+
+    // Start initialization
+    init();
+  </script>
+</body>
+</html>

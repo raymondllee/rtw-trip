@@ -1,5 +1,6 @@
 import { FirestoreScenarioManager } from './firestore-scenario-manager.js';
 import { StatePersistence } from './state-persistence.js';
+import { summaryManager } from './summary-manager.js';
 
 const DATA_PATH = './itinerary_structured.json';
 
@@ -867,6 +868,24 @@ async function initMapApp() {
     }
   }
 
+  async function updateViewSummaryButtonState() {
+    const viewSummaryBtn = document.getElementById('view-summary-btn');
+    if (!currentScenarioId) {
+      // No scenario selected, disable button
+      viewSummaryBtn.disabled = true;
+      return;
+    }
+
+    try {
+      // Check if current scenario has a saved summary
+      const hasSummary = await scenarioManager.hasSummary(currentScenarioId);
+      viewSummaryBtn.disabled = !hasSummary;
+    } catch (error) {
+      console.error('Error checking summary status:', error);
+      viewSummaryBtn.disabled = true;
+    }
+  }
+
   // Auto-save functionality
   let autoSaveTimeout = null;
 
@@ -1465,6 +1484,9 @@ async function initMapApp() {
 
         // Save scenario selection to state
         statePersistence.saveScenarioSelection(scenarioId);
+
+        // Update view summary button state
+        await updateViewSummaryButtonState();
       }
     } catch (error) {
       console.error('Error loading scenario:', error);
@@ -1812,7 +1834,77 @@ async function initMapApp() {
   });
 
   document.getElementById('import-scenarios-btn').addEventListener('click', openImportScenariosModal);
-  
+
+  // Summary generation button
+  document.getElementById('generate-summary-btn').addEventListener('click', async () => {
+    try {
+      // Build itinerary data from current state
+      const itineraryData = {
+        trip: workingData.trip || {},
+        locations: workingData.locations || [],
+        legs: workingData.legs || [],
+        costs: workingData.costs || []
+      };
+
+      if (!itineraryData.locations || itineraryData.locations.length === 0) {
+        alert('No locations in itinerary to generate summary');
+        return;
+      }
+
+      // Generate and view summary
+      await summaryManager.generateAndView(itineraryData, currentScenarioId);
+
+      // Update view summary button state after generation
+      await updateViewSummaryButtonState();
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      alert('Failed to generate summary: ' + error.message);
+    }
+  });
+
+  // View saved summary button (in scenario actions dropdown)
+  document.getElementById('view-summary-btn').addEventListener('click', async () => {
+    if (!currentScenarioId) {
+      alert('Please save your scenario first before viewing summary');
+      return;
+    }
+
+    try {
+      // Check if scenario has a saved summary
+      const hasSummary = await scenarioManager.hasSummary(currentScenarioId);
+
+      if (hasSummary) {
+        // View the saved summary
+        const summary = await scenarioManager.getSummary(currentScenarioId);
+
+        // Store summary data for viewer
+        sessionStorage.setItem('summaryItineraryData', JSON.stringify({
+          trip: workingData.trip || {},
+          locations: workingData.locations || [],
+          legs: workingData.legs || [],
+          costs: workingData.costs || []
+        }));
+        sessionStorage.setItem('summaryScenarioId', currentScenarioId);
+
+        // Open with saved summary
+        const params = new URLSearchParams({
+          scenario: currentScenarioId,
+          id: 'saved'
+        });
+        window.open(`summary-viewer.html?${params.toString()}`, '_blank');
+      } else {
+        // No saved summary, offer to generate
+        const generate = confirm('This scenario does not have a saved summary yet. Generate one now?');
+        if (generate) {
+          document.getElementById('generate-summary-btn').click();
+        }
+      }
+    } catch (error) {
+      console.error('Error viewing summary:', error);
+      alert('Failed to view summary: ' + error.message);
+    }
+  });
+
   // Scenario selector
   document.getElementById('scenario-selector').addEventListener('change', async (e) => {
     const value = e.target.value;
@@ -1872,6 +1964,9 @@ async function initMapApp() {
       currentScenarioId = null;
       currentScenarioName = null;
     }
+
+    // Update view summary button state
+    await updateViewSummaryButtonState();
   });
   
   // Initialize Places API
@@ -2210,6 +2305,9 @@ async function initMapApp() {
     // Give it a moment for render to complete
     setTimeout(() => updateChatContext(initialLeg, initialSubLeg), 100);
   }
+
+  // Initialize view summary button state
+  updateViewSummaryButtonState();
 
   console.log('✅ App initialized with state:', {
     scenarioId: currentScenarioId,

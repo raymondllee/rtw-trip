@@ -338,6 +338,13 @@ html, body {
   box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.1);
 }
 
+.filter-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
 .transport-toggle {
   display: flex;
   align-items: center;
@@ -350,6 +357,27 @@ html, body {
 
 .transport-toggle input[type="checkbox"] {
   cursor: pointer;
+}
+
+.btn-summary {
+  padding: 6px 12px;
+  background: #1e88e5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.btn-summary:hover {
+  background: #1565c0;
+}
+
+.btn-summary:active {
+  background: #0d47a1;
 }
 
 /* Scenario Section */
@@ -479,6 +507,16 @@ html, body {
 
 .scenario-actions-dropdown .dropdown-item:hover {
   background: #f5f5f5;
+}
+
+.scenario-actions-dropdown .dropdown-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: #999;
+}
+
+.scenario-actions-dropdown .dropdown-item:disabled:hover {
+  background: transparent;
 }
 
 .scenario-actions-dropdown .dropdown-item .icon {

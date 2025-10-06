@@ -39,10 +39,12 @@
             </select>
           </label>
         </div>
-        <label class="transport-toggle">
-          <input type="checkbox" id="routing-toggle">
-          <span>Show Transport</span>
-        </label>
+        <div class="filter-controls">
+          <label class="transport-toggle">
+            <input type="checkbox" id="routing-toggle">
+            <span>Show Transport</span>
+          </label>
+        </div>
       </div>
 
       <!-- Scenario Controls -->
@@ -72,6 +74,14 @@
           <span>Manage All</span>
         </button>
         <div class="dropdown-divider"></div>
+        <button id="generate-summary-btn" class="dropdown-item">
+          <span class="icon">📄</span>
+          <span>Generate Summary</span>
+        </button>
+        <button id="view-summary-btn" class="dropdown-item" disabled>
+          <span class="icon">👁️</span>
+          <span>View Summary</span>
+        </button>
         <button id="add-cost-btn" class="dropdown-item">
           <span class="icon">💰</span>
           <span>Add Cost</span>
