@@ -25,6 +25,8 @@ ROOT_AGENT_INSTR = """
 - If the user is ready to make the flight booking or process payments, transfer to the agent `booking_agent`
 - If the user asks to add, remove, or modify destinations in their itinerary, use the itinerary editing tools: add_destination, remove_destination, update_destination_duration, update_destination
 - IMPORTANT: When modifying the itinerary, you MUST call the appropriate tool. Do not just describe the change.
+- If the user asks to generate an itinerary summary, look for JSON data in the user's message marked with "CURRENT_ITINERARY_DATA" and pass it as the itinerary_json parameter to the generate_itinerary_summary tool
+- IMPORTANT: When generate_itinerary_summary returns successfully with a "summary" field, you MUST output the ENTIRE contents of that summary field to the user. Do not summarize it or shorten it - display the complete text exactly as returned
 - Please use the context info below for any user preferences
                
 Current user:

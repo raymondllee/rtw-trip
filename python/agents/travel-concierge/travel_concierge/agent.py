@@ -24,6 +24,7 @@ from travel_concierge.sub_agents.inspiration.agent import inspiration_agent
 from travel_concierge.sub_agents.planning.agent import planning_agent
 from travel_concierge.sub_agents.post_trip.agent import post_trip_agent
 from travel_concierge.sub_agents.pre_trip.agent import pre_trip_agent
+from travel_concierge.sub_agents.cost_research.agent import cost_research_agent
 # Don't use itinerary_editor as a sub_agent - it causes tool calling conflicts
 # from travel_concierge.sub_agents.itinerary_editor.agent import itinerary_editor_agent
 
@@ -34,6 +35,9 @@ from travel_concierge.tools.itinerary_editor import (
     update_destination_duration,
     update_destination,
     get_current_itinerary,
+)
+from travel_concierge.tools.itinerary_summary_generator import (
+    generate_itinerary_summary,
 )
 
 
@@ -49,6 +53,7 @@ root_agent = Agent(
         pre_trip_agent,
         in_trip_agent,
         post_trip_agent,
+        cost_research_agent,
         # itinerary_editor_agent,  # Removed - using tools directly on root agent instead
     ],
     # Add itinerary editing tools directly to root agent to avoid sub-agent tool calling conflicts
@@ -58,6 +63,7 @@ root_agent = Agent(
         update_destination_duration,
         update_destination,
         get_current_itinerary,
+        generate_itinerary_summary,
     ],
     before_agent_callback=_load_precreated_itinerary,
 )
