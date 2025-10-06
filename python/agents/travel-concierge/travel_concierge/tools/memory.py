@@ -118,16 +118,40 @@ def _set_initial_states(source: Dict[str, Any], target: State | dict[str, Any]):
     if constants.SYSTEM_TIME not in target:
         target[constants.SYSTEM_TIME] = str(datetime.now())
 
+    # ALWAYS check if itinerary exists in target (passed from API) and preserve it
+    # This allows the API server to pass fresh itinerary data on every request
+    existing_itinerary = target.get(constants.ITIN_KEY)
+    has_existing_itinerary = existing_itinerary and (
+        isinstance(existing_itinerary, dict) and
+        existing_itinerary.get('locations')
+    )
+
     if constants.ITIN_INITIALIZED not in target:
         target[constants.ITIN_INITIALIZED] = True
-
         target.update(source)
 
+    # Restore/use the existing itinerary if we have one (from API)
+    # Otherwise use the one from the source (default scenario file)
+    if has_existing_itinerary:
+        target[constants.ITIN_KEY] = existing_itinerary
+        itinerary = existing_itinerary
+        print(f"[memory] Preserved itinerary from API with {len(existing_itinerary.get('locations', []))} locations")
+    else:
         itinerary = source.get(constants.ITIN_KEY, {})
         if itinerary:
+            print(f"[memory] Using itinerary from scenario file")
+
+    if itinerary:
+        # Get dates from itinerary or trip sub-object
+        if constants.START_DATE in itinerary:
             target[constants.ITIN_START_DATE] = itinerary[constants.START_DATE]
             target[constants.ITIN_END_DATE] = itinerary[constants.END_DATE]
             target[constants.ITIN_DATETIME] = itinerary[constants.START_DATE]
+        elif 'trip' in itinerary:
+            trip = itinerary['trip']
+            target[constants.ITIN_START_DATE] = trip.get(constants.START_DATE, '')
+            target[constants.ITIN_END_DATE] = trip.get(constants.END_DATE, '')
+            target[constants.ITIN_DATETIME] = trip.get(constants.START_DATE, '')
 
 
 def _load_precreated_itinerary(callback_context: CallbackContext):

@@ -1,11 +1,14 @@
 import { FirestoreScenarioManager } from './firestore-scenario-manager.js';
+import { StatePersistence } from './state-persistence.js';
 
 const DATA_PATH = './itinerary_structured.json';
 
 async function loadData() {
   const res = await fetch(DATA_PATH);
   if (!res.ok) throw new Error('Failed to load itinerary_structured.json');
-  return res.json();
+  const data = await res.json();
+  console.log(`📊 Loaded itinerary with ${data.costs?.length || 0} cost items from ${DATA_PATH}`);
+  return data;
 }
 
 function toLatLng(location) {
@@ -109,6 +112,31 @@ function getActivityColor(activityType) {
     'arrival': '#e67e22'
   };
   return colors[activityType] || '#7f8c8d';
+}
+
+// Helper functions for cost display (fallbacks if not loaded from cost-utils-standalone.js)
+function getCategoryIcon(category) {
+  const icons = {
+    accommodation: '🏨',
+    flight: '✈️',
+    activity: '🎯',
+    food: '🍽️',
+    transport: '🚗',
+    other: '📦'
+  };
+  return icons[category] || '📦';
+}
+
+function getCategoryDisplayName(category) {
+  const names = {
+    accommodation: 'Accommodation',
+    flight: 'Flights',
+    activity: 'Activities',
+    food: 'Food & Dining',
+    transport: 'Local Transport',
+    other: 'Other'
+  };
+  return names[category] || 'Other';
 }
 
 function getTransportationIcon(transportMode) {
@@ -260,7 +288,7 @@ function getTransportationMode(fromLocation, toLocation, index) {
   }
 }
 
-function addMarkersAndPath(map, locations, showRouting = false) {
+function addMarkersAndPath(map, locations, workingData, showRouting = false) {
   const info = new google.maps.InfoWindow();
   const markers = [];
   const pathCoords = [];
@@ -428,12 +456,44 @@ function addMarkersAndPath(map, locations, showRouting = false) {
     const highlights = Array.isArray(location.highlights) ? location.highlights : [];
     const notes = location.notes || '';
 
+    // Calculate costs for this location
+    const costs = workingData.costs || [];
+    const destinationCosts = window.calculateDestinationCosts(location.id, costs, location, workingData.locations);
+    const costSummaryHTML = destinationCosts.total > 0 ? `
+      <div style="background: #f8f9fa; padding: 10px; border-radius: 6px; margin: 8px 0; border: 1px solid #e0e0e0;">
+        <div style="font-weight: 600; color: #2563eb; margin-bottom: 4px;">${window.formatCurrency(destinationCosts.total)}</div>
+        ${duration ? `<div style="font-size: 12px; color: #666;">${window.formatCurrency(destinationCosts.total / location.duration_days)}/day</div>` : ''}
+        ${destinationCosts.count > 0 ? `<div style="font-size: 11px; color: #999;">${destinationCosts.count} cost items</div>` : ''}
+      </div>
+    ` : '';
+
+    const costBreakdownHTML = destinationCosts.total > 0 ? `
+      <div style="margin-top: 8px;">
+        <div style="font-size: 12px; font-weight: 600; color: #333; margin-bottom: 4px;">Cost Breakdown:</div>
+        ${Object.entries(destinationCosts.byCategory)
+          .filter(([_, amount]) => amount > 0)
+          .sort(([_, a], [__, b]) => b - a)
+          .map(([category, amount]) => {
+            const percentage = (amount / destinationCosts.total * 100).toFixed(1);
+            return `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 11px;">
+                <span style="color: #666;">${window.getCategoryIcon(category)} ${window.getCategoryDisplayName(category)}</span>
+                <span style="font-weight: 600; color: #333;">${window.formatCurrency(amount)} (${percentage}%)</span>
+              </div>
+            `;
+          }).join('')}
+      </div>
+    ` : '';
+
+    
     const content = `
       <div style="min-width: 260px; padding: 12px 14px;">
         <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">${name}</div>
         ${subtitle ? `<div style="color: #666; margin-bottom: 4px;">${subtitle}</div>` : ''}
         ${meta ? `<div style="color: #444; margin-bottom: 8px;">${meta}</div>` : ''}
         ${activity ? `<div style="display: inline-block; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 12px; margin-bottom: 8px; background: ${activityColor}">${activity}</div>` : ''}
+        ${costSummaryHTML}
+        ${costBreakdownHTML}
         ${notes ? `<div style="background: #f8f9fa; padding: 8px; border-radius: 4px; margin: 8px 0; border-left: 3px solid ${activityColor}; font-size: 13px; color: #555;"><strong style="color: #333;">Notes:</strong><br>${notes.replace(/\n/g, '<br>')}</div>` : ''}
         ${highlights.length ? `<ul style="margin: 8px 0 0 18px; padding: 0;">${highlights.map(h => `<li style="margin: 2px 0;">${h}</li>`).join('')}</ul>` : ''}
       </div>
@@ -456,12 +516,31 @@ function addMarkersAndPath(map, locations, showRouting = false) {
 async function initMapApp() {
   const originalData = await loadData();
   let workingData = JSON.parse(JSON.stringify(originalData));
+  console.log(`💰 Initial workingData has ${workingData.costs?.length || 0} cost items`);
   let currentScenarioId = null; // Track the currently loaded scenario ID
   let currentScenarioName = null; // Track the currently loaded scenario name
   const scenarioManager = new FirestoreScenarioManager();
+  const statePersistence = new StatePersistence();
   const tripTitle = document.getElementById('trip-title');
 
-  // Helper function to merge sub_legs from template into loaded data
+  // Expose workingData globally for debugging and tools
+  window.appWorkingData = workingData;
+
+  // Helper to update workingData and keep global reference synced
+  function updateWorkingData(newData) {
+    workingData = newData;
+    window.appWorkingData = workingData;
+  }
+
+  // Initialize cost tracking
+  const costTracker = new CostTracker();
+  const costUI = new CostUI(costTracker);
+  const costComparison = new CostComparison();
+  window.costTracker = costTracker;
+  window.costUI = costUI;
+  window.costComparison = costComparison;
+
+  // Helper function to merge sub_legs and costs from template into loaded data
   function mergeSubLegsFromTemplate(data) {
     if (originalData.legs && data.legs) {
       data.legs = data.legs.map(leg => {
@@ -473,21 +552,50 @@ async function initMapApp() {
       });
       console.log(`✅ Merged sub_legs from template (${originalData.legs.filter(l => l.sub_legs).length} legs with sub_legs)`);
     }
+    // Preserve costs from original data if not present in loaded data
+    if (originalData.costs && (!data.costs || data.costs.length === 0)) {
+      data.costs = originalData.costs;
+      console.log(`✅ Merged costs from template (${originalData.costs.length} cost items)`);
+    }
     return data;
   }
 
-  // Try to load the last active scenario from Firestore
+  // Try to restore state from localStorage first
+  const savedState = statePersistence.getState();
+  console.log('📂 Restoring from saved state:', savedState);
+
   try {
-    const scenarios = await scenarioManager.listScenarios();
-    if (scenarios.length > 0) {
-      // Load most recently updated scenario
-      const lastScenario = scenarios[0];
-      const latestVersion = await scenarioManager.getLatestVersion(lastScenario.id);
-      if (latestVersion && latestVersion.itineraryData) {
-        workingData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
-        currentScenarioId = lastScenario.id;
-        currentScenarioName = lastScenario.name;
-        console.log(`Loaded last active scenario: ${lastScenario.name}`);
+    // If we have a saved scenario ID, try to load it
+    if (savedState.scenarioId) {
+      console.log(`🔄 Attempting to restore scenario: ${savedState.scenarioId}`);
+      const scenario = await scenarioManager.getScenario(savedState.scenarioId);
+
+      if (scenario) {
+        const latestVersion = await scenarioManager.getLatestVersion(savedState.scenarioId);
+        if (latestVersion && latestVersion.itineraryData) {
+          console.log(`📥 Loaded from Firestore with ${latestVersion.itineraryData.costs?.length || 0} costs`);
+          workingData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
+          console.log(`💰 After merge, workingData has ${workingData.costs?.length || 0} costs`);
+          currentScenarioId = savedState.scenarioId;
+          currentScenarioName = scenario.name;
+          console.log(`✅ Restored scenario: ${scenario.name}`);
+        }
+      } else {
+        console.warn('⚠️ Saved scenario not found, clearing state');
+        statePersistence.clearState();
+      }
+    } else {
+      // No saved scenario, load most recent one
+      const scenarios = await scenarioManager.listScenarios();
+      if (scenarios.length > 0) {
+        const lastScenario = scenarios[0];
+        const latestVersion = await scenarioManager.getLatestVersion(lastScenario.id);
+        if (latestVersion && latestVersion.itineraryData) {
+          workingData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
+          currentScenarioId = lastScenario.id;
+          currentScenarioName = lastScenario.name;
+          console.log(`Loaded most recent scenario: ${lastScenario.name}`);
+        }
       }
     }
   } catch (error) {
@@ -691,7 +799,7 @@ async function initMapApp() {
       ? filterBySubLeg(workingData, legName, subLegName)
       : filterByLeg(workingData, legName);
     currentLocations = filtered;
-    const { markers, highlightLocation, routingElements } = addMarkersAndPath(map, filtered, useRouting);
+    const { markers, highlightLocation, routingElements } = addMarkersAndPath(map, filtered, workingData, useRouting);
     currentMarkers = markers;
     currentRoutingElements = routingElements || [];
     highlightLocationFn = highlightLocation;
@@ -776,6 +884,7 @@ async function initMapApp() {
     clearTimeout(autoSaveTimeout);
     autoSaveTimeout = setTimeout(async () => {
       try {
+        console.log(`💾 Auto-saving scenario with ${workingData.costs?.length || 0} costs`);
         // Save as a new auto-version (isNamed = false)
         await scenarioManager.saveVersion(currentScenarioId, workingData, false);
         showSaveIndicator();
@@ -788,27 +897,125 @@ async function initMapApp() {
   function updateSidebar(locations) {
     const destinationList = document.getElementById('destination-list');
     const destinationCount = document.querySelector('.destination-count');
-    
+
     const isFiltered = legFilter.value !== 'all';
-    const countText = isFiltered 
-      ? `${locations.length} destinations (${legFilter.value} leg)` 
+    const countText = isFiltered
+      ? `${locations.length} destinations (${legFilter.value} leg)`
       : `${locations.length} destinations`;
     destinationCount.textContent = countText;
+
+    // Get costs data
+    const costs = workingData.costs || [];
+    console.log(`🎨 Rendering sidebar with ${costs.length} total costs for ${locations.length} locations`);
+    console.log(`📍 Location IDs being displayed:`, locations.map(l => `${l.name}(${l.id})`));
+    console.log(`💰 Cost destination IDs:`, [...new Set(costs.map(c => c.destination_id))].sort());
+
     
     // Build sidebar with add buttons between destinations
     const sidebarItems = [];
-    
+
     // Add button at the top
     sidebarItems.push(`
       <div class="add-destination-btn" data-insert-index="0">
         <span>+ Add destination at start</span>
       </div>
     `);
-    
+
     locations.forEach((loc, idx) => {
       const dateRange = formatDateRange(loc.arrival_date, loc.departure_date);
       const duration = loc.duration_days || 1;
       const notes = loc.notes || '';
+
+      // Calculate costs for this destination
+      let destinationCosts, costSummaryHTML, costBreakdownHTML, costDetailsHTML;
+
+      // Check if cost functions are available
+      if (typeof window.calculateDestinationCosts === 'function') {
+        // Pass location object for name-based matching
+        destinationCosts = window.calculateDestinationCosts(loc.id, costs, loc, workingData.locations);
+        console.log(`💵 ${loc.name}: ${destinationCosts.count} costs, $${destinationCosts.total}`);
+        costSummaryHTML = window.generateSidebarCostSummary(destinationCosts, duration);
+        costBreakdownHTML = window.generateCostBreakdownHTML(destinationCosts);
+        costDetailsHTML = window.generateCostSummaryHTML(destinationCosts, duration);
+      } else {
+        // Fallback: simple cost calculation without external functions
+        const destinationCostsManual = costs.filter(cost => cost.destination_id === loc.id);
+        const totalCost = destinationCostsManual.reduce((sum, cost) => sum + (parseFloat(cost.amount_usd) || 0), 0);
+
+        destinationCosts = {
+          total: totalCost,
+          count: destinationCostsManual.length,
+          byCategory: { accommodation: 0, flight: 0, activity: 0, food: 0, transport: 0, other: 0 }
+        };
+
+        // Simple category breakdown
+        destinationCostsManual.forEach(cost => {
+          const category = cost.category || 'other';
+          if (destinationCosts.byCategory.hasOwnProperty(category)) {
+            destinationCosts.byCategory[category] += parseFloat(cost.amount_usd) || 0;
+          }
+        });
+
+        // Simple HTML generation without external dependencies
+        costSummaryHTML = totalCost > 0 ? `
+          <div class="destination-cost-summary">
+            <div class="cost-total">
+              <span class="cost-amount">$${totalCost.toLocaleString()}</span>
+              ${duration > 0 ? `<span class="cost-per-day">$${Math.round(totalCost/duration)}/day</span>` : ''}
+            </div>
+            <div class="cost-breakdown-toggle">
+              <span class="toggle-icon">▼</span>
+              <span class="toggle-text">Details</span>
+            </div>
+          </div>
+        ` : '';
+
+        costBreakdownHTML = totalCost > 0 ? `
+          <div class="cost-breakdown">
+            ${Object.entries(destinationCosts.byCategory)
+              .filter(([_, amount]) => amount > 0)
+              .map(([category, amount]) => {
+                const percentage = (amount / totalCost * 100).toFixed(1);
+                return `
+                  <div class="cost-breakdown-item">
+                    <div class="cost-category">
+                      <span class="cost-icon">${getCategoryIcon(category)}</span>
+                      <span class="cost-name">${getCategoryDisplayName(category)}</span>
+                    </div>
+                    <div class="cost-amount">
+                      <span class="cost-value">$${amount.toLocaleString()}</span>
+                      <span class="cost-percentage">${percentage}%</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+          </div>
+        ` : '';
+
+        costDetailsHTML = totalCost > 0 ? `
+          <div class="cost-summary">
+            <div class="cost-summary-row">
+              <span class="cost-label">Total Cost:</span>
+              <span class="cost-value total">$${totalCost.toLocaleString()}</span>
+            </div>
+            ${duration > 0 ? `
+              <div class="cost-summary-row">
+                <span class="cost-label">Per Day:</span>
+                <span class="cost-value">$${Math.round(totalCost/duration).toLocaleString()}</span>
+              </div>
+            ` : ''}
+            <div class="cost-summary-row">
+              <span class="cost-label">Per Person:</span>
+              <span class="cost-value">$${Math.round(totalCost/3).toLocaleString()}</span>
+            </div>
+            <div class="cost-summary-row">
+              <span class="cost-label">Items:</span>
+              <span class="cost-value">${destinationCosts.count}</span>
+            </div>
+          </div>
+        ` : '';
+      }
+
       
       // Add the destination item
       sidebarItems.push(`
@@ -823,6 +1030,11 @@ async function initMapApp() {
               <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}"> days
             </div>
             ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
+            ${costSummaryHTML}
+            <div class="destination-cost-details" id="cost-details-${loc.id}">
+              ${costBreakdownHTML}
+              ${costDetailsHTML}
+            </div>
             <div class="destination-notes">
               <textarea class="editable-notes" placeholder="Add notes..." data-location-id="${loc.id}">${notes}</textarea>
             </div>
@@ -862,6 +1074,23 @@ async function initMapApp() {
         e.stopPropagation();
         const index = parseInt(e.target.dataset.index);
         deleteDestination(index);
+      });
+    });
+
+    // Add click handlers for cost breakdown toggles
+    destinationList.querySelectorAll('.cost-breakdown-toggle').forEach(toggle => {
+      toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const toggleElement = e.currentTarget;
+        const destinationItem = toggleElement.closest('.destination-item');
+
+        if (destinationItem) {
+          const costDetails = destinationItem.querySelector('.destination-cost-details');
+          if (costDetails) {
+            costDetails.classList.toggle('visible');
+            toggleElement.classList.toggle('expanded');
+          }
+        }
       });
     });
     
@@ -1233,6 +1462,9 @@ async function initMapApp() {
         updateChatContext(legFilter.value, subLegFilter.value);
         closeManageScenariosModal();
         document.getElementById('scenario-selector').value = scenarioId;
+
+        // Save scenario selection to state
+        statePersistence.saveScenarioSelection(scenarioId);
       }
     } catch (error) {
       console.error('Error loading scenario:', error);
@@ -1373,9 +1605,16 @@ async function initMapApp() {
     subLegFilter.value = ''; // Reset sub-leg selection
     updateMap();
     updateChatContext(e.target.value, null);
+
+    // Save leg selection to state
+    statePersistence.saveLegSelection(e.target.value, null);
   });
 
-  subLegFilter.addEventListener('change', updateMap);
+  subLegFilter.addEventListener('change', function(e) {
+    updateMap();
+    // Save sub-leg selection to state
+    statePersistence.saveLegSelection(legFilter.value, e.target.value || null);
+  });
   routingToggle.addEventListener('change', updateMap);
   
   // Export scenario button
@@ -1441,6 +1680,101 @@ async function initMapApp() {
 
   // Scenario controls
   document.getElementById('manage-scenarios-btn').addEventListener('click', openManageScenariosModal);
+
+  // Cost tracking buttons
+  document.getElementById('add-cost-btn').addEventListener('click', () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    scenarioActionsDropdown.style.display = 'none';
+    scenarioActionsBtn.classList.remove('active');
+
+    costUI.setSessionId(currentScenarioId || 'default');
+    costUI.setDestinations(workingData.locations || []);
+    costUI.showAddCostModal();
+  });
+
+  document.getElementById('view-costs-btn').addEventListener('click', async () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    scenarioActionsDropdown.style.display = 'none';
+    scenarioActionsBtn.classList.remove('active');
+
+    costUI.setSessionId(currentScenarioId || 'default');
+    costUI.setDestinations(workingData.locations || []);
+    await costUI.showCostDetails();
+  });
+
+  document.getElementById('compare-costs-btn').addEventListener('click', async () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    scenarioActionsDropdown.style.display = 'none';
+    scenarioActionsBtn.classList.remove('active');
+
+    try {
+      const scenarios = await scenarioManager.listScenarios();
+      if (scenarios.length < 2) {
+        alert('You need at least 2 scenarios to compare costs. Create more scenarios first.');
+        return;
+      }
+
+      // Load scenario data with itineraries
+      const scenariosWithData = await Promise.all(
+        scenarios.map(async (scenario) => {
+          const latestVersion = await scenarioManager.getLatestVersion(scenario.id);
+          return {
+            id: scenario.id,
+            name: scenario.name,
+            itinerary: latestVersion?.itineraryData || null
+          };
+        })
+      );
+
+      await costComparison.showComparisonModal(scenariosWithData.filter(s => s.itinerary));
+    } catch (error) {
+      console.error('Error loading scenarios for comparison:', error);
+      alert('Failed to load scenarios for comparison.');
+    }
+  });
+
+  // Update cost summary when costs change
+  window.addEventListener('costs-updated', async () => {
+    await updateCostSummary();
+  });
+
+  async function updateCostSummary() {
+    const summarySection = document.getElementById('cost-summary-section');
+    if (!summarySection) return;
+
+    try {
+      costUI.setSessionId(currentScenarioId || 'default');
+      const summary = await costUI.fetchSummary({
+        destinations: workingData.locations || [],
+        traveler_count: workingData.trip?.travelers?.length || 1,
+        total_days: calculateTotalDays()
+      });
+
+      if (summary && summary.totalUSD > 0) {
+        summarySection.innerHTML = '';
+        summarySection.appendChild(costUI.createSummaryWidget(summary));
+        summarySection.style.display = 'block';
+      } else {
+        summarySection.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Error updating cost summary:', error);
+    }
+  }
+
+  function calculateTotalDays() {
+    if (!workingData.trip?.start_date || !workingData.trip?.end_date) return 0;
+    const start = new Date(workingData.trip.start_date);
+    const end = new Date(workingData.trip.end_date);
+    const diffTime = Math.abs(end - start);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  // Initial cost summary update
+  updateCostSummary();
 
   // Duplicate scenario button
   document.getElementById('duplicate-scenario-btn').addEventListener('click', async () => {
@@ -1857,12 +2191,32 @@ async function initMapApp() {
     updateChatContext(legFilter.value, subLegFilter.value || null);
   });
 
-  // Initialize chat context with 'all' on load
-  render('all', null, routingToggle.checked);
+  // Restore leg/sub-leg selections from saved state
+  const initialLeg = savedState.selectedLeg || 'all';
+  const initialSubLeg = savedState.selectedSubLeg || null;
+
+  // Set the filter values
+  legFilter.value = initialLeg;
+  if (initialLeg !== 'all') {
+    populateSubLegs(initialLeg);
+    if (initialSubLeg) {
+      subLegFilter.value = initialSubLeg;
+    }
+  }
+
+  // Initial render with restored state
+  render(initialLeg, initialSubLeg, routingToggle.checked);
   if (chatInstance) {
     // Give it a moment for render to complete
-    setTimeout(() => updateChatContext('all', null), 100);
+    setTimeout(() => updateChatContext(initialLeg, initialSubLeg), 100);
   }
+
+  console.log('✅ App initialized with state:', {
+    scenarioId: currentScenarioId,
+    scenarioName: currentScenarioName,
+    leg: initialLeg,
+    subLeg: initialSubLeg
+  });
 }
 
 window.addEventListener('load', () => {
