@@ -796,26 +796,7 @@ def bulk_save_costs():
             }), 404
 
         scenario_data = scenario_doc.to_dict()
-        current_costs = scenario_data.get('costs', [])
-
-        # Remove existing costs for this destination
-        filtered_costs = [
-            c for c in current_costs
-            if c.get('destination_id') != destination_id
-        ]
-
-        # Add new researched costs
-        filtered_costs.extend(cost_items)
-
-        # Update Firestore scenario document (align field casing with frontend)
-        scenario_ref.update({
-            'costs': filtered_costs,
-            'updatedAt': firestore.SERVER_TIMESTAMP
-        })
-
-        print(f"✅ Saved {len(cost_items)} costs to scenario document for {destination_name}")
-
-        # ALSO update the latest version's itineraryData (this is what the UI loads!)
+        # Update the latest version's itineraryData (this is what the UI loads!)
         current_version = scenario_data.get('currentVersion', 0)
 
         # Get the latest version by highest versionNumber
@@ -856,20 +837,95 @@ def bulk_save_costs():
         else:
             print(f"⚠️ Warning: No versions found for scenario {scenario_id}")
 
-        print(f"   Removed {len(current_costs) - len(filtered_costs) + len(cost_items)} old costs from scenario")
-        print(f"   Total costs in scenario now: {len(filtered_costs)}")
+        # Lightweight snapshot summary on the scenario document (no full costs array)
+        try:
+            totals_by_category = {}
+            for item in version_filtered_costs:
+                cat = item.get('category', 'other')
+                totals_by_category[cat] = totals_by_category.get(cat, 0.0) + float(item.get('amount_usd', 0) or 0)
+            scenario_ref.update({
+                'updatedAt': firestore.SERVER_TIMESTAMP,
+                'costsCount': len(version_filtered_costs),
+                'totalsByCategory': totals_by_category,
+            })
+            print(f"🧮 Updated scenario summary: {len(version_filtered_costs)} items")
+        except Exception as e:
+            print(f"Warning: failed to update scenario summary: {e}")
 
         return jsonify({
             'status': 'success',
             'message': f'Saved {len(cost_items)} costs for {destination_name}',
             'costs_saved': len(cost_items),
-            'total_costs': len(filtered_costs)
+            'total_costs': len(version_filtered_costs)
         })
 
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
         print(f"Error in bulk-save endpoint: {error_details}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'error_details': error_details
+        }), 500
+
+@app.route('/api/itinerary/summary', methods=['POST'])
+def generate_summary():
+    """
+    Generate a formatted itinerary summary using the generate_itinerary_summary tool.
+
+    Expected request body:
+    {
+        "itinerary": {
+            "locations": [...],
+            "trip": {...},
+            "legs": [...],
+            "costs": [...]
+        },
+        "session_id": "optional-session-id"
+    }
+    """
+    try:
+        from travel_concierge.tools.itinerary_summary_generator import generate_itinerary_summary as gen_summary_tool
+
+        data = request.json
+        itinerary_data = data.get('itinerary', {})
+        session_id = data.get('session_id')
+
+        if not itinerary_data or not itinerary_data.get('locations'):
+            return jsonify({
+                'status': 'error',
+                'error': 'No itinerary data provided'
+            }), 400
+
+        print(f"📄 Generating summary for itinerary with {len(itinerary_data.get('locations', []))} locations")
+
+        # Call the summary generator tool directly
+        result = gen_summary_tool(
+            itinerary_json=json.dumps(itinerary_data),
+            tool_context=None  # We're passing data directly as JSON
+        )
+
+        if result.get('status') == 'success':
+            print(f"✅ Summary generated successfully ({len(result.get('summary', ''))} characters)")
+            return jsonify({
+                'status': 'success',
+                'summary': result.get('summary'),
+                'itinerary_data': result.get('itinerary_data'),
+                'message': result.get('message')
+            })
+        else:
+            print(f"❌ Summary generation failed: {result.get('message')}")
+            return jsonify({
+                'status': 'error',
+                'error': result.get('message'),
+                'prompt': result.get('prompt')  # Return prompt for debugging
+            }), 500
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in summary generation endpoint: {error_details}")
         return jsonify({
             'status': 'error',
             'error': str(e),
