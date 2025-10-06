@@ -810,11 +810,11 @@ def bulk_save_costs():
 
         if versions:
             latest_version_ref = versions[0].reference
-            latest_version_data = versions[0].to_dict()
+            latest_version_data = versions[0].to_dict() or {}
 
             # Get itineraryData from the version
-            itinerary_data = latest_version_data.get('itineraryData', {})
-            version_costs = itinerary_data.get('costs', [])
+            itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+            version_costs = itinerary_data.get('costs', []) or []
 
             # Remove existing costs for this destination from version
             version_filtered_costs = [
@@ -825,15 +825,28 @@ def bulk_save_costs():
             # Add new costs
             version_filtered_costs.extend(cost_items)
 
-            # Update the version's itineraryData
-            itinerary_data['costs'] = version_filtered_costs
-            latest_version_ref.update({
-                'itineraryData': itinerary_data,
-                'updatedAt': firestore.SERVER_TIMESTAMP
+            # Prepare new version payload (create a new version instead of mutating latest)
+            new_version_number = max(int(scenario_data.get('currentVersion', 0) or 0), int(latest_version_data.get('versionNumber', 0) or 0)) + 1
+            new_version_ref = scenario_ref.collection('versions').document()
+            new_itinerary_data = dict(itinerary_data)
+            new_itinerary_data['costs'] = version_filtered_costs
+
+            new_version_ref.set({
+                'versionNumber': new_version_number,
+                'versionName': '',
+                'isNamed': False,
+                'itineraryData': new_itinerary_data,
+                'createdAt': firestore.SERVER_TIMESTAMP,
             })
 
-            print(f"✅ Also updated latest version (ID: {versions[0].id}) itineraryData")
-            print(f"   Total costs in version now: {len(version_filtered_costs)}")
+            # Update scenario's currentVersion
+            scenario_ref.update({
+                'currentVersion': new_version_number,
+                'updatedAt': firestore.SERVER_TIMESTAMP,
+            })
+
+            print(f"✅ Created new version v{new_version_number} with updated itineraryData")
+            print(f"   Total costs in new version: {len(version_filtered_costs)}")
         else:
             print(f"⚠️ Warning: No versions found for scenario {scenario_id}")
 

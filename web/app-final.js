@@ -1530,10 +1530,17 @@ async function initMapApp() {
         const locationCount = version.itineraryData?.locations?.length || 0;
 
         return `
-          <div class="version-item" style="padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; hover: background: #f5f5f5;"
-               onclick="revertToVersion('${scenarioId}', ${version.versionNumber})">
-            <div style="font-weight: bold; margin-bottom: 4px;">${versionLabel}</div>
-            <div style="font-size: 12px; color: #666;">${locationCount} destinations • ${createdDate}</div>
+          <div class="version-item" style="padding: 12px; border-bottom: 1px solid #eee;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-weight: bold; margin-bottom: 4px;">${versionLabel}</div>
+                <div style="font-size: 12px; color: #666;">${locationCount} destinations • ${createdDate}</div>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button onclick="revertToVersion('${scenarioId}', ${version.versionNumber})" style="padding:6px 10px; background:#0070f3; color:#fff; border:none; border-radius:4px; cursor:pointer;">Revert</button>
+                <button onclick="nameVersionPrompt('${scenarioId}', ${version.versionNumber})" style="padding:6px 10px; background:#666; color:#fff; border:none; border-radius:4px; cursor:pointer;">Label</button>
+              </div>
+            </div>
           </div>
         `;
       }).join('');
@@ -1575,6 +1582,19 @@ async function initMapApp() {
     } catch (error) {
       console.error('Error showing version history:', error);
       alert('Failed to load version history');
+    }
+  };
+
+  window.nameVersionPrompt = async function(scenarioId, versionNumber) {
+    const name = prompt(`Enter a label for version ${versionNumber}:`);
+    if (!name || !name.trim()) return;
+    try {
+      await scenarioManager.nameVersion(scenarioId, versionNumber, name.trim());
+      // Refresh the version history modal
+      await window.showVersionHistory(scenarioId);
+    } catch (error) {
+      console.error('Error naming version:', error);
+      alert('Failed to label version');
     }
   };
 
