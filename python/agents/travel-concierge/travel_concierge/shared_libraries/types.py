@@ -229,3 +229,149 @@ class UserProfile(BaseModel):
 class PackingList(BaseModel):
     """A list of things to pack for the trip."""
     items: list[str]
+
+
+class CostItem(BaseModel):
+    """A single cost item for trip budgeting and tracking."""
+    id: str = Field(description="Unique identifier for the cost item")
+    category: str = Field(
+        description="Cost category: 'flight', 'accommodation', 'activity', 'food', 'transport', 'other'"
+    )
+    description: str = Field(description="Description of the cost item")
+    amount: float = Field(description="Cost amount in the original currency")
+    currency: str = Field(
+        description="ISO 4217 currency code, e.g., USD, EUR, JPY, GBP"
+    )
+    amount_usd: float = Field(
+        description="Cost amount converted to USD for aggregation"
+    )
+    date: str = Field(description="Date of expense in YYYY-MM-DD format")
+    destination_id: Optional[int] = Field(
+        default=None, description="ID of the associated destination/location"
+    )
+    booking_status: str = Field(
+        default="estimated",
+        description="Status: 'estimated', 'researched', 'booked', 'paid'"
+    )
+    source: str = Field(
+        default="manual",
+        description="Source: 'manual', 'ai_estimate', 'web_research', 'booking_api'"
+    )
+    notes: Optional[str] = Field(default=None, description="Additional notes")
+
+
+class CostsByCategory(BaseModel):
+    """Cost breakdown by category."""
+    flight: float = Field(default=0.0, description="Total flight costs in USD")
+    accommodation: float = Field(default=0.0, description="Total accommodation costs in USD")
+    activity: float = Field(default=0.0, description="Total activity costs in USD")
+    food: float = Field(default=0.0, description="Total food costs in USD")
+    transport: float = Field(default=0.0, description="Total transport costs in USD")
+    other: float = Field(default=0.0, description="Total other costs in USD")
+
+
+class DestinationCost(BaseModel):
+    """Aggregated costs for a destination."""
+    destination_id: int = Field(description="ID of the destination")
+    destination_name: str = Field(description="Name of the destination")
+    costs_by_category: CostsByCategory
+    total_usd: float = Field(description="Total costs for this destination in USD")
+    cost_per_day: float = Field(description="Average cost per day in USD")
+    currency_breakdown: dict[str, float] = Field(
+        default_factory=dict,
+        description="Costs broken down by original currency"
+    )
+
+
+class CostSummary(BaseModel):
+    """Overall cost summary for the trip."""
+    total_usd: float = Field(description="Total trip cost in USD")
+    costs_by_category: CostsByCategory
+    costs_by_destination: list[DestinationCost] = Field(default_factory=list)
+    cost_per_person: Optional[float] = Field(
+        default=None, description="Cost per person if travelers count is known"
+    )
+    cost_per_day: float = Field(description="Average cost per day")
+    currency_totals: dict[str, float] = Field(
+        default_factory=dict,
+        description="Total costs by currency"
+    )
+
+
+# ============================================================================
+# Cost Research Agent Types
+# ============================================================================
+
+class CostResearchRequest(BaseModel):
+    """Request to research costs for a specific destination."""
+    destination_name: str = Field(description="Full destination name (e.g., 'Bangkok, Thailand')")
+    destination_id: int = Field(description="ID linking to itinerary destination")
+    duration_days: int = Field(description="Number of days staying in this destination")
+    arrival_date: str = Field(description="Arrival date in YYYY-MM-DD format")
+    departure_date: str = Field(description="Departure date in YYYY-MM-DD format")
+    num_travelers: int = Field(default=1, description="Number of travelers")
+    travel_style: str = Field(
+        default="mid-range",
+        description="Travel style preference: 'budget', 'mid-range', or 'luxury'"
+    )
+    previous_destination: Optional[str] = Field(
+        default=None,
+        description="Previous destination name for flight pricing (if applicable)"
+    )
+    next_destination: Optional[str] = Field(
+        default=None,
+        description="Next destination name for flight pricing (if applicable)"
+    )
+
+
+class CostResearchResult(BaseModel):
+    """Research results for a specific cost category."""
+    category: str = Field(
+        description="Cost category: 'accommodation', 'flight', 'food', 'transport', 'activity'"
+    )
+    amount_low: float = Field(description="Lower bound estimate in USD")
+    amount_mid: float = Field(description="Typical/recommended estimate in USD")
+    amount_high: float = Field(description="Upper bound estimate in USD")
+    currency_local: str = Field(description="Local currency code (e.g., 'THB', 'JPY')")
+    amount_local: float = Field(description="Typical amount in local currency")
+    sources: list[str] = Field(
+        default_factory=list,
+        description="URLs of sources used for research"
+    )
+    confidence: str = Field(
+        description="Confidence level: 'high', 'medium', or 'low'"
+    )
+    notes: str = Field(
+        description="Key findings, booking tips, or important context"
+    )
+    researched_at: str = Field(description="ISO timestamp when research was conducted")
+
+
+class DestinationCostResearch(BaseModel):
+    """Complete cost research results for a destination."""
+    destination_id: int = Field(description="ID of the destination")
+    destination_name: str = Field(description="Name of the destination")
+    accommodation: CostResearchResult = Field(
+        description="Accommodation costs (total for stay)"
+    )
+    flights: CostResearchResult = Field(
+        description="Flight costs (inbound and/or outbound)"
+    )
+    food_daily: CostResearchResult = Field(
+        description="Daily food costs per person"
+    )
+    transport_daily: CostResearchResult = Field(
+        description="Daily local transport costs per person"
+    )
+    activities: CostResearchResult = Field(
+        description="Total activity and attraction costs for stay"
+    )
+    total_low: float = Field(description="Total low estimate in USD")
+    total_mid: float = Field(description="Total typical estimate in USD")
+    total_high: float = Field(description="Total high estimate in USD")
+    cost_per_day_mid: float = Field(
+        description="Average cost per day (mid estimate) in USD"
+    )
+    research_summary: str = Field(
+        description="Overall insights, tips, and recommendations"
+    )

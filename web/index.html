@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RTW Trip Map</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./cost-styles.css">
 </head>
 <body>
   <header class="app-header">
@@ -71,6 +72,19 @@
           <span>Manage All</span>
         </button>
         <div class="dropdown-divider"></div>
+        <button id="add-cost-btn" class="dropdown-item">
+          <span class="icon">💰</span>
+          <span>Add Cost</span>
+        </button>
+        <button id="view-costs-btn" class="dropdown-item">
+          <span class="icon">📊</span>
+          <span>View Costs</span>
+        </button>
+        <button id="compare-costs-btn" class="dropdown-item">
+          <span class="icon">📈</span>
+          <span>Compare Scenarios</span>
+        </button>
+        <div class="dropdown-divider"></div>
         <button id="import-scenarios-btn" class="dropdown-item">
           <span class="icon">📥</span>
           <span>Import</span>
@@ -79,6 +93,11 @@
           <span class="icon">📤</span>
           <span>Export</span>
         </button>
+      </div>
+
+      <!-- Cost Summary Section -->
+      <div id="cost-summary-section" class="cost-summary-section" style="display: none;">
+        <!-- Cost summary widget will be inserted here -->
       </div>
 
       <div class="destination-list" id="destination-list">
@@ -247,6 +266,10 @@
     }
   </script>
   <script src="./sidebar-resize.js"></script>
+  <script src="./cost-tracker.js"></script>
+  <script src="./cost-ui.js"></script>
+  <script src="./cost-comparison.js"></script>
+  <script src="./cost-utils-standalone.js"></script>
   <script type="module" src="./chat.js"></script>
   <script type="module" src="./app-final.js"></script>
   <script>

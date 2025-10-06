@@ -1,0 +1,981 @@
+/* ============================================================================
+   Cost Tracking Styles
+   ============================================================================ */
+
+/* Cost Summary Widget */
+.cost-summary-widget {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.cost-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.cost-summary-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.cost-summary-total {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.cost-summary-breakdown {
+  margin: 12px 0;
+}
+
+.cost-category-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.cost-category-row:last-child {
+  border-bottom: none;
+}
+
+.cost-category-row span:first-child {
+  color: #666;
+}
+
+.cost-category-row span:last-child {
+  font-weight: 600;
+  color: #333;
+}
+
+.cost-summary-per-person,
+.cost-summary-per-day {
+  margin-top: 12px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+}
+
+/* Cost Form */
+.cost-form {
+  width: 100%;
+  max-width: 500px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* Cost List */
+.cost-list {
+  width: 100%;
+  max-width: 700px;
+}
+
+.cost-list-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.cost-items {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.cost-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: white;
+  transition: all 0.2s;
+}
+
+.cost-item:hover {
+  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+}
+
+.cost-item-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.cost-item-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.cost-item-description {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cost-item-meta {
+  font-size: 12px;
+  color: #666;
+}
+
+.cost-item-amount {
+  text-align: right;
+  font-weight: 600;
+  color: #333;
+  flex-shrink: 0;
+}
+
+.cost-item-amount small {
+  font-size: 11px;
+  color: #999;
+  font-weight: 400;
+}
+
+.cost-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 32px;
+  color: #999;
+}
+
+/* Destination Cost Breakdown */
+.destination-cost-breakdown {
+  margin-top: 24px;
+}
+
+.destination-cost-breakdown h4 {
+  margin-bottom: 12px;
+  font-size: 16px;
+  color: #333;
+}
+
+.destination-cost-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.destination-cost-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.destination-cost-item:hover {
+  border-color: #2563eb;
+  background: #f8f9fa;
+}
+
+.destination-cost-name {
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.destination-cost-amount {
+  font-weight: 700;
+  color: #2563eb;
+  margin-right: 12px;
+}
+
+.destination-cost-per-day {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+/* Buttons */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #4b5563;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #2563eb;
+  color: #2563eb;
+}
+
+.btn-outline:hover {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: #f0f0f0;
+}
+
+/* ============================================================================
+   Cost Comparison Styles
+   ============================================================================ */
+
+.cost-comparison-container {
+  width: 100%;
+  max-width: 1200px;
+}
+
+.comparison-header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.comparison-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  color: #333;
+}
+
+.comparison-header p {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.comparison-empty-state {
+  text-align: center;
+  padding: 64px 32px;
+  color: #999;
+}
+
+.comparison-empty-state h3 {
+  margin: 0 0 12px 0;
+  color: #666;
+}
+
+/* Overview Table */
+.comparison-overview {
+  margin-bottom: 48px;
+}
+
+.comparison-overview h3 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.comparison-table thead {
+  background: #f8f9fa;
+}
+
+.comparison-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.comparison-table td {
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.comparison-table .scenario-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.comparison-table .cost-total {
+  font-weight: 700;
+  font-size: 18px;
+  color: #2563eb;
+}
+
+.cheapest-row {
+  background: #f0fdf4;
+}
+
+.expensive-row {
+  background: #fef3c7;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.badge-success {
+  background: #10b981;
+  color: white;
+}
+
+.badge-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+/* Category Comparison */
+.category-comparison {
+  margin-bottom: 48px;
+}
+
+.category-comparison h3 {
+  margin: 0 0 24px 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.category-bar-group {
+  margin-bottom: 32px;
+}
+
+.category-label {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.category-bars-container {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.scenario-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scenario-bar-row:last-child {
+  margin-bottom: 0;
+}
+
+.scenario-bar-label {
+  flex: 0 0 120px;
+  font-size: 14px;
+  color: #666;
+}
+
+.scenario-bar-wrapper {
+  flex: 1;
+  height: 32px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.scenario-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  transition: width 0.3s ease;
+}
+
+.scenario-bar-value {
+  flex: 0 0 100px;
+  text-align: right;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+/* Scenario Cards */
+.detailed-breakdown {
+  margin-bottom: 32px;
+}
+
+.detailed-breakdown h3 {
+  margin: 0 0 24px 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.scenario-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.scenario-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.scenario-card h4 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.scenario-card-total {
+  font-size: 32px;
+  font-weight: 700;
+  color: #2563eb;
+  margin-bottom: 24px;
+}
+
+.scenario-card-breakdown {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.breakdown-row span:first-child {
+  color: #666;
+}
+
+.breakdown-row span:last-child {
+  font-weight: 600;
+  color: #333;
+}
+
+.scenario-card-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.stat {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.comparison-modal .modal-content {
+  max-width: 1200px;
+}
+
+/* ============================================================================
+   Sidebar Cost Integration
+   ============================================================================ */
+
+/* Destination Cost Summary */
+.destination-cost-summary {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.cost-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.cost-amount {
+  font-weight: 700;
+  color: #2563eb;
+  font-size: 16px;
+}
+
+.cost-per-day {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.cost-breakdown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  font-size: 13px;
+  color: #666;
+}
+
+.cost-breakdown-toggle:hover {
+  background: #e8f4f8;
+  color: #2563eb;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.cost-breakdown-toggle.expanded .toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Expandable Cost Details */
+.destination-cost-details {
+  margin-top: 8px;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  display: none;
+}
+
+.destination-cost-details.visible {
+  display: block;
+}
+
+.cost-breakdown {
+  margin-bottom: 12px;
+}
+
+.cost-breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.cost-breakdown-item:last-child {
+  border-bottom: none;
+}
+
+.cost-category {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.cost-icon {
+  font-size: 16px;
+}
+
+.cost-name {
+  font-size: 13px;
+  color: #666;
+}
+
+.cost-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.cost-value {
+  font-weight: 600;
+  color: #333;
+  font-size: 13px;
+}
+
+.cost-percentage {
+  font-size: 11px;
+  color: #999;
+}
+
+.cost-summary {
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.cost-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.cost-label {
+  color: #666;
+}
+
+.cost-summary .cost-value.total {
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.cost-summary-empty {
+  text-align: center;
+  padding: 16px;
+  color: #999;
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Map Modal Cost Integration */
+.info-window .cost-summary {
+  margin: 12px 0;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.info-window .cost-breakdown {
+  margin-top: 8px;
+}
+
+.info-window .cost-breakdown-item {
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.info-window .cost-category {
+  font-size: 12px;
+}
+
+.info-window .cost-value {
+  font-size: 12px;
+}
+
+.info-window .cost-percentage {
+  font-size: 10px;
+}
+
+/* Budget Status */
+.budget-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.budget-status.on_track {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.budget-status.over_budget {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.budget-status.under_budget {
+  background: #e0f2fe;
+  color: #075985;
+  border: 1px solid #bae6fd;
+}
+
+.status-icon {
+  font-size: 14px;
+}
+
+.status-text {
+  font-weight: 600;
+  flex: 1;
+}
+
+.variance-amount {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* Cost Highlighting */
+.destination-item:hover .destination-cost-summary {
+  border-color: #2563eb;
+  background: #e8f4f8;
+}
+
+.destination-item.highlighted .destination-cost-summary {
+  border-color: #2563eb;
+  background: #dbeafe;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+}
+
+/* Loading State */
+.cost-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: #666;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.cost-loading::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border: 2px solid #e0e0e0;
+  border-top: 2px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal-content {
+    max-width: 100%;
+    margin: 0 12px;
+  }
+
+  .cost-item {
+    flex-wrap: wrap;
+  }
+
+  .cost-item-amount {
+    width: 100%;
+    text-align: left;
+    margin-top: 8px;
+  }
+
+  .form-row {
+    flex-direction: column;
+  }
+
+  .comparison-table {
+    font-size: 12px;
+  }
+
+  .comparison-table th,
+  .comparison-table td {
+    padding: 8px;
+  }
+
+  .scenario-bar-label {
+    flex: 0 0 80px;
+    font-size: 12px;
+  }
+
+  .scenario-bar-value {
+    flex: 0 0 70px;
+    font-size: 12px;
+  }
+
+  .scenario-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .destination-cost-summary {
+    padding: 6px 8px;
+  }
+
+  .cost-amount {
+    font-size: 14px;
+  }
+
+  .cost-per-day {
+    font-size: 11px;
+  }
+
+  .cost-breakdown-item {
+    padding: 4px 0;
+  }
+
+  .cost-name {
+    font-size: 12px;
+  }
+
+  .cost-value {
+    font-size: 12px;
+  }
+
+  .cost-percentage {
+    font-size: 10px;
+  }
+}
