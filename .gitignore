@@ -7,3 +7,71 @@ data/unresolved.json
 .env
 node_modules
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Logs
+logs/*.log
+logs/*.pid
+logs/.*.swp
+python/agents/travel-concierge/logs/
+
+# Development and testing files
+test-*.py
+test-*.html
+test-*.json
+test-*.sh
+*_test.py
+debug-*.py
+debug-*.js
+validate_*.py
+populate_*.py
+fix_*.py
+clean_*.py
+update_*.py
+simple_test.py
+direct_*.py
+*_manual.py
+
+# Development documentation (keep structured docs, ignore scratch notes)
+COST_*.md
+QUICKSTART_*.md
+QUICK_*.md
+TESTING_*.md
+DESTINATION_MAPPING.md
+JAPAN_COST_GUIDE.md
+export-scenario-helper.md
+
+# Temporary and backup files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Scripts (utility/dev scripts)
+scripts/backfill-*.py
+scripts/test-*.py
+scripts/validate-*.py
+add_*.py
+okinawa_*.py
+
+# Cost research standalone
+python/agents/travel-concierge/travel_concierge/cost_research_standalone.py
+
+# Web testing pages
+web/cost-backfill-tool.html
+web/update-costs.html
+web/404.html
+update_firestore_costs.html
+
+# Provider switching scripts
+switch-*.sh
+
+# Test results
+test-backfill-results.json
