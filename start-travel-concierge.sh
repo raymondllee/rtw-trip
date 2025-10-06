@@ -68,23 +68,8 @@ echo ""
 echo "🐍 Starting Flask API Server (Port 5001)..."
 cd "$SCRIPT_DIR/python/agents/travel-concierge"
 
-# Check if venv exists, create if not
-if [ ! -d "venv" ]; then
-    echo "📦 Creating Python virtual environment..."
-    python3 -m venv venv
-fi
-
-# Activate virtual environment and install dependencies
-source venv/bin/activate
-
-# Install Flask dependencies if not already installed
-if ! pip show flask >/dev/null 2>&1; then
-    echo "📦 Installing Flask dependencies..."
-    pip install flask flask-cors requests >/dev/null 2>&1
-fi
-
-# Start Flask API server in background
-python api_server.py > "$SCRIPT_DIR/logs/flask-api.log" 2>&1 &
+# Start Flask API server in background using Poetry
+poetry run python api_server.py > "$SCRIPT_DIR/logs/flask-api.log" 2>&1 &
 FLASK_PID=$!
 echo "✅ Flask API Server started (PID: $FLASK_PID)"
 

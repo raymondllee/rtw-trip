@@ -21,6 +21,8 @@ import uuid
 import requests
 from datetime import datetime
 
+from travel_concierge.tools.cost_tracker import CostTrackerService
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend requests
 
@@ -31,6 +33,9 @@ USER_ID = "web_user"
 
 # Store sessions in memory (use Redis/DB for production)
 sessions = {}
+
+# Cost tracker service (one instance per session - in production use DB)
+cost_trackers = {}
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -151,8 +156,9 @@ User question: {message}
             "web_session_id": session_id
         }
 
-        # Additionally pass itinerary data if we're initializing
-        if initialize_itinerary and context.get('destinations'):
+        # ALWAYS pass itinerary data when context has destinations
+        # This ensures tools like generate_itinerary_summary can access the itinerary
+        if context.get('destinations'):
             itinerary_data = {
                 "locations": context.get('destinations', []),
                 "trip": {
@@ -162,7 +168,11 @@ User question: {message}
                 }
             }
             adk_payload["state"]["itinerary"] = itinerary_data
-            adk_payload["state"]["itinerary_initialized"] = True
+            print(f"✅ Passing itinerary with {len(context.get('destinations', []))} destinations in state")
+
+            # Only set initialized flag on first message
+            if initialize_itinerary:
+                adk_payload["state"]["itinerary_initialized"] = True
 
         print(f"Sending to ADK: {context_prompt[:100]}...")
 
@@ -555,6 +565,510 @@ def generate_fallback_title(user_messages):
 def health():
     """Health check endpoint"""
     return jsonify({'status': 'healthy'})
+
+# ============================================================================
+# Cost Tracking API Endpoints
+# ============================================================================
+
+def get_cost_tracker(session_id):
+    """Get or create cost tracker for a session."""
+    if session_id not in cost_trackers:
+        cost_trackers[session_id] = CostTrackerService()
+    return cost_trackers[session_id]
+
+@app.route('/api/costs', methods=['POST'])
+def add_cost():
+    """Add a new cost item."""
+    try:
+        data = request.json
+        session_id = data.get('session_id', 'default')
+
+        tracker = get_cost_tracker(session_id)
+
+        cost_item = tracker.add_cost(
+            category=data.get('category'),
+            description=data.get('description'),
+            amount=float(data.get('amount')),
+            currency=data.get('currency', 'USD'),
+            date=data.get('date'),
+            destination_id=data.get('destination_id'),
+            booking_status=data.get('booking_status', 'estimated'),
+            source=data.get('source', 'manual'),
+            notes=data.get('notes')
+        )
+
+        return jsonify({
+            'status': 'success',
+            'cost': cost_item.model_dump()
+        })
+    except Exception as e:
+        print(f"Error adding cost: {e}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@app.route('/api/costs/<cost_id>', methods=['PUT'])
+def update_cost(cost_id):
+    """Update an existing cost item."""
+    try:
+        data = request.json
+        session_id = data.get('session_id', 'default')
+
+        tracker = get_cost_tracker(session_id)
+
+        updates = {k: v for k, v in data.items() if k not in ['session_id', 'cost_id']}
+        cost_item = tracker.update_cost(cost_id, **updates)
+
+        if cost_item:
+            return jsonify({
+                'status': 'success',
+                'cost': cost_item.model_dump()
+            })
+        else:
+            return jsonify({'status': 'error', 'error': 'Cost not found'}), 404
+    except Exception as e:
+        print(f"Error updating cost: {e}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@app.route('/api/costs/<cost_id>', methods=['DELETE'])
+def delete_cost(cost_id):
+    """Delete a cost item."""
+    try:
+        data = request.json or {}
+        session_id = data.get('session_id', 'default')
+
+        tracker = get_cost_tracker(session_id)
+        success = tracker.delete_cost(cost_id)
+
+        if success:
+            return jsonify({'status': 'success'})
+        else:
+            return jsonify({'status': 'error', 'error': 'Cost not found'}), 404
+    except Exception as e:
+        print(f"Error deleting cost: {e}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@app.route('/api/costs', methods=['GET'])
+def get_costs():
+    """Get all costs or filtered costs."""
+    try:
+        session_id = request.args.get('session_id', 'default')
+        destination_id = request.args.get('destination_id', type=int)
+        category = request.args.get('category')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
+        tracker = get_cost_tracker(session_id)
+
+        if any([destination_id, category, start_date, end_date]):
+            costs = tracker.filter_costs(
+                destination_id=destination_id,
+                category=category,
+                start_date=start_date,
+                end_date=end_date
+            )
+        else:
+            costs = tracker.costs
+
+        return jsonify({
+            'status': 'success',
+            'costs': [cost.model_dump() for cost in costs]
+        })
+    except Exception as e:
+        print(f"Error getting costs: {e}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@app.route('/api/costs/summary', methods=['POST'])
+def get_cost_summary():
+    """Get comprehensive cost summary."""
+    try:
+        data = request.json or {}
+        session_id = data.get('session_id', 'default')
+        destinations = data.get('destinations')
+        traveler_count = data.get('traveler_count')
+        total_days = data.get('total_days')
+
+        tracker = get_cost_tracker(session_id)
+        summary = tracker.get_cost_summary(
+            destinations=destinations,
+            traveler_count=traveler_count,
+            total_days=total_days
+        )
+
+        return jsonify({
+            'status': 'success',
+            'summary': summary.model_dump()
+        })
+    except Exception as e:
+        print(f"Error getting cost summary: {e}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@app.route('/api/costs/export', methods=['GET'])
+def export_costs():
+    """Export all costs as JSON."""
+    try:
+        session_id = request.args.get('session_id', 'default')
+        tracker = get_cost_tracker(session_id)
+
+        return jsonify({
+            'status': 'success',
+            'costs': tracker.export_costs()
+        })
+    except Exception as e:
+        print(f"Error exporting costs: {e}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@app.route('/api/costs/import', methods=['POST'])
+def import_costs():
+    """Import costs from JSON."""
+    try:
+        data = request.json
+        session_id = data.get('session_id', 'default')
+        costs_data = data.get('costs', [])
+
+        tracker = get_cost_tracker(session_id)
+        tracker.load_costs(costs_data)
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Imported {len(costs_data)} cost items'
+        })
+    except Exception as e:
+        print(f"Error importing costs: {e}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@app.route('/api/costs/bulk-save', methods=['POST'])
+def bulk_save_costs():
+    """
+    Bulk save cost items to Firestore.
+    This endpoint is called by the cost_research_agent after researching costs.
+
+    Expected request body:
+    {
+        "session_id": "session_abc123",
+        "scenario_id": "scenario_xyz789",
+        "destination_id": 10,
+        "destination_name": "Tokyo, Japan",
+        "cost_items": [
+            {
+                "id": "10_tokyo_accommodation",
+                "category": "accommodation",
+                "description": "Hotel in Tokyo",
+                "amount": 1750.0,
+                "currency": "USD",
+                "amount_usd": 1750.0,
+                "destination_id": 10,
+                "booking_status": "estimated",
+                "source": "web_research",
+                "notes": "7 nights for 3 people"
+            },
+            ...
+        ]
+    }
+    """
+    try:
+        from google.cloud import firestore
+
+        data = request.json
+        session_id = data.get('session_id')
+        scenario_id = data.get('scenario_id')
+        destination_id = data.get('destination_id')
+        destination_name = data.get('destination_name')
+        cost_items = data.get('cost_items', [])
+
+        # Validate required fields
+        if not all([scenario_id, destination_id, cost_items]):
+            return jsonify({
+                'status': 'error',
+                'error': 'Missing required fields: scenario_id, destination_id, cost_items'
+            }), 400
+
+        print(f"💾 Bulk saving {len(cost_items)} costs for {destination_name} (ID: {destination_id})")
+
+        # Initialize Firestore
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(scenario_id)
+
+        # Get current scenario
+        scenario_doc = scenario_ref.get()
+        if not scenario_doc.exists:
+            return jsonify({
+                'status': 'error',
+                'error': f'Scenario {scenario_id} not found'
+            }), 404
+
+        scenario_data = scenario_doc.to_dict()
+        current_costs = scenario_data.get('costs', [])
+
+        # Remove existing costs for this destination
+        filtered_costs = [
+            c for c in current_costs
+            if c.get('destination_id') != destination_id
+        ]
+
+        # Add new researched costs
+        filtered_costs.extend(cost_items)
+
+        # Update Firestore scenario document (align field casing with frontend)
+        scenario_ref.update({
+            'costs': filtered_costs,
+            'updatedAt': firestore.SERVER_TIMESTAMP
+        })
+
+        print(f"✅ Saved {len(cost_items)} costs to scenario document for {destination_name}")
+
+        # ALSO update the latest version's itineraryData (this is what the UI loads!)
+        current_version = scenario_data.get('currentVersion', 0)
+
+        # Get the latest version by highest versionNumber
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if versions:
+            latest_version_ref = versions[0].reference
+            latest_version_data = versions[0].to_dict()
+
+            # Get itineraryData from the version
+            itinerary_data = latest_version_data.get('itineraryData', {})
+            version_costs = itinerary_data.get('costs', [])
+
+            # Remove existing costs for this destination from version
+            version_filtered_costs = [
+                c for c in version_costs
+                if c.get('destination_id') != destination_id
+            ]
+
+            # Add new costs
+            version_filtered_costs.extend(cost_items)
+
+            # Update the version's itineraryData
+            itinerary_data['costs'] = version_filtered_costs
+            latest_version_ref.update({
+                'itineraryData': itinerary_data,
+                'updatedAt': firestore.SERVER_TIMESTAMP
+            })
+
+            print(f"✅ Also updated latest version (ID: {versions[0].id}) itineraryData")
+            print(f"   Total costs in version now: {len(version_filtered_costs)}")
+        else:
+            print(f"⚠️ Warning: No versions found for scenario {scenario_id}")
+
+        print(f"   Removed {len(current_costs) - len(filtered_costs) + len(cost_items)} old costs from scenario")
+        print(f"   Total costs in scenario now: {len(filtered_costs)}")
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Saved {len(cost_items)} costs for {destination_name}',
+            'costs_saved': len(cost_items),
+            'total_costs': len(filtered_costs)
+        })
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in bulk-save endpoint: {error_details}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'error_details': error_details
+        }), 500
+
+@app.route('/api/costs/research', methods=['POST'])
+def research_costs():
+    """
+    Research costs for a destination using the cost_research_agent.
+
+    Expected request body:
+    {
+        "session_id": "session_abc123",
+        "scenario_id": "scenario_xyz789",  # REQUIRED for saving to Firestore
+        "destination_name": "Bangkok, Thailand",
+        "destination_id": 5,
+        "duration_days": 7,
+        "arrival_date": "2026-07-15",
+        "departure_date": "2026-07-22",
+        "num_travelers": 2,
+        "travel_style": "mid-range",
+        "previous_destination": "Singapore",  # optional
+        "next_destination": "Chiang Mai"  # optional
+    }
+    """
+    try:
+        data = request.json
+        session_id = data.get('session_id', 'default')
+        scenario_id = data.get('scenario_id')
+
+        # Build the research request message
+        destination_name = data.get('destination_name')
+        destination_id = data.get('destination_id')
+        duration_days = data.get('duration_days')
+        arrival_date = data.get('arrival_date')
+        departure_date = data.get('departure_date')
+        num_travelers = data.get('num_travelers', 1)
+        travel_style = data.get('travel_style', 'mid-range')
+        previous_destination = data.get('previous_destination')
+        next_destination = data.get('next_destination')
+
+        # Validate required fields
+        if not all([scenario_id, destination_name, destination_id, duration_days, arrival_date, departure_date]):
+            return jsonify({
+                'status': 'error',
+                'error': 'Missing required fields: scenario_id, destination_name, destination_id, duration_days, arrival_date, departure_date'
+            }), 400
+
+        # Create context for the agent
+        research_prompt = f"""Please research accurate, real-world costs for the following destination:
+
+Destination: {destination_name}
+Destination ID: {destination_id}
+Duration: {duration_days} days
+Arrival Date: {arrival_date}
+Departure Date: {departure_date}
+Number of Travelers: {num_travelers}
+Travel Style: {travel_style}
+"""
+
+        if previous_destination:
+            research_prompt += f"Previous Destination: {previous_destination} (for flight pricing)\n"
+        if next_destination:
+            research_prompt += f"Next Destination: {next_destination} (for flight pricing)\n"
+
+        research_prompt += """
+Please provide comprehensive cost research including:
+1. Accommodation costs (total for stay)
+2. Flight costs (if applicable)
+3. Daily food costs per person
+4. Daily local transport costs per person
+5. Activity and attraction costs
+
+For each category, provide low/mid/high estimates with sources.
+"""
+
+        # Create or get session
+        session_endpoint = f"{ADK_API_URL}/apps/{APP_NAME}/users/{USER_ID}/sessions/{session_id}"
+        try:
+            session_resp = requests.post(session_endpoint)
+            if session_resp.status_code != 200:
+                print(f"Warning: Session creation response: {session_resp.status_code}")
+        except Exception as e:
+            print(f"Session creation warning: {e}")
+
+        # Prepare ADK payload to invoke cost_research_agent
+        adk_payload = {
+            "session_id": session_id,
+            "app_name": APP_NAME,
+            "user_id": USER_ID,
+            # Call the cost research agent directly to improve reliability
+            "agent_name": "cost_research_agent",
+            "new_message": {
+                "role": "user",
+                "parts": [{"text": research_prompt}],
+            },
+            "state": {
+                "web_session_id": session_id,
+                "scenario_id": scenario_id,  # Pass scenario_id so agent can save to Firestore
+                "destination_id": destination_id,
+                "duration_days": duration_days,
+                "num_travelers": num_travelers,
+            }
+        }
+
+        print(f"🔍 Triggering cost research for: {destination_name}")
+
+        # Call ADK API
+        run_endpoint = f"{ADK_API_URL}/run_sse"
+        headers = {
+            "Content-Type": "application/json; charset=UTF-8",
+            "Accept": "text/event-stream",
+        }
+
+        research_result = None
+        response_text = ""
+        save_tool_called = False
+
+        with requests.post(
+            run_endpoint,
+            data=json.dumps(adk_payload),
+            headers=headers,
+            stream=True,
+            timeout=180  # Cost research may take longer due to multiple searches
+        ) as r:
+            for chunk in r.iter_lines():
+                if not chunk:
+                    continue
+                json_string = chunk.decode("utf-8").removeprefix("data: ").strip()
+                try:
+                    event = json.loads(json_string)
+
+                    # Extract text responses
+                    if "content" in event and "parts" in event["content"]:
+                        for part in event["content"]["parts"]:
+                            if "text" in part:
+                                response_text += part["text"]
+
+                            # Check if save_researched_costs tool was called
+                            if "function_call" in part:
+                                func_call = part["function_call"]
+                                if func_call.get("name") == "save_researched_costs":
+                                    save_tool_called = True
+                                    # Extract research data from the tool call args
+                                    research_result = func_call.get("args", {}).get("research_data")
+
+                            # Also check function responses for save confirmation
+                            if "function_response" in part:
+                                func_resp = part["function_response"]
+                                if func_resp.get("name") == "save_researched_costs":
+                                    # Tool was successfully called
+                                    save_tool_called = True
+
+                except json.JSONDecodeError:
+                    continue
+
+        # Try to extract JSON from response_text if we don't have structured data
+        if not research_result and response_text:
+            # Look for JSON in the response text
+            import re
+            json_match = re.search(r'\{[\s\S]*"destination_name"[\s\S]*\}', response_text)
+            if json_match:
+                try:
+                    research_result = json.loads(json_match.group())
+                    print(f"✅ Extracted JSON from response text")
+                except:
+                    pass
+
+        if research_result or save_tool_called:
+            print(f"✅ Cost research completed for {destination_name}")
+            return jsonify({
+                'status': 'success',
+                'research': research_result,
+                'response_text': response_text,
+                'saved_to_firestore': save_tool_called
+            })
+        else:
+            print(f"⚠️ Cost research returned no structured data")
+            return jsonify({
+                'status': 'partial',
+                'response_text': response_text,
+                'message': 'Research completed but no structured data returned'
+            })
+
+    except requests.exceptions.Timeout:
+        return jsonify({
+            'status': 'error',
+            'error': 'Cost research timed out. This process can take 2-3 minutes due to extensive web searches.'
+        }), 504
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in cost research endpoint: {error_details}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'error_details': error_details
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
