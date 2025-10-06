@@ -61,6 +61,15 @@ scripts/validate-*.py
 add_*.py
 okinawa_*.py
 
+# Travel concierge test and debug files
+python/agents/travel-concierge/test_*.py
+python/agents/travel-concierge/debug_*.py
+python/agents/travel-concierge/test_*.json
+
+# JSON test and export files
+test_*.json
+current-scenario.json
+
 # Cost research standalone
 python/agents/travel-concierge/travel_concierge/cost_research_standalone.py
 
