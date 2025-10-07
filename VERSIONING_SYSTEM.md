@@ -183,8 +183,16 @@ const unsubscribe = scenarioManager.subscribeToVersions(scenarioId, callback)
 
 ## Configuration
 
+### Client Config Generation
+- Run `node scripts/build-web-config.js` to generate client config files from `.env`.
+- Generated files (gitignored):
+  - `web/config.js` — app runtime config (OAuth/Maps/etc.).
+  - `web/firebase-config.js` — Firebase initialization config.
+
+Use `.env.example` as a template for required variables. Do not commit real secrets.
+
 ### Firebase Config Location
-`web/firebase-config.js`
+`web/firebase-config.js` (generated)
 
 **Required environment variables (or direct values):**
 - `FIREBASE_API_KEY`

@@ -42,21 +42,26 @@ const firebaseConfig = {
 };
 ```
 
-## Step 4: Update firebase-config.js
+## Step 4: Configure environment and generate client config
 
-1. Open `web/firebase-config.js`
-2. Replace the placeholder values with your actual configuration:
+1. Create your environment file from the example and fill in values from Firebase Console (Step 3) and Google Cloud as needed:
 
-```javascript
-const firebaseConfig = {
-  apiKey: "YOUR_ACTUAL_API_KEY",
-  authDomain: "YOUR_ACTUAL_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_ACTUAL_PROJECT_ID",
-  storageBucket: "YOUR_ACTUAL_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_ACTUAL_SENDER_ID",
-  appId: "YOUR_ACTUAL_APP_ID"
-};
+```bash
+cp .env.example .env
+# Edit .env and set Firebase and Google values
 ```
+
+2. Generate client-side configuration files (these are gitignored):
+
+```bash
+node scripts/build-web-config.js
+```
+
+This creates/updates:
+- `web/config.js` (uses values from `.env`)
+- `web/firebase-config.js` (uses values from `.env`)
+
+Note: Do not commit secrets. Both generated files are ignored by `.gitignore`.
 
 ## Step 5: Set Up Firestore Security Rules
 
@@ -111,8 +116,8 @@ service cloud.firestore {
 ## Troubleshooting
 
 ### "Firebase: Error (auth/api-key-not-valid)"
-- Double-check your `apiKey` in `firebase-config.js`
-- Make sure you copied the entire key
+- Double-check `FIREBASE_API_KEY` in `.env`
+- Rerun `node scripts/build-web-config.js`
 
 ### "Missing or insufficient permissions"
 - Check your Firestore security rules (Step 5)
