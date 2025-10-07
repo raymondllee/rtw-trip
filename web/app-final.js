@@ -519,6 +519,8 @@ async function initMapApp() {
   let workingData = JSON.parse(JSON.stringify(originalData));
   console.log(`💰 Initial workingData has ${workingData.costs?.length || 0} cost items`);
   let currentScenarioId = null; // Track the currently loaded scenario ID
+  // Expose to other modules (e.g., chat.js)
+  window.currentScenarioId = currentScenarioId;
   let currentScenarioName = null; // Track the currently loaded scenario name
   const scenarioManager = new FirestoreScenarioManager();
   const statePersistence = new StatePersistence();
@@ -578,6 +580,7 @@ async function initMapApp() {
           workingData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
           console.log(`💰 After merge, workingData has ${workingData.costs?.length || 0} costs`);
           currentScenarioId = savedState.scenarioId;
+          window.currentScenarioId = currentScenarioId;
           currentScenarioName = scenario.name;
           console.log(`✅ Restored scenario: ${scenario.name}`);
         }
@@ -594,6 +597,7 @@ async function initMapApp() {
         if (latestVersion && latestVersion.itineraryData) {
           workingData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
           currentScenarioId = lastScenario.id;
+          window.currentScenarioId = currentScenarioId;
           currentScenarioName = lastScenario.name;
           console.log(`Loaded most recent scenario: ${lastScenario.name}`);
         }
@@ -693,6 +697,7 @@ async function initMapApp() {
             'Auto-saved trip planning'
           );
           currentScenarioId = defaultScenario.id;
+          window.currentScenarioId = currentScenarioId;
           currentScenarioName = defaultScenario.name;
         }
 
@@ -1491,6 +1496,7 @@ async function initMapApp() {
       if (scenario && latestVersion) {
         workingData = mergeSubLegsFromTemplate(JSON.parse(JSON.stringify(latestVersion.itineraryData)));
         currentScenarioId = scenarioId;
+        window.currentScenarioId = currentScenarioId;
         currentScenarioName = scenario.name;
         render(legFilter.value, subLegFilter.value, routingToggle.checked);
         updateChatContext(legFilter.value, subLegFilter.value);
@@ -1518,6 +1524,7 @@ async function initMapApp() {
         // If we deleted the current scenario, reset
         if (currentScenarioId === scenarioId) {
           currentScenarioId = null;
+          window.currentScenarioId = currentScenarioId;
           currentScenarioName = null;
         }
       } catch (error) {
@@ -1881,6 +1888,7 @@ async function initMapApp() {
           // Load the new scenario
           workingData = JSON.parse(JSON.stringify(emptyData));
           currentScenarioId = newScenarioId;
+          window.currentScenarioId = currentScenarioId;
           currentScenarioName = scenarioName.trim();
           updateScenarioNameDisplay();
           render(legFilter.value, routingToggle.checked, false);

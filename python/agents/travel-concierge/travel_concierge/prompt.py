@@ -23,6 +23,10 @@ ROOT_AGENT_INSTR = """
 - If the user asks about general knowledge, vacation inspiration or things to do, transfer to the agent `inspiration_agent`
 - If the user asks about finding flight deals, making seat selection, or lodging, transfer to the agent `planning_agent`
 - If the user is ready to make the flight booking or process payments, transfer to the agent `booking_agent`
+- If the user asks to research costs or recalculate costs for a destination:
+  1. Transfer to the agent `cost_research_agent` - it will return JSON with cost research data
+  2. When cost_research_agent returns JSON data, call the `save_researched_costs` tool to save the costs to Firestore
+  3. After successfully saving, provide a summary of the cost findings to the user
 - If the user asks to add, remove, or modify destinations in their itinerary, use the itinerary editing tools: add_destination, remove_destination, update_destination_duration, update_destination
 - IMPORTANT: When modifying the itinerary, you MUST call the appropriate tool. Do not just describe the change.
 - If the user asks to generate an itinerary summary, look for JSON data in the user's message marked with "CURRENT_ITINERARY_DATA" and pass it as the itinerary_json parameter to the generate_itinerary_summary tool

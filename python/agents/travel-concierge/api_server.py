@@ -59,6 +59,7 @@ def chat():
     context = data.get('context', {})
     session_id = data.get('session_id')
     initialize_itinerary = data.get('initialize_itinerary', False)
+    scenario_id = data.get('scenario_id')
 
     # Generate session ID if not provided
     if not session_id or session_id == 'null':
@@ -67,6 +68,7 @@ def chat():
     print(f"Received message: {message}")
     print(f"Received context: {json.dumps(context, indent=2)}")
     print(f"Session ID: {session_id}")
+    print(f"Scenario ID: {scenario_id}")
     print(f"Initialize itinerary: {initialize_itinerary}")
 
     # Build context-aware message - keep it concise to avoid timeouts
@@ -155,6 +157,8 @@ User question: {message}
         adk_payload["state"] = {
             "web_session_id": session_id
         }
+        if scenario_id:
+            adk_payload["state"]["scenario_id"] = scenario_id
 
         # ALWAYS pass itinerary data when context has destinations
         # This ensures tools like generate_itinerary_summary can access the itinerary
@@ -389,8 +393,6 @@ def get_changes(session_id):
     """Get pending changes for a session (polled by frontend)"""
     if session_id in sessions and 'changes' in sessions[session_id]:
         changes = sessions[session_id]['changes']
-        if changes:
-            print(f"📤 Sending {len(changes)} changes to frontend for session {session_id}")
         # Clear changes after sending
         sessions[session_id]['changes'] = []
         return jsonify({

@@ -32,14 +32,7 @@ class TravelConciergeChat {
     this.initFloatingChat();
     this.initInputResizers();
 
-    // Check if chat is already visible (not hidden) and start polling
-    if (this.chatContainer && !this.chatContainer.classList.contains('hidden')) {
-      console.log('💡 Chat container is visible on init, starting polling...');
-      this.isOpen = true;
-      this.startPollingForChanges();
-    }
-
-    // Restore chat state from localStorage
+    // Restore chat state from localStorage (includes chat open/close state)
     this.restoreChatState();
   }
 
@@ -66,6 +59,16 @@ class TravelConciergeChat {
         }
       } catch (error) {
         console.error('Error restoring chat:', error);
+      }
+    }
+
+    // Restore chat open/closed UI state
+    if (this.chatContainer) {
+      const shouldBeOpen = savedState.chatOpen !== false; // default open if undefined
+      if (shouldBeOpen) {
+        this.openChat();
+      } else {
+        this.closeChat();
       }
     }
   }
@@ -181,6 +184,8 @@ class TravelConciergeChat {
     this.toggleBtn.classList.remove('collapsed');
     this.chatInput.focus();
     this.startPollingForChanges();
+    // Persist UI state
+    this.statePersistence.saveChatOpenState(true);
   }
 
   closeChat() {
@@ -189,6 +194,8 @@ class TravelConciergeChat {
     this.chatContainer.classList.add('hidden');
     this.toggleBtn.classList.add('collapsed');
     this.stopPollingForChanges();
+    // Persist UI state
+    this.statePersistence.saveChatOpenState(false);
   }
 
   updateContext(legName, destinationsData, startDate, endDate, subLegName = null) {
@@ -537,6 +544,8 @@ class TravelConciergeChat {
         message,
         context,
         session_id: this.sessionId,
+        // Include current scenario so backend tools can save costs to Firestore
+        scenario_id: window.currentScenarioId || null,
         // Only send initialize_itinerary flag on actual first message (no session and no chat history)
         initialize_itinerary: !this.sessionId && this.messages.length === 0
       };
@@ -1374,7 +1383,7 @@ class TravelConciergeChat {
       } catch (error) {
         console.error('Error polling for changes:', error);
       }
-    }, 2000); // Poll every 2 seconds
+    }, 4000); // Poll every 4 seconds
   }
 
   stopPollingForChanges() {

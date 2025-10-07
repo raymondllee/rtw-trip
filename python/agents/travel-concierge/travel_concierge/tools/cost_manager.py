@@ -53,15 +53,12 @@ def save_researched_costs(
     # Extract session ID and scenario ID from context
     state = getattr(tool_context, "state", {}) or {}
     session_id = state.get("web_session_id", "default")
-
-    # Get scenario_id - we need this to save to Firestore
-    # The scenario_id should be passed in the state when the agent is called
     scenario_id = state.get("scenario_id")
 
     if not scenario_id:
         return {
             "status": "error",
-            "message": "No scenario_id in context. Cannot save costs without knowing which scenario to update."
+            "message": f"No scenario_id in context. Cannot save costs without knowing which scenario to update."
         }
 
     # Convert research data to cost items

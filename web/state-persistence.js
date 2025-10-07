@@ -62,6 +62,8 @@ export class StatePersistence {
       chatId: null,
       chatMessages: [],
       sessionId: null,
+      // Persist whether the sidebar chat is open (default true so input is visible on first load)
+      chatOpen: true,
       lastUpdated: null
     };
   }
@@ -101,6 +103,13 @@ export class StatePersistence {
       chatMessages: messages,
       sessionId
     });
+  }
+
+  /**
+   * Save chat open/closed UI state
+   */
+  saveChatOpenState(isOpen) {
+    this.saveState({ chatOpen: !!isOpen });
   }
 
   /**

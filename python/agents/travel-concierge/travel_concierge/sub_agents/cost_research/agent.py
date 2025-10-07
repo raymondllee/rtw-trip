@@ -12,32 +12,71 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Cost Research Agent - Researches accurate pricing for destinations using web search."""
+"""Cost Research Agent
+
+Researches accurate pricing for destinations using web search.
+"""
 
 from google.adk.agents import Agent
-from google.genai.types import GenerateContentConfig
+from google.adk.agents.callback_context import CallbackContext
+from google.adk.models.llm_request import LlmRequest
+from google.genai.types import (
+    GenerateContentConfig,
+    ToolConfig,
+    FunctionCallingConfig,
+)
 
 from travel_concierge.shared_libraries import types
 from travel_concierge.sub_agents.cost_research import prompt
 from travel_concierge.tools.search import google_search_grounding
-from travel_concierge.tools.cost_manager import save_researched_costs
+
+
+def structured_output_callback(
+    callback_context: CallbackContext, llm_request: LlmRequest
+):
+    """
+    Callback to enable structured output after tools have been used.
+    After research is complete (indicated by conversation history),
+    remove tools and set output schema for structured JSON response.
+    """
+    # Check if we have tool responses in the conversation (research is done)
+    def _has_tool_response(part) -> bool:
+        if isinstance(part, dict):
+            return bool(part.get("functionResponse"))
+        return bool(getattr(part, "function_response", None))
+
+    tool_response_count = sum(
+        1 for msg in llm_request.contents
+        if hasattr(msg, 'parts')
+        for part in msg.parts
+        if _has_tool_response(part)
+    )
+
+    if tool_response_count >= 3:
+        # Switch to structured output phase (keep tools_dict intact to avoid
+        # ADK lookup errors)
+        llm_request.config.tools = None
+        # Set output schema for structured response
+        llm_request.set_output_schema(types.DestinationCostResearch)
+        llm_request.config.tool_config = ToolConfig(
+            function_calling_config=FunctionCallingConfig(mode="none")
+        )
 
 
 cost_research_agent = Agent(
     model="gemini-2.5-flash",
     name="cost_research_agent",
     description=(
-        "Research accurate, real-world travel costs for destinations using web search. "
-        "Provides detailed cost breakdowns for accommodation, flights, food, transport, "
-        "and activities with low/mid/high estimates and source citations. "
-        "Automatically saves researched costs to Firestore."
+        "Research accurate, real-world travel costs for destinations using web"
+        " search. Returns structured JSON with cost breakdowns for"
+        " accommodation, flights, food, transport, and activities with"
+        " low/mid/high estimates and source citations."
     ),
     instruction=prompt.COST_RESEARCH_AGENT_INSTR,
-    tools=[google_search_grounding, save_researched_costs],
-    # Provide a typed output schema to make downstream usage predictable
-    output_schema=types.DestinationCostResearch,
+    tools=[google_search_grounding],
+    before_model_callback=structured_output_callback,
     generate_content_config=GenerateContentConfig(
         temperature=0.1,  # Low temperature for consistent, factual research
-        top_p=0.5
+        top_p=0.5,
     )
 )
