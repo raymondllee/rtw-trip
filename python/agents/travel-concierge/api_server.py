@@ -825,6 +825,25 @@ def bulk_save_costs():
             # Add new costs
             version_filtered_costs.extend(cost_items)
 
+            # If no change in costs, skip creating a new version
+            try:
+                import json as _json
+                def _stable(obj):
+                    return _json.dumps(obj, sort_keys=True, separators=(",", ":"))
+                if _stable(version_costs) == _stable(version_filtered_costs):
+                    scenario_ref.update({
+                        'updatedAt': firestore.SERVER_TIMESTAMP,
+                    })
+                    print(f"ℹ️ No cost changes detected; skipped new version creation")
+                    return jsonify({
+                        'status': 'success',
+                        'message': 'No changes in costs; latest version left unchanged',
+                        'costs_saved': 0,
+                        'total_costs': len(version_filtered_costs)
+                    })
+            except Exception as _:
+                pass
+
             # Prepare new version payload (create a new version instead of mutating latest)
             new_version_number = max(int(scenario_data.get('currentVersion', 0) or 0), int(latest_version_data.get('versionNumber', 0) or 0)) + 1
             new_version_ref = scenario_ref.collection('versions').document()
@@ -837,6 +856,8 @@ def bulk_save_costs():
                 'isNamed': False,
                 'itineraryData': new_itinerary_data,
                 'createdAt': firestore.SERVER_TIMESTAMP,
+                'itineraryDataHash': None,
+                'isAutosave': True,
             })
 
             # Update scenario's currentVersion

@@ -421,28 +421,7 @@ html, body {
   align-items: stretch;
 }
 
-.scenario-selector {
-  flex: 1;
-  padding: 7px 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-  font-size: 13px;
-  font-weight: 500;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.scenario-selector:hover {
-  border-color: #1e88e5;
-}
-
-.scenario-selector:focus {
-  outline: none;
-  border-color: #1e88e5;
-  box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.1);
-}
+/* scenario-selector removed; using scenario-name-display */
 
 .scenario-actions-btn {
   padding: 7px 10px;
@@ -668,7 +647,7 @@ textarea.form-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 100000; /* Ensure above dropdowns and side panels */
 }
 
 .modal {
@@ -678,6 +657,8 @@ textarea.form-input {
   min-width: 400px;
   max-width: 500px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  position: relative;
+  z-index: 100001;
 }
 
 .modal h3 {
@@ -1412,5 +1393,3 @@ input[type="checkbox"] {
   color: #666;
   font-size: 14px;
 }
-
-

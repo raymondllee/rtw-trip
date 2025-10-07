@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "build:data": "node scripts/build-data.js",
+    "build:config": "node scripts/build-web-config.js",
     "parse": "node scripts/parse-itinerary.js",
     "geocode": "node scripts/geocode.js",
     "validate": "node scripts/validate-destinations.cjs",
-    "start": "npm run build:data",
-    "serve": "npx http-server -c-1 -p 5173 | cat"
+    "start": "npm run build:data && npm run build:config",
+    "serve": "npm run build:config && npx http-server -c-1 -p 5173 | cat"
   },
   "keywords": [],
   "author": "",

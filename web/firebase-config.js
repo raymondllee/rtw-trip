@@ -5,7 +5,7 @@ import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.0/firebas
 // Firebase configuration for pdf-extract-393514 project
 // DO NOT COMMIT THIS FILE WITH REAL CREDENTIALS
 const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY || "YOUR_API_KEY_HERE",
+  apiKey: (window.RTW_CONFIG && window.RTW_CONFIG.firebaseApiKey) || "YOUR_API_KEY_HERE",
   authDomain: "pdf-extract-393514.firebaseapp.com",
   projectId: "pdf-extract-393514",
   storageBucket: "pdf-extract-393514.firebasestorage.app",

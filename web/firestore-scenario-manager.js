@@ -24,6 +24,40 @@ export class FirestoreScenarioManager {
   }
 
   /**
+   * Deterministic stringify with sorted keys for stable hashing/comparison
+   */
+  _stableStringify(obj) {
+    const seen = new WeakSet();
+    const stringify = (value) => {
+      if (value === null || typeof value !== 'object') {
+        return JSON.stringify(value);
+      }
+      if (seen.has(value)) {
+        return '"[Circular]"';
+      }
+      seen.add(value);
+      if (Array.isArray(value)) {
+        return '[' + value.map((v) => stringify(v)).join(',') + ']';
+      }
+      const keys = Object.keys(value).sort();
+      return '{' + keys.map((k) => JSON.stringify(k) + ':' + stringify(value[k])).join(',') + '}';
+    };
+    return stringify(obj);
+  }
+
+  /**
+   * Simple djb2 hash for strings (fast, non-crypto)
+   */
+  _hashString(str) {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+    }
+    // Convert to unsigned 32-bit and string
+    return (hash >>> 0).toString(36);
+  }
+
+  /**
    * Get or create a scenario
    */
   async getOrCreateScenario(name, description = '') {
@@ -76,27 +110,49 @@ export class FirestoreScenarioManager {
     }
 
     const currentVersion = scenarioDoc.data().currentVersion || 0;
-    const newVersionNumber = currentVersion + 1;
+    const latest = await this.getLatestVersion(scenarioId);
 
-    // Create new version document
+    // For autosave, compute a hash to detect changes
+    let currentHash = null;
+    if (!isNamed) {
+      const currentStr = this._stableStringify(itineraryData);
+      currentHash = this._hashString(currentStr);
+    }
+
+    // Compare with latest version for autosaves
+    if (!isNamed && latest) {
+      const lastHash = latest.itineraryDataHash || this._hashString(this._stableStringify(latest.itineraryData || {}));
+      if (lastHash === currentHash) {
+        // Touch scenario timestamps but skip creating a new identical version
+        await updateDoc(scenarioRef, {
+          updatedAt: Timestamp.now(),
+          lastAutosaveAt: Timestamp.now(),
+          lastAutosaveHash: currentHash,
+        });
+        return { id: latest.id, skipped: true, reason: 'no_changes' };
+      }
+    }
+
+    const newVersionNumber = currentVersion + 1;
     const versionRef = doc(collection(db, 'scenarios', scenarioId, 'versions'));
     const versionData = {
       versionNumber: newVersionNumber,
       versionName: isNamed ? versionName : '',
       itineraryData: JSON.parse(JSON.stringify(itineraryData)), // Deep copy
+      // Only store hash for autosaves; named versions can compute on demand later
+      itineraryDataHash: currentHash,
       isNamed,
+      isAutosave: !isNamed,
       createdAt: Timestamp.now()
     };
 
     await setDoc(versionRef, versionData);
 
-    // Update scenario's current version
     await updateDoc(scenarioRef, {
       currentVersion: newVersionNumber,
       updatedAt: Timestamp.now()
     });
 
-    // Clean up old auto-versions if needed
     if (!isNamed) {
       await this.cleanupOldVersions(scenarioId);
     }
@@ -159,6 +215,62 @@ export class FirestoreScenarioManager {
 
     const versionDoc = snapshot.docs[0];
     return { id: versionDoc.id, ...versionDoc.data() };
+  }
+
+  /**
+   * Delete a specific version by version number and update currentVersion if needed
+   */
+  async deleteVersion(scenarioId, versionNumber) {
+    const versionsRef = collection(db, 'scenarios', scenarioId, 'versions');
+    const q = query(versionsRef, where('versionNumber', '==', versionNumber), limit(1));
+    const snap = await getDocs(q);
+    if (snap.empty) return { deleted: 0 };
+
+    const versionDoc = snap.docs[0];
+    await deleteDoc(doc(db, 'scenarios', scenarioId, 'versions', versionDoc.id));
+
+    // Recompute currentVersion to the highest remaining
+    const latest = await this.getLatestVersion(scenarioId);
+    const scenarioRef = doc(db, 'scenarios', scenarioId);
+    if (latest) {
+      await updateDoc(scenarioRef, { currentVersion: latest.versionNumber, updatedAt: Timestamp.now() });
+    } else {
+      await updateDoc(scenarioRef, { currentVersion: 0, updatedAt: Timestamp.now() });
+    }
+
+    return { deleted: 1 };
+  }
+
+  /**
+   * Delete all unlabeled versions for a scenario (optionally keep the latest one)
+   */
+  async deleteUnlabeledVersions(scenarioId, keepLatest = true) {
+    const versionsRef = collection(db, 'scenarios', scenarioId, 'versions');
+    const allSnap = await getDocs(versionsRef);
+    const versions = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const unlabeled = versions.filter(v => !v.isNamed);
+    if (unlabeled.length === 0) return { deleted: 0 };
+
+    // Optionally keep the highest versionNumber among unlabeled
+    let toDelete = unlabeled;
+    if (keepLatest) {
+      const maxUnlabeled = unlabeled.reduce((a, b) => (a.versionNumber > b.versionNumber ? a : b));
+      toDelete = unlabeled.filter(v => v.id !== maxUnlabeled.id);
+    }
+
+    await Promise.all(toDelete.map(v => deleteDoc(doc(db, 'scenarios', scenarioId, 'versions', v.id))));
+
+    // Update currentVersion to highest remaining
+    const latest = await this.getLatestVersion(scenarioId);
+    const scenarioRef = doc(db, 'scenarios', scenarioId);
+    if (latest) {
+      await updateDoc(scenarioRef, { currentVersion: latest.versionNumber, updatedAt: Timestamp.now() });
+    } else {
+      await updateDoc(scenarioRef, { currentVersion: 0, updatedAt: Timestamp.now() });
+    }
+
+    return { deleted: toDelete.length };
   }
 
   /**
@@ -363,5 +475,71 @@ export class FirestoreScenarioManager {
     }
 
     return migrated;
+  }
+
+  /**
+   * Save a summary for a scenario
+   */
+  async saveSummary(scenarioId, summaryData) {
+    if (!scenarioId) {
+      throw new Error('Scenario ID is required');
+    }
+
+    const scenarioRef = doc(db, 'scenarios', scenarioId);
+    const scenarioDoc = await getDoc(scenarioRef);
+
+    if (!scenarioDoc.exists()) {
+      throw new Error('Scenario not found');
+    }
+
+    // Update scenario with summary data
+    await updateDoc(scenarioRef, {
+      summary: summaryData,
+      summaryGeneratedAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+
+    console.log(`Summary saved to scenario ${scenarioId}`);
+  }
+
+  /**
+   * Get the saved summary for a scenario
+   */
+  async getSummary(scenarioId) {
+    const scenarioRef = doc(db, 'scenarios', scenarioId);
+    const scenarioDoc = await getDoc(scenarioRef);
+
+    if (!scenarioDoc.exists()) {
+      throw new Error('Scenario not found');
+    }
+
+    const data = scenarioDoc.data();
+    return data.summary || null;
+  }
+
+  /**
+   * Check if a scenario has a saved summary
+   */
+  async hasSummary(scenarioId) {
+    const summary = await this.getSummary(scenarioId);
+    return summary !== null;
+  }
+
+  /**
+   * Delete a summary from a scenario
+   */
+  async deleteSummary(scenarioId) {
+    if (!scenarioId) {
+      throw new Error('Scenario ID is required');
+    }
+
+    const scenarioRef = doc(db, 'scenarios', scenarioId);
+    await updateDoc(scenarioRef, {
+      summary: null,
+      summaryGeneratedAt: null,
+      updatedAt: Timestamp.now()
+    });
+
+    console.log(`Summary deleted from scenario ${scenarioId}`);
   }
 }

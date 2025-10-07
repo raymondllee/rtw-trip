@@ -152,6 +152,10 @@ class TravelConciergeChat {
     this.newChatBtn?.addEventListener('click', () => {
       this.clearChat();
       this.createNewChat();
+      // Ensure chat is open when starting a new chat
+      if (!this.isOpen) {
+        this.openChat();
+      }
     });
     this.historyBtn?.addEventListener('click', () => this.showChatHistory());
     this.closeHistoryBtn?.addEventListener('click', () => this.hideChatHistory());
@@ -865,6 +869,11 @@ class TravelConciergeChat {
 
       // Update the displayed title
       this.updateChatTitle(chatData.title || 'New Chat');
+
+      // Auto-expand chat box when loading a previous thread
+      if (!this.isOpen) {
+        this.openChat();
+      }
 
       // Save chat state
       this.statePersistence.saveChatState(this.currentChatId, this.messages, this.sessionId);

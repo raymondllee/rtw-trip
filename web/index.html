@@ -50,28 +50,28 @@
       <!-- Scenario Controls -->
       <div class="scenario-section">
         <div class="scenario-header">
-          <label for="scenario-selector" class="scenario-label">Scenario</label>
+          <label class="scenario-label">Scenario</label>
           <div class="save-indicator" id="save-indicator">Saved ✓</div>
         </div>
-        <div class="scenario-controls">
-          <select id="scenario-selector" class="scenario-selector">
-            <option value="">Unsaved Changes</option>
-            <option value="__new__">+ New Scenario</option>
-            <option disabled>──────────</option>
-          </select>
+        <div class="scenario-controls" style="display:flex; align-items:center; gap:8px;">
+          <div id="scenario-name-display" style="flex:1; font-weight:600; color:#333;">Unsaved Changes</div>
           <button id="scenario-actions-btn" class="scenario-actions-btn" title="Scenario actions">⋯</button>
         </div>
       </div>
 
       <!-- Scenario Actions Dropdown -->
       <div class="scenario-actions-dropdown" id="scenario-actions-dropdown" style="display: none;">
-        <button id="duplicate-scenario-btn" class="dropdown-item">
-          <span class="icon">📋</span>
-          <span>Duplicate</span>
-        </button>
         <button id="manage-scenarios-btn" class="dropdown-item">
           <span class="icon">⚙️</span>
-          <span>Manage All</span>
+          <span>Manage Scenarios</span>
+        </button>
+        <button id="version-history-btn" class="dropdown-item">
+          <span class="icon">🕓</span>
+          <span>Version History</span>
+        </button>
+        <button id="save-named-version-btn" class="dropdown-item">
+          <span class="icon">📌</span>
+          <span>Save Named Version</span>
         </button>
         <div class="dropdown-divider"></div>
         <button id="generate-summary-btn" class="dropdown-item">
@@ -296,5 +296,3 @@
   </script>
 </body>
 </html>
-
-
