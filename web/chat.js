@@ -520,6 +520,7 @@ class TravelConciergeChat {
         start_date: this.currentStartDate || '',
         end_date: this.currentEndDate || '',
         destinations: (this.currentDestinationsData || []).map(loc => ({
+          id: loc.id,  // Include destination ID for cost tracking
           name: loc.name,
           city: loc.city,
           country: loc.country,
