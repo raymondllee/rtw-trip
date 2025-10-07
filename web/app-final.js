@@ -468,6 +468,7 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
       </div>
     ` : '';
 
+    // Simple cost breakdown for marker popup (summary only)
     const costBreakdownHTML = destinationCosts.total > 0 ? `
       <div style="margin-top: 8px;">
         <div style="font-size: 12px; font-weight: 600; color: #333; margin-bottom: 4px;">Cost Breakdown:</div>

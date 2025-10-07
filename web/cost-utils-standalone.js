@@ -141,15 +141,16 @@ function calculateDestinationCosts(destinationId, costs, location = null, allLoc
   return {
     total,
     byCategory,
-    count: destinationCosts.length
+    count: destinationCosts.length,
+    items: destinationCosts  // Include individual cost items for detailed display
   };
 }
 
 // Format currency
-function formatCurrency(amount) {
+function formatCurrency(amount, currency = 'USD') {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency: currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(amount);
@@ -187,6 +188,41 @@ function generateCostBreakdownHTML(costs, showEmpty = false) {
     return '<div class="cost-breakdown-empty">No cost data available</div>';
   }
 
+  // Enhanced detailed view with all metadata
+  if (costs.items && costs.items.length > 0) {
+    const breakdownItems = costs.items
+      .sort((a, b) => (b.amount_usd || b.amount) - (a.amount_usd || a.amount))
+      .map(cost => {
+        const amount = cost.amount_usd || cost.amount;
+        const percentage = costs.total > 0 ? (amount / costs.total * 100).toFixed(1) : 0;
+        const confidenceColor = cost.confidence === 'high' ? '#22c55e' : cost.confidence === 'low' ? '#f59e0b' : '#3b82f6';
+        const confidenceBadge = cost.confidence ? `<span style="background: ${confidenceColor}; color: white; font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-left: 4px; text-transform: capitalize;">${cost.confidence}</span>` : '';
+
+        return `
+          <div class="cost-breakdown-item-detailed" style="border-left: 3px solid ${confidenceColor}; padding: 8px 10px; margin: 6px 0; background: #f8f9fa; border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="color: #666; font-size: 12px; font-weight: 600;">
+                ${getCategoryIcon(cost.category)} ${getCategoryDisplayName(cost.category)}
+                ${confidenceBadge}
+              </span>
+              <span style="font-weight: 700; color: #333; font-size: 13px;">${formatCurrency(amount)} <span style="font-size: 10px; color: #888;">(${percentage}%)</span></span>
+            </div>
+            ${cost.currency !== 'USD' ? `<div style="font-size: 10px; color: #888; margin-bottom: 4px;">${formatCurrency(cost.amount, cost.currency)}</div>` : ''}
+            ${cost.notes ? `<div style="font-size: 11px; color: #666; margin-top: 4px; line-height: 1.4; font-style: italic;">${cost.notes}</div>` : ''}
+            <div style="font-size: 9px; color: #999; margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="display: flex; align-items: center; gap: 4px;">
+                ${cost.source === 'cost_research' ? '🔍 <span>AI Researched</span>' : '📝 <span>' + (cost.source || 'Manual') + '</span>'}
+              </span>
+              ${cost.researched_at ? `<span>${new Date(cost.researched_at).toLocaleDateString()}</span>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+    return `<div class="cost-breakdown">${breakdownItems}</div>`;
+  }
+
+  // Fallback to category-based summary if no individual items
   const categories = [
     'accommodation',
     'flight',
