@@ -59,5 +59,38 @@ function buildConfig() {
   console.log('✓ Config file written to:', configPath);
 }
 
+// Build the Firebase config file
+function buildFirebaseConfig() {
+  const env = loadEnv();
+
+  const firebaseTemplate = `// Firebase Configuration and Initialization
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
+import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "${env.FIREBASE_API_KEY || 'YOUR_FIREBASE_API_KEY_HERE'}",
+  authDomain: "${env.FIREBASE_AUTH_DOMAIN || 'YOUR_FIREBASE_AUTH_DOMAIN'}",
+  projectId: "${env.FIREBASE_PROJECT_ID || 'YOUR_FIREBASE_PROJECT_ID'}",
+  storageBucket: "${env.FIREBASE_STORAGE_BUCKET || 'YOUR_FIREBASE_STORAGE_BUCKET'}",
+  messagingSenderId: "${env.FIREBASE_MESSAGING_SENDER_ID || 'YOUR_FIREBASE_MESSAGING_SENDER_ID'}",
+  appId: "${env.FIREBASE_APP_ID || 'YOUR_FIREBASE_APP_ID'}",
+  measurementId: "${env.FIREBASE_MEASUREMENT_ID || 'YOUR_FIREBASE_MEASUREMENT_ID'}"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+export { db };
+`;
+
+  const firebaseConfigPath = path.join(__dirname, '..', 'web', 'firebase-config.js');
+
+  // Create/overwrite firebase-config.js
+  fs.writeFileSync(firebaseConfigPath, firebaseTemplate);
+  console.log('✓ Firebase config built successfully');
+  console.log('✓ Firebase config file written to:', firebaseConfigPath);
+}
+
 // Run the build
 buildConfig();
+buildFirebaseConfig();
