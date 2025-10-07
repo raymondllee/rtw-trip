@@ -197,7 +197,7 @@ User question: {message}
             data=json.dumps(adk_payload),
             headers=headers,
             stream=True,
-            timeout=120  # Increased timeout for complex requests
+            timeout=300  # 5 minutes for large itineraries with many destinations
         ) as r:
             for chunk in r.iter_lines():
                 if not chunk:

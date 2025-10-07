@@ -555,9 +555,9 @@ class TravelConciergeChat {
 
       console.log('🚀 Sending request to chat API...');
 
-      // Create a timeout promise (2 minutes)
+      // Create a timeout promise (5 minutes for large itineraries)
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Request timeout - taking longer than 2 minutes')), 120000)
+        setTimeout(() => reject(new Error('Request timeout - taking longer than 5 minutes')), 300000)
       );
 
       // Race between fetch and timeout
@@ -643,7 +643,7 @@ class TravelConciergeChat {
       let errorMessage = 'Sorry, I encountered an error. ';
 
       if (error.message.includes('timeout')) {
-        errorMessage += `The request took longer than expected (${elapsedSeconds}s). The AI is processing a large itinerary with 43 destinations. Try asking about a specific region instead.`;
+        errorMessage += `The request took longer than expected (${elapsedSeconds}s). The AI is processing a large itinerary. This can take several minutes for complex requests.`;
       } else if (error.message.includes('Failed to fetch') || error.message.includes('Connection')) {
         errorMessage += 'Please make sure the backend server is running on http://localhost:5001';
       } else {
