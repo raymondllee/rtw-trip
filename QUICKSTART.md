@@ -6,6 +6,7 @@ Get your trip planning app running with cloud-based versioning in 5 minutes.
 ✅ Google Cloud Project (you already have one)
 ✅ Node.js and npm installed
 ✅ Firebase SDK installed (`npm install` already ran)
+✅ Environment file prepared (`.env` based on `.env.example`)
 
 ## Step-by-Step Setup
 
@@ -24,20 +25,26 @@ Get your trip planning app running with cloud-based versioning in 5 minutes.
 4. Click **"Register app"**
 5. **Copy the config object** (you'll need it next)
 
-### 3. Configure Firebase (1 minute)
+### 3. Configure environment and build configs (1–2 minutes)
 
-Open `web/firebase-config.js` and replace the placeholder values:
+1. Copy the example env file and fill in values from Firebase Console and Google Cloud:
 
-```javascript
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY_HERE",                    // ← Paste from Firebase Console
-  authDomain: "YOUR_PROJECT.firebaseapp.com",     // ← Paste from Firebase Console
-  projectId: "YOUR_PROJECT_ID",                   // ← Paste from Firebase Console
-  storageBucket: "YOUR_PROJECT.appspot.com",      // ← Paste from Firebase Console
-  messagingSenderId: "YOUR_SENDER_ID",            // ← Paste from Firebase Console
-  appId: "YOUR_APP_ID"                            // ← Paste from Firebase Console
-};
+```bash
+cp .env.example .env
+# Edit .env with your real values (Firebase + Google OAuth/Maps)
 ```
+
+2. Generate client-side config files (gitignored):
+
+```bash
+node scripts/build-web-config.js
+```
+
+This creates/updates:
+- `web/config.js` (uses values from `.env`)
+- `web/firebase-config.js` (uses values from `.env`)
+
+Note: Do not commit secrets. Both files are already ignored by `.gitignore`.
 
 ### 4. Set Security Rules (1 minute)
 
@@ -142,7 +149,7 @@ await manager.migrateFromLocalStorage();
 ## Troubleshooting
 
 ### "Firebase: Error (auth/api-key-not-valid)"
-→ Double-check your `apiKey` in `web/firebase-config.js`
+→ Double-check `FIREBASE_API_KEY` in `.env`, then rerun `node scripts/build-web-config.js`
 
 ### "Missing or insufficient permissions"
 → Check Firestore security rules (Step 4)
@@ -155,7 +162,7 @@ await manager.migrateFromLocalStorage();
 
 ### Nothing happens after changes
 → Open console, look for errors
-→ Check Firebase config is correct
+→ Verify `.env` values and rerun `node scripts/build-web-config.js`
 → Verify Firestore is enabled in console
 
 ## Get Help
@@ -169,7 +176,7 @@ await manager.migrateFromLocalStorage();
 ```bash
 1. Enable Firestore      → console.firebase.google.com
 2. Register app          → Get config object
-3. Update firebase-config.js → Paste config
+3. Configure env (.env)  → Then run `node scripts/build-web-config.js`
 4. Set security rules    → Copy/paste rules
 5. npm run serve         → Test it!
 ```
