@@ -613,7 +613,14 @@ class TravelConciergeChat {
       // Add bot response
       // ⚠️ NOTE: AI responses may be inconsistent. The AI might claim it cannot access the itinerary
       // even when complete context data was sent. Backend investigation needed for this non-deterministic behavior.
-      this.addMessage(data.response || 'Sorry, I could not generate a response.', 'bot', false, isFloating);
+      this.addMessage(data.response || data.response_text || 'Sorry, I could not generate a response.', 'bot', false, isFloating);
+
+      // If backend saved to Firestore, notify app to refresh cost UI
+      if (data.saved_to_firestore) {
+        try {
+          window.dispatchEvent(new Event('costs-updated'));
+        } catch {}
+      }
 
       // Sync messages to the other view
       if (isFloating) {

@@ -239,8 +239,26 @@ User question: {message}
                 except json.JSONDecodeError:
                     continue
 
+        # Check if response contains structured cost research data and extract summary
+        final_response_text = response_text
+        try:
+            # Look for JSON with destination_name in the response
+            import re
+            json_match = re.search(r'\{[\s\S]*"destination_name"[\s\S]*\}', response_text)
+            if json_match:
+                research_data = json.loads(json_match.group())
+                if 'research_summary' in research_data:
+                    final_response_text = research_data['research_summary']
+                    print(f"✅ Extracted research_summary for chat: {final_response_text[:100]}...")
+
+                    # TODO: Save the full research data to Firestore via save_researched_costs tool
+                    # This would require the agent to call the tool instead of returning structured data directly
+        except Exception as e:
+            print(f"⚠️ Could not extract research_summary from response: {e}")
+            final_response_text = response_text
+
         return jsonify({
-            'response': response_text or 'No response generated',
+            'response': final_response_text or 'No response generated',
             'session_id': session_id,
             'status': 'success'
         })
@@ -1131,13 +1149,134 @@ For each category, provide low/mid/high estimates with sources.
                 except:
                     pass
 
-        if research_result or save_tool_called:
+        # Alternative C: If we have structured research JSON but no save tool call,
+        # save the data server-side via /api/costs/bulk-save and also generate a
+        # concise human summary using the root agent.
+        saved_via_server = False
+        summary_text = None
+
+        if research_result and not save_tool_called:
+            try:
+                # Build cost_items similar to save_researched_costs tool
+                categories_map = {
+                    'accommodation': 'accommodation',
+                    'flights': 'flight',
+                    'activities': 'activity',
+                    'food_daily': 'food',
+                    'transport_daily': 'transport'
+                }
+
+                cost_items = []
+                for research_cat, itinerary_cat in categories_map.items():
+                    if research_cat not in research_result:
+                        continue
+                    cat_data = research_result.get(research_cat) or {}
+
+                    base_usd = float(cat_data.get('amount_mid', 0) or 0)
+                    base_local = float(cat_data.get('amount_local', 0) or 0)
+                    currency_local = cat_data.get('currency_local', 'USD')
+
+                    multiplier = 1
+                    if research_cat in ('food_daily', 'transport_daily'):
+                        multiplier = max(1, int(duration_days)) * max(1, int(num_travelers))
+                    elif research_cat == 'flights':
+                        multiplier = max(1, int(num_travelers))
+
+                    amount_usd = base_usd * multiplier
+                    amount_local = base_local * multiplier if base_local else amount_usd
+
+                    stable_dest = (
+                        destination_name.lower()
+                        .replace(' ', '_')
+                        .replace(',', '')
+                        .replace('/', '-')
+                        .replace(':', '-')
+                    )
+
+                    cost_items.append({
+                        'id': f"{destination_id}_{stable_dest}_{itinerary_cat}",
+                        'category': itinerary_cat,
+                        'description': f"{cat_data.get('category', research_cat).title()} in {destination_name}",
+                        'amount': amount_local,
+                        'currency': currency_local,
+                        'amount_usd': amount_usd,
+                        'date': datetime.now().strftime("%Y-%m-%d"),
+                        'destination_id': destination_id,
+                        'booking_status': 'researched',
+                        'source': 'web_research',
+                        'notes': cat_data.get('notes', ''),
+                        'confidence': cat_data.get('confidence', 'medium'),
+                        'sources': cat_data.get('sources', []),
+                        'researched_at': cat_data.get('researched_at', datetime.now().isoformat()),
+                    })
+
+                # Save to Firestore via our own endpoint
+                try:
+                    save_resp = requests.post(
+                        f"{ADK_API_URL.replace('/adk', '')}/api/costs/bulk-save",  # same Flask server
+                        json={
+                            'session_id': session_id,
+                            'scenario_id': scenario_id,
+                            'destination_id': destination_id,
+                            'destination_name': destination_name,
+                            'cost_items': cost_items,
+                        },
+                        timeout=30,
+                    )
+                    saved_via_server = save_resp.status_code == 200
+                except Exception:
+                    saved_via_server = False
+
+                # Ask root agent to summarize for the chat response
+                try:
+                    summary_prompt = (
+                        f"Summarize these researched costs for {destination_name} in 3-5 sentences "
+                        f"for a family of {num_travelers} traveling {duration_days} days. "
+                        f"Focus on total, per-day, and major categories.\n\n" 
+                        f"JSON:\n{json.dumps(research_result)}"
+                    )
+                    run_payload = {
+                        'session_id': session_id,
+                        'app_name': APP_NAME,
+                        'user_id': USER_ID,
+                        'agent_name': 'root_agent',
+                        'new_message': {
+                            'role': 'user',
+                            'parts': [{'text': summary_prompt}],
+                        },
+                    }
+                    with requests.post(
+                        run_endpoint,
+                        data=json.dumps(run_payload),
+                        headers=headers,
+                        stream=True,
+                        timeout=60,
+                    ) as r2:
+                        for chunk in r2.iter_lines():
+                            if not chunk:
+                                continue
+                            s = chunk.decode('utf-8').removeprefix('data: ').strip()
+                            try:
+                                ev = json.loads(s)
+                                if 'content' in ev and 'parts' in ev['content']:
+                                    for p in ev['content']['parts']:
+                                        if 'text' in p:
+                                            summary_text = (summary_text or '') + p['text']
+                            except json.JSONDecodeError:
+                                continue
+                except Exception:
+                    summary_text = None
+
+            except Exception as e:
+                print(f"Error during server-side save of research JSON: {e}")
+
+        if research_result or save_tool_called or saved_via_server:
             print(f"✅ Cost research completed for {destination_name}")
             return jsonify({
                 'status': 'success',
                 'research': research_result,
-                'response_text': response_text,
-                'saved_to_firestore': save_tool_called
+                'response_text': summary_text or response_text,
+                'saved_to_firestore': save_tool_called or saved_via_server
             })
         else:
             print(f"⚠️ Cost research returned no structured data")
