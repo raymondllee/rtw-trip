@@ -15,7 +15,7 @@ cd /app
 
 # Start ADK API server in the background
 echo "📡 Starting ADK API server on port 8000..."
-adk api_server travel_concierge --port 8000 --host 0.0.0.0 &
+python3 -m google_adk.cli api_server travel_concierge --port 8000 --host 0.0.0.0 &
 ADK_PID=$!
 
 # Give ADK server time to start
