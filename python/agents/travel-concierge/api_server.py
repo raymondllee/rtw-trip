@@ -14,17 +14,21 @@
 
 """Simple Flask API server for the travel concierge agent"""
 
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
 import json
 import time
 import uuid
 import requests
+import os
 from datetime import datetime
 
 from travel_concierge.tools.cost_tracker import CostTrackerService
 
-app = Flask(__name__)
+# Determine web directory path (go up from api_server.py to repo root, then to web)
+WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web'))
+
+app = Flask(__name__, static_folder=WEB_DIR, static_url_path='')
 CORS(app)  # Enable CORS for frontend requests
 
 # ADK API Server endpoint (you need to run: adk api_server travel_concierge)
@@ -807,6 +811,16 @@ def generate_fallback_title(user_messages):
 def health():
     """Health check endpoint"""
     return jsonify({'status': 'healthy'})
+
+@app.route('/')
+def index():
+    """Serve the main web application"""
+    return send_from_directory(WEB_DIR, 'index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    """Serve static files from web directory"""
+    return send_from_directory(WEB_DIR, path)
 
 # ============================================================================
 # Cost Tracking API Endpoints
