@@ -20,6 +20,12 @@ echo "🔍 Checking installed packages..."
 pip3 list | grep -i adk || echo "⚠️ ADK not found in pip list"
 echo "🔍 Looking for google_adk installation location..."
 pip3 show google-adk | grep Location || echo "⚠️ Could not find google-adk location"
+echo "🔍 Listing contents of /usr/local/lib/python3.12/dist-packages:"
+ls -la /usr/local/lib/python3.12/dist-packages/ | grep -i google || echo "⚠️ No google packages found"
+echo "🔍 Trying to import google_adk directly:"
+$PYTHON_BIN -c "import google_adk; print(google_adk.__file__)" || echo "⚠️ Cannot import google_adk"
+echo "🔍 Checking if google-adk has cli module:"
+$PYTHON_BIN -c "from google_adk import cli; print(cli.__file__)" || echo "⚠️ Cannot import google_adk.cli"
 
 # Set Python path to include the travel-concierge module
 export PYTHONPATH="/app/python/agents:${PYTHONPATH}"
