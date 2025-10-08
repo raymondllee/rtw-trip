@@ -17,6 +17,7 @@
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import json
+import time
 import uuid
 import requests
 from datetime import datetime
@@ -81,6 +82,21 @@ def chat():
         leg_name = context.get('leg_name', 'Unknown')
         sub_leg_name = context.get('sub_leg_name', None)
 
+        # Extract destination names for verification
+        dest_names = [d.get('name', 'Unknown') if isinstance(d, dict) else d for d in destinations]
+
+        # Create destination verification helper
+        dest_verification = f"""
+AVAILABLE DESTINATIONS IN CURRENT ITINERARY:
+{json.dumps({str(i): name for i, name in enumerate(dest_names)}, indent=2)}
+
+IMPORTANT: Before taking any action on a destination, you MUST:
+1. Check if the destination exists in the list above
+2. If the destination is NOT in the list, inform the user it's not in the current itinerary
+3. Only use tools or perform actions for destinations that exist in the current itinerary
+4. Always reference destinations by their exact name as shown above
+"""
+
         # Create compact itinerary JSON for tool parsing
         itinerary_json = json.dumps({
             "locations": destinations,
@@ -91,9 +107,6 @@ def chat():
                 "sub_leg_name": sub_leg_name
             }
         }, separators=(',', ':'))  # Compact JSON without spaces
-
-        # Just get the destination names for user-friendly summary
-        dest_names = [d.get('name', 'Unknown') if isinstance(d, dict) else d for d in destinations]
 
         # Add context about filtering to help LLM understand scope
         if sub_leg_name:
@@ -106,7 +119,7 @@ def chat():
         context_prompt = f"""
 I'm planning a trip. Currently viewing: {scope_info}
 
-Destinations: {', '.join(dest_names[:5])}{'...' if len(dest_names) > 5 else ''}
+{dest_verification}
 
 CURRENT_ITINERARY_DATA:
 ```json
@@ -114,6 +127,12 @@ CURRENT_ITINERARY_DATA:
 ```
 
 User question: {message}
+
+CRITICAL REMINDERS:
+1. NEVER claim you've added/removed/modified destinations without calling a tool
+2. ALWAYS use the appropriate tool (add_destination, remove_destination, update_destination, etc.) for itinerary changes
+3. Let the tool response inform the user - don't describe the change yourself
+4. Only work with destinations that exist in the available destinations list above
 """
     else:
         context_prompt = message
@@ -163,6 +182,17 @@ User question: {message}
         }
         if scenario_id:
             adk_payload["state"]["scenario_id"] = scenario_id
+
+        print(f"\n🔧 ADK STATE DEBUG:")
+        print(f"   Session ID being passed: {session_id}")
+        print(f"   Scenario ID being passed: {scenario_id}")
+        print(f"   Full state payload: {adk_payload['state']}")
+        print(f"{'='*50}\n")
+
+        # Track session activity for the default_session fix
+        if session_id not in sessions:
+            sessions[session_id] = {'changes': []}
+        sessions[session_id]['last_activity'] = time.time()
 
         # ALWAYS pass itinerary data when context has destinations
         # This ensures tools like generate_itinerary_summary can access the itinerary
@@ -217,8 +247,31 @@ User question: {message}
                     if "content" in event and "parts" in event["content"]:
                         for part in event["content"]["parts"]:
                             if "text" in part:
-                                response_text += part["text"]
-                                print(f"💬 AGENT TEXT: {part['text']}")
+                                text_content = part["text"]
+                                response_text += text_content
+                                print(f"💬 AGENT TEXT: {text_content}")
+
+                                # DETECT HALLUCINATED ITINERARY CHANGES
+                                hallucinated_patterns = [
+                                    r'has been added',
+                                    r'has been removed',
+                                    r'has been updated',
+                                    r'has been modified',
+                                    r'has been changed',
+                                    r'added to your itinerary',
+                                    r'removed from your itinerary',
+                                    r'updated your itinerary'
+                                ]
+
+                                import re
+                                for pattern in hallucinated_patterns:
+                                    if re.search(pattern, text_content, re.IGNORECASE):
+                                        print(f"\n🚨 DETECTED HALLUCINATED ITINERARY CHANGE: '{text_content}'")
+                                        print(f"⚠️ AGENT CLAIMED TO MAKE CHANGES WITHOUT CALLING TOOLS!")
+                                        print(f"🔧 FORCING CORRECT BEHAVIOR: Agent must use tools for itinerary changes\n")
+                                        # Override the hallucinated response
+                                        response_text = "I need to use the proper tools to modify your itinerary. Let me call the appropriate tool to make this change."
+                                        break
 
                             # Log function/tool calls
                             if "function_call" in part:
@@ -312,7 +365,6 @@ User question: {message}
                                     if dest_id is None:
                                         # Use arrival_date to generate a stable ID if available
                                         if isinstance(dest, dict) and dest.get('arrival_date'):
-                                            import time
                                             from datetime import datetime as dt
                                             # Convert date string to timestamp (milliseconds like 1759377102)
                                             try:
@@ -444,6 +496,26 @@ def add_destination_endpoint():
     insert_after = data.get('insert_after')
     session_id = data.get('session_id')
 
+    # Fix for default_session issue - if tools are sending default_session,
+    # try to find a more appropriate session
+    if session_id == 'default_session':
+        # Look for recently active sessions (with activity in last 10 minutes)
+        current_time = time.time()
+        for sid, session_data in sessions.items():
+            if sid != 'default_session' and 'last_activity' in session_data:
+                if current_time - session_data['last_activity'] < 600:  # 10 minutes
+                    session_id = sid
+                    print(f"🔧 FIXED: Replaced default_session with active session: {session_id}")
+                    break
+
+        # If no active session found, use the most recent session
+        if session_id == 'default_session' and len(sessions) > 1:
+            # Find the most recently created session (excluding default_session)
+            recent_sessions = [sid for sid in sessions.keys() if sid != 'default_session']
+            if recent_sessions:
+                session_id = recent_sessions[-1]  # Use last created session
+                print(f"🔧 FIXED: Replaced default_session with most recent session: {session_id}")
+
     print(f"📍 ADD DESTINATION called:")
     print(f"   Session ID: {session_id}")
     print(f"   Destination: {destination.get('name')}")
@@ -556,6 +628,11 @@ def get_changes(session_id):
     """Get pending changes for a session (polled by frontend)"""
     if session_id in sessions and 'changes' in sessions[session_id]:
         changes = sessions[session_id]['changes']
+        if changes:  # Only log when there are actual changes
+            print(f"🔔 CHANGES ENDPOINT POLLED:")
+            print(f"   Session ID: {session_id}")
+            print(f"   Changes to send: {len(changes)}")
+            print(f"   Changes: {changes}")
         # Clear changes after sending
         sessions[session_id]['changes'] = []
         return jsonify({

@@ -130,6 +130,8 @@ def _extract_itinerary(tool_context: ToolContext) -> Dict[str, Any]:
 def _get_session_id(tool_context: ToolContext) -> str:
     """Determine the appropriate session id for API requests."""
 
+    print(f"\n🔍 _get_session_id CALLED!")
+
     if not tool_context:
         print("[itinerary] No tool_context provided")
         return "default_session"
@@ -489,6 +491,11 @@ def add_destination(
     """
 
     try:
+        print(f"\n📍 ADD DESTINATION called:")
+        print(f"   Name: {name}")
+        print(f"   City: {city}")
+        print(f"   Country: {country}")
+
         itinerary = _extract_itinerary(tool_context)
         new_destination = _build_destination_payload(
             name=name,
@@ -502,6 +509,8 @@ def add_destination(
         )
 
         session_id = _get_session_id(tool_context)
+        print(f"   Session ID determined: {session_id}")
+        print(f"   Insert after: {insert_after}")
 
         response = requests.post(
             f"{ITINERARY_API_URL}/add",
