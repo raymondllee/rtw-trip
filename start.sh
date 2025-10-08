@@ -14,8 +14,12 @@ PYTHON_BIN="/usr/bin/python3"
 echo "🔍 Using Python: $PYTHON_BIN"
 echo "🔍 Python version: $($PYTHON_BIN --version)"
 echo "🔍 Pip path: $(which pip3)"
+echo "🔍 Python sys.path:"
+$PYTHON_BIN -c "import sys; print('\n'.join(sys.path))"
 echo "🔍 Checking installed packages..."
 pip3 list | grep -i adk || echo "⚠️ ADK not found in pip list"
+echo "🔍 Looking for google_adk installation location..."
+pip3 show google-adk | grep Location || echo "⚠️ Could not find google-adk location"
 
 # Set Python path to include the travel-concierge module
 export PYTHONPATH="/app/python/agents:${PYTHONPATH}"
