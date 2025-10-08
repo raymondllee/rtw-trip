@@ -45,7 +45,7 @@ ls -la /app/python/agents/ || echo "⚠️ /app/python/agents doesn't exist"
 cd /app/python/agents
 echo "🔍 Contents of agents directory:"
 ls -la
-$PYTHON_BIN -m google.adk.cli api_server travel_concierge --port 8000 --host 0.0.0.0 &
+$PYTHON_BIN -m google.adk.cli api_server travel-concierge --port 8000 --host 0.0.0.0 &
 ADK_PID=$!
 cd /app
 
