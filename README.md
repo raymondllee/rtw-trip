@@ -256,36 +256,28 @@ The AI Travel Concierge is powered by Google's Agent Development Kit and consist
 
 ## 🌐 Deployment
 
+### Production Deployment (Railway) ✅ Recommended
+
+The complete application with all features is deployed to Railway:
+
+**URL**: https://rtw-trip-production.up.railway.app
+
+This deployment includes:
+- ✅ Interactive map with Google Maps integration
+- ✅ Firebase/Firestore data persistence
+- ✅ AI Travel Concierge with chat interface
+- ✅ Real-time itinerary editing
+- ✅ Cost tracking and scenario management
+
+**See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) for complete deployment guide.**
+
 ### Frontend Only (GitHub Pages)
 
-The frontend map interface is automatically deployed to GitHub Pages:
+A static version of the map interface is also available:
 
 **URL**: https://raymondllee.github.io/rtw-trip/
 
-*Note: AI features are not available in the GitHub Pages deployment.*
-
-### Full Application Deployment
-
-For the complete application with AI features:
-
-1. **Deploy Frontend**:
-   ```bash
-   npm run build:data
-   # Deploy web/ directory to your hosting provider
-   ```
-
-2. **Deploy Backend Services**:
-   - **Flask API Server** - Deploy to any Python hosting service
-   - **ADK API Server** - Deploy to Google Cloud Run or similar
-   - Configure environment variables for API keys
-
-3. **Environment Variables**:
-   ```javascript
-   window.RTW_CONFIG = {
-     googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
-     googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID
-   };
-   ```
+*Note: AI features and Firestore integration are not available in the GitHub Pages deployment.*
 
 ## 🗺️ Data Sources
 

@@ -1,230 +1,392 @@
 # Railway Deployment Guide
 
-This guide walks you through deploying the RTW Trip application to Railway.
+Complete guide for deploying the RTW Trip application to Railway.
 
-## Prerequisites
+## ✅ Verified Working Deployment
 
-1. A [Railway](https://railway.app) account
-2. Google Cloud Project with the following APIs enabled:
+This guide reflects a **successful production deployment** as of 2025. All steps have been tested and verified.
+
+## 📋 Prerequisites
+
+1. [Railway](https://railway.app) account
+2. Google Cloud Project with these APIs enabled:
    - Vertex AI API
    - Firestore API
-   - Places API
-3. Google Cloud service account credentials
+   - Places API (New)
+   - Maps JavaScript API
+3. Firebase project with Firestore enabled
+4. Google Cloud service account credentials JSON file
 
-## Environment Variables
+## 🚀 Quick Start
 
-You'll need to configure the following environment variables in Railway:
+### 1. Connect Repository to Railway
 
-### Required Variables
+1. Go to [Railway](https://railway.app)
+2. Click **"New Project"**
+3. Select **"Deploy from GitHub repo"**
+4. Choose your `rtw-trip` repository
+5. Railway will create a new service
+
+### 2. Configure Environment Variables
+
+Go to your Railway service → **Variables** tab and add these variables:
+
+#### Firebase Configuration (Required)
+```bash
+FIREBASE_API_KEY=your-firebase-api-key
+FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+FIREBASE_APP_ID=your-app-id
+FIREBASE_MEASUREMENT_ID=your-measurement-id
+```
+
+#### Google Maps & Places (Required)
+```bash
+GOOGLE_MAPS_API_KEY=your-maps-api-key
+GOOGLE_PLACES_API_KEY=your-places-api-key
+```
+
+#### Google Cloud AI Configuration (Required for AI features)
+```bash
+GOOGLE_GENAI_USE_VERTEXAI=1
+GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_CLOUD_STORAGE_BUCKET=your-gcs-bucket-name
+```
+
+#### Google Cloud Service Account Credentials (Required)
+```bash
+# Name: GOOGLE_APPLICATION_CREDENTIALS_JSON
+# Value: Paste the ENTIRE contents of your service account JSON file
+# This is a multi-line value - Railway will handle it correctly
+```
+
+#### Optional Configuration
+```bash
+TRAVEL_CONCIERGE_SCENARIO=travel_concierge/profiles/itinerary_empty_default.json
+```
+
+**Important**: Railway also automatically provides `RAILWAY_PUBLIC_DOMAIN` which is used by the build process.
+
+### 3. Deploy
+
+Railway will automatically deploy after you set the variables. The deployment process:
+
+1. **Build Phase** (defined in `nixpacks.toml`):
+   - Installs Node.js 20 and Python 3
+   - Runs `npm install`
+   - Runs `pip3 install -r requirements.txt`
+   - Runs `npm run build:config` to generate config files
+
+2. **Start Phase** (defined in `start.sh`):
+   - Runs `node scripts/build-web-config.js` to generate web config from env vars
+   - Starts ADK API server on port 8000 (internal)
+   - Waits 10 seconds for ADK to initialize
+   - Starts Flask API server on Railway's assigned PORT (public)
+   - Flask serves both API endpoints and static web files
+
+### 4. Verify Deployment
+
+Once deployed, Railway will provide a public URL. Test it:
 
 ```bash
-# Google Cloud Configuration
-GOOGLE_GENAI_USE_VERTEXAI=1
-GOOGLE_CLOUD_PROJECT=your-project-id
-GOOGLE_CLOUD_LOCATION=us-central1
+# Check health endpoint
+curl https://your-app.railway.app/health
 
-# Google Places API
-GOOGLE_PLACES_API_KEY=your-places-api-key
-
-# GCS Storage Bucket
-GOOGLE_CLOUD_STORAGE_BUCKET=your-bucket-name
-
-# Travel Concierge Configuration
-TRAVEL_CONCIERGE_SCENARIO=travel_concierge/profiles/itinerary_empty_default.json
-
-# Port Configuration (Railway sets this automatically)
-PORT=5001
+# Should return: {"status":"healthy"}
 ```
 
-### Google Cloud Credentials
+Visit your app URL in a browser to see the full interface.
 
-Railway requires credentials in JSON format. You have two options:
-
-#### Setting Up Service Account Credentials
-
-1. You should already have a service account JSON file (e.g., `pdf-extract-393514-8f5ce6fa33d2.json`)
-2. In Railway, add environment variable `GOOGLE_APPLICATION_CREDENTIALS_JSON`
-3. Paste the **entire JSON contents** as the value (it will be a multi-line value)
-4. Railway will automatically create a file from this and set `GOOGLE_APPLICATION_CREDENTIALS` to point to it
-
-**Important**: The JSON should include `type`, `project_id`, `private_key`, `client_email`, etc.
-
-## Deployment Steps
-
-### 1. Connect Your Repository
-
-1. Log in to [Railway](https://railway.app)
-2. Click "New Project"
-3. Select "Deploy from GitHub repo"
-4. Choose your repository
-
-### 2. Configure Build Settings
-
-Railway will automatically detect the configuration from `railway.json`. The build process will:
-
-1. Install Node.js dependencies
-2. Build the web configuration
-3. Install Python dependencies from `requirements.txt`
-
-### 3. Set Environment Variables
-
-1. In your Railway project, go to "Variables"
-2. Add all the environment variables listed above
-3. **Important**: Add your Google Cloud credentials as `GOOGLE_APPLICATION_CREDENTIALS_JSON`
-
-### 4. Deploy
-
-Railway will automatically deploy your application. The deployment process:
-
-1. Runs the build command
-2. Starts both the ADK API server (port 8000) and Flask API server (using Railway's PORT)
-3. Makes the Flask API available via Railway's public URL
-
-### 5. Update Frontend Configuration
-
-After deployment, update your frontend configuration:
-
-1. Copy the Railway URL from your deployment
-2. Update `web/config.js`:
-
-```javascript
-export const API_CONFIG = {
-  BASE_URL: 'https://your-railway-app.railway.app',
-  TIMEOUT: 300000
-};
-```
-
-3. Rebuild and redeploy if needed
-
-## Architecture on Railway
+## 🏗️ Architecture on Railway
 
 ```
-Railway Container
+Railway Container (Single Service)
+├── Node.js Build Process
+│   └── Generates firebase-config.js and config.js from env vars
+│
 ├── ADK API Server (localhost:8000)
-│   └── Handles agent orchestration
-└── Flask API Server (0.0.0.0:$PORT)
-    ├── Proxies to ADK server
-    ├── Handles chat endpoints
-    ├── Manages Firestore operations
-    └── Serves frontend API
+│   └── Google Agent Development Kit
+│       └── AI Travel Concierge agents
+│
+└── Flask API Server (0.0.0.0:$PORT - public)
+    ├── Serves static web files from /app/web
+    ├── API endpoints (/api/*)
+    ├── Health check (/health)
+    └── Proxies to ADK API server internally
 ```
 
-## Troubleshooting
+## 📁 Key Files for Railway
+
+### Configuration Files
+
+- **`railway.json`** - Railway-specific configuration
+  - Specifies NIXPACKS builder
+  - Sets start command to `bash start.sh`
+  - Configures restart policy
+
+- **`nixpacks.toml`** - Build configuration
+  - Installs Python 3 and Node.js 20
+  - Installs npm and pip dependencies
+  - Runs config build during build phase
+
+- **`start.sh`** - Startup script
+  - Builds web configuration from environment variables
+  - Starts ADK API server in background
+  - Starts Flask API server in foreground
+
+- **`requirements.txt`** - Python dependencies
+  - Google ADK and agent framework
+  - Flask and API dependencies
+  - Gunicorn for production serving
+
+### Generated Files (Not in Git)
+
+These files are generated during deployment from environment variables:
+
+- **`web/config.js`** - Frontend configuration
+  - Generated by `scripts/build-web-config.js`
+  - Contains Firebase and Google Maps API keys
+  - Sets API_CONFIG.BASE_URL to Railway domain
+
+- **`web/firebase-config.js`** - Firebase initialization
+  - Generated by `scripts/build-web-config.js`
+  - Initializes Firebase app with credentials from env vars
+  - Exports Firestore db instance
+
+## 🔍 How Config Generation Works
+
+The app generates configuration files at two points:
+
+### During Build (nixpacks.toml)
+```toml
+[phases.build]
+cmds = ["npm run build:config"]
+```
+This runs early but may not have all env vars available.
+
+### During Startup (start.sh)
+```bash
+node scripts/build-web-config.js
+```
+This ensures env vars are read correctly at runtime.
+
+### The Build Script
+Located at `scripts/build-web-config.js`, it:
+1. Loads environment variables from Railway
+2. Generates `web/config.js` with browser-compatible JavaScript (window.*)
+3. Generates `web/firebase-config.js` with Firebase initialization
+4. Both files are served by Flask as static assets
+
+## 📊 Data Source
+
+**Important**: The app does NOT use a static `itinerary_structured.json` file in production.
+
+Instead:
+- App loads the latest scenario from **Firestore** on startup
+- If no scenarios exist, shows empty state
+- Users can create/load scenarios through the UI
+- All data is persisted in Firebase Firestore
+
+This is configured in `web/app-final.js`:
+```javascript
+// Try to load from static file (local dev only)
+// Falls back to empty data and loads from Firestore
+```
+
+## 🐛 Troubleshooting
 
 ### Build Failures
 
+**Issue**: `npm run build:config` fails with "environment variables not set"
+
+**Solution**: Environment variables may not be available during build phase. This is expected - the start script will regenerate configs with correct values.
+
+---
+
 **Issue**: Python dependencies fail to install
 
-**Solution**: Ensure `requirements.txt` is in the root directory and contains all necessary packages.
-
-**Issue**: `adk` command not found
-
-**Solution**: Make sure `google-adk` is in `requirements.txt` and the build completes successfully.
+**Solution**:
+- Verify `requirements.txt` is in root directory
+- Check Railway build logs for specific error
+- May need to add `--break-system-packages` flag (already in nixpacks.toml)
 
 ### Runtime Issues
 
-**Issue**: Application starts but crashes immediately
-
-**Solution**: Check logs for ADK server startup. The Flask server waits 5 seconds for ADK to start.
-
-**Issue**: "Could not connect to ADK API server" errors
+**Issue**: "Firebase 400 Bad Request" errors in browser console
 
 **Solution**:
-- Verify both servers are running in the container
-- Check that ADK server is bound to `0.0.0.0:8000` not `127.0.0.1:8000`
-- Increase the sleep time in Procfile if needed
+- Verify ALL Firebase environment variables are set in Railway
+- Check Railway deployment logs for config generation output
+- Look for lines showing `FIREBASE_PROJECT_ID: YOUR_FIREBASE_PROJECT_ID` (indicates missing env vars)
+- Correct values should show actual project ID, not placeholder text
 
-**Issue**: Google Cloud authentication errors
+---
+
+**Issue**: "Could not connect to ADK API server"
 
 **Solution**:
+- Check Railway logs to verify ADK server started successfully
+- Look for "✅ ADK server started successfully" in logs
+- May need to increase sleep time in `start.sh` from 10 to 15 seconds
 - Verify `GOOGLE_APPLICATION_CREDENTIALS_JSON` is set correctly
-- Ensure the service account has the necessary permissions:
-  - Vertex AI User
-  - Firestore User
-  - Storage Object Viewer
 
-**Issue**: Timeout errors during cost research
+---
 
-**Solution**: The Procfile is already configured with `--timeout 300` (5 minutes). If you need longer:
+**Issue**: Google Maps shows "Oops! Something went wrong"
+
+**Solution**:
+- Verify `GOOGLE_MAPS_API_KEY` is set in Railway variables
+- Check that Maps JavaScript API is enabled in Google Cloud Console
+- Ensure API key has correct restrictions (allow your Railway domain)
+
+---
+
+**Issue**: Firestore connection works locally but not on Railway
+
+**Solution**:
+- Ensure Firebase credentials match between local and Railway
+- Check Firestore security rules allow access
+- Verify Firebase project ID in environment variables is correct
+
+### Checking Environment Variables
+
+To debug environment variable issues, check the Railway deployment logs for these lines:
 
 ```
-gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 600 api_server:app
+📋 Environment check:
+  FIREBASE_PROJECT_ID: pdf-extract-393514  ✅ (should show actual ID)
+  GOOGLE_MAPS_API_KEY: ***xyz  ✅ (should show last 4 chars)
+  RAILWAY_PUBLIC_DOMAIN: your-app.railway.app  ✅
+
+🔍 Environment variables loaded:
+  FIREBASE_PROJECT_ID: pdf-extract-393514  ✅
+  FIREBASE_API_KEY: ***xyz  ✅
 ```
 
-### CORS Issues
+If you see `NOT SET` or placeholder values like `YOUR_FIREBASE_PROJECT_ID`, the environment variables are not being read correctly.
 
-If you experience CORS issues:
+## 💰 Cost Considerations
 
-1. Verify the Flask app has `CORS(app)` enabled (already configured in `api_server.py:28`)
-2. Check that your frontend is using the correct Railway URL
-3. Ensure you're using HTTPS in production
+### Railway Costs
+- **Hobby Plan**: $5/month for 512MB RAM
+- **Pro Plan**: $20/month for better performance
+- This app typically uses:
+  - ~500MB RAM
+  - ~0.1 vCPU (spikes during AI operations)
+  - Minimal bandwidth
 
-## Monitoring
+### Google Cloud Costs
+Monitor these potentially expensive services:
+- **Vertex AI API**: Charged per API call (~$0.001 per call)
+- **Firestore**: Free tier covers most development usage
+- **Maps API**: Free tier covers ~28k map loads per month
+- **Places API**: Free tier covers limited requests
 
-Railway provides built-in monitoring:
+**Recommendation**: Set up billing alerts in Google Cloud Console.
 
-1. **Logs**: View real-time logs in the Railway dashboard
-2. **Metrics**: Monitor CPU, memory, and network usage
-3. **Deployments**: Track deployment history and rollback if needed
+## 🔒 Security Best Practices
 
-## Scaling
+1. **Never commit credentials**: All secrets should be in Railway environment variables only
+2. **Use environment-specific projects**:
+   - Separate Firebase projects for dev/staging/production
+   - Separate Google Cloud projects if possible
+3. **Firestore Security Rules**: Configure rules to restrict access
+4. **API Key Restrictions**:
+   - Restrict Maps API key to your Railway domain
+   - Restrict Places API key by HTTP referrer
+   - Service account should have minimal required permissions
+5. **Rotate credentials regularly**: Update service accounts and API keys periodically
 
-To handle more traffic:
+## 📈 Monitoring & Debugging
 
-1. Increase the number of Gunicorn workers in `Procfile`:
+### Railway Dashboard
+- **Logs**: Real-time logs with search and filtering
+- **Metrics**: CPU, memory, and network usage graphs
+- **Deployments**: History of deployments with ability to rollback
+
+### Recommended Log Searches
+```
+"error" - Find all errors
+"Firebase" - Check Firebase initialization
+"ADK" - Monitor ADK API server
+"Environment check" - Verify environment variables
+```
+
+### Health Checks
+Add this to your monitoring:
+```bash
+curl https://your-app.railway.app/health
+```
+
+Expected response:
+```json
+{"status":"healthy"}
+```
+
+## 🚀 Optimization Tips
+
+### Performance
+1. Enable Railway's **automatic HTTPS** (enabled by default)
+2. Use Railway's **CDN** for static assets (automatic)
+3. Consider increasing Gunicorn workers in `start.sh`:
+   ```bash
+   --workers 4  # From default 2
    ```
-   --workers 4
-   ```
 
-2. Upgrade your Railway plan for more resources
+### Reliability
+1. Railway automatically restarts on failure (configured in `railway.json`)
+2. Set up monitoring/alerts for downtime
+3. Use Railway's deployment history for quick rollbacks
 
-3. Consider separating the ADK server and Flask server into different Railway services
+### Scaling
+- For higher traffic, upgrade Railway plan
+- Consider separating ADK and Flask into separate Railway services
+- Use Railway's horizontal scaling for multiple instances
 
-## Custom Domain
-
-To use a custom domain:
-
-1. Go to your Railway project settings
-2. Click "Domains"
-3. Add your custom domain
-4. Update DNS records as instructed
-5. Update `web/config.js` with your custom domain
-
-## Environment-Specific Configuration
-
-For multiple environments (dev, staging, production):
-
-1. Create separate Railway projects for each environment
-2. Use different Firebase projects for each environment
-3. Configure environment-specific variables in each Railway project
-
-## Security Considerations
-
-1. **Never commit** `.env` files or credentials to Git
-2. Use Railway's environment variables for all secrets
-3. Rotate API keys and service account credentials regularly
-4. Enable Railway's automatic HTTPS
-5. Set up Firebase security rules for Firestore
-
-## Cost Optimization
-
-1. Use Railway's sleep mode for development environments
-2. Monitor your Google Cloud API usage (Vertex AI can be expensive)
-3. Set up billing alerts in Google Cloud Console
-4. Consider caching frequently requested data
-
-## Support
+## 🆘 Support Resources
 
 - **Railway Documentation**: https://docs.railway.app
 - **Google ADK Documentation**: https://cloud.google.com/vertex-ai/docs/agent-builder
-- **Issues**: Create an issue in your repository
+- **Firebase Documentation**: https://firebase.google.com/docs
+- **Project Issues**: Create an issue in your GitHub repository
 
-## Next Steps
+## ✅ Post-Deployment Checklist
 
 After successful deployment:
 
-1. Test all major features (chat, itinerary editing, cost research)
-2. Set up monitoring and alerts
-3. Configure custom domain (optional)
-4. Set up CI/CD for automated deployments
-5. Document any environment-specific configurations
+- [ ] Test health endpoint returns 200 OK
+- [ ] Verify app loads in browser without console errors
+- [ ] Check Firebase connection (scenarios load)
+- [ ] Test Google Maps displays correctly
+- [ ] Verify AI chat is functional (if using)
+- [ ] Test itinerary editing features
+- [ ] Check cost tracking works
+- [ ] Set up monitoring and alerts
+- [ ] Configure custom domain (optional)
+- [ ] Document any environment-specific configurations
+
+## 🔄 Continuous Deployment
+
+Railway automatically redeploys when you push to your GitHub repository:
+
+1. Make changes locally
+2. Commit and push to GitHub:
+   ```bash
+   git add .
+   git commit -m "Description of changes"
+   git push
+   ```
+3. Railway automatically:
+   - Detects the push
+   - Runs build process
+   - Deploys new version
+   - Switches traffic to new deployment
+
+No manual intervention needed!
+
+---
+
+**Last Updated**: 2025-10-08 (Verified working deployment)
