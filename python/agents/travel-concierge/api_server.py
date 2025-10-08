@@ -812,16 +812,6 @@ def health():
     """Health check endpoint"""
     return jsonify({'status': 'healthy'})
 
-@app.route('/')
-def index():
-    """Serve the main web application"""
-    return send_from_directory(WEB_DIR, 'index.html')
-
-@app.route('/<path:path>')
-def serve_static(path):
-    """Serve static files from web directory"""
-    return send_from_directory(WEB_DIR, path)
-
 # ============================================================================
 # Cost Tracking API Endpoints
 # ============================================================================
@@ -1553,6 +1543,36 @@ For each category, provide low/mid/high estimates with sources.
             'error': str(e),
             'error_details': error_details
         }), 500
+
+# ============================================================================
+# Static File Serving (must be last to not override API routes)
+# ============================================================================
+
+@app.route('/')
+def index():
+    """Serve the main web application"""
+    try:
+        return send_from_directory(WEB_DIR, 'index.html')
+    except Exception as e:
+        return jsonify({
+            'error': 'Web files not found',
+            'details': str(e),
+            'web_dir': WEB_DIR
+        }), 404
+
+@app.route('/<path:path>')
+def serve_static(path):
+    """Serve static files from web directory"""
+    try:
+        # Only serve files that actually exist
+        file_path = os.path.join(WEB_DIR, path)
+        if os.path.isfile(file_path):
+            return send_from_directory(WEB_DIR, path)
+        # If path doesn't exist and doesn't start with /api, return 404
+        if not path.startswith('api/'):
+            return jsonify({'error': 'File not found', 'path': path}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
