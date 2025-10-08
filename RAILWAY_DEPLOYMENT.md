@@ -4,7 +4,7 @@ Complete guide for deploying the RTW Trip application to Railway.
 
 ## ✅ Verified Working Deployment
 
-This guide reflects a **successful production deployment** as of 2025. All steps have been tested and verified.
+This guide reflects a **successful production deployment** as of 10/8/2025. All steps have been tested and verified.
 
 ## 📋 Prerequisites
 

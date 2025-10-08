@@ -1,9 +1,31 @@
 const DATA_PATH = '../itinerary_structured.json';
 
+// Import destination ID management utilities
+import {
+  generateDestinationId,
+  isUUID,
+  validateDataIntegrity,
+  findOrphanedCosts,
+  reassignCosts,
+  deleteCostsByDestination,
+  migrateItineraryData
+} from './destination-id-manager.js';
+
 async function loadData() {
   const res = await fetch(DATA_PATH);
   if (!res.ok) throw new Error('Failed to load itinerary_structured.json');
-  return res.json();
+  const data = await res.json();
+
+  // Validate data integrity on load
+  const validation = validateDataIntegrity(data);
+  if (validation.warnings.length > 0) {
+    console.warn('⚠️ Data integrity warnings:', validation.warnings);
+  }
+  if (!validation.valid) {
+    console.error('❌ Data integrity errors:', validation.errors);
+  }
+
+  return data;
 }
 
 function toLatLng(location) {
@@ -573,8 +595,8 @@ async function initMapApp() {
   }
   
   function generateNewLocationId() {
-    const existingIds = workingData.locations.map(loc => loc.id || 0);
-    return Math.max(...existingIds, 0) + 1;
+    // Use UUID for new destinations
+    return generateDestinationId();
   }
   
   function parseAddressComponents(components) {

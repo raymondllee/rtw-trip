@@ -1,8 +1,20 @@
 import { FirestoreScenarioManager } from './firestore-scenario-manager.js';
 import { StatePersistence } from './state-persistence.js';
 import { summaryManager } from './summary-manager.js';
+import { addDataIntegrityButton } from './data-integrity-ui.js';
+import { generateDestinationId, normalizeId } from './destination-id-manager.js';
+import {
+  showDestinationDeletionDialog,
+  handleDestinationDeletion,
+  populateReassignDropdown
+} from './destination-deletion-handler.js';
 
 const DATA_PATH = './itinerary_structured.json';
+
+const idsEqual = (a, b) => {
+  if (a == null || b == null) return a == null && b == null;
+  return normalizeId(a) === normalizeId(b);
+};
 
 async function loadData() {
   // First try to load from static file (fallback for local dev or if Firestore is unavailable)
@@ -659,6 +671,24 @@ async function initMapApp() {
     subLegFilterContainer: !!subLegFilterContainer
   });
 
+  function handleDataUpdate(newData, options = {}) {
+    if (!newData) return;
+    const { skipRecalc = false } = options;
+    updateWorkingData(newData);
+    if (!skipRecalc) {
+      recalculateTripMetadata();
+    }
+    const showRouting = routingToggle ? routingToggle.checked : false;
+    render(legFilter.value, subLegFilter.value, showRouting);
+  }
+
+  function refreshDataIntegrityButton() {
+    const container = document.getElementById('planning-controls');
+    if (!container) return;
+    container.innerHTML = '';
+    addDataIntegrityButton(workingData, handleDataUpdate, 'planning-controls');
+  }
+
   const legs = groupLegs(workingData);
   legs.forEach(legName => {
     const opt = document.createElement('option');
@@ -823,6 +853,8 @@ async function initMapApp() {
   }
   
   function render(legName, subLegName = null, useRouting = false, triggerAutoSave = true) {
+    refreshDataIntegrityButton();
+
     currentMarkers.forEach(m => m.setMap(null));
     currentMarkers = [];
 
@@ -1006,7 +1038,9 @@ async function initMapApp() {
         costDetailsHTML = window.generateCostSummaryHTML(destinationCosts, duration);
       } else {
         // Fallback: simple cost calculation without external functions
-        const destinationCostsManual = costs.filter(cost => cost.destination_id === loc.id);
+        const destinationCostsManual = costs.filter(cost =>
+          idsEqual(cost.destination_id ?? cost.destinationId, loc.id)
+        );
         const totalCost = destinationCostsManual.reduce((sum, cost) => sum + (parseFloat(cost.amount_usd) || 0), 0);
 
         destinationCosts = {
@@ -1086,7 +1120,7 @@ async function initMapApp() {
       
       // Add the destination item
       sidebarItems.push(`
-        <div class="destination-item" data-index="${idx}" draggable="true" style="display: flex; align-items: flex-start;">
+        <div class="destination-item" data-index="${idx}" data-location-id="${loc.id}" draggable="true" style="display: flex; align-items: flex-start;">
           <div class="drag-handle">⋮⋮</div>
           <div class="destination-number" style="background: ${getActivityColor(loc.activity_type)}">${idx + 1}</div>
           <div class="destination-info">
@@ -1106,7 +1140,7 @@ async function initMapApp() {
               <textarea class="editable-notes" placeholder="Add notes..." data-location-id="${loc.id}">${notes}</textarea>
             </div>
           </div>
-          <button class="delete-destination-btn" data-index="${idx}" title="Delete destination">×</button>
+          <button class="delete-destination-btn" data-location-id="${loc.id}" title="Delete destination">×</button>
         </div>
       `);
       
@@ -1139,8 +1173,8 @@ async function initMapApp() {
     destinationList.querySelectorAll('.delete-destination-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const index = parseInt(e.target.dataset.index);
-        deleteDestination(index);
+        const locationId = e.currentTarget.dataset.locationId;
+        deleteDestination(locationId);
       });
     });
 
@@ -1239,10 +1273,10 @@ async function initMapApp() {
   function setupDurationEditing(container, filteredLocations) {
     container.querySelectorAll('.editable-duration').forEach(input => {
       input.addEventListener('change', (e) => {
-        const locationId = parseInt(e.target.dataset.locationId);
-        const newDuration = parseInt(e.target.value) || 1;
+        const locationId = e.target.dataset.locationId;
+        const newDuration = parseInt(e.target.value, 10) || 1;
         
-        const globalLocation = workingData.locations.find(loc => loc.id === locationId);
+        const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
         if (globalLocation) {
           globalLocation.duration_days = newDuration;
           recalculateDates(workingData.locations);
@@ -1262,7 +1296,7 @@ async function initMapApp() {
       let notesTimer = null;
       
       textarea.addEventListener('input', (e) => {
-        const locationId = parseInt(e.target.dataset.locationId);
+        const locationId = e.target.dataset.locationId;
         const newNotes = e.target.value;
         
         // Clear previous timer
@@ -1270,7 +1304,7 @@ async function initMapApp() {
         
         // Set new timer to save after 1 second of no typing
         notesTimer = setTimeout(() => {
-          const globalLocation = workingData.locations.find(loc => loc.id === locationId);
+          const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
           if (globalLocation) {
             globalLocation.notes = newNotes;
             triggerAutosave();
@@ -1363,8 +1397,12 @@ async function initMapApp() {
   }
   
   function generateNewLocationId() {
-    const existingIds = workingData.locations.map(loc => loc.id || 0);
-    return Math.max(...existingIds, 0) + 1;
+    const existingIds = new Set((workingData.locations || []).map(loc => normalizeId(loc.id)));
+    let newId = generateDestinationId();
+    while (existingIds.has(normalizeId(newId))) {
+      newId = generateDestinationId();
+    }
+    return newId;
   }
   
   function parseAddressComponents(components) {
@@ -1411,25 +1449,45 @@ async function initMapApp() {
     closeAddDestinationModal();
   }
 
-  function deleteDestination(index) {
-    // Don't allow deletion if only one destination remains
-    if (workingData.locations.length <= 1) {
+  function deleteDestination(destinationId) {
+    if (!destinationId) return;
+
+    const totalLocations = workingData.locations?.length || 0;
+    if (totalLocations <= 1) {
       alert('Cannot delete the last destination. Your trip must have at least one destination.');
       return;
     }
 
-    const location = workingData.locations[index];
-    const confirmMessage = `Are you sure you want to delete "${location.name}"?\n\nThis action cannot be undone.`;
-    
-    if (confirm(confirmMessage)) {
-      // Remove the destination
-      workingData.locations.splice(index, 1);
-      
-      // Recalculate dates for all remaining destinations
-      recalculateDates(workingData.locations);
-      
-      // Re-render the map and sidebar
-      render(legFilter.value, subLegFilter.value, routingToggle.checked);
+    const location = workingData.locations.find(loc => idsEqual(loc.id, destinationId));
+    if (!location) {
+      console.warn('Destination not found for deletion:', destinationId);
+      return;
+    }
+
+    const associatedCosts = (workingData.costs || []).filter(cost =>
+      idsEqual(cost.destination_id ?? cost.destinationId, destinationId)
+    );
+
+    showDestinationDeletionDialog(location, associatedCosts, (options = {}) => {
+      const updatedData = handleDestinationDeletion(workingData, destinationId, options);
+      updateWorkingData(updatedData);
+
+      if (options.recalculateDates) {
+        recalculateDates(workingData.locations);
+      } else {
+        recalculateTripMetadata();
+      }
+
+      const showRouting = routingToggle ? routingToggle.checked : false;
+      render(legFilter.value, subLegFilter.value, showRouting);
+    });
+
+    const modal = document.getElementById('delete-destination-modal');
+    if (modal) {
+      const dropdown = modal.querySelector('#reassign-dest-dropdown');
+      if (dropdown) {
+        populateReassignDropdown(dropdown, workingData.locations, destinationId);
+      }
     }
   }
 

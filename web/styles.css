@@ -31,6 +31,13 @@ html, body {
   justify-content: space-between;
 }
 
+.planning-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
 .filters {
   display: flex;
   align-items: center;
