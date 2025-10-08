@@ -25,8 +25,13 @@ from datetime import datetime
 
 from travel_concierge.tools.cost_tracker import CostTrackerService
 
-# Determine web directory path (go up from api_server.py to repo root, then to web)
-WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web'))
+# Determine web directory path
+# In production (Railway), files are at /app/web
+# In development, go up from api_server.py to repo root, then to web
+if os.path.exists('/app/web'):
+    WEB_DIR = '/app/web'
+else:
+    WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web'))
 
 app = Flask(__name__, static_folder=WEB_DIR, static_url_path='')
 CORS(app)  # Enable CORS for frontend requests
