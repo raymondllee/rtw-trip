@@ -7,11 +7,12 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Read environment variables from .env file
+// Read environment variables from .env file or process.env
 function loadEnv() {
   const envPath = path.join(__dirname, '..', '.env');
   const env = {};
 
+  // First, try to read from .env file
   try {
     const envContent = fs.readFileSync(envPath, 'utf8');
     envContent.split('\n').forEach(line => {
@@ -27,6 +28,13 @@ function loadEnv() {
     console.warn('Warning: .env file not found or could not be read:', error.message);
   }
 
+  // Override with process.env (for Railway/production deployments)
+  Object.keys(process.env).forEach(key => {
+    if (process.env[key]) {
+      env[key] = process.env[key];
+    }
+  });
+
   return env;
 }
 
@@ -34,8 +42,20 @@ function loadEnv() {
 function buildConfig() {
   const env = loadEnv();
 
-  const configTemplate = `window.RTW_CONFIG = {
-  googleCloudProjectId: "${env.GOOGLE_CLOUD_PROJECT_ID || 'YOUR_GOOGLE_CLOUD_PROJECT_ID'}",
+  // Determine API base URL (use RAILWAY_PUBLIC_DOMAIN if available, otherwise localhost)
+  const apiBaseUrl = env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${env.RAILWAY_PUBLIC_DOMAIN}`
+    : (env.API_BASE_URL || 'http://localhost:5001');
+
+  const configTemplate = `// Production configuration using environment variables
+// This file is generated during build from environment variables
+export const API_CONFIG = {
+  BASE_URL: '${apiBaseUrl}',
+  TIMEOUT: 300000
+};
+
+window.RTW_CONFIG = {
+  googleCloudProjectId: "${env.GOOGLE_CLOUD_PROJECT || env.GOOGLE_CLOUD_PROJECT_ID || 'YOUR_GOOGLE_CLOUD_PROJECT_ID'}",
   googleCloudLocation: "${env.GOOGLE_CLOUD_LOCATION || 'us-central1'}",
   googleOAuthClientId: "${env.GOOGLE_OAUTH_CLIENT_ID || 'YOUR_GOOGLE_OAUTH_CLIENT_ID'}",
   googleOAuthClientSecret: "${env.GOOGLE_OAUTH_CLIENT_SECRET || 'YOUR_GOOGLE_OAUTH_CLIENT_SECRET'}",
