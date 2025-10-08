@@ -21,6 +21,12 @@ export class FirestoreScenarioManager {
     this.userId = 'default-user'; // TODO: Replace with actual user ID from auth
     this.currentScenarioId = null;
     this.autoVersionRetention = 50; // Keep last 50 auto-versions
+
+    // Debug: Verify Firebase is initialized
+    console.log('🔥 FirestoreScenarioManager initialized, db available:', !!db);
+    if (!db) {
+      console.error('❌ Firestore database is not initialized!');
+    }
   }
 
   /**

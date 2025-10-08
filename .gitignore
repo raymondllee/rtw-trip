@@ -9,6 +9,9 @@ data/unresolved.json
 .env
 node_modules
 
+# Screenshots artifacts
+screenshots/
+
 # Python
 __pycache__/
 *.pyc

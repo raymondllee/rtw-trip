@@ -100,8 +100,15 @@ const firebaseConfig = {
   measurementId: "${env.FIREBASE_MEASUREMENT_ID || 'YOUR_FIREBASE_MEASUREMENT_ID'}"
 };
 
+console.log('🔧 Initializing Firebase with config:', {
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain
+});
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+console.log('✅ Firebase initialized successfully');
 
 export { db };
 `;
