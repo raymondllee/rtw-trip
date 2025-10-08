@@ -7,8 +7,17 @@ set -e
 
 echo "🚀 Starting RTW Trip Application..."
 
+# Debug: Show Python and pip paths
+echo "🔍 Python path: $(which python3)"
+echo "🔍 Pip path: $(which pip3)"
+echo "🔍 Checking installed packages..."
+pip3 list | grep -i adk || echo "⚠️ ADK not found in pip list"
+
 # Set Python path to include the travel-concierge module
 export PYTHONPATH="/app/python/agents:${PYTHONPATH}"
+
+# Add site-packages to Python path (where pip installed packages)
+export PYTHONPATH="/usr/local/lib/python3.12/site-packages:${PYTHONPATH}"
 
 # Change to the correct directory
 cd /app
