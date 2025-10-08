@@ -5,7 +5,6 @@ aptPkgs = ["python3-pip", "python3-venv"]
 [phases.install]
 cmds = [
     "npm install",
-    "pip3 install --break-system-packages --upgrade pip setuptools wheel",
     "pip3 install --break-system-packages -r requirements.txt"
 ]
 
