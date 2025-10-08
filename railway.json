@@ -1,0 +1,12 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm install && npm run build:config && cd python/agents/travel-concierge && pip install -r ../../../requirements.txt"
+  },
+  "deploy": {
+    "startCommand": "adk api_server travel_concierge --port 8000 & sleep 5 && cd python/agents/travel-concierge && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 300 api_server:app",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}

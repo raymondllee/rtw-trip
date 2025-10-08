@@ -87,3 +87,6 @@ switch-*.sh
 
 # Test results
 test-backfill-results.json
+
+# Railway deployment
+.railway/
