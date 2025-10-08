@@ -39,7 +39,10 @@ from travel_concierge.tools.itinerary_editor import (
 from travel_concierge.tools.itinerary_summary_generator import (
     generate_itinerary_summary,
 )
-from travel_concierge.tools.cost_manager import save_researched_costs
+from travel_concierge.tools.cost_manager import (
+    save_researched_costs,
+    update_destination_cost,
+)
 
 
 root_agent = Agent(
@@ -66,6 +69,7 @@ root_agent = Agent(
         get_current_itinerary,
         generate_itinerary_summary,
         save_researched_costs,  # Save cost research results from cost_research_agent
+        update_destination_cost,  # Backwards-compatible alias for legacy tool calls
     ],
     before_agent_callback=_load_precreated_itinerary,
 )

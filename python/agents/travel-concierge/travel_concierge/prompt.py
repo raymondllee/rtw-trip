@@ -26,7 +26,8 @@ ROOT_AGENT_INSTR = """
 - If the user is ready to make the flight booking or process payments, transfer to the agent `booking_agent`
 - If the user EXPLICITLY asks to research costs, update costs, or get pricing information for a destination:
   1. Transfer to the agent `cost_research_agent` - it will return JSON with cost research data
-  2. When cost_research_agent returns JSON data, call the `save_researched_costs` tool to save the costs to Firestore
+  2. When cost_research_agent returns JSON data, call **ONLY** the `save_researched_costs` tool to save the costs to Firestore. There is no tool named `update_destination_cost` or any other variation. Always supply the exact parameters required by `save_researched_costs`: `destination_name`, `destination_id`, `duration_days`, `num_travelers`, and the full `research_data` JSON.
+     - Destination IDs may be UUIDs or other non-numeric identifiers. Pass them exactly as provided (do **not** convert them to numbers).
   3. After successfully saving, provide a summary of the cost findings to the user
 - IMPORTANT: Questions about "must-see destinations", "what to visit", "recommendations", or "suggestions" should go to inspiration_agent, NOT cost_research_agent
 - If the user asks to add, remove, or modify destinations in their itinerary, you MUST use the itinerary editing tools: add_destination, remove_destination, update_destination_duration, update_destination

@@ -45,12 +45,38 @@ def structured_output_callback(
             return bool(part.get("functionResponse"))
         return bool(getattr(part, "function_response", None))
 
-    tool_response_count = sum(
-        1 for msg in llm_request.contents
-        if hasattr(msg, 'parts')
-        for part in msg.parts
-        if _has_tool_response(part)
-    )
+    def _role_name(message):
+        """Extract role name as lowercase string from various message types."""
+        role = getattr(message, "role", None)
+        if role is None and isinstance(message, dict):
+            role = message.get("role")
+
+        # google.genai.types.Content.role may be an enum-like object
+        if hasattr(role, "name"):
+            role = role.name
+
+        if isinstance(role, str):
+            return role.lower()
+        return None
+
+    def _iter_parts(message):
+        """Safely yield parts from message-like objects."""
+        parts = getattr(message, "parts", None)
+        if parts is None and isinstance(message, dict):
+            parts = message.get("parts", [])
+        return parts or []
+
+    tool_response_count = 0
+    for message in reversed(list(llm_request.contents or [])):
+        for part in _iter_parts(message):
+            if _has_tool_response(part):
+                tool_response_count += 1
+
+        role_name = _role_name(message)
+        if role_name == "user":
+            # Stop once we've reached the latest user message so tool counts
+            # are scoped to the current turn.
+            break
 
     if tool_response_count >= 3:
         # Switch to structured output phase (keep tools_dict intact to avoid

@@ -17,6 +17,7 @@
 from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
 import json
+import re
 import time
 import uuid
 import requests
@@ -24,6 +25,7 @@ import os
 from datetime import datetime
 
 from travel_concierge.tools.cost_tracker import CostTrackerService
+from travel_concierge.tools.cost_manager import _to_float
 
 # Determine web directory path
 # In production (Railway), files are at /app/web
@@ -308,6 +310,7 @@ CRITICAL REMINDERS:
         # Check if response contains structured cost research data and extract summary
         final_response_text = response_text
         research_data = None
+        saved_costs = False
 
         import sys
         print(f"\n{'='*80}", flush=True)
@@ -319,154 +322,209 @@ CRITICAL REMINDERS:
         sys.stdout.flush()
 
         try:
-            # Look for JSON with destination_name in the response
-            import re
-            json_match = re.search(r'\{[\s\S]*"destination_name"[\s\S]*\}', response_text)
-            print(f"🔎 JSON match found: {json_match is not None}")
-            if json_match:
-                research_data = json.loads(json_match.group())
-                if 'research_summary' in research_data:
-                    final_response_text = research_data['research_summary']
-                    print(f"✅ Extracted research_summary for chat: {final_response_text[:100]}...")
+            def _extract_cost_research_objects(text: str) -> list[dict]:
+                """Extract all DestinationCostResearch-like JSON objects from the text."""
+                decoder = json.JSONDecoder()
+                idx = 0
+                length = len(text)
+                results = []
 
-                    # Save the research data to Firestore via bulk-save API
+                def _collect(obj):
+                    if isinstance(obj, dict) and "destination_name" in obj:
+                        results.append(obj)
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            _collect(item)
+
+                while idx < length:
+                    char = text[idx]
+                    if char not in ('{', '['):
+                        idx += 1
+                        continue
+
                     try:
-                        # Extract required parameters for bulk save
-                        destination_name = research_data.get('destination_name', 'Unknown Destination')
+                        obj, offset = decoder.raw_decode(text[idx:])
+                    except json.JSONDecodeError:
+                        idx += 1
+                        continue
 
-                        # Generate a stable destination_id from the destination name
-                        # This ensures consistency regardless of array position
-                        def generate_stable_id(name):
-                            """Generate a stable, URL-safe ID from destination name"""
-                            import re
-                            # Remove country suffix if present (e.g., "Okinawa, Japan" -> "Okinawa")
-                            clean_name = name.split(',')[0].strip()
-                            # Convert to lowercase and replace spaces/special chars with underscores
-                            stable_id = re.sub(r'[^a-z0-9]+', '_', clean_name.lower()).strip('_')
-                            return stable_id
+                    if offset <= 0:
+                        idx += 1
+                        continue
 
-                        # Try to find the matching destination_id from context
-                        actual_destination_id = None
-                        matched_destination = None
+                    _collect(obj)
+                    idx += offset
 
-                        print(f"🔎 Looking for destination: '{destination_name}'", flush=True)
-                        print(f"   Context has destinations: {context.get('destinations') is not None}", flush=True)
+                    # Skip whitespace between objects
+                    while idx < length and text[idx].isspace():
+                        idx += 1
 
-                        if context and context.get('destinations'):
-                            for idx, dest in enumerate(context['destinations']):
-                                dest_name = dest.get('name', '') if isinstance(dest, dict) else str(dest)
-                                # Check if destination has an id field, if not check for timestamp-based ID
-                                dest_id = None
-                                if isinstance(dest, dict):
-                                    # Try multiple possible ID field names
-                                    dest_id = dest.get('id') or dest.get('destination_id') or dest.get('arrival_date')
+                return results
 
-                                print(f"   Checking dest[{idx}]: name='{dest_name}', id={dest_id}", flush=True)
+            research_items = _extract_cost_research_objects(response_text)
+            print(f"🔎 Extracted {len(research_items)} cost research object(s)")
 
-                                # Match by name (case-insensitive, partial match)
-                                name_match = (
-                                    destination_name.lower() in dest_name.lower() or
-                                    dest_name.lower() in destination_name.lower()
-                                )
+            summaries = []
+            for research_data in research_items:
+                destination_name = research_data.get('destination_name', 'Unknown Destination')
+                summary = research_data.get('research_summary')
+                if summary:
+                    summaries.append(f"{destination_name}: {summary}")
+                    print(f"✅ Extracted research_summary for chat: {summary[:100]}...")
 
-                                if name_match:
-                                    # If no ID found, generate from arrival_date timestamp or use index
-                                    if dest_id is None:
-                                        # Use arrival_date to generate a stable ID if available
-                                        if isinstance(dest, dict) and dest.get('arrival_date'):
-                                            from datetime import datetime as dt
-                                            # Convert date string to timestamp (milliseconds like 1759377102)
-                                            try:
-                                                date_obj = dt.strptime(dest['arrival_date'], '%Y-%m-%d')
-                                                dest_id = int(date_obj.timestamp() * 1000)
-                                            except:
-                                                dest_id = idx
-                                        else:
+                # Save the research data to Firestore via bulk-save API
+                try:
+                    def normalize_destination_id(raw_id, name):
+                        """Return destination identifiers as stable strings."""
+                        if isinstance(raw_id, str):
+                            ident = raw_id.strip()
+                            if ident:
+                                return ident
+
+                        if raw_id is not None:
+                            return str(raw_id)
+
+                        base_name = (name or "").strip() or "unknown destination"
+                        clean = re.sub(r'[^a-z0-9]+', '_', base_name.lower()).strip('_')
+                        if clean:
+                            return clean
+
+                        # Fallback unique identifier when no usable name exists
+                        return str(uuid.uuid4())
+
+                    # Try to find the matching destination_id from context
+                    actual_destination_id = None
+
+                    print(f"🔎 Looking for destination: '{destination_name}'", flush=True)
+                    print(f"   Context has destinations: {context.get('destinations') is not None}", flush=True)
+
+                    if context and context.get('destinations'):
+                        for idx, dest in enumerate(context['destinations']):
+                            dest_name = dest.get('name', '') if isinstance(dest, dict) else str(dest)
+                            # Check if destination has an id field, if not check for timestamp-based ID
+                            dest_id = None
+                            if isinstance(dest, dict):
+                                # Try multiple possible ID field names
+                                dest_id = dest.get('id') or dest.get('destination_id') or dest.get('arrival_date')
+
+                            print(f"   Checking dest[{idx}]: name='{dest_name}', id={dest_id}", flush=True)
+
+                            # Match by name (case-insensitive, partial match)
+                            name_match = (
+                                destination_name.lower() in dest_name.lower() or
+                                dest_name.lower() in destination_name.lower()
+                            )
+
+                            if name_match:
+                                # If no ID found, generate from arrival_date timestamp or use index
+                                if dest_id is None:
+                                    # Use arrival_date to generate a stable ID if available
+                                    if isinstance(dest, dict) and dest.get('arrival_date'):
+                                        from datetime import datetime as dt
+                                        # Convert date string to timestamp (milliseconds like 1759377102)
+                                        try:
+                                            date_obj = dt.strptime(dest['arrival_date'], '%Y-%m-%d')
+                                            dest_id = int(date_obj.timestamp() * 1000)
+                                        except Exception:
                                             dest_id = idx
+                                    else:
+                                        dest_id = idx
 
-                                    actual_destination_id = dest_id
-                                    matched_destination = dest_name
-                                    print(f"🎯 MATCHED '{destination_name}' to '{dest_name}' -> ID {actual_destination_id}", flush=True)
-                                    break
+                                actual_destination_id = normalize_destination_id(dest_id, dest_name)
+                                print(f"🎯 MATCHED '{destination_name}' to '{dest_name}' -> ID {actual_destination_id}", flush=True)
+                                break
 
-                        if actual_destination_id is None:
-                            # Fallback: generate a stable ID from the name
-                            actual_destination_id = generate_stable_id(destination_name)
-                            print(f"⚠️ Could not match '{destination_name}' to any destination in context", flush=True)
-                            if context and context.get('destinations'):
-                                print(f"   Available: {[(i, d.get('name') if isinstance(d, dict) else d) for i, d in enumerate(context.get('destinations', []))]}", flush=True)
-                            print(f"   Generated stable ID: '{actual_destination_id}'", flush=True)
+                    if actual_destination_id is None:
+                        # Fallback: generate a stable ID from the name
+                        actual_destination_id = normalize_destination_id(None, destination_name)
+                        print(f"⚠️ Could not match '{destination_name}' to any destination in context", flush=True)
+                        if context and context.get('destinations'):
+                            print(f"   Available: {[(i, d.get('name') if isinstance(d, dict) else d) for i, d in enumerate(context.get('destinations', []))]}", flush=True)
+                        print(f"   Generated stable ID: '{actual_destination_id}'", flush=True)
 
-                        print(f"📍 Final destination_id for save: {actual_destination_id}")
+                    print(f"📍 Final destination_id for save: {actual_destination_id}")
 
-                        # Build cost_items similar to save_researched_costs tool
-                        categories_map = {
-                            'accommodation': 'accommodation',
-                            'flights': 'flight',
-                            'activities': 'activity',
-                            'food_daily': 'food',
-                            'transport_daily': 'transport'
-                        }
+                    # Build cost_items similar to save_researched_costs tool
+                    categories_map = {
+                        'accommodation': 'accommodation',
+                        'flights': 'flight',
+                        'activities': 'activity',
+                        'food_daily': 'food',
+                        'transport_daily': 'transport'
+                    }
 
-                        cost_items = []
-                        for research_cat, itinerary_cat in categories_map.items():
-                            if research_cat not in research_data:
-                                continue
-                            cat_data = research_data.get(research_cat) or {}
+                    cost_items = []
+                    for research_cat, itinerary_cat in categories_map.items():
+                        if research_cat not in research_data:
+                            continue
+                        cat_data = research_data.get(research_cat) or {}
 
-                            base_usd = float(cat_data.get('amount_mid', 0) or 0)
-                            base_local = float(cat_data.get('amount_local', 0) or 0)
-                            currency_local = cat_data.get('currency_local', 'USD')
+                        base_usd = _to_float(cat_data.get('amount_mid', 0))
+                        base_local = _to_float(cat_data.get('amount_local', 0))
+                        currency_local = cat_data.get('currency_local', 'USD')
 
-                            # Generate stable cost item ID
-                            cost_id = f"{actual_destination_id}_{itinerary_cat}"
+                        # Generate stable cost item ID
+                        cost_id = f"{actual_destination_id}_{itinerary_cat}"
 
-                            cost_items.append({
-                                'id': cost_id,
-                                'category': itinerary_cat,
-                                'amount': base_local if base_local else base_usd,
-                                'currency': currency_local,
-                                'amount_usd': base_usd,
-                                'destination_id': actual_destination_id,
-                                'booking_status': 'researched',
-                                'source': 'cost_research',
-                                'confidence': cat_data.get('confidence', 'medium'),
-                                'notes': cat_data.get('notes', ''),
-                                'researched_at': cat_data.get('researched_at', datetime.now().isoformat())
-                            })
+                        cost_items.append({
+                            'id': cost_id,
+                            'category': itinerary_cat,
+                            'amount': base_local if base_local else base_usd,
+                            'currency': currency_local,
+                            'amount_usd': base_usd,
+                            'destination_id': actual_destination_id,
+                            'booking_status': 'researched',
+                            'source': 'cost_research',
+                            'confidence': cat_data.get('confidence', 'medium'),
+                            'notes': cat_data.get('notes', ''),
+                            'researched_at': cat_data.get('researched_at', datetime.now().isoformat())
+                        })
 
-                        # Call bulk save API (using the same Flask server on port 5001)
-                        save_url = "http://127.0.0.1:5001/api/costs/bulk-save"
-                        save_resp = requests.post(
-                            save_url,
-                            json={
-                                'session_id': session_id,
-                                'scenario_id': scenario_id or 'current',  # Use scenario_id from context
-                                'destination_id': actual_destination_id,  # Use matched destination ID
-                                'destination_name': destination_name,
-                                'cost_items': cost_items,
-                            },
-                            timeout=30,
-                        )
-                        if save_resp.status_code == 200:
-                            print(f"✅ Saved cost research data to Firestore:", flush=True)
-                            print(f"   Destination: {destination_name}", flush=True)
-                            print(f"   Destination ID: {actual_destination_id}", flush=True)
-                            print(f"   Cost items: {len(cost_items)}", flush=True)
-                        else:
-                            print(f"⚠️ Failed to save cost data: {save_resp.status_code}", flush=True)
-                            print(f"   Response: {save_resp.text[:200]}", flush=True)
-                    except Exception as save_error:
-                        print(f"⚠️ Error saving cost research to Firestore: {save_error}")
+                    if not cost_items:
+                        print(f"⚠️ No cost items generated for {destination_name}", flush=True)
+                        continue
+
+                    # Call bulk save API (using the same Flask server on port 5001)
+                    save_url = "http://127.0.0.1:5001/api/costs/bulk-save"
+                    save_resp = requests.post(
+                        save_url,
+                        json={
+                            'session_id': session_id,
+                            'scenario_id': scenario_id or 'current',  # Use scenario_id from context
+                            'destination_id': actual_destination_id,  # Use matched destination ID
+                            'destination_name': destination_name,
+                            'cost_items': cost_items,
+                        },
+                        timeout=30,
+                    )
+                    if save_resp.status_code == 200:
+                        print(f"✅ Saved cost research data to Firestore:", flush=True)
+                        print(f"   Destination: {destination_name}", flush=True)
+                        print(f"   Destination ID: {actual_destination_id}", flush=True)
+                        print(f"   Cost items: {len(cost_items)}", flush=True)
+                        saved_costs = True
+                    else:
+                        print(f"⚠️ Failed to save cost data: {save_resp.status_code}", flush=True)
+                        print(f"   Response: {save_resp.text[:200]}", flush=True)
+                except Exception as save_error:
+                    import traceback
+                    print(f"⚠️ Error saving cost research to Firestore: {save_error}")
+                    print(f"   Traceback: {traceback.format_exc()}")
+
+            if summaries:
+                final_response_text = "\n\n".join(summaries)
 
         except Exception as e:
+            import traceback
             print(f"⚠️ Could not extract research_summary from response: {e}")
+            print(f"   Traceback: {traceback.format_exc()}")
             final_response_text = response_text
 
         return jsonify({
-            'response': final_response_text or 'No response generated',
+            'response': final_response_text or response_text or 'No response generated',
             'session_id': session_id,
-            'status': 'success'
+            'status': 'success',
+            'saved_to_firestore': saved_costs
         })
 
     except requests.exceptions.ConnectionError:
@@ -902,7 +960,7 @@ def get_costs():
     """Get all costs or filtered costs."""
     try:
         session_id = request.args.get('session_id', 'default')
-        destination_id = request.args.get('destination_id', type=int)
+        destination_id = request.args.get('destination_id')
         category = request.args.get('category')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
@@ -996,7 +1054,7 @@ def bulk_save_costs():
     {
         "session_id": "session_abc123",
         "scenario_id": "scenario_xyz789",
-        "destination_id": 10,
+        "destination_id": "tokyo_japan",
         "destination_name": "Tokyo, Japan",
         "cost_items": [
             {
@@ -1006,7 +1064,7 @@ def bulk_save_costs():
                 "amount": 1750.0,
                 "currency": "USD",
                 "amount_usd": 1750.0,
-                "destination_id": 10,
+                "destination_id": "tokyo_japan",
                 "booking_status": "estimated",
                 "source": "web_research",
                 "notes": "7 nights for 3 people"
@@ -1025,7 +1083,8 @@ def bulk_save_costs():
         data = request.json
         session_id = data.get('session_id')
         scenario_id = data.get('scenario_id')
-        destination_id = data.get('destination_id')
+        raw_destination_id = data.get('destination_id')
+        destination_id = str(raw_destination_id).strip() if raw_destination_id is not None else None
         destination_name = data.get('destination_name')
         cost_items = data.get('cost_items', [])
 
@@ -1045,6 +1104,14 @@ def bulk_save_costs():
             }), 400
 
         print(f"💾 Bulk saving {len(cost_items)} costs for {destination_name} (ID: {destination_id})")
+
+        # Ensure each cost item carries a string destination_id
+        for item in cost_items:
+            item_dest_id = item.get('destination_id')
+            if item_dest_id is None and destination_id is not None:
+                item['destination_id'] = destination_id
+            elif item_dest_id is not None:
+                item['destination_id'] = str(item_dest_id).strip() or destination_id
 
         # Initialize Firestore
         db = firestore.Client()
@@ -1082,8 +1149,17 @@ def bulk_save_costs():
             # Remove existing costs for this destination from version
             version_filtered_costs = [
                 c for c in version_costs
-                if c.get('destination_id') != destination_id
+                if str(c.get('destination_id')).strip() != destination_id
             ]
+
+            # Normalize destination_id to strings on remaining costs
+            normalized_existing_costs = []
+            for item in version_filtered_costs:
+                item_copy = dict(item)
+                if 'destination_id' in item_copy and item_copy['destination_id'] is not None:
+                    item_copy['destination_id'] = str(item_copy['destination_id']).strip()
+                normalized_existing_costs.append(item_copy)
+            version_filtered_costs = normalized_existing_costs
 
             # Add new costs
             version_filtered_costs.extend(cost_items)
@@ -1139,7 +1215,7 @@ def bulk_save_costs():
             totals_by_category = {}
             for item in version_filtered_costs:
                 cat = item.get('category', 'other')
-                totals_by_category[cat] = totals_by_category.get(cat, 0.0) + float(item.get('amount_usd', 0) or 0)
+                totals_by_category[cat] = totals_by_category.get(cat, 0.0) + _to_float(item.get('amount_usd', 0))
             scenario_ref.update({
                 'updatedAt': firestore.SERVER_TIMESTAMP,
                 'costsCount': len(version_filtered_costs),
@@ -1239,7 +1315,7 @@ def research_costs():
         "session_id": "session_abc123",
         "scenario_id": "scenario_xyz789",  # REQUIRED for saving to Firestore
         "destination_name": "Bangkok, Thailand",
-        "destination_id": 5,
+        "destination_id": "bangkok_thailand",
         "duration_days": 7,
         "arrival_date": "2026-07-15",
         "departure_date": "2026-07-22",
@@ -1415,8 +1491,8 @@ For each category, provide low/mid/high estimates with sources.
                         continue
                     cat_data = research_result.get(research_cat) or {}
 
-                    base_usd = float(cat_data.get('amount_mid', 0) or 0)
-                    base_local = float(cat_data.get('amount_local', 0) or 0)
+                    base_usd = _to_float(cat_data.get('amount_mid', 0))
+                    base_local = _to_float(cat_data.get('amount_local', 0))
                     currency_local = cat_data.get('currency_local', 'USD')
 
                     multiplier = 1
@@ -1581,3 +1657,18 @@ def serve_static(path):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
+def _to_float(value) -> float:
+    """Best-effort conversion of mixed values to floats."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        stripped = value.strip().replace(',', '')
+        try:
+            return float(stripped)
+        except ValueError:
+            return 0.0
+    if isinstance(value, dict):
+        for key in ("amount_mid", "amount", "value"):
+            if key in value:
+                return _to_float(value[key])
+    return 0.0

@@ -23,7 +23,7 @@
       "currency": "USD",
       "amount_usd": 1680.0,
       "date": "2026-06-13",
-      "destination_id": 2,
+      "destination_id": "2",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -36,7 +36,7 @@
       "currency": "USD",
       "amount_usd": 240.0,
       "date": "2026-06-13",
-      "destination_id": 2,
+      "destination_id": "2",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -49,7 +49,7 @@
       "currency": "USD",
       "amount_usd": 120.0,
       "date": "2026-06-13",
-      "destination_id": 2,
+      "destination_id": "2",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -62,7 +62,7 @@
       "currency": "USD",
       "amount_usd": 240.0,
       "date": "2026-06-13",
-      "destination_id": 2,
+      "destination_id": "2",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -75,7 +75,7 @@
       "currency": "USD",
       "amount_usd": 367.5,
       "date": "2026-06-13",
-      "destination_id": 2,
+      "destination_id": "2",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -88,7 +88,7 @@
       "currency": "USD",
       "amount_usd": 147.0,
       "date": "2026-06-13",
-      "destination_id": 2,
+      "destination_id": "2",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -101,7 +101,7 @@
       "currency": "USD",
       "amount_usd": 220.49999999999997,
       "date": "2026-06-13",
-      "destination_id": 2,
+      "destination_id": "2",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -114,7 +114,7 @@
       "currency": "USD",
       "amount_usd": 450,
       "date": "2026-06-19",
-      "destination_id": 3,
+      "destination_id": "3",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -127,7 +127,7 @@
       "currency": "USD",
       "amount_usd": 1008.0,
       "date": "2026-06-19",
-      "destination_id": 3,
+      "destination_id": "3",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -140,7 +140,7 @@
       "currency": "USD",
       "amount_usd": 960.0,
       "date": "2026-06-19",
-      "destination_id": 3,
+      "destination_id": "3",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -153,7 +153,7 @@
       "currency": "USD",
       "amount_usd": 240.0,
       "date": "2026-06-19",
-      "destination_id": 3,
+      "destination_id": "3",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -166,7 +166,7 @@
       "currency": "USD",
       "amount_usd": 367.5,
       "date": "2026-06-19",
-      "destination_id": 3,
+      "destination_id": "3",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -179,7 +179,7 @@
       "currency": "USD",
       "amount_usd": 147.0,
       "date": "2026-06-19",
-      "destination_id": 3,
+      "destination_id": "3",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -192,7 +192,7 @@
       "currency": "USD",
       "amount_usd": 220.49999999999997,
       "date": "2026-06-19",
-      "destination_id": 3,
+      "destination_id": "3",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -205,7 +205,7 @@
       "currency": "USD",
       "amount_usd": 1500,
       "date": "2026-06-26",
-      "destination_id": 4,
+      "destination_id": "4",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -218,7 +218,7 @@
       "currency": "USD",
       "amount_usd": 1680.0,
       "date": "2026-06-26",
-      "destination_id": 4,
+      "destination_id": "4",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -231,7 +231,7 @@
       "currency": "USD",
       "amount_usd": 1200.0,
       "date": "2026-06-26",
-      "destination_id": 4,
+      "destination_id": "4",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -244,7 +244,7 @@
       "currency": "USD",
       "amount_usd": 300.0,
       "date": "2026-06-26",
-      "destination_id": 4,
+      "destination_id": "4",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -257,7 +257,7 @@
       "currency": "USD",
       "amount_usd": 1050.0,
       "date": "2026-06-26",
-      "destination_id": 4,
+      "destination_id": "4",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -270,7 +270,7 @@
       "currency": "USD",
       "amount_usd": 420.0,
       "date": "2026-06-26",
-      "destination_id": 4,
+      "destination_id": "4",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -283,7 +283,7 @@
       "currency": "USD",
       "amount_usd": 630.0,
       "date": "2026-06-26",
-      "destination_id": 4,
+      "destination_id": "4",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -296,7 +296,7 @@
       "currency": "USD",
       "amount_usd": 1500,
       "date": "2026-07-03",
-      "destination_id": 5,
+      "destination_id": "5",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -309,7 +309,7 @@
       "currency": "USD",
       "amount_usd": 1512.0,
       "date": "2026-07-03",
-      "destination_id": 5,
+      "destination_id": "5",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -322,7 +322,7 @@
       "currency": "USD",
       "amount_usd": 1080.0,
       "date": "2026-07-03",
-      "destination_id": 5,
+      "destination_id": "5",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -335,7 +335,7 @@
       "currency": "USD",
       "amount_usd": 270.0,
       "date": "2026-07-03",
-      "destination_id": 5,
+      "destination_id": "5",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -348,7 +348,7 @@
       "currency": "USD",
       "amount_usd": 540.0,
       "date": "2026-07-03",
-      "destination_id": 5,
+      "destination_id": "5",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -361,7 +361,7 @@
       "currency": "USD",
       "amount_usd": 216.0,
       "date": "2026-07-03",
-      "destination_id": 5,
+      "destination_id": "5",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -374,7 +374,7 @@
       "currency": "USD",
       "amount_usd": 324.0,
       "date": "2026-07-03",
-      "destination_id": 5,
+      "destination_id": "5",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -387,7 +387,7 @@
       "currency": "USD",
       "amount_usd": 450,
       "date": "2026-07-12",
-      "destination_id": 6,
+      "destination_id": "6",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -400,7 +400,7 @@
       "currency": "USD",
       "amount_usd": 1120.0,
       "date": "2026-07-12",
-      "destination_id": 6,
+      "destination_id": "6",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -413,7 +413,7 @@
       "currency": "USD",
       "amount_usd": 96.0,
       "date": "2026-07-12",
-      "destination_id": 6,
+      "destination_id": "6",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -426,7 +426,7 @@
       "currency": "USD",
       "amount_usd": 72.0,
       "date": "2026-07-12",
-      "destination_id": 6,
+      "destination_id": "6",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -439,7 +439,7 @@
       "currency": "USD",
       "amount_usd": 96.0,
       "date": "2026-07-12",
-      "destination_id": 6,
+      "destination_id": "6",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -452,7 +452,7 @@
       "currency": "USD",
       "amount_usd": 840.0,
       "date": "2026-07-12",
-      "destination_id": 6,
+      "destination_id": "6",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -465,7 +465,7 @@
       "currency": "USD",
       "amount_usd": 336.0,
       "date": "2026-07-12",
-      "destination_id": 6,
+      "destination_id": "6",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -478,7 +478,7 @@
       "currency": "USD",
       "amount_usd": 503.99999999999994,
       "date": "2026-07-12",
-      "destination_id": 6,
+      "destination_id": "6",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -491,7 +491,7 @@
       "currency": "USD",
       "amount_usd": 450,
       "date": "2026-07-14",
-      "destination_id": 7,
+      "destination_id": "7",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -504,7 +504,7 @@
       "currency": "USD",
       "amount_usd": 768.0,
       "date": "2026-07-14",
-      "destination_id": 7,
+      "destination_id": "7",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -517,7 +517,7 @@
       "currency": "USD",
       "amount_usd": 400.0,
       "date": "2026-07-14",
-      "destination_id": 7,
+      "destination_id": "7",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -530,7 +530,7 @@
       "currency": "USD",
       "amount_usd": 200.0,
       "date": "2026-07-14",
-      "destination_id": 7,
+      "destination_id": "7",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -543,7 +543,7 @@
       "currency": "USD",
       "amount_usd": 240.0,
       "date": "2026-07-14",
-      "destination_id": 7,
+      "destination_id": "7",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -556,7 +556,7 @@
       "currency": "USD",
       "amount_usd": 96.0,
       "date": "2026-07-14",
-      "destination_id": 7,
+      "destination_id": "7",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -569,7 +569,7 @@
       "currency": "USD",
       "amount_usd": 144.0,
       "date": "2026-07-14",
-      "destination_id": 7,
+      "destination_id": "7",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -582,7 +582,7 @@
       "currency": "USD",
       "amount_usd": 450,
       "date": "2026-07-18",
-      "destination_id": 8,
+      "destination_id": "8",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -595,7 +595,7 @@
       "currency": "USD",
       "amount_usd": 20.0,
       "date": "2026-07-18",
-      "destination_id": 8,
+      "destination_id": "8",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -608,7 +608,7 @@
       "currency": "USD",
       "amount_usd": 60.0,
       "date": "2026-07-18",
-      "destination_id": 8,
+      "destination_id": "8",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -621,7 +621,7 @@
       "currency": "USD",
       "amount_usd": 24.0,
       "date": "2026-07-18",
-      "destination_id": 8,
+      "destination_id": "8",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -634,7 +634,7 @@
       "currency": "USD",
       "amount_usd": 36.0,
       "date": "2026-07-18",
-      "destination_id": 8,
+      "destination_id": "8",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -647,7 +647,7 @@
       "currency": "USD",
       "amount_usd": 900,
       "date": "2026-07-19",
-      "destination_id": 9,
+      "destination_id": "9",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -660,7 +660,7 @@
       "currency": "USD",
       "amount_usd": 1200.0,
       "date": "2026-07-19",
-      "destination_id": 9,
+      "destination_id": "9",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -673,7 +673,7 @@
       "currency": "USD",
       "amount_usd": 120.0,
       "date": "2026-07-19",
-      "destination_id": 9,
+      "destination_id": "9",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -686,7 +686,7 @@
       "currency": "USD",
       "amount_usd": 90.0,
       "date": "2026-07-19",
-      "destination_id": 9,
+      "destination_id": "9",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -699,7 +699,7 @@
       "currency": "USD",
       "amount_usd": 120.0,
       "date": "2026-07-19",
-      "destination_id": 9,
+      "destination_id": "9",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -712,7 +712,7 @@
       "currency": "USD",
       "amount_usd": 450.0,
       "date": "2026-07-19",
-      "destination_id": 9,
+      "destination_id": "9",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -725,7 +725,7 @@
       "currency": "USD",
       "amount_usd": 180.0,
       "date": "2026-07-19",
-      "destination_id": 9,
+      "destination_id": "9",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -738,7 +738,7 @@
       "currency": "USD",
       "amount_usd": 270.0,
       "date": "2026-07-19",
-      "destination_id": 9,
+      "destination_id": "9",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -751,7 +751,7 @@
       "currency": "USD",
       "amount_usd": 600,
       "date": "2026-08-14",
-      "destination_id": 11,
+      "destination_id": "11",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -764,7 +764,7 @@
       "currency": "USD",
       "amount_usd": 2800.0,
       "date": "2026-08-14",
-      "destination_id": 11,
+      "destination_id": "11",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -777,7 +777,7 @@
       "currency": "USD",
       "amount_usd": 300.0,
       "date": "2026-08-14",
-      "destination_id": 11,
+      "destination_id": "11",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -790,7 +790,7 @@
       "currency": "USD",
       "amount_usd": 150.0,
       "date": "2026-08-14",
-      "destination_id": 11,
+      "destination_id": "11",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -803,7 +803,7 @@
       "currency": "USD",
       "amount_usd": 300.0,
       "date": "2026-08-14",
-      "destination_id": 11,
+      "destination_id": "11",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -816,7 +816,7 @@
       "currency": "USD",
       "amount_usd": 1050.0,
       "date": "2026-08-14",
-      "destination_id": 11,
+      "destination_id": "11",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -829,7 +829,7 @@
       "currency": "USD",
       "amount_usd": 420.0,
       "date": "2026-08-14",
-      "destination_id": 11,
+      "destination_id": "11",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -842,7 +842,7 @@
       "currency": "USD",
       "amount_usd": 630.0,
       "date": "2026-08-14",
-      "destination_id": 11,
+      "destination_id": "11",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -855,7 +855,7 @@
       "currency": "USD",
       "amount_usd": 600,
       "date": "2026-08-21",
-      "destination_id": 12,
+      "destination_id": "12",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -868,7 +868,7 @@
       "currency": "USD",
       "amount_usd": 9200.0,
       "date": "2026-08-21",
-      "destination_id": 12,
+      "destination_id": "12",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -881,7 +881,7 @@
       "currency": "USD",
       "amount_usd": 300.0,
       "date": "2026-08-21",
-      "destination_id": 12,
+      "destination_id": "12",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -894,7 +894,7 @@
       "currency": "USD",
       "amount_usd": 150.0,
       "date": "2026-08-21",
-      "destination_id": 12,
+      "destination_id": "12",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -907,7 +907,7 @@
       "currency": "USD",
       "amount_usd": 300.0,
       "date": "2026-08-21",
-      "destination_id": 12,
+      "destination_id": "12",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -920,7 +920,7 @@
       "currency": "USD",
       "amount_usd": 3450.0,
       "date": "2026-08-21",
-      "destination_id": 12,
+      "destination_id": "12",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -933,7 +933,7 @@
       "currency": "USD",
       "amount_usd": 1380.0,
       "date": "2026-08-21",
-      "destination_id": 12,
+      "destination_id": "12",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -946,7 +946,7 @@
       "currency": "USD",
       "amount_usd": 2070.0,
       "date": "2026-08-21",
-      "destination_id": 12,
+      "destination_id": "12",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -959,7 +959,7 @@
       "currency": "USD",
       "amount_usd": 1200,
       "date": "2026-09-13",
-      "destination_id": 13,
+      "destination_id": "13",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -972,7 +972,7 @@
       "currency": "USD",
       "amount_usd": 1248.0,
       "date": "2026-09-13",
-      "destination_id": 13,
+      "destination_id": "13",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -985,7 +985,7 @@
       "currency": "USD",
       "amount_usd": 540.0,
       "date": "2026-09-13",
-      "destination_id": 13,
+      "destination_id": "13",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -998,7 +998,7 @@
       "currency": "USD",
       "amount_usd": 270.0,
       "date": "2026-09-13",
-      "destination_id": 13,
+      "destination_id": "13",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -1011,7 +1011,7 @@
       "currency": "USD",
       "amount_usd": 780.0,
       "date": "2026-09-13",
-      "destination_id": 13,
+      "destination_id": "13",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -1024,7 +1024,7 @@
       "currency": "USD",
       "amount_usd": 312.0,
       "date": "2026-09-13",
-      "destination_id": 13,
+      "destination_id": "13",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -1037,7 +1037,7 @@
       "currency": "USD",
       "amount_usd": 468.0,
       "date": "2026-09-13",
-      "destination_id": 13,
+      "destination_id": "13",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -1050,7 +1050,7 @@
       "currency": "USD",
       "amount_usd": 1500,
       "date": "2026-09-26",
-      "destination_id": 14,
+      "destination_id": "14",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -1063,7 +1063,7 @@
       "currency": "USD",
       "amount_usd": 3200.0,
       "date": "2026-09-26",
-      "destination_id": 14,
+      "destination_id": "14",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -1076,7 +1076,7 @@
       "currency": "USD",
       "amount_usd": 270.0,
       "date": "2026-09-26",
-      "destination_id": 14,
+      "destination_id": "14",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -1089,7 +1089,7 @@
       "currency": "USD",
       "amount_usd": 135.0,
       "date": "2026-09-26",
-      "destination_id": 14,
+      "destination_id": "14",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -1102,7 +1102,7 @@
       "currency": "USD",
       "amount_usd": 270.0,
       "date": "2026-09-26",
-      "destination_id": 14,
+      "destination_id": "14",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -1115,7 +1115,7 @@
       "currency": "USD",
       "amount_usd": 1050.0,
       "date": "2026-09-26",
-      "destination_id": 14,
+      "destination_id": "14",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -1128,7 +1128,7 @@
       "currency": "USD",
       "amount_usd": 420.0,
       "date": "2026-09-26",
-      "destination_id": 14,
+      "destination_id": "14",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -1141,7 +1141,7 @@
       "currency": "USD",
       "amount_usd": 629.9999999999999,
       "date": "2026-09-26",
-      "destination_id": 14,
+      "destination_id": "14",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -1154,7 +1154,7 @@
       "currency": "USD",
       "amount_usd": 1500,
       "date": "2026-10-06",
-      "destination_id": 15,
+      "destination_id": "15",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated flight cost"
@@ -1167,7 +1167,7 @@
       "currency": "USD",
       "amount_usd": 160.0,
       "date": "2026-10-06",
-      "destination_id": 15,
+      "destination_id": "15",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated accommodation cost"
@@ -1180,7 +1180,7 @@
       "currency": "USD",
       "amount_usd": 72.0,
       "date": "2026-10-06",
-      "destination_id": 15,
+      "destination_id": "15",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated activity cost"
@@ -1193,7 +1193,7 @@
       "currency": "USD",
       "amount_usd": 240.0,
       "date": "2026-10-06",
-      "destination_id": 15,
+      "destination_id": "15",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated daily food costs"
@@ -1206,7 +1206,7 @@
       "currency": "USD",
       "amount_usd": 96.0,
       "date": "2026-10-06",
-      "destination_id": 15,
+      "destination_id": "15",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated local transport costs"
@@ -1219,7 +1219,7 @@
       "currency": "USD",
       "amount_usd": 144.0,
       "date": "2026-10-06",
-      "destination_id": 15,
+      "destination_id": "15",
       "booking_status": "estimated",
       "source": "ai_estimate",
       "notes": "Estimated miscellaneous costs"
@@ -1232,7 +1232,7 @@
       "currency": "JPY",
       "amount_usd": 1750.0,
       "date": "2026-07-22",
-      "destination_id": 10,
+      "destination_id": "10",
       "booking_status": "researched",
       "source": "web_research",
       "notes": "Prices for 3 people can be higher due to limited triple rooms; booking two separate rooms might be an alternative. Booking in advance is recommended, especially for mid-range and luxury options. Airbnb can offer more space for groups at a potentially lower cost than hotels, but prices vary greatly. (Estimates based on 7 nights for 3 people)"
@@ -1245,7 +1245,7 @@
       "currency": "JPY",
       "amount_usd": 945.0,
       "date": "2026-07-22",
-      "destination_id": 10,
+      "destination_id": "10",
       "booking_status": "researched",
       "source": "web_research",
       "notes": "Estimates are for 3 people for 7 days. Eating at local eateries, convenience stores, and street food stalls can significantly reduce costs. Mid-range includes a mix of casual restaurants and some nicer meals. High-end includes frequent dining at more expensive restaurants."
@@ -1258,7 +1258,7 @@
       "currency": "JPY",
       "amount_usd": 210.0,
       "date": "2026-07-22",
-      "destination_id": 10,
+      "destination_id": "10",
       "booking_status": "researched",
       "source": "web_research",
       "notes": "Estimates are for 3 people for 7 days. Purchasing a Tokyo Subway Ticket can offer significant savings. Walking is also a great way to explore. Taxis are expensive, especially for longer distances."
@@ -1271,7 +1271,7 @@
       "currency": "JPY",
       "amount_usd": 675.0,
       "date": "2026-07-22",
-      "destination_id": 10,
+      "destination_id": "10",
       "booking_status": "researched",
       "source": "web_research",
       "notes": "Estimates are for 3 people for 7 days. Many temples, shrines, and parks are free to enter. Consider purchasing a Tokyo Pass for discounts on multiple attractions. Booking popular tours or experiences in advance is recommended."
@@ -1284,7 +1284,7 @@
       "currency": "JPY",
       "amount_usd": 1950.0,
       "date": "2026-07-22",
-      "destination_id": 10,
+      "destination_id": "10",
       "booking_status": "researched",
       "source": "web_research",
       "notes": "Flight estimates are for a round trip from Los Angeles (LAX) to Tokyo (NRT/HND) for 3 travelers. Prices can vary significantly based on origin city, booking time, and seasonality. Booking 2-6 months in advance is recommended."

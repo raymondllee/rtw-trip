@@ -246,7 +246,7 @@ class CostItem(BaseModel):
         description="Cost amount converted to USD for aggregation"
     )
     date: str = Field(description="Date of expense in YYYY-MM-DD format")
-    destination_id: Optional[int] = Field(
+    destination_id: Optional[str] = Field(
         default=None, description="ID of the associated destination/location"
     )
     booking_status: str = Field(
@@ -272,7 +272,7 @@ class CostsByCategory(BaseModel):
 
 class DestinationCost(BaseModel):
     """Aggregated costs for a destination."""
-    destination_id: int = Field(description="ID of the destination")
+    destination_id: str = Field(description="ID of the destination")
     destination_name: str = Field(description="Name of the destination")
     costs_by_category: CostsByCategory
     total_usd: float = Field(description="Total costs for this destination in USD")
@@ -305,7 +305,7 @@ class CostSummary(BaseModel):
 class CostResearchRequest(BaseModel):
     """Request to research costs for a specific destination."""
     destination_name: str = Field(description="Full destination name (e.g., 'Bangkok, Thailand')")
-    destination_id: int = Field(description="ID linking to itinerary destination")
+    destination_id: str = Field(description="ID linking to itinerary destination")
     duration_days: int = Field(description="Number of days staying in this destination")
     arrival_date: str = Field(description="Arrival date in YYYY-MM-DD format")
     departure_date: str = Field(description="Departure date in YYYY-MM-DD format")
@@ -349,7 +349,7 @@ class CostResearchResult(BaseModel):
 
 class DestinationCostResearch(BaseModel):
     """Complete cost research results for a destination."""
-    destination_id: int = Field(description="ID of the destination")
+    destination_id: str = Field(description="ID of the destination")
     destination_name: str = Field(description="Name of the destination")
     accommodation: CostResearchResult = Field(
         description="Accommodation costs (total for stay)"

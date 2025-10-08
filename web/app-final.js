@@ -2093,9 +2093,17 @@ async function initMapApp() {
     }
   });
 
-  // Update cost summary when costs change
+  // Update itinerary data and cost summary when costs change
   window.addEventListener('costs-updated', async () => {
-    await updateCostSummary();
+    try {
+      if (currentScenarioId) {
+        await window.loadScenarioById(currentScenarioId);
+      }
+    } catch (error) {
+      console.error('Error refreshing scenario after cost update:', error);
+    } finally {
+      await updateCostSummary();
+    }
   });
 
   async function updateCostSummary() {

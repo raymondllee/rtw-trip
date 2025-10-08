@@ -102,24 +102,6 @@ def save_researched_costs(
     # Keep destination identifiers as strings for downstream systems
     destination_id = _coerce_destination_id(destination_id, destination_name)
 
-    # Local fallback converter in case globals aren't available in certain runtimes
-    def _to_float_local(value) -> float:
-        if isinstance(value, (int, float)):
-            return float(value)
-        if isinstance(value, str):
-            stripped = value.strip().replace(',', '')
-            try:
-                return float(stripped)
-            except ValueError:
-                return 0.0
-        if isinstance(value, dict):
-            for key in ("amount_mid", "amount", "value"):
-                if key in value:
-                    return _to_float_local(value[key])
-        return 0.0
-
-    to_float = globals().get("_to_float", _to_float_local)
-
     # Convert research data to cost items
     cost_items = []
 
@@ -138,8 +120,8 @@ def save_researched_costs(
         cat_data = research_data[research_cat] or {}
 
         # Base values from research output (mid is the primary estimate)
-        base_usd = to_float(cat_data.get('amount_mid', 0))
-        base_local = to_float(cat_data.get('amount_local', 0))
+        base_usd = _to_float(cat_data.get('amount_mid', 0))
+        base_local = _to_float(cat_data.get('amount_local', 0))
         currency_local = cat_data.get('currency_local', 'USD')
 
         # Scale per category semantics:

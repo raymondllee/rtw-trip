@@ -135,7 +135,7 @@ class CostTrackerService:
         amount: float,
         currency: str,
         date: str,
-        destination_id: Optional[int] = None,
+        destination_id: Optional[str] = None,
         booking_status: str = "estimated",
         source: str = "manual",
         notes: Optional[str] = None,
@@ -143,6 +143,11 @@ class CostTrackerService:
         """Add a new cost item."""
         # Convert to USD
         amount_usd = self.converter.convert_to_usd(amount, currency)
+
+        dest_id_str = None
+        if destination_id is not None:
+            dest_id_candidate = str(destination_id).strip()
+            dest_id_str = dest_id_candidate if dest_id_candidate else None
 
         # Create cost item
         cost = CostItem(
@@ -153,7 +158,7 @@ class CostTrackerService:
             currency=currency,
             amount_usd=amount_usd,
             date=date,
-            destination_id=destination_id,
+            destination_id=dest_id_str,
             booking_status=booking_status,
             source=source,
             notes=notes,
@@ -198,7 +203,7 @@ class CostTrackerService:
 
     def filter_costs(
         self,
-        destination_id: Optional[int] = None,
+        destination_id: Optional[str] = None,
         category: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
@@ -207,7 +212,11 @@ class CostTrackerService:
         filtered = self.costs
 
         if destination_id is not None:
-            filtered = [c for c in filtered if c.destination_id == destination_id]
+            dest_id_norm = str(destination_id).strip()
+            filtered = [
+                c for c in filtered
+                if (str(c.destination_id).strip() if c.destination_id is not None else None) == dest_id_norm
+            ]
         if category:
             filtered = [c for c in filtered if c.category == category]
         if start_date:
@@ -249,11 +258,12 @@ class CostTrackerService:
 
         for dest in destinations:
             dest_id = dest.get("id")
+            dest_id_str = str(dest_id).strip() if dest_id is not None else None
             dest_name = dest.get("name", "Unknown")
             duration_days = dest.get("duration_days", 0)
 
             # Get costs for this destination
-            dest_costs = self.filter_costs(destination_id=dest_id)
+            dest_costs = self.filter_costs(destination_id=dest_id_str)
             total_usd = sum(c.amount_usd for c in dest_costs)
             costs_by_category = self.calculate_costs_by_category(dest_costs)
 
@@ -269,7 +279,7 @@ class CostTrackerService:
 
             result.append(
                 DestinationCost(
-                    destination_id=dest_id,
+                    destination_id=dest_id_str or "unknown_destination",
                     destination_name=dest_name,
                     costs_by_category=costs_by_category,
                     total_usd=total_usd,
