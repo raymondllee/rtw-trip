@@ -1,11 +1,15 @@
 #!/bin/bash
 
 # Railway startup script for RTW Trip application
-# This script starts both the ADK API server and the Flask API server
+# This script builds web config and starts both the ADK API server and the Flask API server
 
 set -e
 
 echo "🚀 Starting RTW Trip Application..."
+
+# Build web configuration from environment variables
+echo "🔧 Building web configuration..."
+npm run build:config
 
 # Use the system Python (where pip3 installed packages), not Nix Python
 PYTHON_BIN="/usr/bin/python3"
