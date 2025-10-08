@@ -22,10 +22,12 @@ echo "🔍 Looking for google_adk installation location..."
 pip3 show google-adk | grep Location || echo "⚠️ Could not find google-adk location"
 echo "🔍 Listing contents of /usr/local/lib/python3.12/dist-packages:"
 ls -la /usr/local/lib/python3.12/dist-packages/ | grep -i google || echo "⚠️ No google packages found"
-echo "🔍 Trying to import google_adk directly:"
-$PYTHON_BIN -c "import google_adk; print(google_adk.__file__)" || echo "⚠️ Cannot import google_adk"
-echo "🔍 Checking if google-adk has cli module:"
-$PYTHON_BIN -c "from google_adk import cli; print(cli.__file__)" || echo "⚠️ Cannot import google_adk.cli"
+echo "🔍 Checking google namespace package:"
+ls -la /usr/local/lib/python3.12/dist-packages/google/ | grep -i adk || echo "⚠️ No adk in google namespace"
+echo "🔍 Trying to import as google.adk:"
+$PYTHON_BIN -c "from google import adk; print(adk.__file__)" || echo "⚠️ Cannot import google.adk"
+echo "🔍 Checking for CLI in google.adk:"
+$PYTHON_BIN -c "from google.adk import cli; print('CLI found')" || echo "⚠️ Cannot import google.adk.cli"
 
 # Set Python path to include the travel-concierge module
 export PYTHONPATH="/app/python/agents:${PYTHONPATH}"
@@ -35,7 +37,7 @@ cd /app
 
 # Start ADK API server in the background
 echo "📡 Starting ADK API server on port 8000..."
-$PYTHON_BIN -m google_adk.cli api_server travel_concierge --port 8000 --host 0.0.0.0 &
+$PYTHON_BIN -m google.adk.cli api_server travel_concierge --port 8000 --host 0.0.0.0 &
 ADK_PID=$!
 
 # Give ADK server time to start
