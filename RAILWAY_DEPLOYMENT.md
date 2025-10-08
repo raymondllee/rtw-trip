@@ -40,25 +40,14 @@ PORT=5001
 
 Railway requires credentials in JSON format. You have two options:
 
-#### Option 1: Service Account Key (Recommended)
+#### Setting Up Service Account Credentials
 
-1. Create a service account in Google Cloud Console
-2. Download the JSON key file
-3. In Railway, set the `GOOGLE_APPLICATION_CREDENTIALS_JSON` environment variable to the entire contents of the JSON file
+1. You should already have a service account JSON file (e.g., `pdf-extract-393514-8f5ce6fa33d2.json`)
+2. In Railway, add environment variable `GOOGLE_APPLICATION_CREDENTIALS_JSON`
+3. Paste the **entire JSON contents** as the value (it will be a multi-line value)
+4. Railway will automatically create a file from this and set `GOOGLE_APPLICATION_CREDENTIALS` to point to it
 
-```bash
-GOOGLE_APPLICATION_CREDENTIALS_JSON={"type":"service_account","project_id":"..."}
-```
-
-#### Option 2: Application Default Credentials
-
-If using application default credentials, set:
-
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=/app/service-account.json
-```
-
-Then create a build step to copy your credentials during deployment.
+**Important**: The JSON should include `type`, `project_id`, `private_key`, `client_email`, etc.
 
 ## Deployment Steps
 
