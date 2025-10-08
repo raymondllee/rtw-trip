@@ -37,7 +37,14 @@ cd /app
 
 # Start ADK API server in the background
 echo "📡 Starting ADK API server on port 8000..."
+echo "🔍 Current directory: $(pwd)"
+echo "🔍 Checking /app/python structure:"
+ls -la /app/python/ || echo "⚠️ /app/python doesn't exist"
+echo "🔍 Checking /app/python/agents structure:"
+ls -la /app/python/agents/ || echo "⚠️ /app/python/agents doesn't exist"
 cd /app/python/agents
+echo "🔍 Contents of agents directory:"
+ls -la
 $PYTHON_BIN -m google.adk.cli api_server travel_concierge --port 8000 --host 0.0.0.0 &
 ADK_PID=$!
 cd /app
