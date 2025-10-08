@@ -1,20 +1,24 @@
-// Production configuration using environment variables
-// This file is used when deploying to production environments
-// that support environment variables (like Vercel, Netlify, etc.)
+// Production configuration fallback
+// This file should only load if config.js fails to load
+// Railway deployment uses build-web-config.js to generate config.js
 
-window.RTW_CONFIG = {
-  // Use environment variables for production
-  googleMapsApiKey: process?.env?.GOOGLE_MAPS_API_KEY || window.GOOGLE_MAPS_API_KEY || '',
-  googleOAuthClientId: process?.env?.GOOGLE_OAUTH_CLIENT_ID || window.GOOGLE_OAUTH_CLIENT_ID || ''
-};
+if (!window.RTW_CONFIG) {
+  console.warn('config.js did not load - using production fallback');
 
-// Fallback for static hosting (GitHub Pages)
-if (!window.RTW_CONFIG.googleMapsApiKey) {
-  // Try to load from a separate config file
-  const script = document.createElement('script');
-  script.src = './config.js';
-  script.onerror = () => {
-    console.error('Missing Google Maps API key. Please configure config.js or set environment variables.');
+  // Minimal fallback config
+  window.RTW_CONFIG = {
+    googleMapsApiKey: window.GOOGLE_MAPS_API_KEY || '',
+    googleOAuthClientId: window.GOOGLE_OAUTH_CLIENT_ID || ''
   };
-  document.head.appendChild(script);
+
+  if (!window.RTW_CONFIG.googleMapsApiKey) {
+    console.error('Missing Google Maps API key. Please check Railway environment variables.');
+  }
+}
+
+if (!window.API_CONFIG) {
+  window.API_CONFIG = {
+    BASE_URL: window.location.origin,
+    TIMEOUT: 300000
+  };
 }

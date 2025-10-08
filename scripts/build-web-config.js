@@ -47,13 +47,16 @@ function buildConfig() {
     ? `https://${env.RAILWAY_PUBLIC_DOMAIN}`
     : (env.API_BASE_URL || 'http://localhost:5001');
 
-  const configTemplate = `// Production configuration using environment variables
-// This file is generated during build from environment variables
-export const API_CONFIG = {
+  const configTemplate = `// Configuration generated during build from environment variables
+// This file is loaded as a regular script (not a module)
+
+// API configuration
+window.API_CONFIG = {
   BASE_URL: '${apiBaseUrl}',
   TIMEOUT: 300000
 };
 
+// Application configuration
 window.RTW_CONFIG = {
   googleCloudProjectId: "${env.GOOGLE_CLOUD_PROJECT || env.GOOGLE_CLOUD_PROJECT_ID || 'YOUR_GOOGLE_CLOUD_PROJECT_ID'}",
   googleCloudLocation: "${env.GOOGLE_CLOUD_LOCATION || 'us-central1'}",
