@@ -14,8 +14,8 @@
 
 """Tools for managing costs in the itinerary - saves directly to Firestore."""
 
-import json
 import os
+import re
 import requests
 from datetime import datetime
 from google.genai.types import Tool, FunctionDeclaration
@@ -25,10 +25,48 @@ from google.adk.tools import ToolContext
 FLASK_API_URL = os.getenv("FLASK_API_URL", "http://127.0.0.1:5001")
 
 
+def _to_float(value) -> float:
+    """Best-effort conversion of mixed inputs to float."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        stripped = value.strip().replace(',', '')
+        try:
+            return float(stripped)
+        except ValueError:
+            return 0.0
+    if isinstance(value, dict):
+        for key in ("amount_mid", "amount", "value"):
+            if key in value:
+                return _to_float(value[key])
+    return 0.0
+
+
+def _coerce_destination_id(destination_id, destination_name: str) -> str:
+    """
+    Ensure destination identifiers are consistently represented as strings.
+    """
+    if isinstance(destination_id, str):
+        ident = destination_id.strip()
+        if ident:
+            return ident
+
+    if destination_id is not None:
+        return str(destination_id)
+
+    clean_name = (destination_name or "").strip().lower()
+    clean_name = re.sub(r'[^a-z0-9]+', '_', clean_name).strip('_')
+    if clean_name:
+        return clean_name
+
+    # Fallback identifier when destination name is missing
+    return "destination"
+
+
 def save_researched_costs(
     tool_context: ToolContext,
     destination_name: str,
-    destination_id: int,
+    destination_id: str,
     duration_days: int,
     num_travelers: int,
     research_data: dict
@@ -61,6 +99,27 @@ def save_researched_costs(
             "message": f"No scenario_id in context. Cannot save costs without knowing which scenario to update."
         }
 
+    # Keep destination identifiers as strings for downstream systems
+    destination_id = _coerce_destination_id(destination_id, destination_name)
+
+    # Local fallback converter in case globals aren't available in certain runtimes
+    def _to_float_local(value) -> float:
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            stripped = value.strip().replace(',', '')
+            try:
+                return float(stripped)
+            except ValueError:
+                return 0.0
+        if isinstance(value, dict):
+            for key in ("amount_mid", "amount", "value"):
+                if key in value:
+                    return _to_float_local(value[key])
+        return 0.0
+
+    to_float = globals().get("_to_float", _to_float_local)
+
     # Convert research data to cost items
     cost_items = []
 
@@ -79,8 +138,8 @@ def save_researched_costs(
         cat_data = research_data[research_cat] or {}
 
         # Base values from research output (mid is the primary estimate)
-        base_usd = float(cat_data.get('amount_mid', 0) or 0)
-        base_local = float(cat_data.get('amount_local', 0) or 0)
+        base_usd = to_float(cat_data.get('amount_mid', 0))
+        base_local = to_float(cat_data.get('amount_local', 0))
         currency_local = cat_data.get('currency_local', 'USD')
 
         # Scale per category semantics:
@@ -159,6 +218,28 @@ def save_researched_costs(
         }
 
 
+def update_destination_cost(
+    tool_context: ToolContext,
+    destination_name: str,
+    destination_id: str,
+    duration_days: int,
+    num_travelers: int,
+    research_data: dict
+) -> dict:
+    """
+    Backwards-compatible alias that forwards to save_researched_costs.
+    Some legacy prompts still reference update_destination_cost.
+    """
+    return save_researched_costs(
+        tool_context=tool_context,
+        destination_name=destination_name,
+        destination_id=destination_id,
+        duration_days=duration_days,
+        num_travelers=num_travelers,
+        research_data=research_data,
+    )
+
+
 # Tool declaration for the agent
 save_researched_costs_tool = Tool(
     function_declarations=[
@@ -177,7 +258,40 @@ save_researched_costs_tool = Tool(
                         "description": "Name of the destination (e.g., 'Tokyo, Japan')"
                     },
                     "destination_id": {
+                        "type": "string",
+                        "description": "ID of the destination in the itinerary"
+                    },
+                    "duration_days": {
                         "type": "integer",
+                        "description": "Number of days for this destination"
+                    },
+                    "num_travelers": {
+                        "type": "integer",
+                        "description": "Number of travelers"
+                    },
+                    "research_data": {
+                        "type": "object",
+                        "description": "The complete cost research data with all categories (accommodation, flights, food_daily, transport_daily, activities)"
+                    }
+                },
+                "required": ["destination_name", "destination_id", "duration_days", "num_travelers", "research_data"]
+            }
+        ),
+        FunctionDeclaration(
+            name="update_destination_cost",
+            description=(
+                "Deprecated alias for save_researched_costs. Saves researched costs to Firestore "
+                "for backwards compatibility."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "destination_name": {
+                        "type": "string",
+                        "description": "Name of the destination (e.g., 'Tokyo, Japan')"
+                    },
+                    "destination_id": {
+                        "type": "string",
                         "description": "ID of the destination in the itinerary"
                     },
                     "duration_days": {
