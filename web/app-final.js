@@ -5,11 +5,26 @@ import { summaryManager } from './summary-manager.js';
 const DATA_PATH = './itinerary_structured.json';
 
 async function loadData() {
-  const res = await fetch(DATA_PATH);
-  if (!res.ok) throw new Error('Failed to load itinerary_structured.json');
-  const data = await res.json();
-  console.log(`📊 Loaded itinerary with ${data.costs?.length || 0} cost items from ${DATA_PATH}`);
-  return data;
+  // First try to load from static file (fallback for local dev or if Firestore is unavailable)
+  try {
+    const res = await fetch(DATA_PATH);
+    if (res.ok) {
+      const data = await res.json();
+      console.log(`📊 Loaded itinerary with ${data.costs?.length || 0} cost items from ${DATA_PATH}`);
+      return data;
+    }
+  } catch (error) {
+    console.warn('Static itinerary file not found, will use Firestore fallback:', error);
+  }
+
+  // Return minimal empty data structure if file not found
+  // The app will load the latest scenario from Firestore in initMapApp
+  console.log('📊 Using empty initial data - will load from Firestore');
+  return {
+    locations: [],
+    legs: [],
+    costs: []
+  };
 }
 
 function toLatLng(location) {
@@ -569,6 +584,8 @@ async function initMapApp() {
   console.log('📂 Restoring from saved state:', savedState);
 
   try {
+    let scenarioLoaded = false;
+
     // If we have a saved scenario ID, try to load it
     if (savedState.scenarioId) {
       console.log(`🔄 Attempting to restore scenario: ${savedState.scenarioId}`);
@@ -584,25 +601,35 @@ async function initMapApp() {
           window.currentScenarioId = currentScenarioId;
           currentScenarioName = scenario.name;
           console.log(`✅ Restored scenario: ${scenario.name}`);
+          scenarioLoaded = true;
         }
       } else {
         console.warn('⚠️ Saved scenario not found, clearing state');
         statePersistence.clearState();
       }
-    } else {
-      // No saved scenario, load most recent one
+    }
+
+    // If no scenario loaded yet (no saved state or saved scenario not found), load most recent one
+    if (!scenarioLoaded) {
       const scenarios = await scenarioManager.listScenarios();
       if (scenarios.length > 0) {
         const lastScenario = scenarios[0];
+        console.log(`📥 Loading most recent scenario: ${lastScenario.name}`);
         const latestVersion = await scenarioManager.getLatestVersion(lastScenario.id);
         if (latestVersion && latestVersion.itineraryData) {
           workingData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
           currentScenarioId = lastScenario.id;
           window.currentScenarioId = currentScenarioId;
           currentScenarioName = lastScenario.name;
-          console.log(`Loaded most recent scenario: ${lastScenario.name}`);
+          console.log(`✅ Loaded most recent scenario: ${lastScenario.name} with ${workingData.locations?.length || 0} locations`);
+          scenarioLoaded = true;
         }
       }
+    }
+
+    // If still no data loaded (no Firestore scenarios or static file), show helpful message
+    if (!scenarioLoaded && workingData.locations.length === 0) {
+      console.warn('⚠️ No scenarios found in Firestore and no static data file. App will start empty.');
     }
   } catch (error) {
     console.warn('Could not load from Firestore, using default data:', error);
