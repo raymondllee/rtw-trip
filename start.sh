@@ -9,7 +9,13 @@ echo "🚀 Starting RTW Trip Application..."
 
 # Build web configuration from environment variables
 echo "🔧 Building web configuration..."
-npm run build:config
+echo "📋 Environment check:"
+echo "  FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-NOT SET}"
+echo "  GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-NOT SET}"
+echo "  RAILWAY_PUBLIC_DOMAIN: ${RAILWAY_PUBLIC_DOMAIN:-NOT SET}"
+
+# Run the build script directly with node (npm run may not pass env vars)
+node scripts/build-web-config.js
 
 # Use the system Python (where pip3 installed packages), not Nix Python
 PYTHON_BIN="/usr/bin/python3"

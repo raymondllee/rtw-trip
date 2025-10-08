@@ -42,6 +42,13 @@ function loadEnv() {
 function buildConfig() {
   const env = loadEnv();
 
+  // Debug: Log environment variables being used
+  console.log('🔍 Environment variables loaded:');
+  console.log('  FIREBASE_PROJECT_ID:', env.FIREBASE_PROJECT_ID || 'NOT SET');
+  console.log('  FIREBASE_API_KEY:', env.FIREBASE_API_KEY ? '***' + env.FIREBASE_API_KEY.slice(-4) : 'NOT SET');
+  console.log('  GOOGLE_MAPS_API_KEY:', env.GOOGLE_MAPS_API_KEY ? '***' + env.GOOGLE_MAPS_API_KEY.slice(-4) : 'NOT SET');
+  console.log('  RAILWAY_PUBLIC_DOMAIN:', env.RAILWAY_PUBLIC_DOMAIN || 'NOT SET');
+
   // Determine API base URL (use RAILWAY_PUBLIC_DOMAIN if available, otherwise localhost)
   const apiBaseUrl = env.RAILWAY_PUBLIC_DOMAIN
     ? `https://${env.RAILWAY_PUBLIC_DOMAIN}`
