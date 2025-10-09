@@ -694,6 +694,45 @@
   transform: rotate(180deg);
 }
 
+.destination-cost-missing {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px dashed #d4d4d8;
+  border-radius: 4px;
+  background: #f9fafb;
+}
+
+.update-costs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.update-costs-btn:hover:not(:disabled) {
+  background: #dbe3ff;
+  color: #1d4ed8;
+}
+
+.update-costs-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.update-costs-btn--sent {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
 /* Expandable Cost Details */
 .destination-cost-details {
   margin-top: 8px;

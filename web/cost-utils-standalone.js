@@ -299,17 +299,41 @@ function generateCostSummaryHTML(costs, durationDays = 0) {
 }
 
 // Generate cost summary for sidebar
-function generateSidebarCostSummary(costs, durationDays = 0) {
-  if (!costs || costs.total === 0) {
-    return '';
+function generateSidebarCostSummary(costs, durationDays = 0, destinationName = '') {
+  const total = Number(costs?.total ?? 0);
+  const hasCostData = Boolean(
+    costs &&
+    (
+      (Number.isFinite(total) && total > 0) ||
+      (typeof costs.count === 'number' && costs.count > 0) ||
+      (Array.isArray(costs.items) && costs.items.length > 0)
+    )
+  );
+
+  if (!hasCostData) {
+    if (!destinationName) {
+      return '';
+    }
+
+    return `
+      <div class="destination-cost-missing">
+        <button
+          class="update-costs-btn"
+          data-destination-name="${destinationName}"
+          title="Ask AI to research costs"
+        >
+          💰 Update costs for ${destinationName}
+        </button>
+      </div>
+    `;
   }
 
-  const costPerDay = durationDays > 0 ? costs.total / durationDays : 0;
+  const costPerDay = durationDays > 0 ? total / durationDays : 0;
 
   return `
     <div class="destination-cost-summary">
       <div class="cost-total">
-        <span class="cost-amount">${formatCurrency(costs.total)}</span>
+        <span class="cost-amount">${formatCurrency(total)}</span>
         ${durationDays > 0 ? `<span class="cost-per-day">${formatCurrency(costPerDay)}/day</span>` : ''}
       </div>
       <div class="cost-breakdown-toggle">

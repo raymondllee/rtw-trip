@@ -1058,6 +1058,109 @@ async function initMapApp() {
     }, 1000); // Debounce by 1 second
   }
   
+  function buildCostAgentPrompt(destination, legName = '', subLegName = '') {
+    if (!destination) return '';
+
+    const locationBits = [];
+    if (destination.name) locationBits.push(destination.name);
+    if (destination.city && destination.city !== destination.name) locationBits.push(destination.city);
+    if (destination.country) locationBits.push(destination.country);
+    const locationLabel = locationBits.length ? locationBits.join(', ') : 'this destination';
+
+    const segments = [`Please research and add updated cost estimates for ${locationLabel}.`];
+
+    const scheduleBits = [];
+    if (destination.duration_days) scheduleBits.push(`${destination.duration_days} day stay`);
+    if (destination.arrival_date) scheduleBits.push(`arrival ${destination.arrival_date}`);
+    if (destination.departure_date) scheduleBits.push(`departure ${destination.departure_date}`);
+    if (scheduleBits.length) {
+      segments.push(`Schedule: ${scheduleBits.join(' • ')}.`);
+    }
+
+    if (destination.activity_type) {
+      segments.push(`Primary focus: ${destination.activity_type}.`);
+    }
+
+    const highlights = Array.isArray(destination.highlights)
+      ? destination.highlights.filter(Boolean).slice(0, 3)
+      : [];
+    if (!highlights.length && typeof destination.notes === 'string') {
+      const trimmedNotes = destination.notes.trim();
+      if (trimmedNotes) {
+        highlights.push(trimmedNotes);
+      }
+    }
+    if (highlights.length) {
+      segments.push(`Highlights or notes: ${highlights.join('; ')}.`);
+    }
+
+    if (legName && legName !== 'all') {
+      const legContext = subLegName ? `${legName} › ${subLegName}` : legName;
+      segments.push(`Leg context: ${legContext}.`);
+    }
+
+    const idSource = destination.id ?? destination.destination_id ?? destination.destinationId ?? destination.normalizedId ?? '';
+    const destinationId = idSource ? normalizeId(idSource) : normalizeId(destination.name || locationLabel || 'unknown-destination');
+    segments.push(`Destination ID: ${destinationId}.`);
+
+    segments.push('Return 4-6 cost line items covering accommodation, transport, food, activities, and other key costs for the whole party.');
+    segments.push('Respond with a JSON array where each item follows our schema: category, description, amount, currency, amount_usd, date, booking_status, source="ai_estimate", notes.');
+
+    return segments.join('\n');
+  }
+
+  function requestCostUpdateFromAgent(destination, buttonEl, legName = '', subLegName = '') {
+    const prompt = buildCostAgentPrompt(destination, legName, subLegName);
+    if (!prompt) {
+      console.warn('⚠️ Skipping cost update request - no prompt generated.');
+      return;
+    }
+
+    if (!chatInstance) {
+      alert('The AI Travel Concierge chat is not ready yet. Please open the AI panel and try again.');
+      return;
+    }
+
+    const targetForm = chatInstance.chatColumnForm || chatInstance.chatForm || chatInstance.floatingChatForm;
+    const targetInput = chatInstance.chatColumnInput || chatInstance.chatInput || chatInstance.floatingChatInput;
+
+    if (!targetForm || !targetInput) {
+      console.warn('⚠️ Unable to send cost request - chat form elements not found.');
+      return;
+    }
+
+    if (typeof chatInstance.moveToColumn === 'function') {
+      chatInstance.moveToColumn();
+    }
+    if (typeof chatInstance.openChat === 'function') {
+      chatInstance.openChat();
+    }
+
+    targetInput.value = prompt;
+    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+    targetForm.dispatchEvent(submitEvent);
+
+    if (buttonEl) {
+      const originalLabel = buttonEl.dataset.originalLabel || buttonEl.innerHTML;
+      buttonEl.dataset.originalLabel = originalLabel;
+      buttonEl.disabled = true;
+      buttonEl.textContent = 'Request sent to cost agent';
+      buttonEl.classList.add('update-costs-btn--sent');
+
+      let restored = false;
+      const restoreButton = () => {
+        if (restored) return;
+        restored = true;
+        buttonEl.disabled = false;
+        buttonEl.classList.remove('update-costs-btn--sent');
+        buttonEl.innerHTML = buttonEl.dataset.originalLabel || originalLabel;
+      };
+
+      setTimeout(restoreButton, 6000);
+      window.addEventListener('costs-updated', restoreButton, { once: true });
+    }
+  }
+
   function updateSidebar(locations) {
     const destinationList = document.getElementById('destination-list');
     const destinationCount = document.querySelector('.destination-count');
@@ -1093,7 +1196,7 @@ async function initMapApp() {
         // Pass location object for name-based matching
         destinationCosts = window.calculateDestinationCosts(loc.id, costs, loc, workingData.locations);
         console.log(`💵 ${loc.name}: ${destinationCosts.count} costs, $${destinationCosts.total}`);
-        costSummaryHTML = window.generateSidebarCostSummary(destinationCosts, duration);
+        costSummaryHTML = window.generateSidebarCostSummary(destinationCosts, duration, loc.name);
         costBreakdownHTML = window.generateCostBreakdownHTML(destinationCosts);
         costDetailsHTML = window.generateCostSummaryHTML(destinationCosts, duration);
       } else {
@@ -1118,18 +1221,32 @@ async function initMapApp() {
         });
 
         // Simple HTML generation without external dependencies
-        costSummaryHTML = totalCost > 0 ? `
-          <div class="destination-cost-summary">
-            <div class="cost-total">
-              <span class="cost-amount">$${totalCost.toLocaleString()}</span>
-              ${duration > 0 ? `<span class="cost-per-day">$${Math.round(totalCost/duration)}/day</span>` : ''}
+        if (totalCost > 0) {
+          costSummaryHTML = `
+            <div class="destination-cost-summary">
+              <div class="cost-total">
+                <span class="cost-amount">$${totalCost.toLocaleString()}</span>
+                ${duration > 0 ? `<span class="cost-per-day">$${Math.round(totalCost/duration)}/day</span>` : ''}
+              </div>
+              <div class="cost-breakdown-toggle">
+                <span class="toggle-icon">▼</span>
+                <span class="toggle-text">Details</span>
+              </div>
             </div>
-            <div class="cost-breakdown-toggle">
-              <span class="toggle-icon">▼</span>
-              <span class="toggle-text">Details</span>
+          `;
+        } else {
+          costSummaryHTML = `
+            <div class="destination-cost-missing">
+              <button
+                class="update-costs-btn"
+                data-destination-name="${loc.name}"
+                title="Ask AI to research costs"
+              >
+                💰 Update costs for ${loc.name}
+              </button>
             </div>
-          </div>
-        ` : '';
+          `;
+        }
 
         costBreakdownHTML = totalCost > 0 ? `
           <div class="cost-breakdown">
@@ -1208,6 +1325,35 @@ async function initMapApp() {
     });
     
     destinationList.innerHTML = sidebarItems.join('');
+
+    destinationList.querySelectorAll('.update-costs-btn').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (button.disabled) return;
+
+        const container = button.closest('.destination-item');
+        const destinationId = container?.dataset.locationId;
+        const destinationName = button.dataset.destinationName;
+
+        const destination = (workingData.locations || []).find(candidate => {
+          if (destinationId) {
+            return idsEqual(candidate.id, destinationId);
+          }
+          return candidate.name === destinationName || candidate.city === destinationName;
+        });
+
+        if (!destination) {
+          console.warn('⚠️ Unable to find destination for cost update request:', destinationName, destinationId);
+          return;
+        }
+
+        const legName = legFilter ? legFilter.value : '';
+        const subLegName = subLegFilter ? subLegFilter.value : '';
+
+        requestCostUpdateFromAgent(destination, button, legName, subLegName);
+      });
+    });
     
     // Add click handlers for destinations
     destinationList.querySelectorAll('.destination-item').forEach((item, idx) => {
