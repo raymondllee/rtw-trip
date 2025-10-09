@@ -354,6 +354,34 @@ export class FirestoreScenarioManager {
   }
 
   /**
+   * Rename a scenario
+   */
+  async renameScenario(scenarioId, newName) {
+    if (!scenarioId) {
+      throw new Error('Scenario ID is required');
+    }
+
+    if (!newName || !newName.trim()) {
+      throw new Error('New name is required');
+    }
+
+    const scenarioRef = doc(db, 'scenarios', scenarioId);
+    const scenarioDoc = await getDoc(scenarioRef);
+
+    if (!scenarioDoc.exists()) {
+      throw new Error('Scenario not found');
+    }
+
+    // Update scenario name
+    await updateDoc(scenarioRef, {
+      name: newName.trim(),
+      updatedAt: Timestamp.now()
+    });
+
+    return { id: scenarioId, name: newName.trim() };
+  }
+
+  /**
    * Delete a scenario and all its versions
    */
   async deleteScenario(scenarioId) {

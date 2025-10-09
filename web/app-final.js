@@ -1011,7 +1011,9 @@ async function initMapApp() {
     const countText = isFiltered
       ? `${locations.length} destinations (${legFilter.value} leg)`
       : `${locations.length} destinations`;
-    destinationCount.textContent = countText;
+    if (destinationCount) {
+      destinationCount.textContent = countText;
+    }
 
     // Get costs data
     const costs = workingData.costs || [];
@@ -1611,6 +1613,7 @@ async function initMapApp() {
               <div class="scenario-actions-btn">
                 <button class="btn-load" onclick="loadScenarioById('${scenario.id}')">Load</button>
                 <button class="btn-versions" onclick="showVersionHistory('${scenario.id}')">History</button>
+                <button class="btn-rename" onclick="renameScenarioById('${scenario.id}', '${scenario.name.replace(/'/g, "\\'")}')">Rename</button>
                 <button class="btn-delete" onclick="deleteScenarioById('${scenario.id}')">Delete</button>
               </div>
             </div>
@@ -1671,6 +1674,68 @@ async function initMapApp() {
     }
   };
 
+  window.renameScenarioById = async function(scenarioId, currentName, isDynamicModal = false) {
+    const newName = prompt('Enter new name for scenario:', currentName);
+
+    if (newName === null) {
+      // User cancelled
+      return;
+    }
+
+    if (!newName.trim()) {
+      alert('Scenario name cannot be empty');
+      return;
+    }
+
+    try {
+      await scenarioManager.renameScenario(scenarioId, newName);
+
+      // Refresh the appropriate modal
+      if (isDynamicModal) {
+        await window.showManageScenarios();
+      } else {
+        await updateScenarioList();
+      }
+
+      // If we renamed the current scenario, update the display
+      if (currentScenarioId === scenarioId) {
+        currentScenarioName = newName.trim();
+        updateScenarioNameDisplay();
+      }
+    } catch (error) {
+      console.error('Error renaming scenario:', error);
+      alert('Failed to rename scenario: ' + error.message);
+    }
+  };
+
+  window.duplicateScenario = async function(scenarioId) {
+    try {
+      const scenario = await scenarioManager.getScenario(scenarioId);
+      const latest = await scenarioManager.getLatestVersion(scenarioId);
+      const baseName = scenario?.name || 'Itinerary';
+      const defaultName = `Copy of ${baseName}`;
+      const newName = prompt('Enter name for duplicated scenario:', defaultName);
+
+      if (!newName || !newName.trim()) return;
+
+      const scenarioData = {
+        name: newName.trim(),
+        description: `Duplicated from ${baseName}`,
+        data: JSON.parse(JSON.stringify(latest?.itineraryData || {})),
+      };
+      const newScenarioId = await scenarioManager.saveScenario(scenarioData);
+
+      // Load the duplicated scenario
+      await window.loadScenarioById(newScenarioId);
+      // Refresh list
+      await window.showManageScenarios();
+      alert(`Scenario "${newName.trim()}" has been created.`);
+    } catch (err) {
+      console.error('Error duplicating scenario:', err);
+      alert('Failed to duplicate scenario');
+    }
+  };
+
   window.showVersionHistory = async function(scenarioId) {
     try {
       const scenario = await scenarioManager.getScenario(scenarioId);
@@ -1716,7 +1781,7 @@ async function initMapApp() {
       const modal = document.createElement('div');
       modal.id = 'version-history-modal';
       modal.className = 'modal-overlay';
-      modal.style.cssText = 'display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;';
+      modal.style.cssText = 'display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100001; align-items: center; justify-content: center;';
       modal.innerHTML = `
         <div class="modal-content" style="background: white; padding: 24px; border-radius: 8px; max-width: 600px; max-height: 80vh; overflow-y: auto; width: 90%;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -1764,34 +1829,6 @@ async function initMapApp() {
         } catch (err) {
           console.error('Error deleting unlabeled versions:', err);
           alert('Failed to delete unlabeled versions');
-        }
-      };
-
-      // Provide a global duplicator for the dynamic list
-      window.duplicateScenario = async function (scenarioId) {
-        try {
-          const scenario = await scenarioManager.getScenario(scenarioId);
-          const latest = await scenarioManager.getLatestVersion(scenarioId);
-          const baseName = scenario?.name || 'Itinerary';
-          const defaultName = `${baseName} (Copy)`;
-          const newName = prompt('Enter name for duplicated scenario:', defaultName);
-          if (!newName || !newName.trim()) return;
-
-          const scenarioData = {
-            name: newName.trim(),
-            description: `Duplicated from ${baseName}`,
-            data: JSON.parse(JSON.stringify(latest?.itineraryData || {})),
-          };
-          const newScenarioId = await scenarioManager.saveScenario(scenarioData);
-
-          // Load the duplicated scenario
-          await window.loadScenarioById(newScenarioId);
-          // Refresh list
-          await window.showManageScenarios();
-          alert(`Scenario "${newName.trim()}" has been created.`);
-        } catch (err) {
-          console.error('Error duplicating scenario:', err);
-          alert('Failed to duplicate scenario');
         }
       };
     } catch (error) {
@@ -1959,6 +1996,7 @@ async function initMapApp() {
                 <button onclick="loadScenarioById('${scenario.id}')" style="padding:6px 10px; background:#0070f3; color:#fff; border:none; border-radius:4px; cursor:pointer;">Load</button>
                 <button onclick="showVersionHistory('${scenario.id}')" style="padding:6px 10px; background:#666; color:#fff; border:none; border-radius:4px; cursor:pointer;">History</button>
                 <button onclick="duplicateScenario('${scenario.id}')" style="padding:6px 10px; background:#fff; color:#333; border:1px solid #eee; border-radius:4px; cursor:pointer;">Duplicate</button>
+                <button onclick="renameScenarioById('${scenario.id}', '${scenario.name.replace(/'/g, "\\'")}', true)" style="padding:6px 10px; background:#ff9800; color:#fff; border:none; border-radius:4px; cursor:pointer;">Rename</button>
                 <button onclick="deleteScenarioById('${scenario.id}')" style="padding:6px 10px; background:#fff; color:#d32f2f; border:1px solid #eee; border-radius:4px; cursor:pointer;">Delete</button>
               </div>
             </div>
