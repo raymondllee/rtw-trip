@@ -12,13 +12,7 @@
     <h1 id="trip-title">Round The World Trip</h1>
     <div class="controls">
       <span id="summary"></span>
-    </div>
-  </header>
-  <main class="main-content">
-    <div id="map"></div>
-    <div id="sidebar-resizer" class="sidebar-resizer"></div>
-    <aside class="sidebar">
-      <!-- Unified Filter and Scenario Section -->
+      <!-- Unified Filter and Scenario Section (moved to header) -->
       <div class="unified-filter-section">
         <div id="scenario-name-display" class="scenario-name-compact">Unsaved Changes</div>
         <select id="leg-filter" class="filter-select-compact">
@@ -30,6 +24,16 @@
         <button id="add-destination-bar-btn" class="add-destination-bar-btn" title="Add destination">+</button>
         <button id="scenario-actions-btn" class="scenario-actions-btn-compact" title="Scenario actions">⋯</button>
         <div class="save-indicator" id="save-indicator">✓</div>
+      </div>
+    </div>
+  </header>
+  <main class="main-content">
+    <div id="map"></div>
+    <div id="sidebar-resizer" class="sidebar-resizer"></div>
+    <aside class="sidebar">
+      <div class="sidebar-title">
+        <div class="header-primary">Destinations</div>
+        <div id="sidebar-summary" class="header-secondary"></div>
       </div>
       <div id="planning-controls" class="planning-controls" style="padding: 4px 12px;"></div>
 
@@ -106,12 +110,30 @@
       <div id="chat-resizer" class="chat-resizer"></div>
       <div class="sidebar-chat">
         <div class="chat-header-sidebar">
-          <h4><span id="chat-title-display" class="chat-title-display">AI Travel Concierge</span></h4>
+          <h4>AI Travel Concierge</h4>
           <div class="chat-header-controls">
-            <button id="new-chat-btn" class="chat-action-btn" title="New chat">+</button>
-            <button id="chat-history-btn" class="chat-action-btn" title="Chat history">📝</button>
-            <button id="undock-chat-btn" class="undock-chat-btn" title="Undock chat">⬈</button>
+            <button id="chat-menu-btn" class="chat-menu-btn" title="Chat options">⋯</button>
             <button id="toggle-chat-sidebar" class="toggle-chat-btn">▼</button>
+          </div>
+          <!-- Chat menu dropdown -->
+          <div class="chat-menu-dropdown" id="chat-menu-dropdown" style="display: none;">
+            <button class="chat-menu-item" data-action="new-chat">
+              <span class="icon">💬</span>
+              <span>New Chat</span>
+            </button>
+            <button class="chat-menu-item" data-action="chat-history">
+              <span class="icon">📝</span>
+              <span>Chat History</span>
+            </button>
+            <div class="dropdown-divider"></div>
+            <button class="chat-menu-item" data-action="column-mode">
+              <span class="icon">⬌</span>
+              <span>Column Mode</span>
+            </button>
+            <button class="chat-menu-item" data-action="undock">
+              <span class="icon">⬈</span>
+              <span>Undock Chat</span>
+            </button>
           </div>
         </div>
         <div id="chat-container-sidebar" class="chat-container-sidebar">
@@ -128,6 +150,54 @@
             <button type="submit" id="chat-send-btn-sidebar">→</button>
           </form>
         </div>
+      </div>
+    </aside>
+
+    <!-- Chat Column (hidden by default) -->
+    <div id="chat-column-resizer" class="chat-column-resizer" style="display: none;"></div>
+    <aside id="chat-column" class="chat-column" style="display: none;">
+      <div class="chat-column-header">
+        <div class="header-content">
+          <div class="header-primary">AI Travel Concierge</div>
+          <div id="chat-title-secondary" class="header-secondary">New Chat</div>
+        </div>
+        <div class="chat-header-controls">
+          <button id="chat-menu-btn-column" class="chat-menu-btn" title="Chat options">⋯</button>
+        </div>
+        <!-- Chat menu dropdown for column -->
+        <div class="chat-menu-dropdown" id="chat-menu-dropdown-column" style="display: none;">
+          <button class="chat-menu-item" data-action="new-chat">
+            <span class="icon">💬</span>
+            <span>New Chat</span>
+          </button>
+          <button class="chat-menu-item" data-action="chat-history">
+            <span class="icon">📝</span>
+            <span>Chat History</span>
+          </button>
+          <div class="dropdown-divider"></div>
+          <button class="chat-menu-item" data-action="dock-sidebar">
+            <span class="icon">⬋</span>
+            <span>Dock to Sidebar</span>
+          </button>
+          <button class="chat-menu-item" data-action="undock">
+            <span class="icon">⬈</span>
+            <span>Undock Chat</span>
+          </button>
+        </div>
+      </div>
+      <div class="chat-container-column">
+        <div id="chat-messages-column" class="chat-messages-column">
+          <div class="chat-message bot">
+            <div class="message-content">
+              Hi! I can help you modify your itinerary. Try asking me to add destinations, change durations, or remove stops.
+            </div>
+          </div>
+        </div>
+        <div id="chat-input-resizer-column" class="chat-input-resizer"></div>
+        <form id="chat-form-column" class="chat-form-column">
+          <input type="text" id="chat-input-column" placeholder="Ask to modify your trip..." autocomplete="off" required>
+          <button type="submit" id="chat-send-btn-column">→</button>
+        </form>
       </div>
     </aside>
   </main>

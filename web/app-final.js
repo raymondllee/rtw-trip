@@ -894,24 +894,34 @@ async function initMapApp() {
     }
 
     const summary = document.getElementById('summary');
+    const sidebarSummary = document.getElementById('sidebar-summary');
+    let summaryText = '';
+
     if (legName === 'all') {
-      summary.textContent = `${filtered.length} stops • ${workingData.trip?.duration || ''} • ${workingData.trip?.total_cost || ''}`;
+      summaryText = `${filtered.length} stops • ${workingData.trip?.duration || ''} • ${workingData.trip?.total_cost || ''}`;
     } else if (subLegName) {
       const leg = workingData.legs?.find(l => l.name === legName);
       const subLeg = leg?.sub_legs?.find(sl => sl.name === subLegName);
       if (subLeg) {
         const startDate = formatDateRange(subLeg.start_date, subLeg.end_date);
-        summary.textContent = `${filtered.length} stops • ${subLegName} • ${startDate}`;
+        summaryText = `${filtered.length} stops • ${subLegName} • ${startDate}`;
       } else {
-        summary.textContent = `${filtered.length} stops`;
+        summaryText = `${filtered.length} stops`;
       }
     } else {
       const leg = workingData.legs?.find(l => l.name === legName);
       if (leg) {
-        summary.textContent = `${filtered.length} stops • ${leg.duration_days} days • ${leg.total_cost}`;
+        summaryText = `${filtered.length} stops • ${leg.duration_days} days • ${leg.total_cost}`;
       } else {
-        summary.textContent = `${filtered.length} stops`;
+        summaryText = `${filtered.length} stops`;
       }
+    }
+
+    if (summary) {
+      summary.textContent = summaryText;
+    }
+    if (sidebarSummary) {
+      sidebarSummary.textContent = summaryText;
     }
   }
   

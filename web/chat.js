@@ -15,6 +15,7 @@ class TravelConciergeChat {
     this.onItineraryChange = onItineraryChange; // Callback to notify parent of changes
     this.pollInterval = null;
     this.isFloating = false;
+    this.isColumn = false;
     this.currentChatId = null; // Current chat conversation ID
     this.messages = []; // In-memory message history
     this.firestoreEnabled = true; // Enable Firestore persistence (will be disabled on errors)
@@ -34,6 +35,11 @@ class TravelConciergeChat {
 
     // Restore chat state from localStorage (includes chat open/close state)
     this.restoreChatState();
+
+    // Start in column mode by default
+    setTimeout(() => {
+      this.moveToColumn();
+    }, 100);
   }
 
   /**
@@ -82,8 +88,19 @@ class TravelConciergeChat {
     this.chatInput = document.getElementById('chat-input-sidebar');
     this.chatMessages = document.getElementById('chat-messages-sidebar');
     this.sendBtn = document.getElementById('chat-send-btn-sidebar');
-    this.undockBtn = document.getElementById('undock-chat-btn');
+    this.chatMenuBtn = document.getElementById('chat-menu-btn');
+    this.chatMenuDropdown = document.getElementById('chat-menu-dropdown');
     this.sidebarChat = document.querySelector('.sidebar-chat');
+
+    // Column chat elements
+    this.chatColumn = document.getElementById('chat-column');
+    this.chatColumnResizer = document.getElementById('chat-column-resizer');
+    this.chatColumnMessages = document.getElementById('chat-messages-column');
+    this.chatColumnForm = document.getElementById('chat-form-column');
+    this.chatColumnInput = document.getElementById('chat-input-column');
+    this.chatColumnSendBtn = document.getElementById('chat-send-btn-column');
+    this.chatMenuBtnColumn = document.getElementById('chat-menu-btn-column');
+    this.chatMenuDropdownColumn = document.getElementById('chat-menu-dropdown-column');
 
     // Floating chat elements
     this.floatingChat = document.getElementById('floating-chat');
@@ -97,12 +114,11 @@ class TravelConciergeChat {
     this.toggleFloatingBtn = document.getElementById('toggle-floating-chat');
 
     // Chat history elements
-    this.newChatBtn = document.getElementById('new-chat-btn');
-    this.historyBtn = document.getElementById('chat-history-btn');
     this.closeHistoryBtn = document.getElementById('close-history-btn');
 
     // Chat title elements
     this.chatTitleDisplay = document.getElementById('chat-title-display');
+    this.chatTitleDisplayColumn = document.getElementById('chat-title-display-column');
     this.chatTitleDisplayFloating = document.getElementById('chat-title-display-floating');
 
     // Debug: check if elements are found
@@ -110,7 +126,11 @@ class TravelConciergeChat {
       chatInput: !!this.chatInput,
       chatForm: !!this.chatForm,
       sendBtn: !!this.sendBtn,
-      chatInputDisabled: this.chatInput?.disabled
+      chatInputDisabled: this.chatInput?.disabled,
+      chatMenuBtn: !!this.chatMenuBtn,
+      chatMenuDropdown: !!this.chatMenuDropdown,
+      chatMenuBtnColumn: !!this.chatMenuBtnColumn,
+      chatMenuDropdownColumn: !!this.chatMenuDropdownColumn
     });
 
     // Ensure inputs are enabled on initialization
@@ -133,14 +153,42 @@ class TravelConciergeChat {
   attachEventListeners() {
     // Sidebar chat listeners
     this.chatHeader?.addEventListener('click', (e) => {
-      if (e.target !== this.undockBtn && !this.undockBtn.contains(e.target)) {
+      if (!e.target.closest('.chat-menu-btn') && !e.target.closest('.chat-menu-dropdown')) {
         this.toggleChat();
       }
     });
     this.chatForm?.addEventListener('submit', (e) => this.handleSubmit(e));
-    this.undockBtn?.addEventListener('click', (e) => {
+
+    // Chat menu listeners (sidebar)
+    this.chatMenuBtn?.addEventListener('click', (e) => {
+      console.log('🖱️ Chat menu button clicked');
       e.stopPropagation();
-      this.undockChat();
+      this.toggleChatMenu();
+    });
+    this.chatMenuDropdown?.addEventListener('click', (e) => {
+      const menuItem = e.target.closest('.chat-menu-item');
+      if (menuItem) {
+        e.stopPropagation();
+        this.handleChatMenuAction(menuItem.dataset.action);
+        this.chatMenuDropdown.style.display = 'none';
+      }
+    });
+
+    // Column chat listeners
+    this.chatColumnForm?.addEventListener('submit', (e) => this.handleSubmit(e, false, true));
+
+    // Chat menu listeners (column)
+    this.chatMenuBtnColumn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleChatMenuColumn();
+    });
+    this.chatMenuDropdownColumn?.addEventListener('click', (e) => {
+      const menuItem = e.target.closest('.chat-menu-item');
+      if (menuItem) {
+        e.stopPropagation();
+        this.handleChatMenuAction(menuItem.dataset.action);
+        this.chatMenuDropdownColumn.style.display = 'none';
+      }
     });
 
     // Floating chat listeners
@@ -152,20 +200,20 @@ class TravelConciergeChat {
     this.toggleFloatingBtn?.addEventListener('click', () => this.toggleFloatingChat());
 
     // Chat history listeners
-    this.newChatBtn?.addEventListener('click', () => {
-      this.clearChat();
-      this.createNewChat();
-      // Ensure chat is open when starting a new chat
-      if (!this.isOpen) {
-        this.openChat();
-      }
-    });
-    this.historyBtn?.addEventListener('click', () => this.showChatHistory());
     this.closeHistoryBtn?.addEventListener('click', () => this.hideChatHistory());
 
     // Chat title editing listeners
     this.chatTitleDisplay?.addEventListener('click', () => this.startEditingTitle(false));
+    this.chatTitleDisplayColumn?.addEventListener('click', () => this.startEditingTitle(false, true));
     this.chatTitleDisplayFloating?.addEventListener('click', () => this.startEditingTitle(true));
+
+    // Close menus when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.chat-menu-btn') && !e.target.closest('.chat-menu-dropdown')) {
+        if (this.chatMenuDropdown) this.chatMenuDropdown.style.display = 'none';
+        if (this.chatMenuDropdownColumn) this.chatMenuDropdownColumn.style.display = 'none';
+      }
+    });
   }
 
   toggleChat() {
@@ -247,6 +295,120 @@ class TravelConciergeChat {
     this.chatContainer.classList.remove('hidden');
     this.toggleBtn.classList.remove('collapsed');
     this.chatInput.focus();
+  }
+
+  moveToColumn() {
+    console.log('📋 Moving chat to column...');
+    this.isColumn = true;
+
+    // Copy messages from sidebar to column
+    this.syncMessages(this.chatMessages, this.chatColumnMessages);
+
+    // Hide sidebar chat
+    this.sidebarChat.style.display = 'none';
+
+    // Show column chat and resizer
+    this.chatColumn.style.display = 'flex';
+    this.chatColumnResizer.style.display = 'block';
+    this.chatColumnInput.focus();
+  }
+
+  dockFromColumn() {
+    console.log('📥 Docking chat from column...');
+    this.isColumn = false;
+
+    // Copy messages from column to sidebar
+    this.syncMessages(this.chatColumnMessages, this.chatMessages);
+
+    // Hide column chat and resizer
+    this.chatColumn.style.display = 'none';
+    this.chatColumnResizer.style.display = 'none';
+
+    // Show sidebar chat
+    this.sidebarChat.style.display = 'flex';
+    this.isOpen = true;
+    this.chatContainer.classList.remove('hidden');
+    this.toggleBtn.classList.remove('collapsed');
+    this.chatInput.focus();
+  }
+
+  toggleChatMenu() {
+    console.log('🔧 toggleChatMenu called', {
+      dropdown: !!this.chatMenuDropdown,
+      currentDisplay: this.chatMenuDropdown?.style.display
+    });
+
+    if (!this.chatMenuDropdown) {
+      console.error('❌ chatMenuDropdown not found!');
+      return;
+    }
+
+    const isVisible = this.chatMenuDropdown.style.display === 'block';
+    this.chatMenuDropdown.style.display = isVisible ? 'none' : 'block';
+
+    console.log('✅ Menu toggled to:', this.chatMenuDropdown.style.display);
+
+    // Close column menu if open
+    if (this.chatMenuDropdownColumn) {
+      this.chatMenuDropdownColumn.style.display = 'none';
+    }
+  }
+
+  toggleChatMenuColumn() {
+    const isVisible = this.chatMenuDropdownColumn.style.display === 'block';
+    this.chatMenuDropdownColumn.style.display = isVisible ? 'none' : 'block';
+
+    // Close sidebar menu if open
+    if (this.chatMenuDropdown) {
+      this.chatMenuDropdown.style.display = 'none';
+    }
+  }
+
+  async handleChatMenuAction(action) {
+    switch (action) {
+      case 'new-chat':
+        this.clearChat();
+        await this.createNewChat();
+
+        // Add welcome message to sidebar chat
+        this.addMessage(
+          "Hi! I'm your AI Travel Concierge. I can help you modify your trip by adding destinations, adjusting dates, managing costs, and optimizing your itinerary. What would you like to do?",
+          'bot',
+          false,
+          false,
+          false
+        );
+
+        // Sync welcome message to all chat containers
+        this.syncMessages(this.chatMessages, this.floatingChatMessages);
+        if (this.chatColumnMessages) {
+          this.syncMessages(this.chatMessages, this.chatColumnMessages);
+        }
+
+        if (!this.isOpen && !this.isColumn) {
+          this.openChat();
+        }
+        break;
+      case 'chat-history':
+        this.showChatHistory();
+        break;
+      case 'column-mode':
+        this.moveToColumn();
+        break;
+      case 'dock-sidebar':
+        this.dockFromColumn();
+        break;
+      case 'undock':
+        if (this.isColumn) {
+          // Close column first, then undock
+          this.chatColumn.style.display = 'none';
+          this.chatColumnResizer.style.display = 'none';
+          this.sidebarChat.style.display = 'flex';
+          this.isColumn = false;
+        }
+        this.undockChat();
+        break;
+    }
   }
 
   toggleFloatingChat() {
@@ -461,17 +623,10 @@ class TravelConciergeChat {
 
   resetChatMessages(container) {
     if (!container) return;
-    const isFloating = container === this.floatingChatMessages;
-    Array.from(container.querySelectorAll('.chat-message')).forEach((msg, index) => {
-      if (index === 0) {
-        this.assignMessageIdentifiers(msg, isFloating);
-      } else {
-        msg.remove();
-      }
-    });
+    container.innerHTML = '';
   }
 
-  async handleSubmit(e, isFloating = false) {
+  async handleSubmit(e, isFloating = false, isColumn = false) {
     console.log('🚨 handleSubmit called');
 
     try {
@@ -485,9 +640,9 @@ class TravelConciergeChat {
         workingDataLocations: window.workingData?.locations?.length || 0
       });
 
-      const input = isFloating ? this.floatingChatInput : this.chatInput;
-    const messages = isFloating ? this.floatingChatMessages : this.chatMessages;
-    const sendBtn = isFloating ? this.floatingSendBtn : this.sendBtn;
+      const input = isColumn ? this.chatColumnInput : (isFloating ? this.floatingChatInput : this.chatInput);
+    const messages = isColumn ? this.chatColumnMessages : (isFloating ? this.floatingChatMessages : this.chatMessages);
+    const sendBtn = isColumn ? this.chatColumnSendBtn : (isFloating ? this.floatingSendBtn : this.sendBtn);
 
     const message = input.value.trim();
     if (!message) return;
@@ -744,12 +899,15 @@ class TravelConciergeChat {
   clearChat() {
     this.resetChatMessages(this.chatMessages);
     this.resetChatMessages(this.floatingChatMessages);
+    if (this.chatColumnMessages) {
+      this.resetChatMessages(this.chatColumnMessages);
+    }
     this.sessionId = null;
     this.currentChatId = null;
     this.messages = [];
 
     // Reset title to default
-    this.updateChatTitle('AI Travel Concierge');
+    this.updateChatTitle('New Chat');
 
     // Clear chat state from persistence
     this.statePersistence.saveChatState(null, [], null);
@@ -785,6 +943,9 @@ class TravelConciergeChat {
         messagesCount: this.messages?.length || 0,
         sessionId: this.sessionId
       });
+
+      // Update UI with new chat title
+      this.updateChatTitle('New Chat');
 
       // Save chat state
       this.statePersistence.saveChatState(this.currentChatId, this.messages, this.sessionId);
@@ -884,14 +1045,20 @@ class TravelConciergeChat {
       // Clear current chat UI
       this.chatMessages.innerHTML = '';
       this.floatingChatMessages.innerHTML = '';
+      if (this.chatColumnMessages) {
+        this.chatColumnMessages.innerHTML = '';
+      }
 
       // Render messages
       this.messages.forEach(msg => {
         this.addMessage(msg.text, msg.sender, false, false, false);
       });
 
-      // Sync to floating chat
+      // Sync to floating and column chat
       this.syncMessages(this.chatMessages, this.floatingChatMessages);
+      if (this.chatColumnMessages) {
+        this.syncMessages(this.chatMessages, this.chatColumnMessages);
+      }
 
       // Update the displayed title
       this.updateChatTitle(chatData.title || 'New Chat');
@@ -1092,9 +1259,20 @@ class TravelConciergeChat {
    * Update the displayed chat title
    */
   updateChatTitle(title) {
-    const displayTitle = title || 'AI Travel Concierge';
+    const displayTitle = title || 'New Chat';
+
+    // Update secondary header in column mode
+    const chatTitleSecondary = document.getElementById('chat-title-secondary');
+    if (chatTitleSecondary) {
+      chatTitleSecondary.textContent = displayTitle;
+    }
+
+    // Update floating chat title display
     if (this.chatTitleDisplay) {
       this.chatTitleDisplay.textContent = displayTitle;
+    }
+    if (this.chatTitleDisplayColumn) {
+      this.chatTitleDisplayColumn.textContent = displayTitle;
     }
     if (this.chatTitleDisplayFloating) {
       this.chatTitleDisplayFloating.textContent = displayTitle;
@@ -1104,10 +1282,10 @@ class TravelConciergeChat {
   /**
    * Start editing the chat title
    */
-  startEditingTitle(isFloating = false) {
+  startEditingTitle(isFloating = false, isColumn = false) {
     if (!this.currentChatId) return;
 
-    const titleElement = isFloating ? this.chatTitleDisplayFloating : this.chatTitleDisplay;
+    const titleElement = isColumn ? this.chatTitleDisplayColumn : (isFloating ? this.chatTitleDisplayFloating : this.chatTitleDisplay);
     if (!titleElement || titleElement.classList.contains('editing')) return;
 
     const currentTitle = titleElement.textContent;

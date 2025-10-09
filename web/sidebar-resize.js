@@ -109,3 +109,58 @@
     sidebarChat.style.height = savedHeight;
   }
 })();
+// Chat column resizer functionality
+(function() {
+  const chatColumnResizer = document.getElementById('chat-column-resizer');
+  const chatColumn = document.getElementById('chat-column');
+
+  if (!chatColumnResizer || !chatColumn) return;
+
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  chatColumnResizer.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = chatColumn.offsetWidth;
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+
+    // Calculate new width (add because we're dragging from the left edge)
+    const delta = startX - e.clientX;
+    const newWidth = startWidth + delta;
+
+    // Apply constraints
+    const minWidth = parseInt(getComputedStyle(chatColumn).minWidth) || 250;
+    const maxWidth = parseInt(getComputedStyle(chatColumn).maxWidth) || 600;
+
+    const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+    chatColumn.style.width = `${constrainedWidth}px`;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+
+      // Save the width to localStorage
+      localStorage.setItem('chatColumnWidth', chatColumn.style.width);
+    }
+  });
+
+  // Restore saved width on load
+  const savedWidth = localStorage.getItem('chatColumnWidth');
+  if (savedWidth) {
+    chatColumn.style.width = savedWidth;
+  }
+})();
