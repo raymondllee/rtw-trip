@@ -20,6 +20,8 @@ class TravelConciergeChat {
     this.messages = []; // In-memory message history
     this.firestoreEnabled = true; // Enable Firestore persistence (will be disabled on errors)
     this.statePersistence = new StatePersistence();
+    this.messageHistory = []; // User message history for arrow key navigation
+    this.historyIndex = -1; // Current position in history (-1 = not navigating)
 
     // ⚠️ KNOWN ISSUE: Non-deterministic behavior in AI responses
     // The AI backend sometimes responds with "I don't have access to your itinerary"
@@ -159,6 +161,9 @@ class TravelConciergeChat {
     });
     this.chatForm?.addEventListener('submit', (e) => this.handleSubmit(e));
 
+    // Arrow key history navigation for sidebar
+    this.chatInput?.addEventListener('keydown', (e) => this.handleHistoryNavigation(e, this.chatInput));
+
     // Chat menu listeners (sidebar)
     this.chatMenuBtn?.addEventListener('click', (e) => {
       console.log('🖱️ Chat menu button clicked');
@@ -177,6 +182,9 @@ class TravelConciergeChat {
     // Column chat listeners
     this.chatColumnForm?.addEventListener('submit', (e) => this.handleSubmit(e, false, true));
 
+    // Arrow key history navigation for column
+    this.chatColumnInput?.addEventListener('keydown', (e) => this.handleHistoryNavigation(e, this.chatColumnInput));
+
     // Chat menu listeners (column)
     this.chatMenuBtnColumn?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -193,6 +201,10 @@ class TravelConciergeChat {
 
     // Floating chat listeners
     this.floatingChatForm?.addEventListener('submit', (e) => this.handleSubmit(e, true));
+
+    // Arrow key history navigation for floating
+    this.floatingChatInput?.addEventListener('keydown', (e) => this.handleHistoryNavigation(e, this.floatingChatInput));
+
     this.dockBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.dockChat();
@@ -647,6 +659,10 @@ class TravelConciergeChat {
     const message = input.value.trim();
     if (!message) return;
 
+    // Add to message history for arrow key navigation
+    this.messageHistory.push(message);
+    this.historyIndex = -1; // Reset history navigation
+
     // Ensure we have a chat session before adding messages
     if (!this.currentChatId) {
       console.log('🆘 No currentChatId, creating new chat before sending message');
@@ -656,14 +672,14 @@ class TravelConciergeChat {
     }
 
     // Add user message to UI
-    this.addMessage(message, 'user', false, isFloating);
+    this.addMessage(message, 'user', false, isFloating, true, isColumn);
     input.value = '';
 
     // Disable input while processing
-    this.setLoading(true, isFloating);
+    this.setLoading(true, isFloating, isColumn);
 
     // Add loading message with timer
-    const loadingMsgId = this.addMessage('Thinking...', 'bot', true, isFloating);
+    const loadingMsgId = this.addMessage('Thinking...', 'bot', true, isFloating, true, isColumn);
     let elapsedSeconds = 0;
     const timerInterval = setInterval(() => {
       elapsedSeconds++;
@@ -773,12 +789,12 @@ class TravelConciergeChat {
       clearInterval(timerInterval);
 
       // Remove loading message
-      this.removeMessage(loadingMsgId, isFloating);
+      this.removeMessage(loadingMsgId, isFloating, isColumn);
 
       // Add bot response
       // ⚠️ NOTE: AI responses may be inconsistent. The AI might claim it cannot access the itinerary
       // even when complete context data was sent. Backend investigation needed for this non-deterministic behavior.
-      this.addMessage(data.response || data.response_text || 'Sorry, I could not generate a response.', 'bot', false, isFloating);
+      this.addMessage(data.response || data.response_text || 'Sorry, I could not generate a response.', 'bot', false, isFloating, true, isColumn);
 
       // If backend saved to Firestore, notify app to refresh cost UI
       if (data.saved_to_firestore) {
@@ -787,11 +803,20 @@ class TravelConciergeChat {
         } catch {}
       }
 
-      // Sync messages to the other view
-      if (isFloating) {
+      // Sync messages to the other views
+      if (isColumn) {
+        this.syncMessages(this.chatColumnMessages, this.chatMessages);
+        this.syncMessages(this.chatColumnMessages, this.floatingChatMessages);
+      } else if (isFloating) {
         this.syncMessages(this.floatingChatMessages, this.chatMessages);
+        if (this.chatColumnMessages) {
+          this.syncMessages(this.floatingChatMessages, this.chatColumnMessages);
+        }
       } else {
         this.syncMessages(this.chatMessages, this.floatingChatMessages);
+        if (this.chatColumnMessages) {
+          this.syncMessages(this.chatMessages, this.chatColumnMessages);
+        }
       }
 
     } catch (error) {
@@ -801,7 +826,7 @@ class TravelConciergeChat {
       clearInterval(timerInterval);
 
       // Remove loading message
-      this.removeMessage(loadingMsgId, isFloating);
+      this.removeMessage(loadingMsgId, isFloating, isColumn);
 
       // Show error message with details
       let errorMessage = 'Sorry, I encountered an error. ';
@@ -814,16 +839,25 @@ class TravelConciergeChat {
         errorMessage += `Error: ${error.message}`;
       }
 
-      this.addMessage(errorMessage, 'bot', false, isFloating);
+      this.addMessage(errorMessage, 'bot', false, isFloating, true, isColumn);
 
-      // Sync messages to the other view
-      if (isFloating) {
+      // Sync messages to the other views
+      if (isColumn) {
+        this.syncMessages(this.chatColumnMessages, this.chatMessages);
+        this.syncMessages(this.chatColumnMessages, this.floatingChatMessages);
+      } else if (isFloating) {
         this.syncMessages(this.floatingChatMessages, this.chatMessages);
+        if (this.chatColumnMessages) {
+          this.syncMessages(this.floatingChatMessages, this.chatColumnMessages);
+        }
       } else {
         this.syncMessages(this.chatMessages, this.floatingChatMessages);
+        if (this.chatColumnMessages) {
+          this.syncMessages(this.chatMessages, this.chatColumnMessages);
+        }
       }
     } finally {
-      this.setLoading(false, isFloating);
+      this.setLoading(false, isFloating, isColumn);
       console.log('🚨 === CHAT SUBMIT END ===');
       setTimeout(() => {
         console.log('🚨 App state after sending:', {
@@ -837,11 +871,11 @@ class TravelConciergeChat {
       console.error('🔥 CRITICAL ERROR in handleSubmit - this might be causing the page reload:', error);
       console.error('🔥 Error details:', error.message, error.stack);
       alert(`An error occurred while sending your message: ${error.message}`);
-      this.setLoading(false, isFloating);
+      this.setLoading(false, isFloating, isColumn);
     }
   }
 
-  addMessage(text, sender = 'bot', isLoading = false, isFloating = false, saveToFirestore = true) {
+  addMessage(text, sender = 'bot', isLoading = false, isFloating = false, saveToFirestore = true, isColumn = false) {
     // Generate ID without periods (replace decimal point with underscore)
     const baseMessageId = this.generateMessageId();
     const messageDiv = document.createElement('div');
@@ -855,7 +889,7 @@ class TravelConciergeChat {
 
     messageDiv.appendChild(contentDiv);
 
-    const messagesContainer = isFloating ? this.floatingChatMessages : this.chatMessages;
+    const messagesContainer = isColumn ? this.chatColumnMessages : (isFloating ? this.floatingChatMessages : this.chatMessages);
     messagesContainer.appendChild(messageDiv);
 
     // Scroll to bottom
@@ -879,20 +913,69 @@ class TravelConciergeChat {
     return messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
   }
 
-  removeMessage(messageId, isFloating = false) {
-    const message = this.getMessageElement(messageId, isFloating);
+  removeMessage(messageId, isFloating = false, isColumn = false) {
+    const messagesContainer = isColumn ? this.chatColumnMessages : (isFloating ? this.floatingChatMessages : this.chatMessages);
+    if (!messagesContainer) return;
+    const message = messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
     if (message) {
       message.remove();
     }
   }
 
-  setLoading(isLoading, isFloating = false) {
-    if (isFloating) {
+  setLoading(isLoading, isFloating = false, isColumn = false) {
+    if (isColumn) {
+      this.chatColumnInput.disabled = isLoading;
+      this.chatColumnSendBtn.disabled = isLoading;
+    } else if (isFloating) {
       this.floatingChatInput.disabled = isLoading;
       this.floatingSendBtn.disabled = isLoading;
     } else {
       this.chatInput.disabled = isLoading;
       this.sendBtn.disabled = isLoading;
+    }
+  }
+
+  handleHistoryNavigation(e, inputElement) {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+
+      if (this.messageHistory.length === 0) return;
+
+      // First time pressing up, start from the end
+      if (this.historyIndex === -1) {
+        this.historyIndex = this.messageHistory.length - 1;
+      } else if (this.historyIndex > 0) {
+        this.historyIndex--;
+      }
+
+      inputElement.value = this.messageHistory[this.historyIndex];
+
+      // Move cursor to end
+      setTimeout(() => {
+        inputElement.setSelectionRange(inputElement.value.length, inputElement.value.length);
+      }, 0);
+
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+
+      if (this.historyIndex === -1) return; // Not navigating
+
+      if (this.historyIndex < this.messageHistory.length - 1) {
+        this.historyIndex++;
+        inputElement.value = this.messageHistory[this.historyIndex];
+      } else {
+        // At the end, clear input
+        this.historyIndex = -1;
+        inputElement.value = '';
+      }
+
+      // Move cursor to end
+      setTimeout(() => {
+        inputElement.setSelectionRange(inputElement.value.length, inputElement.value.length);
+      }, 0);
+    } else if (e.key !== 'Enter') {
+      // Any other key resets history navigation
+      this.historyIndex = -1;
     }
   }
 
@@ -905,6 +988,7 @@ class TravelConciergeChat {
     this.sessionId = null;
     this.currentChatId = null;
     this.messages = [];
+    // Note: We keep messageHistory for arrow key navigation even when clearing chat
 
     // Reset title to default
     this.updateChatTitle('New Chat');
