@@ -66,6 +66,25 @@ function formatDateRange(a, b) {
   return '';
 }
 
+function formatDateCompact(a, b) {
+  if (!a || !b) return '';
+  const start = new Date(a + 'T00:00:00Z');
+  const end = new Date(b + 'T00:00:00Z');
+  const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: 'UTC' });
+  const startMonth = monthFmt.format(start);
+  const endMonth = monthFmt.format(end);
+  const startDay = start.getUTCDate();
+  const endDay = end.getUTCDate();
+  const year = start.getUTCFullYear();
+
+  // Same month: "Jul 22 – Aug 13, 2026"
+  if (startMonth === endMonth) {
+    return `${startMonth} ${startDay}–${endDay}, ${year}`;
+  }
+  // Different months: "Jul 22 – Aug 13, 2026"
+  return `${startMonth} ${startDay} – ${endMonth} ${endDay}, ${year}`;
+}
+
 function formatDate(date) {
   return date.toISOString().split('T')[0];
 }
@@ -919,8 +938,18 @@ async function initMapApp() {
       const leg = workingData.legs?.find(l => l.name === legName);
       const subLeg = leg?.sub_legs?.find(sl => sl.name === subLegName);
       if (subLeg) {
-        const startDate = formatDateRange(subLeg.start_date, subLeg.end_date);
-        summaryText = `${filtered.length} stops • ${subLegName} • ${startDate}`;
+        // Calculate total cost for filtered destinations
+        const totalCost = filtered.reduce((sum, loc) => {
+          const costs = (workingData.costs || []).filter(c => c.destination_id === loc.id);
+          const locationTotal = costs.reduce((locSum, cost) => {
+            return locSum + (parseFloat(cost.amount_usd) || 0);
+          }, 0);
+          return sum + locationTotal;
+        }, 0);
+
+        const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+        const dateRange = formatDateCompact(subLeg.start_date, subLeg.end_date);
+        summaryText = `${filtered.length} stops • ${subLegName} • ${dateRange} • ${formattedCost}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
