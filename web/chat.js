@@ -295,9 +295,20 @@ class TravelConciergeChat {
 
     handle.addEventListener('mousedown', (e) => {
       if (e.target === handle || e.target === handle.querySelector('h4')) {
+        // Get current position of element
+        const rect = element.getBoundingClientRect();
+        xOffset = rect.left;
+        yOffset = rect.top;
+
         initialX = e.clientX - xOffset;
         initialY = e.clientY - yOffset;
         isDragging = true;
+
+        // Convert to left/top positioning
+        element.style.left = `${xOffset}px`;
+        element.style.top = `${yOffset}px`;
+        element.style.right = 'auto';
+        element.style.bottom = 'auto';
       }
     });
 
@@ -311,8 +322,6 @@ class TravelConciergeChat {
 
         element.style.left = `${currentX}px`;
         element.style.top = `${currentY}px`;
-        element.style.right = 'auto';
-        element.style.bottom = 'auto';
       }
     });
 

@@ -251,20 +251,8 @@
   color: #666;
 }
 
-/* Modal Styles */
-.modal {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  padding: 20px;
-}
+/* Modal Styles - Note: This class name conflicts with main styles.css modal */
+/* Leaving this here but it shouldn't be used - use .modal-overlay instead */
 
 .modal-content {
   background: white;
@@ -649,28 +637,31 @@
 
 /* Destination Cost Summary */
 .destination-cost-summary {
-  margin-top: 8px;
-  padding: 8px 12px;
+  margin-top: 3px;
+  padding: 4px 8px;
   background: #f8f9fa;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .cost-total {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  gap: 8px;
+  flex: 1;
 }
 
 .cost-amount {
   font-weight: 700;
   color: #2563eb;
-  font-size: 16px;
+  font-size: 13px;
 }
 
 .cost-per-day {
-  font-size: 12px;
+  font-size: 10px;
   color: #666;
   font-weight: 500;
 }
@@ -678,13 +669,15 @@
 .cost-breakdown-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 4px 6px;
   border-radius: 4px;
   transition: all 0.2s;
-  font-size: 13px;
+  font-size: 12px;
   color: #666;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .cost-breakdown-toggle:hover {

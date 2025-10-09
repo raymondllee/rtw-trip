@@ -23,42 +23,20 @@
         <div class="destination-count"></div>
       </div>
 
-      <!-- Leg Filter Section -->
-      <div class="leg-filter-section">
-        <div class="leg-filters-row">
-          <label for="leg-filter" class="leg-filter-label">
-            <span>Itinerary View:</span>
-            <select id="leg-filter" class="leg-filter-select">
-              <option value="all" selected>All Legs</option>
-            </select>
-          </label>
-          <label for="sub-leg-filter" class="leg-filter-label" id="sub-leg-filter-container" style="display: none;">
-            <span>Sub-Region:</span>
-            <select id="sub-leg-filter" class="leg-filter-select">
-              <option value="">All Destinations</option>
-            </select>
-          </label>
-        </div>
-        <div class="filter-controls">
-          <label class="transport-toggle">
-            <input type="checkbox" id="routing-toggle">
-            <span>Show Transport</span>
-          </label>
-          <div id="planning-controls" class="planning-controls"></div>
-        </div>
+      <!-- Unified Filter and Scenario Section -->
+      <div class="unified-filter-section">
+        <div id="scenario-name-display" class="scenario-name-compact">Unsaved Changes</div>
+        <select id="leg-filter" class="filter-select-compact">
+          <option value="all" selected>All Legs</option>
+        </select>
+        <select id="sub-leg-filter" class="filter-select-compact" style="display: none;">
+          <option value="">All Destinations</option>
+        </select>
+        <button id="add-destination-bar-btn" class="add-destination-bar-btn" title="Add destination">+</button>
+        <button id="scenario-actions-btn" class="scenario-actions-btn-compact" title="Scenario actions">⋯</button>
+        <div class="save-indicator" id="save-indicator">✓</div>
       </div>
-
-      <!-- Scenario Controls -->
-      <div class="scenario-section">
-        <div class="scenario-header">
-          <label class="scenario-label">Scenario</label>
-          <div class="save-indicator" id="save-indicator">Saved ✓</div>
-        </div>
-        <div class="scenario-controls" style="display:flex; align-items:center; gap:8px;">
-          <div id="scenario-name-display" style="flex:1; font-weight:600; color:#333;">Unsaved Changes</div>
-          <button id="scenario-actions-btn" class="scenario-actions-btn" title="Scenario actions">⋯</button>
-        </div>
-      </div>
+      <div id="planning-controls" class="planning-controls" style="padding: 4px 12px;"></div>
 
       <!-- Scenario Actions Dropdown -->
       <div class="scenario-actions-dropdown" id="scenario-actions-dropdown" style="display: none;">
@@ -100,6 +78,15 @@
           <span>Data Integrity</span>
           <span id="data-integrity-badge" style="margin-left: auto;"></span>
         </button>
+        <div class="dropdown-divider"></div>
+        <button id="add-destination-menu-btn" class="dropdown-item">
+          <span class="icon">📍</span>
+          <span>Add Destination</span>
+        </button>
+        <label class="dropdown-item" style="cursor: pointer; margin: 0;">
+          <input type="checkbox" id="routing-toggle" style="margin-right: 8px;">
+          <span>Show Transport</span>
+        </label>
         <div class="dropdown-divider"></div>
         <button id="import-scenarios-btn" class="dropdown-item">
           <span class="icon">📥</span>

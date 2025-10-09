@@ -122,14 +122,14 @@ html, body {
 }
 
 .destination-item {
-  padding: 8px 12px;
+  padding: 4px 10px;
   border-bottom: 1px solid #f0f0f0;
   cursor: grab;
   transition: background-color 0.2s, transform 0.2s;
   user-select: none;
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 5px;
   position: relative;
 }
 
@@ -165,14 +165,14 @@ html, body {
 
 .destination-number {
   display: inline-block;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: #1e88e5;
   color: white;
   text-align: center;
-  line-height: 20px;
-  font-size: 11px;
+  line-height: 18px;
+  font-size: 10px;
   font-weight: bold;
   flex-shrink: 0;
 }
@@ -184,33 +184,37 @@ html, body {
 .destination-name {
   font-weight: 600;
   color: #333;
-  margin-bottom: 1px;
-  font-size: 14px;
+  margin-bottom: 0;
+  font-size: 13px;
   line-height: 1.2;
 }
 
 .destination-location {
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
   line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .destination-dates {
-  font-size: 11px;
+  font-size: 10px;
   color: #888;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .destination-activity {
   display: inline-block;
-  font-size: 11px;
-  padding: 2px 6px;
+  font-size: 10px;
+  padding: 1px 5px;
   border-radius: 3px;
   color: white;
-  margin-top: 4px;
+  margin: 0;
+  white-space: nowrap;
 }
 
 .editable-duration {
@@ -298,57 +302,97 @@ html, body {
   background: #d32f2f;
 }
 
-/* Leg Filter Section */
-.leg-filter-section {
+/* Unified Filter Section */
+.unified-filter-section {
   position: sticky;
-  top: 38px; /* Height of sidebar-header (8px top + 8px bottom + ~22px content) */
+  top: 38px;
   z-index: 100;
-  padding: 8px 12px;
+  padding: 6px 12px;
   border-bottom: 1px solid #eee;
-  background: #fafbfc;
+  background: #f8f9fa;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 8px;
 }
 
-.leg-filters-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.leg-filter-label {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #555;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+.scenario-name-compact {
   flex: 1;
-  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 100px;
 }
 
-.leg-filter-select {
-  padding: 6px 8px;
+.filter-select-compact {
+  padding: 4px 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
   background: white;
-  font-size: 13px;
-  font-weight: normal;
-  text-transform: none;
-  letter-spacing: normal;
+  font-size: 12px;
   cursor: pointer;
-  height: 32px;
+  height: 28px;
   box-sizing: border-box;
+  min-width: 100px;
 }
 
-.leg-filter-select:focus {
+.filter-select-compact:focus {
   outline: none;
   border-color: #1e88e5;
   box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.1);
+}
+
+.add-destination-bar-btn {
+  padding: 4px 8px;
+  border: 1px solid #1e88e5;
+  border-radius: 4px;
+  background: #1e88e5;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+  height: 28px;
+  min-width: 28px;
+}
+
+.add-destination-bar-btn:hover {
+  background: #1565c0;
+  border-color: #1565c0;
+}
+
+.add-destination-bar-btn:active {
+  transform: scale(0.95);
+}
+
+.scenario-actions-btn-compact {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  color: #666;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+  height: 28px;
+  min-width: 28px;
+}
+
+.scenario-actions-btn-compact:hover {
+  background: #e9ecef;
+  border-color: #999;
+  color: #333;
+}
+
+.scenario-actions-btn-compact.active {
+  background: #e3f2fd;
+  border-color: #1e88e5;
+  color: #1e88e5;
 }
 
 .filter-controls {
@@ -395,7 +439,7 @@ html, body {
 
 /* Scenario Section */
 .scenario-section {
-  padding: 10px 12px;
+  padding: 4px 12px;
   border-bottom: 1px solid #eee;
   background: #f8f9fa;
 }
@@ -404,7 +448,7 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 2px;
 }
 
 .scenario-label {
@@ -416,12 +460,14 @@ html, body {
 }
 
 .save-indicator {
-  font-size: 11px;
+  font-size: 12px;
   color: #27ae60;
   font-weight: 500;
   opacity: 0;
   transition: opacity 0.3s ease;
   pointer-events: none;
+  min-width: 20px;
+  text-align: center;
 }
 
 .save-indicator.show {
@@ -431,18 +477,18 @@ html, body {
 .scenario-controls {
   display: flex;
   gap: 4px;
-  align-items: stretch;
+  align-items: center;
 }
 
 /* scenario-selector removed; using scenario-name-display */
 
 .scenario-actions-btn {
-  padding: 7px 10px;
+  padding: 4px 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
   background: white;
   color: #666;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s;
@@ -657,21 +703,26 @@ textarea.form-input {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100000; /* Ensure above dropdowns and side panels */
+  z-index: 100000;
+  padding: 20px;
 }
 
-.modal {
+.modal-overlay .modal {
   background: white;
   border-radius: 8px;
   padding: 24px;
   min-width: 400px;
   max-width: 500px;
+  width: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   position: relative;
   z-index: 100001;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: auto;
+  box-sizing: border-box;
 }
 
 .modal h3 {
@@ -701,6 +752,8 @@ textarea.form-input {
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-input:focus {
@@ -749,6 +802,7 @@ textarea.form-input {
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border: 1px solid #ddd;
+  z-index: 100002 !important; /* Must be above modal (100001) */
 }
 
 .pac-item {

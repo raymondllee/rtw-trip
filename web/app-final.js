@@ -668,12 +668,10 @@ async function initMapApp() {
 
   const legFilter = document.getElementById('leg-filter');
   const subLegFilter = document.getElementById('sub-leg-filter');
-  const subLegFilterContainer = document.getElementById('sub-leg-filter-container');
 
   console.log('🔧 Sub-leg UI elements:', {
     legFilter: !!legFilter,
-    subLegFilter: !!subLegFilter,
-    subLegFilterContainer: !!subLegFilterContainer
+    subLegFilter: !!subLegFilter
   });
 
   function handleDataUpdate(newData, options = {}) {
@@ -718,7 +716,7 @@ async function initMapApp() {
 
     if (!legName || legName === 'all') {
       console.log('  ⚠️ Hiding sub-leg filter (no leg or "all" selected)');
-      subLegFilterContainer.style.display = 'none';
+      subLegFilter.style.display = 'none';
       return;
     }
 
@@ -737,10 +735,10 @@ async function initMapApp() {
         subLegFilter.appendChild(opt);
       });
       console.log('  ✅ Showing sub-leg filter');
-      subLegFilterContainer.style.display = 'block';
+      subLegFilter.style.display = 'block';
     } else {
       console.log('  ⚠️ No sub-legs found, hiding filter');
-      subLegFilterContainer.style.display = 'none';
+      subLegFilter.style.display = 'none';
     }
   }
 
@@ -1025,13 +1023,6 @@ async function initMapApp() {
     // Build sidebar with add buttons between destinations
     const sidebarItems = [];
 
-    // Add button at the top
-    sidebarItems.push(`
-      <div class="add-destination-btn" data-insert-index="0">
-        <span>+ Add destination at start</span>
-      </div>
-    `);
-
     locations.forEach((loc, idx) => {
       const dateRange = formatDateRange(loc.arrival_date, loc.departure_date);
       const duration = loc.duration_days || 1;
@@ -1137,12 +1128,14 @@ async function initMapApp() {
           <div class="destination-number" style="background: ${getActivityColor(loc.activity_type)}">${idx + 1}</div>
           <div class="destination-info">
             <div class="destination-name">${loc.name}</div>
-            <div class="destination-location">${[loc.city, loc.country].filter(Boolean).join(', ')}</div>
+            <div class="destination-location">
+              <span>${[loc.city, loc.country].filter(Boolean).join(', ')}</span>
+              ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
+            </div>
             <div class="destination-dates">
               ${dateRange ? `${dateRange} • ` : ''}
               <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}"> days
             </div>
-            ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
             ${costSummaryHTML}
             <div class="destination-cost-details" id="cost-details-${loc.id}">
               ${costBreakdownHTML}
@@ -1153,13 +1146,6 @@ async function initMapApp() {
             </div>
           </div>
           <button class="delete-destination-btn" data-location-id="${loc.id}" title="Delete destination">×</button>
-        </div>
-      `);
-      
-      // Add button after this destination
-      sidebarItems.push(`
-        <div class="add-destination-btn" data-insert-index="${idx + 1}">
-          <span>+ Add destination</span>
         </div>
       `);
     });
@@ -1206,15 +1192,7 @@ async function initMapApp() {
         }
       });
     });
-    
-    // Add click handlers for add buttons
-    destinationList.querySelectorAll('.add-destination-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const insertIndex = parseInt(e.currentTarget.dataset.insertIndex);
-        openAddDestinationModal(insertIndex);
-      });
-    });
-    
+
     setupDragAndDrop(destinationList, locations);
     setupDurationEditing(destinationList, locations);
     setupNotesEditing(destinationList, locations);
@@ -1378,15 +1356,59 @@ async function initMapApp() {
     });
   }
   
-  function openAddDestinationModal(insertIndex) {
+  // Calculate best insertion point based on geographic proximity
+  function findBestInsertionIndex(newLocation) {
+    if (!workingData.locations || workingData.locations.length === 0) {
+      return 0;
+    }
+
+    if (!newLocation || !newLocation.lat || !newLocation.lng) {
+      console.warn('Invalid location data, appending to end');
+      return workingData.locations.length;
+    }
+
+    const newLat = newLocation.lat;
+    const newLng = newLocation.lng;
+
+    // Calculate distance to each existing location
+    let minDistance = Infinity;
+    let bestIndex = workingData.locations.length; // Default to end
+
+    workingData.locations.forEach((loc, idx) => {
+      // Skip locations without valid coordinates
+      if (!loc.coordinates || !loc.coordinates.lat || !loc.coordinates.lng) {
+        console.warn('Skipping location without coordinates:', loc.name);
+        return;
+      }
+
+      const distance = Math.sqrt(
+        Math.pow(loc.coordinates.lat - newLat, 2) +
+        Math.pow(loc.coordinates.lng - newLng, 2)
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        // Insert after the nearest neighbor
+        bestIndex = idx + 1;
+      }
+    });
+
+    console.log('Best insertion index:', bestIndex, 'nearest distance:', minDistance);
+    return bestIndex;
+  }
+
+  function openAddDestinationModal(insertIndex = null) {
+    // If no index specified, we'll calculate it after place selection
     pendingInsertIndex = insertIndex;
     const modal = document.getElementById('add-destination-modal');
     const searchInput = document.getElementById('location-search');
     const durationInput = document.getElementById('duration-input');
-    
+
+    console.log('Opening modal:', { modal, searchInput, durationInput, insertIndex });
+
     searchInput.value = '';
     durationInput.value = '3';
-    
+
     if (!document.getElementById('selected-place')) {
       const hiddenInput = document.createElement('input');
       hiddenInput.type = 'hidden';
@@ -1394,10 +1416,11 @@ async function initMapApp() {
       document.getElementById('add-destination-form').appendChild(hiddenInput);
     }
     document.getElementById('selected-place').value = '';
-    
+
     modal.style.display = 'flex';
+    console.log('Modal display set to flex, computed style:', window.getComputedStyle(modal).display);
     searchInput.focus();
-    
+
     if (autocomplete) {
       autocomplete.setBounds(map.getBounds());
     }
@@ -1436,14 +1459,27 @@ async function initMapApp() {
   
   function addNewDestination(insertIndex, placeData, duration) {
     const addressInfo = parseAddressComponents(placeData.address_components || []);
-    
+
+    // Determine leg and sub_leg from neighbor
+    let leg = null;
+    let sub_leg = null;
+    if (workingData.locations && workingData.locations.length > 0) {
+      // Use the neighbor before the insertion point, or after if inserting at start
+      const neighborIndex = insertIndex > 0 ? insertIndex - 1 : 0;
+      const neighbor = workingData.locations[neighborIndex];
+      if (neighbor) {
+        leg = neighbor.leg || null;
+        sub_leg = neighbor.sub_leg || null;
+      }
+    }
+
     const newLocation = {
       id: generateNewLocationId(),
       name: placeData.name,
       city: addressInfo.city,
       country: addressInfo.country,
       region: addressInfo.region || 'Custom',
-      coordinates: {
+      coordinates: {  // Use 'coordinates' to match data structure
         lat: placeData.location.lat,
         lng: placeData.location.lng
       },
@@ -1452,11 +1488,14 @@ async function initMapApp() {
       highlights: [],
       notes: '',
       arrival_date: null,
-      departure_date: null
+      departure_date: null,
+      leg: leg,
+      sub_leg: sub_leg
     };
-    
+
     workingData.locations.splice(insertIndex, 0, newLocation);
     recalculateDates(workingData.locations);
+    recalculateTripMetadata();
     render(legFilter.value, subLegFilter.value, routingToggle.checked);
     closeAddDestinationModal();
   }
@@ -2050,6 +2089,21 @@ async function initMapApp() {
     });
   }
 
+  // Add destination from menu
+  document.getElementById('add-destination-menu-btn').addEventListener('click', () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    scenarioActionsDropdown.style.display = 'none';
+    scenarioActionsBtn.classList.remove('active');
+
+    openAddDestinationModal(null); // null means auto-calculate insertion point
+  });
+
+  // Add destination from bar button
+  document.getElementById('add-destination-bar-btn').addEventListener('click', () => {
+    openAddDestinationModal(null); // null means auto-calculate insertion point
+  });
+
   // Cost tracking buttons
   document.getElementById('add-cost-btn').addEventListener('click', () => {
     const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
@@ -2250,18 +2304,26 @@ async function initMapApp() {
   // Form submissions
   document.getElementById('add-destination-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    
+
     const selectedPlaceData = document.getElementById('selected-place').value;
     const duration = parseInt(document.getElementById('duration-input').value) || 3;
-    
+
     if (!selectedPlaceData) {
       alert('Please select a location from the suggestions.');
       return;
     }
-    
+
     try {
       const placeData = JSON.parse(selectedPlaceData);
-      addNewDestination(pendingInsertIndex, placeData, duration);
+
+      // If no insert index specified, calculate based on geography
+      let insertIndex = pendingInsertIndex;
+      if (insertIndex === null) {
+        insertIndex = findBestInsertionIndex(placeData.location);
+        console.log('Auto-calculated insertion index:', insertIndex);
+      }
+
+      addNewDestination(insertIndex, placeData, duration);
     } catch (error) {
       console.error('Error parsing place data:', error);
       alert('Error adding destination. Please try again.');
