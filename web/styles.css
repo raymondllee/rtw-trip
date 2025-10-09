@@ -88,6 +88,9 @@ html, body {
 }
 
 .sidebar-header {
+  position: sticky;
+  top: 0;
+  z-index: 101;
   padding: 8px 12px;
   border-bottom: 1px solid #eee;
   background: #f8f9fa;
@@ -297,6 +300,9 @@ html, body {
 
 /* Leg Filter Section */
 .leg-filter-section {
+  position: sticky;
+  top: 38px; /* Height of sidebar-header (8px top + 8px bottom + ~22px content) */
+  z-index: 100;
   padding: 8px 12px;
   border-bottom: 1px solid #eee;
   background: #fafbfc;

@@ -18,6 +18,9 @@ import {
   generateBulkCostPrompt
 } from './cost-backlog.js';
 
+// Re-export validateDataIntegrity for use by app-final.js
+export { validateDataIntegrity };
+
 const ALLOWED_COST_CATEGORIES = new Set([
   'flight',
   'accommodation',

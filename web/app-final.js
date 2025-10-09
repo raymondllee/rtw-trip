@@ -1,7 +1,7 @@
 import { FirestoreScenarioManager } from './firestore-scenario-manager.js';
 import { StatePersistence } from './state-persistence.js';
 import { summaryManager } from './summary-manager.js';
-import { addDataIntegrityButton } from './data-integrity-ui.js';
+import { showDataIntegrityPanel, validateDataIntegrity } from './data-integrity-ui.js';
 import { generateDestinationId, normalizeId } from './destination-id-manager.js';
 import {
   showDestinationDeletionDialog,
@@ -640,9 +640,14 @@ async function initMapApp() {
     }
 
     // If still no data loaded (no Firestore scenarios or static file), show helpful message
-    if (!scenarioLoaded && workingData.locations.length === 0) {
+    if (!scenarioLoaded && (!workingData.locations || workingData.locations.length === 0)) {
       console.warn('⚠️ No scenarios found in Firestore and no static data file. App will start empty.');
     }
+
+    // Ensure workingData has required properties
+    if (!workingData.locations) workingData.locations = [];
+    if (!workingData.legs) workingData.legs = [];
+    if (!workingData.costs) workingData.costs = [];
   } catch (error) {
     console.warn('Could not load from Firestore, using default data:', error);
     // Fall back to original data if Firestore fails
@@ -683,10 +688,17 @@ async function initMapApp() {
   }
 
   function refreshDataIntegrityButton() {
-    const container = document.getElementById('planning-controls');
-    if (!container) return;
-    container.innerHTML = '';
-    addDataIntegrityButton(workingData, handleDataUpdate, 'planning-controls');
+    // Update the badge in the dropdown instead of adding a separate button
+    const badge = document.getElementById('data-integrity-badge');
+    if (!badge) return;
+
+    const validation = validateDataIntegrity(workingData);
+    if (validation.valid && validation.warnings.length === 0) {
+      badge.innerHTML = '<span style="color: #28a745; font-size: 12px;">✓ All OK</span>';
+    } else {
+      const issueCount = validation.errors.length + validation.warnings.length;
+      badge.innerHTML = `<span style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">${issueCount}</span>`;
+    }
   }
 
   const legs = groupLegs(workingData);
@@ -865,7 +877,7 @@ async function initMapApp() {
     });
     currentRoutingElements = [];
 
-    const filtered = subLegName
+    const filtered = (subLegName && subLegName !== '')
       ? filterBySubLeg(workingData, legName, subLegName)
       : filterByLeg(workingData, legName);
     currentLocations = filtered;
@@ -2061,6 +2073,15 @@ async function initMapApp() {
     await costUI.showCostDetails();
   });
 
+  document.getElementById('data-integrity-btn').addEventListener('click', () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    if (scenarioActionsDropdown) scenarioActionsDropdown.style.display = 'none';
+    if (scenarioActionsBtn) scenarioActionsBtn.classList.remove('active');
+
+    showDataIntegrityPanel(workingData, handleDataUpdate);
+  });
+
   document.getElementById('compare-costs-btn').addEventListener('click', async () => {
     const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
     const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
@@ -2506,7 +2527,7 @@ async function initMapApp() {
     const legData = workingData.legs?.find(l => l.name === legName);
     console.log('🔧 legData found:', !!legData, legData?.name || 'null');
 
-    const filtered = subLegName
+    const filtered = (subLegName && subLegName !== '')
       ? filterBySubLeg(workingData, legName, subLegName)
       : filterByLeg(workingData, legName);
 
