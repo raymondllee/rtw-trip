@@ -525,12 +525,28 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
         ${costBreakdownHTML}
         ${notes ? `<div style="background: #f8f9fa; padding: 8px; border-radius: 4px; margin: 8px 0; border-left: 3px solid ${activityColor}; font-size: 13px; color: #555;"><strong style="color: #333;">Notes:</strong><br>${notes.replace(/\n/g, '<br>')}</div>` : ''}
         ${highlights.length ? `<ul style="margin: 8px 0 0 18px; padding: 0;">${highlights.map(h => `<li style="margin: 2px 0;">${h}</li>`).join('')}</ul>` : ''}
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
+          <a href="#" class="view-json-link" data-location-index="${index}" style="font-size: 12px; color: #1e88e5; text-decoration: none;">View JSON</a>
+        </div>
       </div>
     `;
 
     info.setOptions({ maxWidth: 360 });
     info.setContent(content);
     info.open({ anchor: marker, map });
+
+    // Add click handler for View JSON link
+    // Capture location in closure
+    const locationData = location;
+    setTimeout(() => {
+      const jsonLink = document.querySelector('.view-json-link');
+      if (jsonLink) {
+        jsonLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          alert(JSON.stringify(locationData, null, 2));
+        });
+      }
+    }, 0);
     
     map.panTo(marker.getPosition());
     
@@ -1294,16 +1310,27 @@ async function initMapApp() {
   
   function setupNotesEditing(container, filteredLocations) {
     container.querySelectorAll('.editable-notes').forEach(textarea => {
+      // Auto-resize function
+      const autoResize = () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+      };
+
+      // Initial resize
+      autoResize();
+
       // Auto-save notes on change with debouncing
       let notesTimer = null;
-      
+
       textarea.addEventListener('input', (e) => {
+        autoResize();
+
         const locationId = e.target.dataset.locationId;
         const newNotes = e.target.value;
-        
+
         // Clear previous timer
         if (notesTimer) clearTimeout(notesTimer);
-        
+
         // Set new timer to save after 1 second of no typing
         notesTimer = setTimeout(() => {
           const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
@@ -1313,11 +1340,11 @@ async function initMapApp() {
           }
         }, 1000);
       });
-      
+
       textarea.addEventListener('click', (e) => {
         e.stopPropagation();
       });
-      
+
       textarea.addEventListener('focus', (e) => {
         e.stopPropagation();
       });

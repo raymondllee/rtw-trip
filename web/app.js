@@ -204,12 +204,30 @@ function addMarkersAndPath(map, locations, showRouting = false) {
         ${meta ? `<div class="info-meta">${meta}</div>` : ''}
         ${activity ? `<div class="info-badge" style="background:${activityColor}">${activity}</div>` : ''}
         ${highlights.length ? `<ul class="info-highlights">${highlights.map(h => `<li>${h}</li>`).join('')}</ul>` : ''}
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
+          <a href="#" class="view-json-link" data-location-id="${location.id}" style="font-size: 12px; color: #1e88e5; text-decoration: none;">View JSON</a>
+        </div>
       </div>
     `;
 
     info.setOptions({ maxWidth: 360 });
     info.setContent(content);
     info.open({ anchor: marker, map });
+
+    // Add click handler for View JSON link
+    setTimeout(() => {
+      const jsonLink = document.querySelector('.view-json-link');
+      if (jsonLink) {
+        jsonLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          const locationId = e.target.dataset.locationId;
+          const loc = workingData.locations.find(l => idsEqual(l.id, locationId));
+          if (loc) {
+            alert(JSON.stringify(loc, null, 2));
+          }
+        });
+      }
+    }, 0);
     
     // Center map on marker
     map.panTo(marker.getPosition());
