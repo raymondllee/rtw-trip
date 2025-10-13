@@ -183,10 +183,22 @@ function getCategoryDisplayName(category) {
 }
 
 // Generate cost breakdown HTML
-function generateCostBreakdownHTML(costs, showEmpty = false) {
+function generateCostBreakdownHTML(costs, showEmpty = false, destinationName = '') {
   if (!costs || !costs.byCategory) {
     return '<div class="cost-breakdown-empty">No cost data available</div>';
   }
+
+  const updateButton = destinationName ? `
+    <div class="destination-cost-update">
+      <button
+        class="update-costs-btn"
+        data-destination-name="${destinationName}"
+        title="Ask AI to research costs"
+      >
+        💰 Update costs for ${destinationName}
+      </button>
+    </div>
+  ` : '';
 
   // Enhanced detailed view with all metadata
   if (costs.items && costs.items.length > 0) {
@@ -219,7 +231,7 @@ function generateCostBreakdownHTML(costs, showEmpty = false) {
         `;
       }).join('');
 
-    return `<div class="cost-breakdown">${breakdownItems}</div>`;
+    return `${updateButton}<div class="cost-breakdown">${breakdownItems}</div>`;
   }
 
   // Fallback to category-based summary if no individual items
@@ -259,6 +271,7 @@ function generateCostBreakdownHTML(costs, showEmpty = false) {
   }
 
   return `
+    ${updateButton}
     <div class="cost-breakdown">
       ${breakdownItems.join('')}
     </div>

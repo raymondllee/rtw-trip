@@ -127,7 +127,7 @@ export function getCategoryDisplayName(category) {
 }
 
 // Generate cost breakdown HTML
-export function generateCostBreakdownHTML(costs, showEmpty = false) {
+export function generateCostBreakdownHTML(costs, showEmpty = false, destinationName = '') {
   if (!costs || !costs.byCategory) {
     return '<div class="cost-breakdown-empty">No cost data available</div>';
   }
@@ -167,7 +167,20 @@ export function generateCostBreakdownHTML(costs, showEmpty = false) {
     return '<div class="cost-breakdown-empty">No cost data available</div>';
   }
 
+  const updateButton = destinationName ? `
+    <div class="destination-cost-update">
+      <button
+        class="update-costs-btn"
+        data-destination-name="${destinationName}"
+        title="Ask AI to research costs"
+      >
+        💰 Update costs for ${destinationName}
+      </button>
+    </div>
+  ` : '';
+
   return `
+    ${updateButton}
     <div class="cost-breakdown">
       ${breakdownItems.join('')}
     </div>

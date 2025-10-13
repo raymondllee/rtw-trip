@@ -798,9 +798,15 @@ class TravelConciergeChat {
 
       // If backend saved to Firestore, notify app to refresh cost UI
       if (data.saved_to_firestore) {
+        console.log('🎉 Backend saved costs to Firestore, dispatching costs-updated event');
         try {
           window.dispatchEvent(new Event('costs-updated'));
-        } catch {}
+          console.log('✅ costs-updated event dispatched successfully');
+        } catch (err) {
+          console.error('❌ Failed to dispatch costs-updated event:', err);
+        }
+      } else {
+        console.log('ℹ️ Backend did not save costs (saved_to_firestore was false)');
       }
 
       // Sync messages to the other views

@@ -957,32 +957,71 @@ def delete_cost(cost_id):
 
 @app.route('/api/costs', methods=['GET'])
 def get_costs():
-    """Get all costs or filtered costs."""
+    """Get all costs or filtered costs from Firestore."""
     try:
+        from google.cloud import firestore
+
         session_id = request.args.get('session_id', 'default')
         destination_id = request.args.get('destination_id')
         category = request.args.get('category')
-        start_date = request.args.get('start_date')
-        end_date = request.args.get('end_date')
 
-        tracker = get_cost_tracker(session_id)
+        print(f"📥 GET /api/costs - session_id: {session_id}, destination_id: {destination_id}, category: {category}")
 
-        if any([destination_id, category, start_date, end_date]):
-            costs = tracker.filter_costs(
-                destination_id=destination_id,
-                category=category,
-                start_date=start_date,
-                end_date=end_date
+        # Try to fetch from Firestore first (session_id is actually scenario_id)
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(session_id)
+        scenario_doc = scenario_ref.get()
+
+        costs = []
+
+        if scenario_doc.exists:
+            print(f"✅ Found scenario in Firestore: {session_id}")
+            scenario_data = scenario_doc.to_dict()
+
+            # Get latest version
+            versions = list(
+                scenario_ref
+                    .collection('versions')
+                    .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                    .limit(1)
+                    .stream()
             )
-        else:
-            costs = tracker.costs
 
+            if versions:
+                latest_version_data = versions[0].to_dict() or {}
+                itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+                costs_data = itinerary_data.get('costs', [])
+
+                print(f"📦 Found {len(costs_data)} costs in Firestore")
+
+                # Filter costs if needed
+                if destination_id:
+                    costs_data = [c for c in costs_data if str(c.get('destination_id', '')).strip() == str(destination_id).strip()]
+                if category:
+                    costs_data = [c for c in costs_data if c.get('category') == category]
+
+                costs = costs_data
+            else:
+                print(f"⚠️ No versions found for scenario: {session_id}")
+        else:
+            print(f"⚠️ Scenario not found in Firestore, falling back to in-memory tracker")
+            # Fall back to in-memory tracker
+            tracker = get_cost_tracker(session_id)
+            if any([destination_id, category]):
+                costs = tracker.filter_costs(destination_id=destination_id, category=category)
+            else:
+                costs = tracker.costs
+            costs = [cost.model_dump() for cost in costs]
+
+        print(f"📤 Returning {len(costs)} costs")
         return jsonify({
             'status': 'success',
-            'costs': [cost.model_dump() for cost in costs]
+            'costs': costs
         })
     except Exception as e:
-        print(f"Error getting costs: {e}")
+        import traceback
+        print(f"❌ Error getting costs: {e}")
+        print(traceback.format_exc())
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route('/api/costs/summary', methods=['POST'])

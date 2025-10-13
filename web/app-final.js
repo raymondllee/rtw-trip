@@ -115,10 +115,12 @@ function filterByLeg(data, legName) {
   const leg = data.legs?.find(l => l.name === legName);
   if (!leg) return data.locations || [];
 
+  // Filter by regions, not by static date ranges
+  const legRegions = leg.regions || [];
+  if (legRegions.length === 0) return data.locations || [];
+
   return (data.locations || []).filter(location => {
-    if (!location.arrival_date && !location.departure_date) return false;
-    const locDate = location.arrival_date || location.departure_date;
-    return locDate >= leg.start_date && locDate <= leg.end_date;
+    return legRegions.includes(location.region);
   });
 }
 
@@ -837,40 +839,11 @@ async function initMapApp() {
     if (lastDate) {
       workingData.trip = workingData.trip || {};
       workingData.trip.end_date = formatDate(lastDate);
-      if (firstDate) {
-        const span = Math.max(1, Math.round((lastDate - firstDate) / msPerDay) + 1);
-        workingData.trip.total_days = span;
-      }
+      // Note: total_days is calculated dynamically from location durations, not stored statically
     }
 
-    if (Array.isArray(workingData.legs)) {
-      workingData.legs.forEach((leg) => {
-        const legRegions = leg.regions || [];
-        const legLocations = locations.filter((loc) => legRegions.includes(loc.region));
-
-        if (!legLocations.length) {
-          return;
-        }
-
-        const legFirst = legLocations[0];
-        const legLast = legLocations[legLocations.length - 1];
-
-        const legStart = toDate(legFirst.arrival_date) || toDate(legFirst.departure_date);
-        const legEnd = toDate(legLast.departure_date) || toDate(legLast.arrival_date);
-
-        if (legStart) leg.start_date = formatDate(legStart);
-        if (legEnd) {
-          leg.end_date = formatDate(legEnd);
-          if (legStart) {
-            const durationDays = Math.max(
-              1,
-              Math.round((legEnd - legStart) / msPerDay) + 1
-            );
-            leg.duration_days = durationDays;
-          }
-        }
-      });
-    }
+    // Note: Leg start_date, end_date, and duration_days are calculated dynamically
+    // from location data when needed, not stored as static metadata
   }
 
   function recalculateDates(locations, startDate) {
@@ -932,31 +905,93 @@ async function initMapApp() {
     const sidebarSummary = document.getElementById('sidebar-summary');
     let summaryText = '';
 
+    // Helper function to calculate total cost for filtered destinations
+    const calculateTotalCost = (destinations) => {
+      return destinations.reduce((sum, loc) => {
+        // Use the same cost calculation function used elsewhere for consistency
+        const allCosts = workingData.costs || [];
+        const locationCosts = window.calculateDestinationCosts
+          ? window.calculateDestinationCosts(loc.id, allCosts, loc, workingData.locations)
+          : { total: allCosts.filter(c => c.destination_id === loc.id).reduce((s, cost) => s + (parseFloat(cost.amount_usd) || 0), 0) };
+        return sum + locationCosts.total;
+      }, 0);
+    };
+
+    // Helper function to calculate total duration for filtered destinations
+    const calculateTotalDuration = (destinations) => {
+      return destinations.reduce((sum, loc) => {
+        return sum + (loc.duration_days || 1);
+      }, 0);
+    };
+
     if (legName === 'all') {
-      summaryText = `${filtered.length} stops • ${workingData.trip?.duration || ''} • ${workingData.trip?.total_cost || ''}`;
+      const totalCost = calculateTotalCost(filtered);
+      const totalDays = calculateTotalDuration(filtered);
+      const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+      summaryText = `${filtered.length} stops • ${totalDays} days • ${formattedCost}`;
     } else if (subLegName) {
       const leg = workingData.legs?.find(l => l.name === legName);
       const subLeg = leg?.sub_legs?.find(sl => sl.name === subLegName);
       if (subLeg) {
-        // Calculate total cost for filtered destinations
-        const totalCost = filtered.reduce((sum, loc) => {
-          const costs = (workingData.costs || []).filter(c => c.destination_id === loc.id);
-          const locationTotal = costs.reduce((locSum, cost) => {
-            return locSum + (parseFloat(cost.amount_usd) || 0);
-          }, 0);
-          return sum + locationTotal;
-        }, 0);
-
+        const totalCost = calculateTotalCost(filtered);
         const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
-        const dateRange = formatDateCompact(subLeg.start_date, subLeg.end_date);
-        summaryText = `${filtered.length} stops • ${subLegName} • ${dateRange} • ${formattedCost}`;
+
+        // Calculate date range from actual filtered locations, not static subLeg metadata
+        let dateRange = '';
+        if (filtered.length > 0) {
+          // Sort locations by date to find chronological first and last
+          const sortedLocations = [...filtered].sort((a, b) => {
+            const dateA = a.arrival_date || a.departure_date || '';
+            const dateB = b.arrival_date || b.departure_date || '';
+            return dateA.localeCompare(dateB);
+          });
+
+          const firstLocation = sortedLocations[0];
+          const lastLocation = sortedLocations[sortedLocations.length - 1];
+          const startDate = firstLocation.arrival_date || firstLocation.departure_date;
+          const endDate = lastLocation.departure_date || lastLocation.arrival_date;
+
+          if (startDate && endDate) {
+            dateRange = formatDateCompact(startDate, endDate);
+          }
+        }
+
+        summaryText = dateRange
+          ? `${filtered.length} stops • ${subLegName} • ${dateRange} • ${formattedCost}`
+          : `${filtered.length} stops • ${subLegName} • ${formattedCost}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
     } else {
       const leg = workingData.legs?.find(l => l.name === legName);
       if (leg) {
-        summaryText = `${filtered.length} stops • ${leg.duration_days} days • ${leg.total_cost}`;
+        const totalCost = calculateTotalCost(filtered);
+        const totalDays = calculateTotalDuration(filtered);
+        const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+
+        // Calculate date range from actual filtered locations, not static leg metadata
+        let dateRange = '';
+        if (filtered.length > 0) {
+          // Sort locations by date to find chronological first and last
+          const sortedLocations = [...filtered].sort((a, b) => {
+            const dateA = a.arrival_date || a.departure_date || '';
+            const dateB = b.arrival_date || b.departure_date || '';
+            return dateA.localeCompare(dateB);
+          });
+
+          const firstLocation = sortedLocations[0];
+          const lastLocation = sortedLocations[sortedLocations.length - 1];
+          const startDate = firstLocation.arrival_date || firstLocation.departure_date;
+          const endDate = lastLocation.departure_date || lastLocation.arrival_date;
+
+          if (startDate && endDate) {
+            dateRange = formatDateCompact(startDate, endDate);
+          }
+        }
+
+        summaryText = dateRange
+          ? `${filtered.length} stops • ${legName} • ${dateRange} • ${formattedCost}`
+          : `${filtered.length} stops • ${legName} • ${totalDays} days • ${formattedCost}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
@@ -1178,6 +1213,13 @@ async function initMapApp() {
     console.log(`🎨 Rendering sidebar with ${costs.length} total costs for ${locations.length} locations`);
     console.log(`📍 Location IDs being displayed:`, locations.map(l => `${l.name}(${l.id})`));
     console.log(`💰 Cost destination IDs:`, [...new Set(costs.map(c => c.destination_id))].sort());
+    console.log(`💵 Full cost data:`, costs.map(c => ({
+      id: c.id,
+      dest_id: c.destination_id,
+      amount: c.amount_usd,
+      category: c.category,
+      desc: c.description?.substring(0, 30)
+    })));
 
     
     // Build sidebar with add buttons between destinations
@@ -1197,7 +1239,7 @@ async function initMapApp() {
         destinationCosts = window.calculateDestinationCosts(loc.id, costs, loc, workingData.locations);
         console.log(`💵 ${loc.name}: ${destinationCosts.count} costs, $${destinationCosts.total}`);
         costSummaryHTML = window.generateSidebarCostSummary(destinationCosts, duration, loc.name);
-        costBreakdownHTML = window.generateCostBreakdownHTML(destinationCosts);
+        costBreakdownHTML = window.generateCostBreakdownHTML(destinationCosts, false, loc.name);
         costDetailsHTML = window.generateCostSummaryHTML(destinationCosts, duration);
       } else {
         // Fallback: simple cost calculation without external functions
@@ -2420,14 +2462,34 @@ async function initMapApp() {
 
   // Update itinerary data and cost summary when costs change
   window.addEventListener('costs-updated', async () => {
+    console.log('🔄 costs-updated event received, refreshing costs...');
     try {
+      // Always use scenario ID (costs are stored per scenario, not per chat session)
       if (currentScenarioId) {
-        await window.loadScenarioById(currentScenarioId);
+        console.log(`📡 Fetching costs for scenario: ${currentScenarioId}`);
+        const freshCosts = await costUI.fetchCosts({ session_id: currentScenarioId });
+        console.log(`📦 Received ${freshCosts?.length || 0} costs from backend`);
+
+        if (freshCosts && Array.isArray(freshCosts)) {
+          workingData.costs = freshCosts;
+          console.log(`✅ Updated workingData.costs with ${freshCosts.length} costs`);
+          console.log(`💰 Cost IDs:`, freshCosts.map(c => `${c.id}: ${c.amount_usd} for ${c.destination_id}`));
+
+          // Re-render only the sidebar with fresh data
+          const filtered = (subLegFilter.value && subLegFilter.value !== '')
+            ? filterBySubLeg(workingData, legFilter.value, subLegFilter.value)
+            : filterByLeg(workingData, legFilter.value);
+          updateSidebar(filtered);
+
+          await updateCostSummary();
+        } else {
+          console.warn('⚠️ No costs returned or invalid format');
+        }
+      } else {
+        console.warn('⚠️ No currentScenarioId, skipping cost refresh');
       }
     } catch (error) {
-      console.error('Error refreshing scenario after cost update:', error);
-    } finally {
-      await updateCostSummary();
+      console.error('❌ Error refreshing costs after update:', error);
     }
   });
 
@@ -2456,11 +2518,10 @@ async function initMapApp() {
   }
 
   function calculateTotalDays() {
-    if (!workingData.trip?.start_date || !workingData.trip?.end_date) return 0;
-    const start = new Date(workingData.trip.start_date);
-    const end = new Date(workingData.trip.end_date);
-    const diffTime = Math.abs(end - start);
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    // Calculate total days from sum of location durations, not date ranges
+    // This ensures consistency with how durations are displayed elsewhere
+    const locations = workingData.locations || [];
+    return locations.reduce((sum, loc) => sum + (loc.duration_days || 1), 0);
   }
 
   // Initial cost summary update
