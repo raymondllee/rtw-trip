@@ -924,41 +924,51 @@ async function initMapApp() {
       }, 0);
     };
 
+    // Helper function to calculate date range from filtered locations
+    const calculateDateRange = (destinations) => {
+      if (destinations.length === 0) return '';
+
+      // Sort locations by date to find chronological first and last
+      const sortedLocations = [...destinations].sort((a, b) => {
+        const dateA = a.arrival_date || a.departure_date || '';
+        const dateB = b.arrival_date || b.departure_date || '';
+        return dateA.localeCompare(dateB);
+      });
+
+      const firstLocation = sortedLocations[0];
+      const lastLocation = sortedLocations[sortedLocations.length - 1];
+      const startDate = firstLocation.arrival_date || firstLocation.departure_date;
+      const endDate = lastLocation.departure_date || lastLocation.arrival_date;
+
+      if (startDate && endDate) {
+        return formatDateCompact(startDate, endDate);
+      }
+      return '';
+    };
+
     if (legName === 'all') {
       const totalCost = calculateTotalCost(filtered);
       const totalDays = calculateTotalDuration(filtered);
+      const dateRange = calculateDateRange(filtered);
       const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
-      summaryText = `${filtered.length} stops • ${totalDays} days • ${formattedCost}`;
+
+      // Format: stops • duration • dates • cost
+      summaryText = dateRange
+        ? `${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}`
+        : `${filtered.length} stops • ${totalDays} days • ${formattedCost}`;
     } else if (subLegName) {
       const leg = workingData.legs?.find(l => l.name === legName);
       const subLeg = leg?.sub_legs?.find(sl => sl.name === subLegName);
       if (subLeg) {
         const totalCost = calculateTotalCost(filtered);
+        const totalDays = calculateTotalDuration(filtered);
+        const dateRange = calculateDateRange(filtered);
         const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
 
-        // Calculate date range from actual filtered locations, not static subLeg metadata
-        let dateRange = '';
-        if (filtered.length > 0) {
-          // Sort locations by date to find chronological first and last
-          const sortedLocations = [...filtered].sort((a, b) => {
-            const dateA = a.arrival_date || a.departure_date || '';
-            const dateB = b.arrival_date || b.departure_date || '';
-            return dateA.localeCompare(dateB);
-          });
-
-          const firstLocation = sortedLocations[0];
-          const lastLocation = sortedLocations[sortedLocations.length - 1];
-          const startDate = firstLocation.arrival_date || firstLocation.departure_date;
-          const endDate = lastLocation.departure_date || lastLocation.arrival_date;
-
-          if (startDate && endDate) {
-            dateRange = formatDateCompact(startDate, endDate);
-          }
-        }
-
+        // Format: leg name • stops • duration • dates • cost
         summaryText = dateRange
-          ? `${filtered.length} stops • ${subLegName} • ${dateRange} • ${formattedCost}`
-          : `${filtered.length} stops • ${subLegName} • ${formattedCost}`;
+          ? `${subLegName} • ${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}`
+          : `${subLegName} • ${filtered.length} stops • ${totalDays} days • ${formattedCost}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
@@ -967,31 +977,13 @@ async function initMapApp() {
       if (leg) {
         const totalCost = calculateTotalCost(filtered);
         const totalDays = calculateTotalDuration(filtered);
+        const dateRange = calculateDateRange(filtered);
         const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
 
-        // Calculate date range from actual filtered locations, not static leg metadata
-        let dateRange = '';
-        if (filtered.length > 0) {
-          // Sort locations by date to find chronological first and last
-          const sortedLocations = [...filtered].sort((a, b) => {
-            const dateA = a.arrival_date || a.departure_date || '';
-            const dateB = b.arrival_date || b.departure_date || '';
-            return dateA.localeCompare(dateB);
-          });
-
-          const firstLocation = sortedLocations[0];
-          const lastLocation = sortedLocations[sortedLocations.length - 1];
-          const startDate = firstLocation.arrival_date || firstLocation.departure_date;
-          const endDate = lastLocation.departure_date || lastLocation.arrival_date;
-
-          if (startDate && endDate) {
-            dateRange = formatDateCompact(startDate, endDate);
-          }
-        }
-
+        // Format: leg name • stops • duration • dates • cost
         summaryText = dateRange
-          ? `${filtered.length} stops • ${legName} • ${dateRange} • ${formattedCost}`
-          : `${filtered.length} stops • ${legName} • ${totalDays} days • ${formattedCost}`;
+          ? `${legName} • ${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}`
+          : `${legName} • ${filtered.length} stops • ${totalDays} days • ${formattedCost}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
