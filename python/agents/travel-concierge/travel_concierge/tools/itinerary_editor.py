@@ -38,48 +38,19 @@ def _get_repo_root() -> Path:
 
 
 @lru_cache(maxsize=1)
-def _load_reference_data() -> Dict[str, Any]:
-    """Load itinerary and geocache data for enriching destinations."""
+def _load_geocache() -> Dict[str, Any]:
+    """Load geocache data for geocoding destinations."""
 
     repo_root = _get_repo_root()
-    itinerary_path = repo_root / "itinerary_structured.json"
     geocache_path = repo_root / "data" / "geocache.json"
 
-    itinerary_data: Dict[str, Any] = {}
     geocache: Dict[str, Any] = {}
-
-    if itinerary_path.exists():
-        with itinerary_path.open("r", encoding="utf-8") as fp:
-            itinerary_data = json.load(fp)
 
     if geocache_path.exists():
         with geocache_path.open("r", encoding="utf-8") as fp:
             geocache = json.load(fp)
 
-    locations = itinerary_data.get("locations", [])
-    by_name: Dict[str, Dict[str, Any]] = {}
-    by_city: Dict[str, Dict[str, Any]] = {}
-    region_by_country: Dict[str, str] = {}
-
-    for loc in locations:
-        name = (loc.get("name") or "").lower()
-        city = (loc.get("city") or "").lower()
-        country = (loc.get("country") or "").lower()
-
-        if name:
-            by_name[name] = loc
-        if city:
-            by_city[city] = loc
-        if country and loc.get("region"):
-            region_by_country[country] = loc["region"]
-
-    return {
-        "locations": locations,
-        "by_name": by_name,
-        "by_city": by_city,
-        "region_by_country": region_by_country,
-        "geocache": geocache,
-    }
+    return geocache
 
 
 def _extract_itinerary(tool_context: ToolContext) -> Dict[str, Any]:
@@ -180,24 +151,20 @@ def _next_location_id(itinerary: Dict[str, Any]) -> int:
 
 
 def _lookup_reference(name: str, city: Optional[str]) -> Optional[Dict[str, Any]]:
-    """Return a known itinerary location that matches by name or city."""
+    """Return a known itinerary location that matches by name or city.
 
-    reference = _load_reference_data()
-    if name:
-        match = reference["by_name"].get(name.lower())
-        if match:
-            return match
-    if city:
-        match = reference["by_city"].get(city.lower())
-        if match:
-            return match
+    Note: This function no longer loads from static files.
+    All reference data should come from the itinerary passed via tool_context.
+    """
+    # No longer using static itinerary_structured.json file
+    # Return None to fall back to geocoding
     return None
 
 
 def _lookup_geocache(name: str, city: Optional[str], country: Optional[str]) -> Optional[Dict[str, float]]:
     """Return coordinates from the cached dataset if available."""
 
-    geocache = _load_reference_data()["geocache"]
+    geocache = _load_geocache()
     candidates = []
     if city and country:
         candidates.append(f"{city}, {country}")
@@ -313,10 +280,47 @@ def _geocode_location(name: str, city: Optional[str], country: Optional[str]) ->
 
 
 def _guess_region(country: Optional[str]) -> str:
-    reference = _load_reference_data()["region_by_country"]
-    if country:
-        return reference.get(country.lower(), "Custom")
-    return "Custom"
+    """Guess region based on country name.
+
+    Note: This function no longer loads from static files.
+    Uses a hardcoded mapping of common countries.
+    """
+    if not country:
+        return "Custom"
+
+    # Common region mappings (no longer loading from static file)
+    region_map = {
+        "indonesia": "Southeast Asia",
+        "palau": "Micronesia",
+        "philippines": "Southeast Asia",
+        "singapore": "Southeast Asia",
+        "malaysia": "Southeast Asia",
+        "taiwan": "East Asia",
+        "japan": "East Asia",
+        "south korea": "East Asia",
+        "china": "East Asia",
+        "nepal": "South Asia",
+        "bhutan": "South Asia",
+        "india": "South Asia",
+        "denmark": "Europe",
+        "sweden": "Europe",
+        "norway": "Europe",
+        "iceland": "Europe",
+        "netherlands": "Europe",
+        "tanzania": "Africa",
+        "rwanda": "Africa",
+        "kenya": "Africa",
+        "brazil": "South America",
+        "ecuador": "South America",
+        "argentina": "South America",
+        "chile": "South America",
+        "peru": "South America",
+        "usa": "North America",
+        "canada": "North America",
+        "mexico": "North America",
+    }
+
+    return region_map.get(country.lower(), "Custom")
 
 
 def _build_destination_payload(

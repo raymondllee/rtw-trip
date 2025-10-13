@@ -190,7 +190,6 @@ rtw-trip/
 │   └── geocache.json              # Geocoding cache
 ├── logs/                          # Application logs
 ├── itineary.md                    # Source itinerary
-├── itinerary_structured.json      # Structured trip data
 ├── start-travel-concierge.sh      # Startup script
 ├── stop-travel-concierge.sh       # Stop script
 └── package.json                   # Dependencies and scripts
@@ -281,16 +280,17 @@ A static version of the map interface is also available:
 
 ## 🗺️ Data Sources
 
-- **Primary**: `itinerary_structured.json` - Structured trip data with coordinates
-- **Source**: `itineary.md` - Original markdown itinerary
-- **Generated**: `data/trip.json` - Parsed and geocoded data
+- **Primary**: Firebase Firestore - All itinerary and cost data
+- **Source**: `itineary.md` - Original markdown itinerary (for reference)
+- **Cache**: `data/geocache.json` - Geocoding cache for destinations
 
 ## 🎨 Customization
 
 ### Adding New Destinations
 
-1. Edit `itinerary_structured.json`
-2. Add new location objects with required fields:
+1. Use the web interface to add destinations via the AI chat or map interface
+2. Or edit directly in Firestore console
+3. Destination data structure:
    ```json
    {
      "id": 30,

@@ -31,67 +31,42 @@ function buildCostDestinationMapping(costs, allLocations) {
 }
 
 /**
- * Match a location to costs using flexible matching
- * Priority: exact ID match > name match > country match > city match
+ * Match a location to costs using UUID-based matching ONLY
+ * Logs warnings for costs that can't be matched to help identify orphaned costs
  */
-function matchLocationToCosts(location, costs, originalData) {
+function matchLocationToCosts(location, costs, allLocations) {
   const matched = [];
-  let matchMethod = 'none';
 
   costs.forEach(cost => {
-    // Method 1: Exact ID match
+    // ONLY match by exact UUID
     if (cost.destination_id === location.id) {
       matched.push(cost);
-      if (!matchMethod || matchMethod === 'none') matchMethod = 'id';
-      return;
-    }
-
-    // Method 2: Name-based matching
-    const costDesc = (cost.description || '').toLowerCase();
-    const locName = (location.name || '').toLowerCase();
-    const locCountry = (location.country || '').toLowerCase();
-    const locCity = (location.city || '').toLowerCase();
-
-    // Check if cost description mentions this location by name
-    if (locName && (
-      costDesc.includes(`in ${locName}`) ||
-      costDesc.includes(`to ${locName}`) ||
-      costDesc.includes(`from ${locName}`) ||
-      costDesc.includes(`${locName} `)
-    )) {
-      matched.push(cost);
-      if (!matchMethod || matchMethod === 'none') matchMethod = 'name';
-      return;
-    }
-
-    // Check if cost description mentions this location's country
-    // This handles cases like "Tokyo" matching costs for "in Japan"
-    if (locCountry && (
-      costDesc.includes(`in ${locCountry}`) ||
-      costDesc.includes(`to ${locCountry}`) ||
-      costDesc.includes(`from ${locCountry}`)
-    )) {
-      matched.push(cost);
-      if (!matchMethod || matchMethod === 'none') matchMethod = 'country';
-      return;
-    }
-
-    // Check city match
-    if (locCity && (
-      costDesc.includes(`in ${locCity}`) ||
-      costDesc.includes(`${locCity} `)
-    )) {
-      matched.push(cost);
-      if (!matchMethod || matchMethod === 'none') matchMethod = 'city';
-      return;
     }
   });
 
   if (matched.length > 0) {
-    console.log(`  ✓ Matched ${location.name} via ${matchMethod}: ${matched.length} costs`);
+    console.log(`  ✓ Matched ${location.name} (${location.id}): ${matched.length} costs`);
   }
 
   return matched;
+}
+
+/**
+ * Find orphaned costs that don't have valid destination_ids
+ * Returns costs that don't match any known destination UUID
+ */
+function findOrphanedCosts(costs, allLocations) {
+  const validIds = new Set(allLocations.map(loc => loc.id));
+  const orphaned = costs.filter(cost => {
+    const destId = cost.destination_id;
+    return destId && !validIds.has(destId);
+  });
+
+  if (orphaned.length > 0) {
+    console.warn(`⚠️ Found ${orphaned.length} orphaned costs with invalid destination_ids:`, orphaned);
+  }
+
+  return orphaned;
 }
 
 // Calculate costs for a specific destination
@@ -391,3 +366,4 @@ window.getCategoryDisplayName = getCategoryDisplayName;
 window.generateCostBreakdownHTML = generateCostBreakdownHTML;
 window.generateCostSummaryHTML = generateCostSummaryHTML;
 window.generateSidebarCostSummary = generateSidebarCostSummary;
+window.findOrphanedCosts = findOrphanedCosts;

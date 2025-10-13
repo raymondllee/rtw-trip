@@ -1,7 +1,6 @@
 web/config.js
 web/firebase-config.js
 web/config.js.backup
-web/itinerary_structured.json
 data/geocache.json
 data/trip.json
 data/trip.raw.json

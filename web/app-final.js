@@ -9,28 +9,13 @@ import {
   populateReassignDropdown
 } from './destination-deletion-handler.js';
 
-const DATA_PATH = './itinerary_structured.json';
-
 const idsEqual = (a, b) => {
   if (a == null || b == null) return a == null && b == null;
   return normalizeId(a) === normalizeId(b);
 };
 
 async function loadData() {
-  // First try to load from static file (fallback for local dev or if Firestore is unavailable)
-  try {
-    const res = await fetch(DATA_PATH);
-    if (res.ok) {
-      const data = await res.json();
-      console.log(`📊 Loaded itinerary with ${data.costs?.length || 0} cost items from ${DATA_PATH}`);
-      return data;
-    }
-  } catch (error) {
-    console.warn('Static itinerary file not found, will use Firestore fallback:', error);
-  }
-
-  // Return minimal empty data structure if file not found
-  // The app will load the latest scenario from Firestore in initMapApp
+  // Return empty data structure - the app loads all data from Firestore in initMapApp
   console.log('📊 Using empty initial data - will load from Firestore');
   return {
     locations: [],
@@ -907,7 +892,8 @@ async function initMapApp() {
 
     // Helper function to calculate total cost for filtered destinations
     const calculateTotalCost = (destinations) => {
-      return destinations.reduce((sum, loc) => {
+      // Calculate destination costs
+      let total = destinations.reduce((sum, loc) => {
         // Use the same cost calculation function used elsewhere for consistency
         const allCosts = workingData.costs || [];
         const locationCosts = window.calculateDestinationCosts
@@ -915,6 +901,29 @@ async function initMapApp() {
           : { total: allCosts.filter(c => c.destination_id === loc.id).reduce((s, cost) => s + (parseFloat(cost.amount_usd) || 0), 0) };
         return sum + locationCosts.total;
       }, 0);
+
+      // Add inter-destination travel costs
+      for (let i = 0; i < destinations.length - 1; i++) {
+        const fromLocation = destinations[i];
+        const toLocation = destinations[i + 1];
+
+        // Calculate distance between destinations
+        const fromLL = toLatLng(fromLocation);
+        const toLL = toLatLng(toLocation);
+
+        if (fromLL && toLL) {
+          const distance = google.maps.geometry.spherical.computeDistanceBetween(
+            new google.maps.LatLng(fromLL.lat, fromLL.lng),
+            new google.maps.LatLng(toLL.lat, toLL.lng)
+          );
+
+          const transportMode = getTransportationMode(fromLocation, toLocation, i);
+          const travelCost = getTransportationCost(fromLocation, toLocation, transportMode, distance);
+          total += travelCost;
+        }
+      }
+
+      return total;
     };
 
     // Helper function to calculate total duration for filtered destinations

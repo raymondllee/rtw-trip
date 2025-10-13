@@ -1191,13 +1191,27 @@ def bulk_save_costs():
             destination_aliases.add(slug_alias.lower())
         destination_aliases.discard("")
 
-        # Ensure each cost item carries a string destination_id
+        print(f"🔍 Looking for costs to remove with aliases: {sorted(destination_aliases)}")
+
+        # Validate and ensure each cost item has a valid UUID destination_id
+        import re
+        uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', re.IGNORECASE)
+
         for item in cost_items:
             item_dest_id = item.get('destination_id')
+
+            # If no destination_id, use the provided destination_id
             if item_dest_id is None and destination_id is not None:
                 item['destination_id'] = destination_id
+                print(f"  📝 Set destination_id to {destination_id} for {item.get('category')}")
             elif item_dest_id is not None:
                 item['destination_id'] = str(item_dest_id).strip() or destination_id
+
+            # Validate the destination_id is a UUID
+            final_dest_id = item.get('destination_id')
+            if final_dest_id and not uuid_pattern.match(str(final_dest_id)):
+                print(f"  ⚠️ WARNING: Cost has non-UUID destination_id: {final_dest_id} for {item.get('category')}")
+                print(f"     This cost may become orphaned! Please use UUIDs only.")
 
         # Initialize Firestore
         db = firestore.Client()
@@ -1232,18 +1246,37 @@ def bulk_save_costs():
             itinerary_data = latest_version_data.get('itineraryData', {}) or {}
             version_costs = itinerary_data.get('costs', []) or []
 
-            # Remove existing costs for this destination (including legacy identifiers)
+            print(f"📊 Total costs in database before removal: {len(version_costs)}")
+            print(f"📊 Costs with descriptions containing '{destination_name.split(',')[0] if destination_name else ''}': {len([c for c in version_costs if destination_name and destination_name.split(',')[0].lower() in (c.get('description') or '').lower()])}")
+
+            # Remove existing estimates for this destination when new research is saved
+            # STRICT UUID MATCHING ONLY - no fallback to name-based matching
             def _belongs_to_destination(cost_item):
+                # Only match estimates for removal - keep manual and booked costs
+                cost_source = cost_item.get('source')
+                booking_status = cost_item.get('booking_status', 'estimated')
+
+                # Keep manual entries and booked items, remove all estimates
+                if cost_source == 'manual' or booking_status in ('confirmed', 'booked'):
+                    return False
+
+                # Check if this estimate belongs to the destination by UUID
                 dest_val = cost_item.get('destination_id')
                 if dest_val:
-                    if str(dest_val).strip().lower() in destination_aliases:
+                    dest_val_norm = str(dest_val).strip().lower()
+                    if dest_val_norm in destination_aliases:
+                        print(f"  ✓ Match by UUID: {dest_val} -> {cost_item.get('category')} ${cost_item.get('amount_usd', 0)}")
                         return True
+
+                # Check by cost ID prefix (for backward compatibility with old cost IDs)
                 item_id = cost_item.get('id')
                 if item_id:
                     lowered = str(item_id).strip().lower()
                     for alias in destination_aliases:
                         if alias and lowered.startswith(alias + "_"):
+                            print(f"  ✓ Match by ID prefix: {item_id} starts with {alias}_")
                             return True
+
                 return False
 
             version_filtered_costs = [
@@ -1756,6 +1789,211 @@ def serve_static(path):
             return jsonify({'error': 'File not found', 'path': path}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 404
+
+@app.route('/api/places/resolve', methods=['POST'])
+def resolve_place():
+    """
+    Resolve a location query to a Google Place ID.
+
+    Request body:
+    {
+        "query": "Tokyo, Japan",
+        "location_type": "city"  // optional
+    }
+
+    Response:
+    {
+        "status": "success",
+        "place_id": "ChIJ...",
+        "name": "Tokyo",
+        "coordinates": {"lat": 35.6762, "lng": 139.6503},
+        ...
+    }
+    """
+    try:
+        from travel_concierge.tools.place_resolver import get_place_resolver
+
+        data = request.get_json() or {}
+        query = data.get('query')
+        location_type = data.get('location_type')
+
+        if not query:
+            return jsonify({'error': 'query parameter required'}), 400
+
+        resolver = get_place_resolver()
+        place_info = resolver.resolve_place(query, location_type=location_type)
+
+        if place_info:
+            return jsonify({
+                'status': 'success',
+                **place_info
+            })
+        else:
+            return jsonify({
+                'status': 'not_found',
+                'error': f'Could not resolve location: {query}'
+            }), 404
+
+    except Exception as e:
+        print(f"❌ Place resolution error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/places/batch-resolve', methods=['POST'])
+def batch_resolve_places():
+    """
+    Resolve multiple location queries in batch.
+
+    Request body:
+    {
+        "queries": ["Tokyo, Japan", "Paris, France", "New York, USA"]
+    }
+
+    Response:
+    {
+        "status": "success",
+        "results": {
+            "Tokyo, Japan": {place_info},
+            "Paris, France": {place_info},
+            ...
+        }
+    }
+    """
+    try:
+        from travel_concierge.tools.place_resolver import get_place_resolver
+
+        data = request.get_json() or {}
+        queries = data.get('queries', [])
+
+        if not queries or not isinstance(queries, list):
+            return jsonify({'error': 'queries array required'}), 400
+
+        resolver = get_place_resolver()
+        results = resolver.batch_resolve(queries)
+
+        return jsonify({
+            'status': 'success',
+            'results': results
+        })
+
+    except Exception as e:
+        print(f"❌ Batch resolution error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/places/details/<place_id>', methods=['GET'])
+def get_place_details(place_id):
+    """
+    Get full details for a known Place ID.
+
+    Usage: GET /api/places/details/ChIJ...
+    """
+    try:
+        from travel_concierge.tools.place_resolver import get_place_resolver
+
+        resolver = get_place_resolver()
+        details = resolver.get_place_details(place_id)
+
+        if details:
+            return jsonify({
+                'status': 'success',
+                **details
+            })
+        else:
+            return jsonify({
+                'status': 'not_found',
+                'error': f'Could not find details for Place ID: {place_id}'
+            }), 404
+
+    except Exception as e:
+        print(f"❌ Place details error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/costs/cleanup-ai-estimates', methods=['POST'])
+def cleanup_ai_estimates():
+    """
+    One-time cleanup: Remove all ai_estimate costs from Firestore.
+    This helps clean up legacy costs that weren't properly removed.
+    """
+    try:
+        from google.cloud import firestore
+
+        data = request.get_json() or {}
+        scenario_id = data.get('scenario_id')
+
+        if not scenario_id:
+            return jsonify({'error': 'scenario_id required'}), 400
+
+        print("="*100)
+        print("🧹 CLEANUP AI ESTIMATES")
+        print("="*100)
+        print(f"   Scenario ID: {scenario_id}")
+
+        # Initialize Firestore
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(scenario_id)
+
+        # Get latest version
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if not versions:
+            return jsonify({'error': 'No versions found'}), 404
+
+        latest_version_ref = versions[0].reference
+        latest_version_data = versions[0].to_dict() or {}
+
+        # Get costs
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        version_costs = itinerary_data.get('costs', []) or []
+
+        print(f"📊 Total costs before cleanup: {len(version_costs)}")
+
+        # Filter out ai_estimate costs
+        cleaned_costs = []
+        removed_costs = []
+
+        for cost in version_costs:
+            source = cost.get('source')
+            booking_status = cost.get('booking_status', 'estimated')
+
+            # Remove if ai_estimate source
+            if source == 'ai_estimate':
+                removed_costs.append(cost)
+                print(f"  🗑️  Removing ai_estimate: {cost.get('category')} - {cost.get('description', 'N/A')[:50]} (${cost.get('amount_usd', 0)})")
+            else:
+                cleaned_costs.append(cost)
+
+        print(f"🧹 Removed {len(removed_costs)} ai_estimate costs")
+        print(f"✅ Kept {len(cleaned_costs)} costs")
+
+        # Update Firestore
+        itinerary_data['costs'] = cleaned_costs
+        latest_version_ref.update({
+            'itineraryData': itinerary_data,
+            'lastModified': datetime.utcnow().isoformat()
+        })
+
+        print(f"✅ Cleanup complete!")
+
+        return jsonify({
+            'status': 'success',
+            'removed': len(removed_costs),
+            'remaining': len(cleaned_costs)
+        })
+
+    except Exception as e:
+        print(f"❌ Cleanup error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)

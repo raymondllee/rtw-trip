@@ -371,9 +371,8 @@ if (destId === costDestId) {
 ### Step-by-Step Migration
 
 1. **Backup Your Data**
-   ```bash
-   cp itinerary_structured.json itinerary_backup.json
-   ```
+   - Export your scenario from Firestore before making changes
+   - Use the web interface "Export" feature
 
 2. **Run Data Integrity Check**
    ```javascript

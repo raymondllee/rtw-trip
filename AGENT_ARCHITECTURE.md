@@ -450,11 +450,10 @@ Located in: `travel_concierge/tools/itinerary_editor.py`
 
 **Geocoding Priority**:
 ```
-1. Reference data (from itinerary_structured.json)
-2. Geocache (from data/geocache.json)
-3. Google Places API (GOOGLE_PLACES_API_KEY)
-4. Nominatim/OpenStreetMap
-5. Fallback (0, 0)
+1. Geocache (from data/geocache.json)
+2. Google Places API (GOOGLE_PLACES_API_KEY)
+3. Nominatim/OpenStreetMap
+4. Fallback (0, 0)
 ```
 
 **`_insert_into_state()`**
