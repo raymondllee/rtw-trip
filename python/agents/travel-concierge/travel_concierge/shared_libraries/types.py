@@ -332,7 +332,7 @@ class CostResearchResult(BaseModel):
     amount_low: float = Field(description="Lower bound estimate in USD")
     amount_mid: float = Field(description="Typical/recommended estimate in USD")
     amount_high: float = Field(description="Upper bound estimate in USD")
-    currency_local: str = Field(description="Local currency code (e.g., 'THB', 'JPY')")
+    currency_local: str = Field(description="Local currency code as valid 3-letter ISO 4217 code (e.g., 'USD', 'EUR', 'THB', 'JPY', 'GBP', 'CNY'). NEVER use 'N/A' or null. Default to 'USD' if unknown.")
     amount_local: float = Field(description="Typical amount in local currency")
     sources: list[str] = Field(
         default_factory=list,

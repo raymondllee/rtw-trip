@@ -64,6 +64,10 @@
           <span class="icon">💰</span>
           <span>Add Cost</span>
         </button>
+        <button id="bulk-update-costs-btn" class="dropdown-item">
+          <span class="icon">💰</span>
+          <span>Update Multiple Costs</span>
+        </button>
         <button id="view-costs-btn" class="dropdown-item">
           <span class="icon">📊</span>
           <span>View Costs</span>
@@ -276,6 +280,35 @@
         <div class="modal-actions">
           <button type="button" class="btn-secondary" id="cancel-import-btn">Cancel</button>
           <button type="button" class="btn-primary" id="confirm-import-btn">Import</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Cost Update Modal -->
+  <div id="bulk-cost-update-modal" class="modal-overlay" style="display: none;">
+    <div class="modal bulk-cost-modal">
+      <h3>Update Costs for Multiple Destinations</h3>
+      <div class="modal-form">
+        <div class="bulk-cost-header">
+          <div class="bulk-cost-actions">
+            <button type="button" class="btn-sm btn-outline" id="select-all-destinations-btn">Select All</button>
+            <button type="button" class="btn-sm btn-outline" id="deselect-all-destinations-btn">Deselect All</button>
+          </div>
+          <div class="selection-count" id="bulk-selection-count">0 of 0 destinations selected</div>
+        </div>
+        <div class="bulk-destination-list" id="bulk-destination-list">
+          <!-- Destinations will be populated here -->
+        </div>
+        <div class="bulk-progress" id="bulk-progress" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="bulk-progress-fill"></div>
+          </div>
+          <div class="progress-text" id="bulk-progress-text">Updating costs...</div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-bulk-update-btn">Cancel</button>
+          <button type="button" class="btn-primary" id="confirm-bulk-update-btn" disabled>Update Costs</button>
         </div>
       </div>
     </div>

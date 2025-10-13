@@ -124,6 +124,16 @@ def save_researched_costs(
         base_local = _to_float(cat_data.get('amount_local', 0))
         currency_local = cat_data.get('currency_local', 'USD')
 
+        # Sanitize currency code - ensure it's a valid ISO 4217 code
+        # AI sometimes returns N/A, null, None, or empty strings
+        if not currency_local or currency_local in ('N/A', 'null', 'None', ''):
+            currency_local = 'USD'
+        currency_local = str(currency_local).strip().upper()
+        # Validate it's a 3-letter code (basic ISO 4217 check)
+        if len(currency_local) != 3 or not currency_local.isalpha():
+            print(f"⚠️  Invalid currency code '{currency_local}' for {destination_name}, defaulting to USD")
+            currency_local = 'USD'
+
         # Scale per category semantics:
         # - food_daily, transport_daily: per-day per-person → scale by duration_days * num_travelers
         # - flights: typically per-person → scale by num_travelers

@@ -148,12 +148,28 @@ function calculateDestinationCosts(destinationId, costs, location = null, allLoc
 
 // Format currency
 function formatCurrency(amount, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount);
+  // Handle invalid or missing currency codes
+  if (!currency || currency === 'N/A' || currency === '' || currency === 'null' || currency === 'undefined') {
+    currency = 'USD';
+  }
+
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  } catch (error) {
+    // If currency code is still invalid, fallback to USD
+    console.warn(`Invalid currency code: ${currency}, using USD instead`);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  }
 }
 
 // Get category icon
@@ -210,6 +226,16 @@ function generateCostBreakdownHTML(costs, showEmpty = false, destinationName = '
         const confidenceColor = cost.confidence === 'high' ? '#22c55e' : cost.confidence === 'low' ? '#f59e0b' : '#3b82f6';
         const confidenceBadge = cost.confidence ? `<span style="background: ${confidenceColor}; color: white; font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-left: 4px; text-transform: capitalize;">${cost.confidence}</span>` : '';
 
+        // Log any invalid currency codes for debugging
+        if (!cost.currency || cost.currency === 'N/A' || cost.currency === '' || cost.currency === 'null' || cost.currency === 'undefined') {
+          console.warn('⚠️ Found cost with invalid currency (using USD fallback):', {
+            id: cost.id,
+            description: cost.description,
+            currency: cost.currency,
+            destination_id: cost.destination_id
+          });
+        }
+
         return `
           <div class="cost-breakdown-item-detailed" style="border-left: 3px solid ${confidenceColor}; padding: 8px 10px; margin: 6px 0; background: #f8f9fa; border-radius: 4px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
@@ -219,7 +245,7 @@ function generateCostBreakdownHTML(costs, showEmpty = false, destinationName = '
               </span>
               <span style="font-weight: 700; color: #333; font-size: 13px;">${formatCurrency(amount)} <span style="font-size: 10px; color: #888;">(${percentage}%)</span></span>
             </div>
-            ${cost.currency !== 'USD' ? `<div style="font-size: 10px; color: #888; margin-bottom: 4px;">${formatCurrency(cost.amount, cost.currency)}</div>` : ''}
+            ${cost.currency && cost.currency !== 'USD' && cost.currency !== 'N/A' ? `<div style="font-size: 10px; color: #888; margin-bottom: 4px;">${formatCurrency(cost.amount, cost.currency)}</div>` : ''}
             ${cost.notes ? `<div style="font-size: 11px; color: #666; margin-top: 4px; line-height: 1.4; font-style: italic;">${cost.notes}</div>` : ''}
             <div style="font-size: 9px; color: #999; margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
               <span style="display: flex; align-items: center; gap: 4px;">

@@ -127,7 +127,8 @@ You MUST return a complete DestinationCostResearch object with:
 1. **All five categories researched** (accommodation, flights, food_daily, transport_daily, activities)
 2. **Each category must have**:
    - amount_low, amount_mid, amount_high in USD
-   - currency_local and amount_local (in local currency)
+   - currency_local: MUST be a valid 3-letter ISO 4217 currency code (e.g., USD, EUR, JPY, GBP, THB, CNY). NEVER use "N/A", null, or leave empty. If unknown, use "USD".
+   - amount_local (in local currency)
    - At least 1-2 source URLs
    - Confidence level
    - Helpful notes
@@ -243,6 +244,7 @@ Return a complete JSON object with these fields:
 **IMPORTANT:**
 - All 5 categories are REQUIRED
 - All numeric values must be valid floats (no null values)
+- currency_local MUST be a valid 3-letter ISO 4217 code (USD, EUR, JPY, GBP, THB, CNY, etc.) - NEVER "N/A" or null
 - Use ISO 8601 timestamps for researched_at
 - Ensure totals are calculated correctly
 """

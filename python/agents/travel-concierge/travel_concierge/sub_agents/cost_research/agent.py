@@ -67,16 +67,16 @@ def structured_output_callback(
         return parts or []
 
     tool_response_count = 0
-    for message in reversed(list(llm_request.contents or [])):
+    for message in llm_request.contents or []:
+        role_name = _role_name(message)
+        if role_name == "user":
+            # New user message marks the start of a turn; reset counts
+            tool_response_count = 0
+            continue
+
         for part in _iter_parts(message):
             if _has_tool_response(part):
                 tool_response_count += 1
-
-        role_name = _role_name(message)
-        if role_name == "user":
-            # Stop once we've reached the latest user message so tool counts
-            # are scoped to the current turn.
-            break
 
     if tool_response_count >= 3:
         # Switch to structured output phase (keep tools_dict intact to avoid

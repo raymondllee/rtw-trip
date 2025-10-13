@@ -49,6 +49,25 @@ sessions = {}
 # Cost tracker service (one instance per session - in production use DB)
 cost_trackers = {}
 
+
+def normalize_destination_id(raw_id, name):
+    """Return destination identifiers as stable strings."""
+    if isinstance(raw_id, str):
+        ident = raw_id.strip()
+        if ident:
+            return ident
+
+    if raw_id is not None:
+        return str(raw_id)
+
+    base_name = (name or "").strip() or "unknown destination"
+    clean = re.sub(r'[^a-z0-9]+', '_', base_name.lower()).strip('_')
+    if clean:
+        return clean
+
+    # Fallback unique identifier when no usable name exists
+    return str(uuid.uuid4())
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """
@@ -374,65 +393,80 @@ CRITICAL REMINDERS:
 
                 # Save the research data to Firestore via bulk-save API
                 try:
-                    def normalize_destination_id(raw_id, name):
-                        """Return destination identifiers as stable strings."""
-                        if isinstance(raw_id, str):
-                            ident = raw_id.strip()
-                            if ident:
-                                return ident
-
-                        if raw_id is not None:
-                            return str(raw_id)
-
-                        base_name = (name or "").strip() or "unknown destination"
-                        clean = re.sub(r'[^a-z0-9]+', '_', base_name.lower()).strip('_')
-                        if clean:
-                            return clean
-
-                        # Fallback unique identifier when no usable name exists
-                        return str(uuid.uuid4())
-
                     # Try to find the matching destination_id from context
                     actual_destination_id = None
 
-                    print(f"🔎 Looking for destination: '{destination_name}'", flush=True)
-                    print(f"   Context has destinations: {context.get('destinations') is not None}", flush=True)
-
-                    if context and context.get('destinations'):
-                        for idx, dest in enumerate(context['destinations']):
-                            dest_name = dest.get('name', '') if isinstance(dest, dict) else str(dest)
-                            # Check if destination has an id field, if not check for timestamp-based ID
-                            dest_id = None
-                            if isinstance(dest, dict):
-                                # Try multiple possible ID field names
-                                dest_id = dest.get('id') or dest.get('destination_id') or dest.get('arrival_date')
-
-                            print(f"   Checking dest[{idx}]: name='{dest_name}', id={dest_id}", flush=True)
-
-                            # Match by name (case-insensitive, partial match)
-                            name_match = (
-                                destination_name.lower() in dest_name.lower() or
-                                dest_name.lower() in destination_name.lower()
+                    # Prefer the destination_id provided in the research payload
+                    raw_destination_id = research_data.get('destination_id')
+                    if raw_destination_id:
+                        normalized_research_id = normalize_destination_id(raw_destination_id, destination_name)
+                        matched_by_id = False
+                        if context and context.get('destinations'):
+                            for dest in context['destinations']:
+                                if not isinstance(dest, dict):
+                                    continue
+                                for key in ('id', 'destination_id'):
+                                    candidate_id = dest.get(key)
+                                    if not candidate_id:
+                                        continue
+                                    candidate_norm = normalize_destination_id(candidate_id, dest.get('name', ''))
+                                    if candidate_norm == normalized_research_id:
+                                        actual_destination_id = normalized_research_id
+                                        matched_by_id = True
+                                        print(
+                                            f"🎯 MATCHED by destination_id -> '{dest.get('name', '')}' "
+                                            f"(ID {actual_destination_id})",
+                                            flush=True
+                                        )
+                                        break
+                                if matched_by_id:
+                                    break
+                        if not matched_by_id:
+                            actual_destination_id = normalized_research_id
+                            print(
+                                f"✅ Using destination_id from research JSON: {actual_destination_id}",
+                                flush=True
                             )
 
-                            if name_match:
-                                # If no ID found, generate from arrival_date timestamp or use index
-                                if dest_id is None:
-                                    # Use arrival_date to generate a stable ID if available
-                                    if isinstance(dest, dict) and dest.get('arrival_date'):
-                                        from datetime import datetime as dt
-                                        # Convert date string to timestamp (milliseconds like 1759377102)
-                                        try:
-                                            date_obj = dt.strptime(dest['arrival_date'], '%Y-%m-%d')
-                                            dest_id = int(date_obj.timestamp() * 1000)
-                                        except Exception:
-                                            dest_id = idx
-                                    else:
-                                        dest_id = idx
+                    if actual_destination_id is None:
+                        print(f"🔎 Looking for destination: '{destination_name}'", flush=True)
+                        print(f"   Context has destinations: {context.get('destinations') is not None}", flush=True)
 
-                                actual_destination_id = normalize_destination_id(dest_id, dest_name)
-                                print(f"🎯 MATCHED '{destination_name}' to '{dest_name}' -> ID {actual_destination_id}", flush=True)
-                                break
+                        if context and context.get('destinations'):
+                            for idx, dest in enumerate(context['destinations']):
+                                dest_name = dest.get('name', '') if isinstance(dest, dict) else str(dest)
+                                # Check if destination has an id field, if not check for timestamp-based ID
+                                dest_id = None
+                                if isinstance(dest, dict):
+                                    # Try multiple possible ID field names
+                                    dest_id = dest.get('id') or dest.get('destination_id') or dest.get('arrival_date')
+
+                                print(f"   Checking dest[{idx}]: name='{dest_name}', id={dest_id}", flush=True)
+
+                                # Match by name (case-insensitive, partial match)
+                                name_match = (
+                                    destination_name.lower() in dest_name.lower() or
+                                    dest_name.lower() in destination_name.lower()
+                                )
+
+                                if name_match:
+                                    # If no ID found, generate from arrival_date timestamp or use index
+                                    if dest_id is None:
+                                        # Use arrival_date to generate a stable ID if available
+                                        if isinstance(dest, dict) and dest.get('arrival_date'):
+                                            from datetime import datetime as dt
+                                            # Convert date string to timestamp (milliseconds like 1759377102)
+                                            try:
+                                                date_obj = dt.strptime(dest['arrival_date'], '%Y-%m-%d')
+                                                dest_id = int(date_obj.timestamp() * 1000)
+                                            except Exception:
+                                                dest_id = idx
+                                        else:
+                                            dest_id = idx
+
+                                    actual_destination_id = normalize_destination_id(dest_id, dest_name)
+                                    print(f"🎯 MATCHED '{destination_name}' to '{dest_name}' -> ID {actual_destination_id}", flush=True)
+                                    break
 
                     if actual_destination_id is None:
                         # Fallback: generate a stable ID from the name
@@ -1122,9 +1156,11 @@ def bulk_save_costs():
         data = request.json
         session_id = data.get('session_id')
         scenario_id = data.get('scenario_id')
-        raw_destination_id = data.get('destination_id')
-        destination_id = str(raw_destination_id).strip() if raw_destination_id is not None else None
         destination_name = data.get('destination_name')
+        raw_destination_id = data.get('destination_id')
+        destination_id = None
+        if raw_destination_id is not None or destination_name:
+            destination_id = normalize_destination_id(raw_destination_id, destination_name)
         cost_items = data.get('cost_items', [])
 
         print(f"📦 Received request:")
@@ -1143,6 +1179,17 @@ def bulk_save_costs():
             }), 400
 
         print(f"💾 Bulk saving {len(cost_items)} costs for {destination_name} (ID: {destination_id})")
+
+        # Build set of legacy destination identifiers that should map to this UUID
+        destination_aliases = set()
+        if raw_destination_id:
+            destination_aliases.add(str(raw_destination_id).strip().lower())
+        if destination_id:
+            destination_aliases.add(str(destination_id).strip().lower())
+        if destination_name:
+            slug_alias = normalize_destination_id(None, destination_name)
+            destination_aliases.add(slug_alias.lower())
+        destination_aliases.discard("")
 
         # Ensure each cost item carries a string destination_id
         for item in cost_items:
@@ -1185,11 +1232,27 @@ def bulk_save_costs():
             itinerary_data = latest_version_data.get('itineraryData', {}) or {}
             version_costs = itinerary_data.get('costs', []) or []
 
-            # Remove existing costs for this destination from version
+            # Remove existing costs for this destination (including legacy identifiers)
+            def _belongs_to_destination(cost_item):
+                dest_val = cost_item.get('destination_id')
+                if dest_val:
+                    if str(dest_val).strip().lower() in destination_aliases:
+                        return True
+                item_id = cost_item.get('id')
+                if item_id:
+                    lowered = str(item_id).strip().lower()
+                    for alias in destination_aliases:
+                        if alias and lowered.startswith(alias + "_"):
+                            return True
+                return False
+
             version_filtered_costs = [
                 c for c in version_costs
-                if str(c.get('destination_id')).strip() != destination_id
+                if not _belongs_to_destination(c)
             ]
+            removed_count = len(version_costs) - len(version_filtered_costs)
+            if removed_count:
+                print(f"🧹 Removed {removed_count} existing cost(s) for aliases {sorted(destination_aliases)}")
 
             # Normalize destination_id to strings on remaining costs
             normalized_existing_costs = []

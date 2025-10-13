@@ -939,6 +939,146 @@
   100% { transform: rotate(360deg); }
 }
 
+/* ============================================================================
+   Bulk Cost Update Modal Styles
+   ============================================================================ */
+
+.bulk-cost-modal {
+  min-width: 500px;
+  max-width: 600px;
+}
+
+.bulk-cost-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.bulk-cost-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.selection-count {
+  font-weight: 600;
+  color: #2563eb;
+  font-size: 14px;
+}
+
+.bulk-destination-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 16px;
+}
+
+.bulk-destination-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bulk-destination-item:hover {
+  border-color: #2563eb;
+  background: #f8f9fa;
+}
+
+.bulk-destination-item.selected {
+  border-color: #2563eb;
+  background: #eef2ff;
+}
+
+.bulk-destination-checkbox {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.bulk-destination-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bulk-destination-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.bulk-destination-meta {
+  font-size: 12px;
+  color: #666;
+  display: flex;
+  gap: 8px;
+}
+
+.bulk-destination-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.bulk-destination-status.has-costs {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.bulk-destination-status.no-costs {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.bulk-progress {
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 24px;
+  background: #e0e0e0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.progress-text {
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+  font-weight: 600;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .modal-content {

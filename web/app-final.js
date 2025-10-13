@@ -2129,7 +2129,168 @@ async function initMapApp() {
     document.getElementById('scenario-file').value = '';
     document.getElementById('overwrite-scenarios').checked = false;
   }
-  
+
+  // Bulk cost update modal functions
+  let bulkCostSelectedDestinations = new Set();
+
+  function openBulkCostUpdateModal() {
+    const modal = document.getElementById('bulk-cost-update-modal');
+    const listContainer = document.getElementById('bulk-destination-list');
+    const countDisplay = document.getElementById('bulk-selection-count');
+    const confirmBtn = document.getElementById('confirm-bulk-update-btn');
+
+    // Get currently filtered destinations
+    const legName = legFilter.value;
+    const subLegName = subLegFilter.value || '';
+    const filtered = (subLegName && subLegName !== '')
+      ? filterBySubLeg(workingData, legName, subLegName)
+      : filterByLeg(workingData, legName);
+
+    if (filtered.length === 0) {
+      alert('No destinations to update. Please adjust your filters.');
+      return;
+    }
+
+    // Reset selection state
+    bulkCostSelectedDestinations.clear();
+
+    // Get costs data to determine status
+    const costs = workingData.costs || [];
+
+    // Populate destination list
+    listContainer.innerHTML = filtered.map((dest, idx) => {
+      const destCosts = costs.filter(c => idsEqual(c.destination_id, dest.id));
+      const hasCosts = destCosts.length > 0;
+      const statusClass = hasCosts ? 'has-costs' : 'no-costs';
+      const statusText = hasCosts ? '✓ Has costs' : '✗ No costs';
+      const duration = dest.duration_days || 1;
+
+      return `
+        <div class="bulk-destination-item" data-destination-index="${idx}">
+          <input type="checkbox" class="bulk-destination-checkbox" data-destination-index="${idx}">
+          <div class="bulk-destination-info">
+            <div class="bulk-destination-name">${dest.name || dest.city || 'Unknown'}</div>
+            <div class="bulk-destination-meta">
+              <span>${duration} day${duration !== 1 ? 's' : ''}</span>
+              <span class="bulk-destination-status ${statusClass}">${statusText}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Update count display
+    countDisplay.textContent = `0 of ${filtered.length} destinations selected`;
+    confirmBtn.disabled = true;
+
+    // Add event listeners for checkboxes and items
+    listContainer.querySelectorAll('.bulk-destination-item').forEach((item, idx) => {
+      const checkbox = item.querySelector('.bulk-destination-checkbox');
+
+      // Click on item toggles checkbox
+      item.addEventListener('click', (e) => {
+        if (e.target !== checkbox) {
+          checkbox.checked = !checkbox.checked;
+          checkbox.dispatchEvent(new Event('change'));
+        }
+      });
+
+      // Checkbox change updates selection
+      checkbox.addEventListener('change', (e) => {
+        e.stopPropagation();
+        if (checkbox.checked) {
+          bulkCostSelectedDestinations.add(idx);
+          item.classList.add('selected');
+        } else {
+          bulkCostSelectedDestinations.delete(idx);
+          item.classList.remove('selected');
+        }
+
+        // Update count and button state
+        countDisplay.textContent = `${bulkCostSelectedDestinations.size} of ${filtered.length} destinations selected`;
+        confirmBtn.disabled = bulkCostSelectedDestinations.size === 0;
+      });
+    });
+
+    modal.style.display = 'flex';
+  }
+
+  function closeBulkCostUpdateModal() {
+    const modal = document.getElementById('bulk-cost-update-modal');
+    const progressSection = document.getElementById('bulk-progress');
+    const listContainer = document.getElementById('bulk-destination-list');
+    const cancelBtn = document.getElementById('cancel-bulk-update-btn');
+
+    modal.style.display = 'none';
+    progressSection.style.display = 'none';
+    listContainer.style.display = 'block';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.disabled = false;
+    bulkCostSelectedDestinations.clear();
+  }
+
+  async function requestBulkCostUpdate() {
+    if (bulkCostSelectedDestinations.size === 0) return;
+
+    const confirmBtn = document.getElementById('confirm-bulk-update-btn');
+    const cancelBtn = document.getElementById('cancel-bulk-update-btn');
+    const progressSection = document.getElementById('bulk-progress');
+    const progressFill = document.getElementById('bulk-progress-fill');
+    const progressText = document.getElementById('bulk-progress-text');
+    const listContainer = document.getElementById('bulk-destination-list');
+
+    // Get filtered destinations
+    const legName = legFilter.value;
+    const subLegName = subLegFilter.value || '';
+    const filtered = (subLegName && subLegName !== '')
+      ? filterBySubLeg(workingData, legName, subLegName)
+      : filterByLeg(workingData, legName);
+
+    // Get selected destinations
+    const selectedDestinations = Array.from(bulkCostSelectedDestinations)
+      .map(idx => filtered[idx])
+      .filter(dest => dest);
+
+    if (selectedDestinations.length === 0) return;
+
+    // Disable buttons and show progress
+    confirmBtn.disabled = true;
+    cancelBtn.disabled = true;
+    listContainer.style.display = 'none';
+    progressSection.style.display = 'block';
+
+    let completed = 0;
+    const total = selectedDestinations.length;
+
+    // Process each destination sequentially
+    for (const destination of selectedDestinations) {
+      progressText.textContent = `Sending cost update request for ${destination.name || destination.city}... (${completed + 1} of ${total})`;
+      progressFill.style.width = `${(completed / total) * 100}%`;
+
+      // Send cost update request
+      try {
+        await new Promise((resolve) => {
+          requestCostUpdateFromAgent(destination, null, legName, subLegName);
+          // Wait 3 seconds before next request to avoid overwhelming the API
+          setTimeout(resolve, 3000);
+        });
+
+        completed++;
+        progressFill.style.width = `${(completed / total) * 100}%`;
+      } catch (error) {
+        console.error(`Error updating costs for ${destination.name}:`, error);
+      }
+    }
+
+    // Complete
+    progressText.textContent = `✓ Sent ${completed} cost update requests to AI agent. Costs will update as the agent processes each request.`;
+    progressFill.style.width = '100%';
+
+    // Enable cancel button to close
+    cancelBtn.disabled = false;
+    cancelBtn.textContent = 'Close';
+  }
+
   window.updateSidebarHighlight = updateSidebarHighlight;
 
   const routingToggle = document.getElementById('routing-toggle');
@@ -2409,6 +2570,48 @@ async function initMapApp() {
     costUI.setSessionId(currentScenarioId || 'default');
     costUI.setDestinations(workingData.locations || []);
     await costUI.showCostDetails();
+  });
+
+  // Bulk cost update button
+  document.getElementById('bulk-update-costs-btn').addEventListener('click', () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    scenarioActionsDropdown.style.display = 'none';
+    scenarioActionsBtn.classList.remove('active');
+
+    openBulkCostUpdateModal();
+  });
+
+  // Bulk cost update modal event listeners
+  document.getElementById('select-all-destinations-btn').addEventListener('click', () => {
+    const checkboxes = document.querySelectorAll('.bulk-destination-checkbox');
+    checkboxes.forEach(cb => {
+      if (!cb.checked) {
+        cb.checked = true;
+        cb.dispatchEvent(new Event('change'));
+      }
+    });
+  });
+
+  document.getElementById('deselect-all-destinations-btn').addEventListener('click', () => {
+    const checkboxes = document.querySelectorAll('.bulk-destination-checkbox');
+    checkboxes.forEach(cb => {
+      if (cb.checked) {
+        cb.checked = false;
+        cb.dispatchEvent(new Event('change'));
+      }
+    });
+  });
+
+  document.getElementById('cancel-bulk-update-btn').addEventListener('click', closeBulkCostUpdateModal);
+
+  document.getElementById('confirm-bulk-update-btn').addEventListener('click', requestBulkCostUpdate);
+
+  // Close bulk cost modal when clicking outside
+  document.getElementById('bulk-cost-update-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'bulk-cost-update-modal') {
+      closeBulkCostUpdateModal();
+    }
   });
 
   document.getElementById('data-integrity-btn').addEventListener('click', () => {
