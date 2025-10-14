@@ -212,13 +212,17 @@ function generateCostBreakdownHTML(costs, showEmpty = false, destinationName = '
         }
 
         return `
-          <div class="cost-breakdown-item-detailed" style="border-left: 3px solid ${confidenceColor}; padding: 8px 10px; margin: 6px 0; background: #f8f9fa; border-radius: 4px;">
+          <div class="cost-breakdown-item-detailed" data-cost-id="${cost.id}" style="border-left: 3px solid ${confidenceColor}; padding: 8px 10px; margin: 6px 0; background: #f8f9fa; border-radius: 4px; position: relative;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
               <span style="color: #666; font-size: 12px; font-weight: 600;">
                 ${getCategoryIcon(cost.category)} ${getCategoryDisplayName(cost.category)}
                 ${confidenceBadge}
               </span>
-              <span style="font-weight: 700; color: #333; font-size: 13px;">${formatCurrency(amount)} <span style="font-size: 10px; color: #888;">(${percentage}%)</span></span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="cost-amount-editable" data-cost-id="${cost.id}" data-original-amount="${amount}" data-currency="${cost.currency || 'USD'}" style="font-weight: 700; color: #333; font-size: 13px; cursor: pointer; padding: 2px 4px; border-radius: 3px; transition: background 0.2s;" title="Click to edit amount">
+                  ${formatCurrency(amount)} <span style="font-size: 10px; color: #888;">(${percentage}%)</span>
+                </span>
+              </div>
             </div>
             ${cost.currency && cost.currency !== 'USD' && cost.currency !== 'N/A' ? `<div style="font-size: 10px; color: #888; margin-bottom: 4px;">${formatCurrency(cost.amount, cost.currency)}</div>` : ''}
             ${cost.notes ? `<div style="font-size: 11px; color: #666; margin-top: 4px; line-height: 1.4; font-style: italic;">${cost.notes}</div>` : ''}
@@ -358,6 +362,256 @@ function generateSidebarCostSummary(costs, durationDays = 0, destinationName = '
   `;
 }
 
+/**
+ * Initialize inline cost editing handlers
+ * Call this after rendering cost breakdowns
+ */
+function initInlineCostEditing() {
+  // Prevent multiple initializations
+  if (window._inlineCostEditingInitialized) {
+    console.log('⚠️ Inline cost editing already initialized, skipping');
+    return;
+  }
+  window._inlineCostEditingInitialized = true;
+
+  console.log('✅ Initializing inline cost editing handlers');
+
+  // Use event delegation to handle dynamically added cost items
+  document.addEventListener('click', (e) => {
+    // Check if clicked element or its parent has the editable class
+    const editableElement = e.target.classList.contains('cost-amount-editable')
+      ? e.target
+      : e.target.closest('.cost-amount-editable');
+
+    if (editableElement && !editableElement.querySelector('input')) {
+      console.log('🖱️ Click detected on editable cost amount:', editableElement.dataset.costId);
+      e.stopPropagation();
+      startInlineEdit(editableElement);
+    }
+  }, true); // Use capture phase to catch events early
+
+  // Add hover effect via CSS
+  const style = document.createElement('style');
+  style.textContent = `
+    .cost-amount-editable:hover {
+      background: #e3f2fd !important;
+      outline: 1px solid #2196f3;
+    }
+    .cost-amount-editing {
+      background: #fff3cd !important;
+      outline: 2px solid #ffc107;
+    }
+  `;
+  if (!document.getElementById('inline-cost-editing-styles')) {
+    style.id = 'inline-cost-editing-styles';
+    document.head.appendChild(style);
+  }
+
+  console.log('✅ Inline cost editing handlers initialized');
+}
+
+/**
+ * Start inline editing for a cost amount
+ */
+function startInlineEdit(element) {
+  console.log('🎯 startInlineEdit called for element:', element);
+
+  const costId = element.dataset.costId;
+  const originalAmount = parseFloat(element.dataset.originalAmount);
+  const currency = element.dataset.currency || 'USD';
+
+  console.log('📊 Cost data:', { costId, originalAmount, currency });
+
+  // Store original content
+  const originalHTML = element.innerHTML;
+
+  // Create input field
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.step = '0.01';
+  input.min = '0';
+  input.value = originalAmount;
+  input.style.cssText = 'width: 100px; font-size: 13px; font-weight: 700; padding: 2px 4px; border: 2px solid #2196f3; border-radius: 3px;';
+
+  console.log('✏️ Created input field, replacing content...');
+
+  // Replace content with input
+  element.innerHTML = '';
+  element.appendChild(input);
+  element.classList.add('cost-amount-editing');
+  input.focus();
+  input.select();
+
+  console.log('✅ Input field should now be visible and focused');
+
+  // Track if save is in progress to prevent multiple saves
+  let saveInProgress = false;
+
+  // Handle save
+  const saveEdit = async () => {
+    if (saveInProgress) {
+      console.log('⏳ Save already in progress, skipping...');
+      return;
+    }
+    saveInProgress = true;
+
+    const newAmount = parseFloat(input.value);
+
+    if (isNaN(newAmount) || newAmount < 0) {
+      alert('Please enter a valid positive number');
+      input.focus();
+      saveInProgress = false;
+      return;
+    }
+
+    if (newAmount === originalAmount) {
+      // No change, just restore if element still exists
+      if (document.body.contains(element)) {
+        element.innerHTML = originalHTML;
+        element.classList.remove('cost-amount-editing');
+      }
+      saveInProgress = false;
+      return;
+    }
+
+    // Show saving state if element still exists
+    if (document.body.contains(element)) {
+      element.innerHTML = '💾 Saving...';
+    }
+
+    try {
+      // Update via API
+      await updateCostAmount(costId, newAmount, currency);
+
+      // Trigger refresh to update all displays
+      console.log('📢 Dispatching costs-updated event...');
+      window.dispatchEvent(new CustomEvent('costs-updated'));
+
+      // Note: Don't wait for the event - the element will be replaced by the refresh
+      // which is fine because we already saved successfully
+
+      console.log(`✅ Updated cost ${costId}: ${originalAmount} → ${newAmount}`);
+    } catch (error) {
+      console.error('Failed to update cost:', error);
+      alert(`Failed to update cost: ${error.message}`);
+      // Restore original only if element still exists
+      if (document.body.contains(element)) {
+        element.innerHTML = originalHTML;
+        element.classList.remove('cost-amount-editing');
+      }
+    } finally {
+      saveInProgress = false;
+    }
+  };
+
+  // Handle cancel
+  const cancelEdit = () => {
+    if (document.body.contains(element)) {
+      element.innerHTML = originalHTML;
+      element.classList.remove('cost-amount-editing');
+    }
+  };
+
+  // Event listeners
+  input.addEventListener('blur', (e) => {
+    // Only save on blur if the element still exists in the DOM
+    if (document.body.contains(element)) {
+      saveEdit();
+    }
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      input.blur(); // Let blur handler save it
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEdit();
+    }
+  });
+}
+
+/**
+ * Update cost amount via API
+ * Uses a workaround: fetches all costs, updates the specific one, and saves back to Firestore
+ */
+async function updateCostAmount(costId, newAmountUSD, currency = 'USD') {
+  const apiBaseUrl = 'http://localhost:5001';
+
+  // Get scenario ID from window
+  const scenarioId = window.currentScenarioId;
+  if (!scenarioId) {
+    throw new Error('No scenario loaded. Please load or create a scenario first.');
+  }
+
+  console.log(`🔄 Updating cost ${costId} with amount ${newAmountUSD} in scenario ${scenarioId}`);
+
+  // Step 1: Fetch all costs from Firestore
+  const getCostsResponse = await fetch(`${apiBaseUrl}/api/costs?session_id=${scenarioId}`);
+  if (!getCostsResponse.ok) {
+    throw new Error(`Failed to fetch costs: ${getCostsResponse.statusText}`);
+  }
+
+  const costsData = await getCostsResponse.json();
+  const allCosts = costsData.costs || [];
+
+  console.log(`📦 Fetched ${allCosts.length} total costs`);
+
+  // Step 2: Find and update the specific cost
+  const costIndex = allCosts.findIndex(c => c.id === costId);
+  if (costIndex === -1) {
+    throw new Error(`Cost with ID ${costId} not found`);
+  }
+
+  const updatedCost = {
+    ...allCosts[costIndex],
+    amount_usd: newAmountUSD,
+    source: 'manual_override',
+    confidence: 'high'
+  };
+
+  console.log(`✏️ Updated cost:`, updatedCost);
+
+  // Step 3: Get the destination_id to use bulk-save
+  const destinationId = updatedCost.destination_id;
+  if (!destinationId) {
+    throw new Error('Cost has no destination_id');
+  }
+
+  // Step 4: Get all costs for this destination
+  const destinationCosts = allCosts.filter(c => c.destination_id === destinationId);
+
+  // Replace the old cost with the updated one
+  const updatedDestinationCosts = destinationCosts.map(c =>
+    c.id === costId ? updatedCost : c
+  );
+
+  console.log(`💾 Saving ${updatedDestinationCosts.length} costs for destination ${destinationId}`);
+
+  // Step 5: Save back to Firestore using bulk-save
+  const bulkSaveResponse = await fetch(`${apiBaseUrl}/api/costs/bulk-save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      session_id: scenarioId,
+      scenario_id: scenarioId,
+      destination_id: destinationId,
+      destination_name: updatedCost.destination_name || '',
+      cost_items: updatedDestinationCosts
+    })
+  });
+
+  if (!bulkSaveResponse.ok) {
+    const errorText = await bulkSaveResponse.text();
+    throw new Error(`Failed to save updated cost: ${bulkSaveResponse.statusText} - ${errorText}`);
+  }
+
+  const result = await bulkSaveResponse.json();
+  console.log(`✅ Cost updated successfully:`, result);
+
+  return result;
+}
+
 // Make functions globally available
 window.calculateDestinationCosts = calculateDestinationCosts;
 window.formatCurrency = formatCurrency;
@@ -367,3 +621,24 @@ window.generateCostBreakdownHTML = generateCostBreakdownHTML;
 window.generateCostSummaryHTML = generateCostSummaryHTML;
 window.generateSidebarCostSummary = generateSidebarCostSummary;
 window.findOrphanedCosts = findOrphanedCosts;
+window.initInlineCostEditing = initInlineCostEditing;
+window.startInlineEdit = startInlineEdit;
+
+// Debug helper
+window.testInlineEdit = function() {
+  const editableElements = document.querySelectorAll('.cost-amount-editable');
+  console.log('Found', editableElements.length, 'editable cost elements');
+  if (editableElements.length > 0) {
+    console.log('Testing first element:', editableElements[0]);
+    startInlineEdit(editableElements[0]);
+  } else {
+    console.log('No editable elements found. Make sure cost breakdown is displayed.');
+  }
+};
+
+// Auto-initialize if DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initInlineCostEditing);
+} else {
+  initInlineCostEditing();
+}

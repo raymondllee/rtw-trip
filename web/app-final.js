@@ -2888,11 +2888,13 @@ async function initMapApp() {
           console.log(`✅ Updated workingData.costs with ${freshCosts.length} costs`);
           console.log(`💰 Cost IDs:`, freshCosts.map(c => `${c.id}: ${c.amount_usd} for ${c.destination_id}`));
 
-          // Re-render only the sidebar with fresh data
-          const filtered = (subLegFilter.value && subLegFilter.value !== '')
-            ? filterBySubLeg(workingData, legFilter.value, subLegFilter.value)
-            : filterByLeg(workingData, legFilter.value);
-          updateSidebar(filtered);
+          // Re-render the sidebar AND header summary with fresh cost data
+          const legName = legFilter.value || 'all';
+          const subLegName = (subLegFilter.value && subLegFilter.value !== '') ? subLegFilter.value : null;
+
+          // Call render to update both sidebar and header summary
+          // triggerAutoSave=false to avoid unnecessary saves
+          render(legName, subLegName, false, false);
 
           try {
             await updateCostSummary();
