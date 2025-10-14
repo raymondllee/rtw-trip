@@ -462,16 +462,39 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
           }
 
           const infoContent = `
-            <div style="max-width: 250px;">
-              <h4 style="margin: 0 0 8px 0;">${transportIcon} ${fromLocation.name} → ${toLocation.name}</h4>
-              <p style="margin: 4px 0;"><strong>Transport:</strong> ${transportMode.charAt(0).toUpperCase() + transportMode.slice(1)} ${statusBadge}</p>
-              <p style="margin: 4px 0;"><strong>Distance:</strong> ${Math.round(distance/1000)}km</p>
-              ${segment && segment.duration_hours ? `<p style="margin: 4px 0;"><strong>Duration:</strong> ${Math.round(segment.duration_hours)}h</p>` : ''}
-              <p style="margin: 4px 0;"><strong>Total Cost:</strong> ${costText} (${segment ? segment.num_travelers : 3} people)</p>
-              <p style="margin: 4px 0;"><strong>Per Person:</strong> $${Math.round(cost/(segment ? segment.num_travelers : 3)).toLocaleString()}</p>
-              ${confidenceInfo}
-              ${segment && segment.notes ? `<p style="margin: 8px 0 4px 0; padding-top: 8px; border-top: 1px solid #eee; font-style: italic; font-size: 12px;">${segment.notes}</p>` : ''}
-              ${segment && segment.booking_reference ? `<p style="margin: 4px 0; font-size: 12px; color: #1e88e5;"><strong>Ref:</strong> ${segment.booking_reference}</p>` : ''}
+            <div style="max-width: 280px; padding: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px;">
+                ${transportIcon} ${fromLocation.name} → ${toLocation.name}
+              </h4>
+              <div style="display: grid; gap: 8px;">
+                <p style="margin: 0; font-size: 13px; line-height: 1.5;">
+                  <strong style="color: #34495e;">Transport:</strong> ${transportMode.charAt(0).toUpperCase() + transportMode.slice(1)} ${statusBadge}
+                </p>
+                <p style="margin: 0; font-size: 13px; line-height: 1.5;">
+                  <strong style="color: #34495e;">Distance:</strong> ${Math.round(distance/1000)}km
+                </p>
+                ${segment && segment.duration_hours ? `
+                  <p style="margin: 0; font-size: 13px; line-height: 1.5;">
+                    <strong style="color: #34495e;">Duration:</strong> ~${Math.round(segment.duration_hours)}h
+                  </p>` : ''}
+                <p style="margin: 0; font-size: 13px; line-height: 1.5;">
+                  <strong style="color: #34495e;">Total Cost:</strong> ${costText} <span style="color: #7f8c8d; font-size: 12px;">(${segment ? segment.num_travelers : 3} people)</span>
+                </p>
+                <p style="margin: 0; font-size: 13px; line-height: 1.5;">
+                  <strong style="color: #34495e;">Per Person:</strong> <span style="color: #27ae60; font-weight: 600;">$${Math.round(cost/(segment ? segment.num_travelers : 3)).toLocaleString()}</span>
+                </p>
+                ${confidenceInfo ? `<p style="margin: 0; font-size: 12px; color: #7f8c8d; line-height: 1.5;">${confidenceInfo}</p>` : ''}
+                ${segment && segment.notes ? `
+                  <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e0e0e0;">
+                    <p style="margin: 0; font-size: 12px; font-style: italic; color: #555; line-height: 1.4;">
+                      💡 ${segment.notes}
+                    </p>
+                  </div>` : ''}
+                ${segment && segment.booking_reference ? `
+                  <p style="margin: 0; font-size: 12px; color: #3498db; font-weight: 500;">
+                    <strong>Ref:</strong> ${segment.booking_reference}
+                  </p>` : ''}
+              </div>
             </div>
           `;
 
