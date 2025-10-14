@@ -1,6 +1,6 @@
 // AI Travel Concierge Chat Module
 import { db } from './firebase-config.js';
-import { collection, addDoc, doc, setDoc, getDoc, getDocs, query, orderBy, limit, updateDoc, deleteDoc, Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+import { collection, addDoc, doc, setDoc, getDoc, getDocs, query, where, orderBy, limit, updateDoc, deleteDoc, Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 import { StatePersistence } from './state-persistence.js';
 
 const CHAT_API_URL = 'http://localhost:5001/api/chat';

@@ -2251,11 +2251,9 @@ async function initMapApp() {
         // Save scenario selection to state
         statePersistence.saveScenarioSelection(scenarioId);
 
-        // Switch chat to this scenario
-        if (chatInstance) {
-          await chatInstance.switchToScenario(scenarioId);
-          // Save the scenario-chat association
-          statePersistence.saveScenarioChatAssociation(scenarioId, chatInstance.currentChatId);
+        // Switch chat to the new scenario
+        if (window.switchChatForScenario) {
+          await window.switchChatForScenario(scenarioId);
         }
 
         // Update view summary button state
@@ -3638,6 +3636,24 @@ async function initMapApp() {
   let chatInstance = null;
   if (window.TravelConciergeChat) {
     chatInstance = new window.TravelConciergeChat(handleItineraryChanges);
+    
+    // Hook into scenario switching events
+    window.switchChatForScenario = async function(scenarioId) {
+      if (!chatInstance || !scenarioId) return;
+      console.log('🔄 App switching chat to scenario:', scenarioId);
+      try {
+        await chatInstance.switchToScenario(scenarioId);
+        
+        // Update scenario name display
+        const scenario = await scenarioManager.getScenario(scenarioId);
+        if (scenario) {
+          currentScenarioName = scenario.name;
+          updateScenarioNameDisplay();
+        }
+      } catch (error) {
+        console.error('Error switching chat for scenario:', error);
+      }
+    };
   }
 
   // Function to update chat context

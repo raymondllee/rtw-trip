@@ -71,6 +71,7 @@ export class StatePersistence {
       floatingChatPosition: { x: null, y: null }, // Position of floating chat
       floatingChatSize: { width: null, height: null }, // Size of floating chat
       sidebarChatHeight: null, // Custom height for sidebar chat
+      scenarioChatMap: {}, // Map scenarioId -> chatId for scenario-chat associations
       lastUpdated: null
     };
   }
@@ -203,6 +204,24 @@ export class StatePersistence {
    */
   getState() {
     return { ...this.state };
+  }
+
+  /**
+   * Save scenario-chat association
+   */
+  saveScenarioChatAssociation(scenarioId, chatId) {
+    // Store scenario-chat mappings in a separate object in state
+    const scenarioChatMap = this.state.scenarioChatMap || {};
+    scenarioChatMap[scenarioId] = chatId;
+    this.saveState({ scenarioChatMap });
+  }
+
+  /**
+   * Get chat ID for a scenario
+   */
+  getChatIdForScenario(scenarioId) {
+    const scenarioChatMap = this.state.scenarioChatMap || {};
+    return scenarioChatMap[scenarioId] || null;
   }
 
   /**
