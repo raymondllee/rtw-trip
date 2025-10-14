@@ -7,6 +7,8 @@
 // ID Generation
 // ============================================================================
 
+const PLACE_ID_PREFIXES = ['ChIJ', 'GhIJ', 'EhIJ'];
+
 /**
  * Generate a unique UUID for a destination
  * @returns {string} UUID v4 string
@@ -37,6 +39,16 @@ export function isUUID(id) {
 }
 
 /**
+ * Check if an ID matches Google Place ID format
+ * @param {string} id
+ * @returns {boolean}
+ */
+export function isPlaceId(id) {
+  if (typeof id !== 'string') return false;
+  return PLACE_ID_PREFIXES.some(prefix => id.startsWith(prefix));
+}
+
+/**
  * Normalize ID to string format for consistent comparison
  * @param {string|number} id
  * @returns {string}
@@ -61,7 +73,7 @@ export function generateIdMigrationMap(locations) {
     const oldId = location.id;
 
     // Skip if already using UUID
-    if (isUUID(oldId)) {
+    if (isUUID(oldId) || isPlaceId(oldId)) {
       migrationMap.set(normalizeId(oldId), oldId);
       return;
     }
@@ -268,14 +280,15 @@ export function validateDataIntegrity(data) {
   }
 
   // Check for mixed ID types (numeric and UUID)
-  const numericIds = locations.filter(loc => !isUUID(loc.id));
   const uuidIds = locations.filter(loc => isUUID(loc.id));
+  const placeIds = locations.filter(loc => isPlaceId(loc.id));
+  const legacyIds = locations.filter(loc => !isUUID(loc.id) && !isPlaceId(loc.id));
 
-  if (numericIds.length > 0 && uuidIds.length > 0) {
+  if (legacyIds.length > 0 && (uuidIds.length > 0 || placeIds.length > 0)) {
     warnings.push({
       type: 'mixed_id_types',
-      message: `Data contains both numeric IDs (${numericIds.length}) and UUIDs (${uuidIds.length})`,
-      data: { numericIds, uuidIds }
+      message: `Data contains legacy IDs (${legacyIds.length}) mixed with UUIDs (${uuidIds.length}) and Place IDs (${placeIds.length})`,
+      data: { legacyIds, uuidIds, placeIds }
     });
   }
 
@@ -287,8 +300,9 @@ export function validateDataIntegrity(data) {
       total_locations: locations.length,
       total_costs: costs.length,
       orphaned_costs: orphanedCosts.length,
-      numeric_ids: numericIds.length,
-      uuid_ids: uuidIds.length
+      legacy_ids: legacyIds.length,
+      uuid_ids: uuidIds.length,
+      place_ids: placeIds.length
     }
   };
 }
@@ -399,7 +413,8 @@ export function createMigrationReport(originalData, migratedData) {
       orphaned_costs_fixed: Math.max(0,
         originalValidation.summary.orphaned_costs - migratedValidation.summary.orphaned_costs
       ),
-      id_format_unified: migratedValidation.summary.uuid_ids === migratedData.locations?.length
+      id_format_unified: migratedValidation.summary.legacy_ids === 0 &&
+        (migratedValidation.summary.uuid_ids + migratedValidation.summary.place_ids) === (migratedData.locations?.length || 0)
     }
   };
 }

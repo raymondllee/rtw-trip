@@ -215,7 +215,7 @@ Return a complete JSON object with these fields:
 
 ```json
 {
-  "destination_id": <integer from context>,
+  "destination_id": "<Place ID from context>",
   "destination_name": "City, Country",
   "accommodation": {
     "category": "accommodation",

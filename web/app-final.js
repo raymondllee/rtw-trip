@@ -629,7 +629,8 @@ async function initMapApp() {
         const latestVersion = await scenarioManager.getLatestVersion(savedState.scenarioId);
         if (latestVersion && latestVersion.itineraryData) {
           console.log(`📥 Loaded from Firestore with ${latestVersion.itineraryData.costs?.length || 0} costs`);
-          workingData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
+          const loadedData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
+          updateWorkingData(loadedData);
           console.log(`💰 After merge, workingData has ${workingData.costs?.length || 0} costs`);
           currentScenarioId = savedState.scenarioId;
           window.currentScenarioId = currentScenarioId;
@@ -651,7 +652,8 @@ async function initMapApp() {
         console.log(`📥 Loading most recent scenario: ${lastScenario.name}`);
         const latestVersion = await scenarioManager.getLatestVersion(lastScenario.id);
         if (latestVersion && latestVersion.itineraryData) {
-          workingData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
+          const loadedData = mergeSubLegsFromTemplate(latestVersion.itineraryData);
+          updateWorkingData(loadedData);
           currentScenarioId = lastScenario.id;
           window.currentScenarioId = currentScenarioId;
           currentScenarioName = lastScenario.name;
@@ -1149,12 +1151,12 @@ async function initMapApp() {
     const prompt = buildCostAgentPrompt(destination, legName, subLegName);
     if (!prompt) {
       console.warn('⚠️ Skipping cost update request - no prompt generated.');
-      return;
+      return false;
     }
 
     if (!chatInstance) {
       alert('The AI Travel Concierge chat is not ready yet. Please open the AI panel and try again.');
-      return;
+      return false;
     }
 
     const targetForm = chatInstance.chatColumnForm || chatInstance.chatForm || chatInstance.floatingChatForm;
@@ -1162,7 +1164,7 @@ async function initMapApp() {
 
     if (!targetForm || !targetInput) {
       console.warn('⚠️ Unable to send cost request - chat form elements not found.');
-      return;
+      return false;
     }
 
     if (typeof chatInstance.moveToColumn === 'function') {
@@ -1195,6 +1197,8 @@ async function initMapApp() {
       setTimeout(restoreButton, 6000);
       window.addEventListener('costs-updated', restoreButton, { once: true });
     }
+
+    return true;
   }
 
   function updateSidebar(locations) {
@@ -1696,6 +1700,26 @@ async function initMapApp() {
     }
     return newId;
   }
+
+  async function fetchPlaceDetails(placeId) {
+    if (!placeId) return null;
+    const baseUrl = window.API_CONFIG?.BASE_URL || 'http://localhost:5001';
+    try {
+      const response = await fetch(`${baseUrl}/api/places/details/${encodeURIComponent(placeId)}`);
+      if (!response.ok) {
+        console.warn(`⚠️ Failed to load place details for ${placeId}: ${response.status}`);
+        return null;
+      }
+      const data = await response.json();
+      if (data.status === 'success') {
+        return data;
+      }
+      console.warn(`⚠️ Place details lookup returned status=${data.status} for ${placeId}`);
+    } catch (error) {
+      console.error(`❌ Error fetching place details for ${placeId}:`, error);
+    }
+    return null;
+  }
   
   function parseAddressComponents(components) {
     const result = { city: '', country: '', region: '' };
@@ -1714,8 +1738,27 @@ async function initMapApp() {
     return result;
   }
   
-  function addNewDestination(insertIndex, placeData, duration) {
+  async function addNewDestination(insertIndex, placeData, duration) {
     const addressInfo = parseAddressComponents(placeData.address_components || []);
+    const placeDetails = await fetchPlaceDetails(placeData.place_id);
+
+    const resolvedId = placeDetails?.place_id || placeData.place_id || null;
+    const existingIds = new Set((workingData.locations || []).map(loc => normalizeId(loc.id)));
+
+    if (resolvedId && existingIds.has(normalizeId(resolvedId))) {
+      alert('This destination is already in your itinerary with the same Place ID.');
+      closeAddDestinationModal();
+      return;
+    }
+
+    const coordinates = placeDetails?.coordinates || {
+      lat: placeData.location.lat,
+      lng: placeData.location.lng
+    };
+
+    const country = placeDetails?.country || addressInfo.country;
+    const city = placeDetails?.city || addressInfo.city;
+    const region = placeDetails?.administrative_area || addressInfo.region || 'Custom';
 
     // Determine leg and sub_leg from neighbor
     let leg = null;
@@ -1731,15 +1774,12 @@ async function initMapApp() {
     }
 
     const newLocation = {
-      id: generateNewLocationId(),
-      name: placeData.name,
-      city: addressInfo.city,
-      country: addressInfo.country,
-      region: addressInfo.region || 'Custom',
-      coordinates: {  // Use 'coordinates' to match data structure
-        lat: placeData.location.lat,
-        lng: placeData.location.lng
-      },
+      id: resolvedId || generateNewLocationId(),
+      name: placeDetails?.name || placeData.name,
+      city,
+      country,
+      region,
+      coordinates,
       duration_days: duration,
       activity_type: 'city exploration',
       highlights: [],
@@ -1750,11 +1790,32 @@ async function initMapApp() {
       sub_leg: sub_leg
     };
 
+    if (placeDetails?.timezone) {
+      newLocation.timezone = placeDetails.timezone;
+    }
+    if (placeDetails?.timezone_name) {
+      newLocation.timezone_name = placeDetails.timezone_name;
+    }
+    if (placeDetails) {
+      newLocation.place_data = {
+        place_id: placeDetails.place_id,
+        formatted_address: placeDetails.formatted_address,
+        types: placeDetails.types,
+        country: placeDetails.country,
+        city: placeDetails.city,
+        administrative_area: placeDetails.administrative_area,
+        timezone: placeDetails.timezone,
+        timezone_name: placeDetails.timezone_name,
+        raw: placeDetails.raw_data || null
+      };
+    }
+
     workingData.locations.splice(insertIndex, 0, newLocation);
     recalculateDates(workingData.locations);
     recalculateTripMetadata();
     render(legFilter.value, subLegFilter.value, routingToggle.checked);
     closeAddDestinationModal();
+    triggerAutosave();
   }
 
   function deleteDestination(destinationId) {
@@ -1889,7 +1950,8 @@ async function initMapApp() {
       const latestVersion = await scenarioManager.getLatestVersion(scenarioId);
 
       if (scenario && latestVersion) {
-        workingData = mergeSubLegsFromTemplate(JSON.parse(JSON.stringify(latestVersion.itineraryData)));
+        const loadedData = mergeSubLegsFromTemplate(JSON.parse(JSON.stringify(latestVersion.itineraryData)));
+        updateWorkingData(loadedData);
         currentScenarioId = scenarioId;
         window.currentScenarioId = currentScenarioId;
         currentScenarioName = scenario.name;
@@ -2140,7 +2202,95 @@ async function initMapApp() {
   }
 
   // Bulk cost update modal functions
+  const costUpdateWaiters = [];
   let bulkCostSelectedDestinations = new Set();
+
+  function waitForNextCostUpdate(destinationLabel, timeoutMs = 240000) {
+    let settled = false;
+    let timeoutId;
+
+    const entry = {
+      destinationLabel,
+      resolve: () => {},
+      reject: () => {}
+    };
+
+    const promise = new Promise((resolve, reject) => {
+      entry.resolve = (result) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        resolve(result);
+      };
+      entry.reject = (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        reject(error);
+      };
+    });
+
+    timeoutId = setTimeout(() => {
+      const index = costUpdateWaiters.indexOf(entry);
+      if (index !== -1) {
+        costUpdateWaiters.splice(index, 1);
+      }
+      entry.reject(new Error(`Timed out waiting for cost refresh${destinationLabel ? ` for ${destinationLabel}` : ''}`));
+    }, timeoutMs);
+
+    costUpdateWaiters.push(entry);
+
+    const cancel = (reason) => {
+      if (settled) return;
+      const index = costUpdateWaiters.indexOf(entry);
+      if (index !== -1) {
+        costUpdateWaiters.splice(index, 1);
+      }
+      entry.reject(reason || new Error(`Cancelled waiting for cost refresh${destinationLabel ? ` for ${destinationLabel}` : ''}`));
+    };
+
+    return { promise, cancel };
+  }
+
+  function resolveNextCostUpdateWaiter(result) {
+    if (!costUpdateWaiters.length) {
+      return;
+    }
+    const waiter = costUpdateWaiters.shift();
+    if (waiter) {
+      waiter.resolve(result);
+    }
+  }
+
+  const BULK_STATUS_CLASSES = ['queued', 'requesting', 'waiting', 'complete', 'failed', 'cancelled'];
+  const BULK_STATUS_DEFAULT_MESSAGES = {
+    queued: 'Queued for update',
+    requesting: 'Sending update request to AI...',
+    waiting: 'Waiting for AI cost update and summary...',
+    complete: '✓ Costs and summary refreshed',
+    failed: '⚠️ Update failed',
+    cancelled: 'Update cancelled'
+  };
+
+  function setBulkDestinationStatus(item, status, message) {
+    if (!item) return;
+
+    BULK_STATUS_CLASSES.forEach(cls => item.classList.remove(`status-${cls}`));
+
+    if (status) {
+      item.classList.add(`status-${status}`);
+      item.dataset.status = status;
+    } else {
+      delete item.dataset.status;
+    }
+
+    const statusEl = item.querySelector('[data-progress-status]');
+    if (statusEl) {
+      const label = message ?? (status ? BULK_STATUS_DEFAULT_MESSAGES[status] : '');
+      statusEl.textContent = label || '';
+      statusEl.dataset.state = status || '';
+    }
+  }
 
   function openBulkCostUpdateModal() {
     const modal = document.getElementById('bulk-cost-update-modal');
@@ -2173,9 +2323,10 @@ async function initMapApp() {
       const statusClass = hasCosts ? 'has-costs' : 'no-costs';
       const statusText = hasCosts ? '✓ Has costs' : '✗ No costs';
       const duration = dest.duration_days || 1;
+      const destinationId = dest.id || dest.destination_id || dest.destinationId || '';
 
       return `
-        <div class="bulk-destination-item" data-destination-index="${idx}">
+        <div class="bulk-destination-item" data-destination-index="${idx}" ${destinationId ? `data-destination-id="${destinationId}"` : ''}>
           <input type="checkbox" class="bulk-destination-checkbox" data-destination-index="${idx}">
           <div class="bulk-destination-info">
             <div class="bulk-destination-name">${dest.name || dest.city || 'Unknown'}</div>
@@ -2183,6 +2334,7 @@ async function initMapApp() {
               <span>${duration} day${duration !== 1 ? 's' : ''}</span>
               <span class="bulk-destination-status ${statusClass}">${statusText}</span>
             </div>
+            <div class="bulk-destination-progress-status" data-progress-status></div>
           </div>
         </div>
       `;
@@ -2247,6 +2399,7 @@ async function initMapApp() {
     const progressFill = document.getElementById('bulk-progress-fill');
     const progressText = document.getElementById('bulk-progress-text');
     const listContainer = document.getElementById('bulk-destination-list');
+    const countDisplay = document.getElementById('bulk-selection-count');
 
     // Get filtered destinations
     const legName = legFilter.value;
@@ -2256,48 +2409,127 @@ async function initMapApp() {
       : filterByLeg(workingData, legName);
 
     // Get selected destinations
-    const selectedDestinations = Array.from(bulkCostSelectedDestinations)
-      .map(idx => filtered[idx])
-      .filter(dest => dest);
+    const selectedEntries = Array.from(bulkCostSelectedDestinations)
+      .map(idx => ({ idx, destination: filtered[idx] }))
+      .filter(entry => entry.destination);
 
-    if (selectedDestinations.length === 0) return;
+    if (selectedEntries.length === 0) return;
 
-    // Disable buttons and show progress
+    // Disable controls and show progress UI
     confirmBtn.disabled = true;
     cancelBtn.disabled = true;
-    listContainer.style.display = 'none';
     progressSection.style.display = 'block';
+    progressFill.style.width = '0%';
+    progressText.textContent = `Starting bulk update for ${selectedEntries.length} destinations...`;
+    if (countDisplay) {
+      countDisplay.textContent = '';
+    }
+
+    // Disable all checkboxes to lock selection during processing
+    listContainer.querySelectorAll('.bulk-destination-checkbox').forEach(cb => {
+      cb.disabled = true;
+    });
+
+    // Mark selected destinations as queued
+    selectedEntries.forEach(({ idx }) => {
+      const item = listContainer.querySelector(`.bulk-destination-item[data-destination-index="${idx}"]`);
+      if (item) {
+        item.classList.add('processing');
+        setBulkDestinationStatus(item, 'queued');
+      }
+    });
 
     let completed = 0;
-    const total = selectedDestinations.length;
+    let failed = 0;
+    const total = selectedEntries.length;
 
-    // Process each destination sequentially
-    for (const destination of selectedDestinations) {
-      progressText.textContent = `Sending cost update request for ${destination.name || destination.city}... (${completed + 1} of ${total})`;
-      progressFill.style.width = `${(completed / total) * 100}%`;
+    // Process each destination sequentially, waiting for cost + summary refresh before continuing
+    for (let i = 0; i < total; i++) {
+      const { idx, destination } = selectedEntries[i];
+      if (!destination) continue;
 
-      // Send cost update request
-      try {
-        await new Promise((resolve) => {
-          requestCostUpdateFromAgent(destination, null, legName, subLegName);
-          // Wait 3 seconds before next request to avoid overwhelming the API
-          setTimeout(resolve, 3000);
-        });
+      const item = listContainer.querySelector(`.bulk-destination-item[data-destination-index="${idx}"]`);
+      const destinationLabel = destination.name || destination.city || destination.id || `Destination ${i + 1}`;
+      const progressPrefix = `(${i + 1}/${total})`;
 
-        completed++;
-        progressFill.style.width = `${(completed / total) * 100}%`;
-      } catch (error) {
-        console.error(`Error updating costs for ${destination.name}:`, error);
+      if (item) {
+        setBulkDestinationStatus(item, 'requesting', `${progressPrefix} sending update request...`);
       }
+      progressText.textContent = `Requesting cost update ${progressPrefix} for ${destinationLabel}`;
+
+      try {
+        const dispatched = requestCostUpdateFromAgent(destination, null, legName, subLegName);
+
+        if (!dispatched) {
+          failed++;
+          if (item) {
+            setBulkDestinationStatus(item, 'failed', 'Unable to send request. Open the AI panel and try again.');
+          }
+          progressText.textContent = `Skipped ${destinationLabel} — chat interface not ready`;
+          continue;
+        }
+
+        if (item) {
+          setBulkDestinationStatus(item, 'waiting', `${progressPrefix} waiting for AI cost update...`);
+        }
+        progressText.textContent = `Waiting for AI to finish ${progressPrefix} ${destinationLabel}`;
+
+        const { promise } = waitForNextCostUpdate(destinationLabel);
+        const result = await promise;
+
+        if (result.costRefreshSucceeded && result.summarySucceeded) {
+          completed++;
+          if (item) {
+            setBulkDestinationStatus(item, 'complete');
+          }
+          progressText.textContent = `Finished ${progressPrefix} ${destinationLabel}`;
+        } else {
+          failed++;
+          if (item) {
+            if (!result.costRefreshSucceeded) {
+              setBulkDestinationStatus(item, 'failed', 'AI did not refresh costs. Ensure the scenario is saved.');
+            } else if (!result.summarySucceeded) {
+              const errText = result.summaryError?.message || result.summaryError || 'Summary refresh failed.';
+              setBulkDestinationStatus(item, 'failed', `Summary failed: ${errText}`);
+            } else {
+              setBulkDestinationStatus(item, 'failed', 'Unknown issue completing update.');
+            }
+          }
+          progressText.textContent = `Issue updating ${destinationLabel}. Review status for details.`;
+        }
+      } catch (error) {
+        failed++;
+        const errMsg = error?.message || error;
+        if (item) {
+          setBulkDestinationStatus(item, 'failed', `Error: ${errMsg}`);
+        }
+        console.error(`Error updating costs for ${destinationLabel}:`, error);
+        progressText.textContent = `Error updating ${destinationLabel}: ${errMsg}`;
+      }
+
+      const processed = completed + failed;
+      const percent = Math.round((processed / total) * 100);
+      progressFill.style.width = `${percent}%`;
+
+      // Count display intentionally left blank during processing (progress bar communicates status)
     }
 
     // Complete
-    progressText.textContent = `✓ Sent ${completed} cost update requests to AI agent. Costs will update as the agent processes each request.`;
-    progressFill.style.width = '100%';
-
-    // Enable cancel button to close
     cancelBtn.disabled = false;
     cancelBtn.textContent = 'Close';
+    listContainer.querySelectorAll('.bulk-destination-checkbox').forEach(cb => {
+      cb.disabled = false;
+    });
+    confirmBtn.disabled = bulkCostSelectedDestinations.size === 0;
+
+    if (failed === 0) {
+      progressFill.style.width = '100%';
+      progressText.textContent = `All ${completed} destinations updated successfully.`;
+    } else if (completed === 0) {
+      progressText.textContent = `All ${failed} destinations failed. Review the statuses above and retry if needed.`;
+    } else {
+      progressText.textContent = `Updated ${completed} destinations. ${failed} destination${failed === 1 ? '' : 's'} had issues — review statuses above.`;
+    }
   }
 
   window.updateSidebarHighlight = updateSidebarHighlight;
@@ -2477,7 +2709,7 @@ async function initMapApp() {
           };
           const newScenarioId = await scenarioManager.saveScenario(scenarioData);
           // Load the new scenario
-          workingData = JSON.parse(JSON.stringify(emptyData));
+          updateWorkingData(JSON.parse(JSON.stringify(emptyData)));
           currentScenarioId = newScenarioId;
           window.currentScenarioId = currentScenarioId;
           currentScenarioName = scenarioName.trim();
@@ -2667,6 +2899,14 @@ async function initMapApp() {
   // Update itinerary data and cost summary when costs change
   window.addEventListener('costs-updated', async () => {
     console.log('🔄 costs-updated event received, refreshing costs...');
+    const waiterResult = {
+      costRefreshSucceeded: false,
+      summarySucceeded: false,
+      summaryError: null,
+      refreshError: null,
+      freshCostsCount: 0
+    };
+
     try {
       // Always use scenario ID (costs are stored per scenario, not per chat session)
       if (currentScenarioId) {
@@ -2676,6 +2916,8 @@ async function initMapApp() {
 
         if (freshCosts && Array.isArray(freshCosts)) {
           workingData.costs = freshCosts;
+          waiterResult.costRefreshSucceeded = true;
+          waiterResult.freshCostsCount = freshCosts.length;
           console.log(`✅ Updated workingData.costs with ${freshCosts.length} costs`);
           console.log(`💰 Cost IDs:`, freshCosts.map(c => `${c.id}: ${c.amount_usd} for ${c.destination_id}`));
 
@@ -2685,15 +2927,28 @@ async function initMapApp() {
             : filterByLeg(workingData, legFilter.value);
           updateSidebar(filtered);
 
-          await updateCostSummary();
+          try {
+            await updateCostSummary();
+            waiterResult.summarySucceeded = true;
+          } catch (summaryError) {
+            waiterResult.summaryError = summaryError;
+            console.error('❌ Error updating cost summary after refresh:', summaryError);
+          }
         } else {
           console.warn('⚠️ No costs returned or invalid format');
         }
       } else {
         console.warn('⚠️ No currentScenarioId, skipping cost refresh');
+        waiterResult.refreshError = new Error('No current scenario ID available');
       }
     } catch (error) {
+      waiterResult.refreshError = error;
+      if (!waiterResult.summaryError) {
+        waiterResult.summaryError = error;
+      }
       console.error('❌ Error refreshing costs after update:', error);
+    } finally {
+      resolveNextCostUpdateWaiter(waiterResult);
     }
   });
 
@@ -2817,7 +3072,7 @@ async function initMapApp() {
   document.getElementById('cancel-import-btn').addEventListener('click', closeImportScenariosModal);
   
   // Form submissions
-  document.getElementById('add-destination-form').addEventListener('submit', (e) => {
+  document.getElementById('add-destination-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const selectedPlaceData = document.getElementById('selected-place').value;
@@ -2838,7 +3093,7 @@ async function initMapApp() {
         console.log('Auto-calculated insertion index:', insertIndex);
       }
 
-      addNewDestination(insertIndex, placeData, duration);
+      await addNewDestination(insertIndex, placeData, duration);
     } catch (error) {
       console.error('Error parsing place data:', error);
       alert('Error adding destination. Please try again.');

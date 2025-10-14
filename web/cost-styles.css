@@ -967,6 +967,8 @@
   font-weight: 600;
   color: #2563eb;
   font-size: 14px;
+  margin-left: auto;
+  padding-left: 16px;
 }
 
 .bulk-destination-list {
@@ -1037,6 +1039,43 @@
   font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
+}
+
+.bulk-destination-progress-status {
+  font-size: 12px;
+  color: #6b7280;
+  min-height: 16px;
+}
+
+.bulk-destination-item.processing {
+  border-color: #2563eb;
+  background: #f9fafc;
+}
+
+.bulk-destination-item.status-queued .bulk-destination-progress-status {
+  color: #6b7280;
+}
+
+.bulk-destination-item.status-requesting .bulk-destination-progress-status {
+  color: #2563eb;
+}
+
+.bulk-destination-item.status-waiting .bulk-destination-progress-status {
+  color: #92400e;
+}
+
+.bulk-destination-item.status-complete .bulk-destination-progress-status {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.bulk-destination-item.status-failed .bulk-destination-progress-status {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.bulk-destination-item.status-cancelled .bulk-destination-progress-status {
+  color: #b45309;
 }
 
 .bulk-destination-status.has-costs {

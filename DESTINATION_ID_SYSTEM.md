@@ -2,37 +2,48 @@
 
 ## Overview
 
-This document explains the robust destination ID and cost linking system implemented for the RTW Trip planner. The system uses **UUID-based stable IDs** to ensure data integrity when adding, removing, and reordering destinations.
+This document explains the robust destination ID and cost linking system implemented for the RTW Trip planner. The platform now uses **Google Place IDs as the canonical identifier** for real-world destinations, with UUIDs retained as a fallback for custom or unmapped locations. This delivers stable, deduplicated identifiers while preserving backward compatibility with legacy data.
 
 ## System Architecture
 
 ### Core Components
 
-1. **[destination-id-manager.js](web/destination-id-manager.js)** - Core ID management and validation
-2. **[data-integrity-ui.js](web/data-integrity-ui.js)** - User interface for data validation and cleanup
-3. **[destination-deletion-handler.js](web/destination-deletion-handler.js)** - Cascade deletion handling
+1. **[destination-id-manager.js](web/destination-id-manager.js)** - Core ID management, validation, and migration utilities
+2. **[place-id-migration.js](web/place-id-migration.js)** - Browser utility for upgrading itineraries to Place IDs
+3. **[travel_concierge/tools/place_resolver.py](python/agents/travel-concierge/travel_concierge/tools/place_resolver.py)** - Server-side Google Places API integration, caching, and timezone enrichment
+4. **[data-integrity-ui.js](web/data-integrity-ui.js)** - User interface for validation and cleanup
+5. **[destination-deletion-handler.js](web/destination-deletion-handler.js)** - Cascade deletion handling
 
 ### ID Structure
 
-- **New Destinations**: UUID v4 format (e.g., `550e8400-e29b-41d4-a716-446655440000`)
-- **Legacy Destinations**: Numeric IDs (e.g., `2`, `3`, `4`)
-- **Backward Compatibility**: Both formats are supported during migration
+- **Canonical Destinations**: Google Place IDs (e.g., `ChIJ51cu8IcbXWARiRtXIothAS4`)
+- **Custom Destinations**: UUID v4 fallback (e.g., `550e8400-e29b-41d4-a716-446655440000`)
+- **Legacy Destinations**: Historic numeric IDs are still recognized and can be migrated
+- **Backward Compatibility**: UUIDs and numeric IDs remain valid; migration tools upgrade them to Place IDs where possible
 
 ## How IDs Work
 
 ### Destination ID Assignment
 
-```javascript
-import { generateDestinationId } from './destination-id-manager.js';
+When a user selects a location via the Google Places-powered destination picker, the front-end calls `/api/places/details/<place_id>` to obtain the canonical ID and rich metadata (coordinates, timezone, formatted address). The resulting destination object looks like:
 
-// Creating a new destination
-const newDestination = {
-  id: generateDestinationId(), // Generates UUID
-  name: "Tokyo",
-  country: "Japan",
-  // ... other fields
-};
+```json
+{
+  "id": "ChIJ51cu8IcbXWARiRtXIothAS4",
+  "name": "Tokyo",
+  "city": "Tokyo",
+  "country": "Japan",
+  "coordinates": { "lat": 35.6764226, "lng": 139.650027 },
+  "timezone": "Asia/Tokyo",
+  "place_data": {
+    "formatted_address": "Tokyo, Japan",
+    "types": ["locality", "political"],
+    "timezone_name": "Japan Standard Time"
+  }
+}
 ```
+
+If a destination cannot be resolved to a Place ID (for example, a bespoke sailing route or a private island), the UI falls back to `generateDestinationId()` to issue a UUID.
 
 ### Cost Linking
 
@@ -45,46 +56,48 @@ Each cost item links to a destination via the `destination_id` field:
   "description": "Hotel in Tokyo",
   "amount": 1200.0,
   "currency": "USD",
-  "destination_id": "550e8400-e29b-41d4-a716-446655440000",
+  "destination_id": "ChIJ51cu8IcbXWARiRtXIothAS4",
   // ... other fields
 }
 ```
 
 ### Key Principles
 
-1. **Stable IDs**: UUIDs never change when destinations are reordered
-2. **No Collisions**: UUIDs are globally unique (collision probability ≈ 0)
-3. **Referential Integrity**: System validates and maintains cost-destination links
-4. **Orphan Detection**: Automatically identifies costs with invalid destination references
+1. **Stable IDs**: Place IDs uniquely identify real-world locations and remain stable across sessions
+2. **Deduplication**: Adding "Tokyo, Japan" twice returns the same Place ID, preventing duplicates
+3. **Rich Metadata**: Every canonical destination includes timezone, address components, and coordinates
+4. **Referential Integrity**: Costs and legs reference canonical IDs; validation ensures they stay in sync
+5. **Fallback Support**: UUIDs continue to cover custom locations so no itinerary content is lost
 
 ## Data Migration
 
-### Migrating from Numeric to UUID IDs
+### Migrating to Place IDs
+
+Use the browser migration utility to upgrade an itinerary in memory:
 
 ```javascript
-import { migrateItineraryData, createMigrationReport } from './destination-id-manager.js';
-
-// Migrate entire dataset
-const migratedData = migrateItineraryData(originalData);
-
-// View migration report
-const report = createMigrationReport(originalData, migratedData);
-console.log(report);
-
-// Migration preserves old IDs for reference
-// Each location gets _legacy_id field
+// Run in the browser console while viewing the itinerary
+const result = await PlaceMigration.migrateToPlaceIds(window.appWorkingData);
+console.log(result._migration_metadata);
 ```
+
+The tool:
+
+1. Resolves every destination name to a Place ID via `/api/places/resolve`
+2. Updates `locations[i].id` to the new Place ID and stores `_legacy_uuid` for reference
+3. Rewrites `costs[*].destination_id` using the generated mapping
+4. Marks unresolved destinations with `_is_custom` (these keep their UUIDs)
 
 ### Migration Metadata
 
-After migration, each destination includes:
+After migration, a destination includes both the new canonical ID and history fields:
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "_legacy_id": 2,
-  "_migrated_at": "2025-01-08T12:34:56Z",
-  // ... other fields
+  "id": "ChIJ51cu8IcbXWARiRtXIothAS4",
+  "_legacy_uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "_migrated_at": "2025-02-02T18:45:12Z",
+  "place_data": { ... }
 }
 ```
 
@@ -210,21 +223,34 @@ showDestinationDeletionDialog(destination, associatedCosts, (options) => {
 
 ## Integration Examples
 
-### Example 1: Adding a New Destination
+### Example 1: Adding a New Destination (Place ID workflow)
 
 ```javascript
-import { generateDestinationId } from './destination-id-manager.js';
+import { generateDestinationId, normalizeId } from './destination-id-manager.js';
 
-function addNewDestination(data, destinationInfo) {
+async function addNewDestination(data, locationQuery) {
+  const placeInfo = await PlaceMigration.resolvePlaceId(locationQuery);
+
+  const id = placeInfo?.place_id ?? generateDestinationId(); // Fallback for custom locations
+
   const newDestination = {
-    id: generateDestinationId(),
-    name: destinationInfo.name,
-    country: destinationInfo.country,
-    coordinates: destinationInfo.coordinates,
-    duration_days: destinationInfo.duration || 3,
+    id,
+    name: placeInfo?.name ?? locationQuery,
+    country: placeInfo?.country ?? null,
+    city: placeInfo?.city ?? null,
+    region: placeInfo?.administrative_area ?? 'Custom',
+    coordinates: placeInfo?.coordinates ?? null,
+    timezone: placeInfo?.timezone ?? null,
+    place_data: placeInfo || null,
+    duration_days: 3,
     arrival_date: null,
     departure_date: null
   };
+
+  const existing = new Set((data.locations || []).map(loc => normalizeId(loc.id)));
+  if (existing.has(normalizeId(id))) {
+    throw new Error(`Destination already exists with ID ${id}`);
+  }
 
   return {
     ...data,
@@ -294,18 +320,11 @@ costsByDest.forEach((costs, destinationId) => {
 
 ## Best Practices
 
-### 1. Always Use the ID Manager
+### 1. Always Resolve Canonical IDs First
 
-❌ **Don't** generate IDs manually:
-```javascript
-const newId = Math.max(...existingIds) + 1; // BAD
-```
+❌ **Don't** invent ad-hoc identifiers such as incremental numbers or custom strings.
 
-✅ **Do** use the ID generator:
-```javascript
-import { generateDestinationId } from './destination-id-manager.js';
-const newId = generateDestinationId(); // GOOD
-```
+✅ **Do** resolve a Place ID via `PlaceMigration.resolvePlaceId()` or `/api/places/details/<place_id>` and only fall back to `generateDestinationId()` when the resolver cannot find a match (e.g., bespoke or offline destinations).
 
 ### 2. Validate Before Saving
 
@@ -382,10 +401,9 @@ if (destId === costDestId) {
    ```
 
 3. **Perform Migration**
-   ```javascript
-   import { migrateItineraryData } from './destination-id-manager.js';
-   const migratedData = migrateItineraryData(originalData);
-   ```
+  ```javascript
+  const migratedData = await PlaceMigration.migrateToPlaceIds(originalData);
+  ```
 
 4. **Review Migration Report**
    ```javascript
@@ -441,13 +459,11 @@ if (!check.valid) {
 
 ---
 
-**Issue**: Mixed numeric and UUID IDs
+**Issue**: Mixed legacy ID formats (numeric / UUID / custom strings)
 
-**Solution**: Complete the migration:
+**Solution**: Complete the Place ID migration:
 ```javascript
-// This is expected during transition
-// Run migration to convert all to UUIDs
-const migratedData = migrateItineraryData(data);
+const migratedData = await PlaceMigration.migrateToPlaceIds(data);
 ```
 
 ## API Reference
@@ -456,6 +472,7 @@ const migratedData = migrateItineraryData(data);
 
 - `generateDestinationId()` - Generate new UUID
 - `isUUID(id)` - Check if ID is UUID format
+- `isPlaceId(id)` - Check if ID uses Google Place ID prefixes
 - `normalizeId(id)` - Convert ID to string for comparison
 
 ### Validation
@@ -466,10 +483,12 @@ const migratedData = migrateItineraryData(data);
 
 ### Migration
 
-- `migrateItineraryData(data)` - Migrate to UUIDs
-- `createMigrationReport(original, migrated)` - Generate report
-- `migrateLocationIds(locations)` - Migrate locations only
-- `migrateCostDestinationIds(costs, map)` - Migrate costs
+- `PlaceMigration.resolvePlaceId(query)` - Resolve a location name to Place ID (browser helper)
+- `PlaceMigration.migrateToPlaceIds(data)` - Bulk migration (locations + costs)
+- `migrateItineraryData(data)` - Legacy helper to normalize numeric IDs → UUIDs
+- `createMigrationReport(original, migrated)` - Generate migration report
+- `migrateLocationIds(locations)` - Legacy location-only migration
+- `migrateCostDestinationIds(costs, map)` - Legacy cost migration helper
 
 ### Cost Management
 
@@ -484,10 +503,11 @@ const migratedData = migrateItineraryData(data);
 
 ## Performance Considerations
 
-- **UUID Generation**: ~0.001ms per ID (negligible)
+- **Place Resolution**: ~50-100ms per unique destination with caching (Google Places API)
+- **UUID Generation**: ~0.001ms per ID (used only for custom locations)
 - **Validation**: ~5-10ms for 1000 locations + 5000 costs
-- **Migration**: ~50-100ms for full dataset
-- **No Database Impact**: All operations are in-memory
+- **Migration**: ~50-100ms per destination (uncached) or ~5ms (cached)
+- **No Database Impact**: All operations are in-memory; persistence handled separately
 
 ## Future Enhancements
 

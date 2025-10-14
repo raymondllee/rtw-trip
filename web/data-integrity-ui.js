@@ -95,9 +95,17 @@ export function showDataIntegrityPanel(data, onUpdate) {
               <div class="stat-label">Orphaned Costs</div>
               <div class="stat-value">${orphanedCosts.length}</div>
             </div>
-            <div class="stat-box ${validation.summary.numeric_ids > 0 ? 'stat-info' : ''}">
-              <div class="stat-label">Numeric IDs</div>
-              <div class="stat-value">${validation.summary.numeric_ids} / ${validation.summary.uuid_ids} UUIDs</div>
+            <div class="stat-box ${validation.summary.legacy_ids > 0 ? 'stat-info' : ''}">
+              <div class="stat-label">Legacy IDs</div>
+              <div class="stat-value">${validation.summary.legacy_ids}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">UUIDs</div>
+              <div class="stat-value">${validation.summary.uuid_ids}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Place IDs</div>
+              <div class="stat-value">${validation.summary.place_ids}</div>
             </div>
             <div class="stat-box ${destinationsMissingCosts.length > 0 ? 'stat-warning' : ''}">
               <div class="stat-label">No Cost Data</div>
@@ -218,11 +226,11 @@ export function showDataIntegrityPanel(data, onUpdate) {
         `}
 
         <!-- Migration Tools -->
-        ${validation.summary.numeric_ids > 0 ? `
+        ${validation.summary.legacy_ids > 0 ? `
           <div class="migration-section" style="margin-top: 20px; padding: 15px; background: #e8f4f8; border-radius: 4px;">
             <h3>🔄 ID Migration Available</h3>
-            <p>Your data contains ${validation.summary.numeric_ids} locations with legacy numeric IDs.
-            Migrate to UUIDs for better stability and prevent ID collisions.</p>
+            <p>Your data contains ${validation.summary.legacy_ids} locations with legacy IDs.
+            Migrate to UUIDs or Place IDs for better stability and prevent ID collisions.</p>
             <button class="btn-primary" onclick="migrateToUUIDs()">
               Migrate to UUIDs
             </button>

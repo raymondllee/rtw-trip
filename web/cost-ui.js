@@ -134,8 +134,13 @@ class CostUI {
       const formData = new FormData(form);
       const costData = Object.fromEntries(formData.entries());
 
-      // Convert destination_id to number or null
-      costData.destination_id = costData.destination_id ? parseInt(costData.destination_id) : null;
+      // Normalize destination_id as string (Place IDs are non-numeric)
+      if (costData.destination_id) {
+        const trimmed = costData.destination_id.trim();
+        costData.destination_id = trimmed.length > 0 ? trimmed : null;
+      } else {
+        costData.destination_id = null;
+      }
       costData.amount = parseFloat(costData.amount);
       costData.session_id = this.sessionId || 'default';
 
