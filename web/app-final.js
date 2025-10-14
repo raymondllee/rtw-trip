@@ -2775,42 +2775,9 @@ async function initMapApp() {
     });
   }
 
-  // Add destination from menu
-  document.getElementById('add-destination-menu-btn').addEventListener('click', () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    scenarioActionsDropdown.style.display = 'none';
-    scenarioActionsBtn.classList.remove('active');
-
-    openAddDestinationModal(null); // null means auto-calculate insertion point
-  });
-
-  // Add destination from bar button
+  // Add destination quick button
   document.getElementById('add-destination-bar-btn').addEventListener('click', () => {
     openAddDestinationModal(null); // null means auto-calculate insertion point
-  });
-
-  // Cost tracking buttons
-  document.getElementById('add-cost-btn').addEventListener('click', () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    scenarioActionsDropdown.style.display = 'none';
-    scenarioActionsBtn.classList.remove('active');
-
-    costUI.setSessionId(currentScenarioId || 'default');
-    costUI.setDestinations(workingData.locations || []);
-    costUI.showAddCostModal();
-  });
-
-  document.getElementById('view-costs-btn').addEventListener('click', async () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    scenarioActionsDropdown.style.display = 'none';
-    scenarioActionsBtn.classList.remove('active');
-
-    costUI.setSessionId(currentScenarioId || 'default');
-    costUI.setDestinations(workingData.locations || []);
-    await costUI.showCostDetails();
   });
 
   // Bulk cost update button

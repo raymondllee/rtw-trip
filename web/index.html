@@ -22,6 +22,10 @@
           <option value="">All Destinations</option>
         </select>
         <button id="add-destination-bar-btn" class="add-destination-bar-btn" title="Add destination">+</button>
+        <label class="transport-toggle" for="routing-toggle">
+          <input type="checkbox" id="routing-toggle">
+          <span>Show Transport</span>
+        </label>
         <button id="scenario-actions-btn" class="scenario-actions-btn-compact" title="Scenario actions">⋯</button>
         <div class="save-indicator" id="save-indicator">✓</div>
       </div>
@@ -60,17 +64,9 @@
           <span class="icon">👁️</span>
           <span>View Summary</span>
         </button>
-        <button id="add-cost-btn" class="dropdown-item">
-          <span class="icon">💰</span>
-          <span>Add Cost</span>
-        </button>
         <button id="bulk-update-costs-btn" class="dropdown-item">
           <span class="icon">💰</span>
           <span>Update Multiple Costs</span>
-        </button>
-        <button id="view-costs-btn" class="dropdown-item">
-          <span class="icon">📊</span>
-          <span>View Costs</span>
         </button>
         <button id="compare-costs-btn" class="dropdown-item">
           <span class="icon">📈</span>
@@ -81,15 +77,6 @@
           <span>Data Integrity</span>
           <span id="data-integrity-badge" style="margin-left: auto;"></span>
         </button>
-        <div class="dropdown-divider"></div>
-        <button id="add-destination-menu-btn" class="dropdown-item">
-          <span class="icon">📍</span>
-          <span>Add Destination</span>
-        </button>
-        <label class="dropdown-item" style="cursor: pointer; margin: 0;">
-          <input type="checkbox" id="routing-toggle" style="margin-right: 8px;">
-          <span>Show Transport</span>
-        </label>
         <div class="dropdown-divider"></div>
         <button id="import-scenarios-btn" class="dropdown-item">
           <span class="icon">📥</span>
@@ -117,7 +104,7 @@
           <h4>AI Travel Concierge</h4>
           <div class="chat-header-controls">
             <button id="chat-menu-btn" class="chat-menu-btn" title="Chat options">⋯</button>
-            <button id="toggle-chat-sidebar" class="toggle-chat-btn">▼</button>
+            <button id="toggle-chat-sidebar" class="toggle-chat-btn" title="Collapse chat">▼</button>
           </div>
           <!-- Chat menu dropdown -->
           <div class="chat-menu-dropdown" id="chat-menu-dropdown" style="display: none;">
@@ -133,10 +120,6 @@
             <button class="chat-menu-item" data-action="column-mode">
               <span class="icon">⬌</span>
               <span>Column Mode</span>
-            </button>
-            <button class="chat-menu-item" data-action="undock">
-              <span class="icon">⬈</span>
-              <span>Undock Chat</span>
             </button>
           </div>
         </div>
@@ -166,6 +149,7 @@
           <div id="chat-title-secondary" class="header-secondary">New Chat</div>
         </div>
         <div class="chat-header-controls">
+          <button id="toggle-chat-column" class="toggle-chat-btn column-toggle" title="Collapse chat">▼</button>
           <button id="chat-menu-btn-column" class="chat-menu-btn" title="Chat options">⋯</button>
         </div>
         <!-- Chat menu dropdown for column -->
@@ -182,10 +166,6 @@
           <button class="chat-menu-item" data-action="dock-sidebar">
             <span class="icon">⬋</span>
             <span>Dock to Sidebar</span>
-          </button>
-          <button class="chat-menu-item" data-action="undock">
-            <span class="icon">⬈</span>
-            <span>Undock Chat</span>
           </button>
         </div>
       </div>
