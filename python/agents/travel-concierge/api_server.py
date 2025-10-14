@@ -950,25 +950,107 @@ def add_cost():
 
 @app.route('/api/costs/<cost_id>', methods=['PUT'])
 def update_cost(cost_id):
-    """Update an existing cost item."""
+    """Update an existing cost item in Firestore."""
     try:
+        from google.cloud import firestore
+
         data = request.json
         session_id = data.get('session_id', 'default')
+        scenario_id = session_id  # Using session_id as scenario_id
 
-        tracker = get_cost_tracker(session_id)
+        print(f"📝 PUT /api/costs/{cost_id} - session_id: {session_id}")
 
+        # Extract updates (exclude meta fields)
         updates = {k: v for k, v in data.items() if k not in ['session_id', 'cost_id']}
-        cost_item = tracker.update_cost(cost_id, **updates)
 
-        if cost_item:
-            return jsonify({
-                'status': 'success',
-                'cost': cost_item.model_dump()
-            })
-        else:
+        # Initialize Firestore
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(scenario_id)
+
+        # Get current scenario
+        scenario_doc = scenario_ref.get()
+        if not scenario_doc.exists:
+            # Fallback to in-memory tracker for backward compatibility
+            print(f"⚠️ Scenario not found in Firestore, using in-memory tracker")
+            tracker = get_cost_tracker(session_id)
+            cost_item = tracker.update_cost(cost_id, **updates)
+            if cost_item:
+                return jsonify({'status': 'success', 'cost': cost_item.model_dump()})
+            else:
+                return jsonify({'status': 'error', 'error': 'Cost not found'}), 404
+
+        scenario_data = scenario_doc.to_dict()
+
+        # Get the latest version
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if not versions:
+            return jsonify({'status': 'error', 'error': f'No versions found for scenario {scenario_id}'}), 404
+
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        version_costs = itinerary_data.get('costs', []) or []
+
+        # Find and update the cost
+        print(f"🔍 Looking for cost_id: {cost_id}")
+        print(f"   First 3 costs in Firestore:")
+        for i, c in enumerate(version_costs[:3]):
+            print(f"      [{i}] id={c.get('id')}, dest={c.get('destination_id')}, cat={c.get('category')}")
+
+        updated_cost = None
+        updated_costs = []
+        for cost in version_costs:
+            if cost.get('id') == cost_id:
+                # Merge updates into existing cost
+                updated_cost = {**cost, **updates}
+                updated_costs.append(updated_cost)
+                print(f"✓ Updated cost: {cost_id} - {updated_cost.get('category')} ${updated_cost.get('amount_usd', 0)}")
+            else:
+                updated_costs.append(cost)
+
+        if not updated_cost:
+            print(f"❌ Cost not found with id={cost_id}")
             return jsonify({'status': 'error', 'error': 'Cost not found'}), 404
+
+        # Create a new version with updated cost
+        new_version_number = max(int(scenario_data.get('currentVersion', 0) or 0), int(latest_version_data.get('versionNumber', 0) or 0)) + 1
+        new_version_ref = scenario_ref.collection('versions').document()
+        new_itinerary_data = dict(itinerary_data)
+        new_itinerary_data['costs'] = updated_costs
+
+        new_version_ref.set({
+            'versionNumber': new_version_number,
+            'versionName': '',
+            'isNamed': False,
+            'itineraryData': new_itinerary_data,
+            'createdAt': firestore.SERVER_TIMESTAMP,
+            'itineraryDataHash': None,
+            'isAutosave': True,
+        })
+
+        # Update scenario's currentVersion
+        scenario_ref.update({
+            'currentVersion': new_version_number,
+            'updatedAt': firestore.SERVER_TIMESTAMP,
+        })
+
+        print(f"✅ Created new version v{new_version_number} with updated cost")
+
+        return jsonify({
+            'status': 'success',
+            'cost': updated_cost
+        })
+
     except Exception as e:
+        import traceback
         print(f"Error updating cost: {e}")
+        print(traceback.format_exc())
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route('/api/costs/<cost_id>', methods=['DELETE'])
@@ -1371,6 +1453,201 @@ def bulk_save_costs():
         import traceback
         error_details = traceback.format_exc()
         print(f"Error in bulk-save endpoint: {error_details}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'error_details': error_details
+        }), 500
+
+@app.route('/api/costs/bulk-update', methods=['PUT'])
+def bulk_update_costs():
+    """
+    Bulk update multiple cost items in Firestore.
+    This endpoint is called by the bulk edit UI when saving changes.
+
+    Expected request body:
+    {
+        "session_id": "session_abc123",
+        "costs": [
+            {
+                "id": "cost_123",
+                "category": "accommodation",
+                "description": "Hotel in Tokyo",
+                "amount": 1750.0,
+                "currency": "USD",
+                "amount_usd": 1750.0,
+                "destination_id": "tokyo_japan",
+                "booking_status": "estimated",
+                "date": "2024-01-15",
+                "notes": "Updated via bulk edit"
+            },
+            ...
+        ]
+    }
+    """
+    print("\n" + "="*100)
+    print("📝 BULK-UPDATE ENDPOINT CALLED")
+    print("="*100)
+    import sys
+    sys.stdout.flush()
+
+    try:
+        from google.cloud import firestore
+
+        data = request.json
+        session_id = data.get('session_id')
+        scenario_id = session_id  # Using session_id as scenario_id for consistency
+        costs_to_update = data.get('costs', [])
+
+        print(f"📦 Received request:")
+        print(f"   Session ID: {session_id}")
+        print(f"   Costs to update: {len(costs_to_update)}")
+        print(f"   Cost being updated: {costs_to_update[0] if costs_to_update else 'none'}")
+        sys.stdout.flush()
+
+        # Validate required fields
+        if not session_id or not costs_to_update:
+            return jsonify({
+                'status': 'error',
+                'error': 'Missing required fields: session_id, costs'
+            }), 400
+
+        # Initialize Firestore
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(scenario_id)
+
+        # Get current scenario
+        scenario_doc = scenario_ref.get()
+        if not scenario_doc.exists:
+            return jsonify({
+                'status': 'error',
+                'error': f'Scenario {scenario_id} not found'
+            }), 404
+
+        scenario_data = scenario_doc.to_dict()
+
+        # Get the latest version
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if not versions:
+            return jsonify({
+                'status': 'error',
+                'error': f'No versions found for scenario {scenario_id}'
+            }), 404
+
+        latest_version_ref = versions[0].reference
+        latest_version_data = versions[0].to_dict() or {}
+
+        # Get itineraryData from the version
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        version_costs = itinerary_data.get('costs', []) or []
+
+        print(f"📊 Total costs in database: {len(version_costs)}")
+        print(f"   First 3 costs from Firestore:")
+        for i, c in enumerate(version_costs[:3]):
+            print(f"      [{i}] id={c.get('id')}, dest={c.get('destination_id')}, cat={c.get('category')}")
+
+        # Create a map of updated costs by ID for quick lookup
+        updates_by_id = {cost['id']: cost for cost in costs_to_update}
+        print(f"🔧 Updates to apply (by ID):")
+        for cost_id in list(updates_by_id.keys())[:3]:
+            print(f"      {cost_id}")
+
+        # Also create a fallback map by destination_id + category for costs without IDs
+        updates_by_dest_cat = {}
+        for cost in costs_to_update:
+            key = f"{cost.get('destination_id')}_{cost.get('category')}"
+            updates_by_dest_cat[key] = cost
+
+        # Update costs in place
+        updated_count = 0
+        updated_costs = []
+        for cost in version_costs:
+            cost_id = cost.get('id')
+
+            # Try to find update by ID first
+            if cost_id and cost_id in updates_by_id:
+                # Merge updates into existing cost, preserving the ID
+                updated_cost = {**cost, **updates_by_id[cost_id]}
+                updated_costs.append(updated_cost)
+                updated_count += 1
+                print(f"  ✓ Updated cost by ID: {cost_id} - {updated_cost.get('category')} ${updated_cost.get('amount_usd', 0)}")
+            else:
+                # Fallback: try to match by destination_id + category
+                fallback_key = f"{cost.get('destination_id')}_{cost.get('category')}"
+                if fallback_key in updates_by_dest_cat:
+                    updated_cost = {**cost, **updates_by_dest_cat[fallback_key]}
+                    updated_costs.append(updated_cost)
+                    updated_count += 1
+                    print(f"  ✓ Updated cost by dest+cat: {fallback_key} - {updated_cost.get('category')} ${updated_cost.get('amount_usd', 0)}")
+                else:
+                    updated_costs.append(cost)
+
+        if updated_count == 0:
+            print(f"⚠️ Warning: No costs were updated")
+            return jsonify({
+                'status': 'success',
+                'message': 'No costs were updated',
+                'updated_count': 0
+            })
+
+        # Create a new version with updated costs
+        new_version_number = max(int(scenario_data.get('currentVersion', 0) or 0), int(latest_version_data.get('versionNumber', 0) or 0)) + 1
+        new_version_ref = scenario_ref.collection('versions').document()
+        new_itinerary_data = dict(itinerary_data)
+        new_itinerary_data['costs'] = updated_costs
+
+        new_version_ref.set({
+            'versionNumber': new_version_number,
+            'versionName': '',
+            'isNamed': False,
+            'itineraryData': new_itinerary_data,
+            'createdAt': firestore.SERVER_TIMESTAMP,
+            'itineraryDataHash': None,
+            'isAutosave': True,
+        })
+
+        # Update scenario's currentVersion
+        scenario_ref.update({
+            'currentVersion': new_version_number,
+            'updatedAt': firestore.SERVER_TIMESTAMP,
+        })
+
+        print(f"✅ Created new version v{new_version_number} with {updated_count} updated costs")
+        print(f"   Total costs in new version: {len(updated_costs)}")
+
+        # Update lightweight snapshot summary on the scenario document
+        try:
+            totals_by_category = {}
+            for item in updated_costs:
+                cat = item.get('category', 'other')
+                totals_by_category[cat] = totals_by_category.get(cat, 0.0) + _to_float(item.get('amount_usd', 0))
+            scenario_ref.update({
+                'updatedAt': firestore.SERVER_TIMESTAMP,
+                'costsCount': len(updated_costs),
+                'totalsByCategory': totals_by_category,
+            })
+            print(f"🧮 Updated scenario summary: {len(updated_costs)} items")
+        except Exception as e:
+            print(f"Warning: failed to update scenario summary: {e}")
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Updated {updated_count} cost(s)',
+            'updated_count': updated_count,
+            'total_costs': len(updated_costs)
+        })
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in bulk-update endpoint: {error_details}")
         return jsonify({
             'status': 'error',
             'error': str(e),

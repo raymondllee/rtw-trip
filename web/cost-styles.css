@@ -1190,3 +1190,387 @@
     font-size: 10px;
   }
 }
+
+/* ============================================================================
+   Bulk Edit Styles
+   ============================================================================ */
+
+/* Bulk Edit Modal */
+.bulk-edit-modal {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.bulk-edit-modal .modal-content {
+  max-width: 95vw;
+  width: 1400px;
+  max-height: 90vh;
+}
+
+.bulk-edit-content {
+  display: flex;
+  flex-direction: column;
+  height: 90vh;
+}
+
+.bulk-edit-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+/* Toolbar */
+.bulk-edit-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  gap: 16px;
+}
+
+.bulk-edit-filters {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.bulk-filter {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.bulk-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.selection-count {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Table Container */
+.bulk-edit-table-container {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+
+/* Table */
+.bulk-edit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.bulk-edit-table thead {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.bulk-edit-table th {
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #e0e0e0;
+  background: #f8f9fa;
+  white-space: nowrap;
+}
+
+.bulk-edit-table th.resizable {
+  position: relative;
+  padding-right: 18px;
+}
+
+.bulk-edit-table th .resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 100%;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bulk-edit-table th .resize-handle::after {
+  content: '';
+  width: 2px;
+  height: 60%;
+  background: #cbd5e1;
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.bulk-edit-table th.resizable:hover .resize-handle::after,
+.bulk-edit-table th .resize-handle.resizing::after {
+  opacity: 0.7;
+}
+
+.bulk-edit-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.bulk-edit-table th.sortable:hover {
+  background: #e9ecef;
+}
+
+.bulk-edit-table th.sortable::after {
+  content: ' ⇅';
+  opacity: 0.3;
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+.bulk-edit-table th.sort-asc::after {
+  content: ' ↑';
+  opacity: 1;
+  color: #2563eb;
+}
+
+.bulk-edit-table th.sort-desc::after {
+  content: ' ↓';
+  opacity: 1;
+  color: #2563eb;
+}
+
+.bulk-edit-table th.numeric {
+  text-align: right;
+}
+
+.bulk-edit-table td {
+  padding: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+.bulk-edit-table td.numeric {
+  text-align: right;
+}
+
+/* Destination Header Row */
+.destination-header-row {
+  background: #f8f9fa;
+  border-top: 2px solid #dee2e6;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.destination-header-row td {
+  padding: 12px 16px !important;
+}
+
+.destination-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+}
+
+.destination-name {
+  font-size: 14px;
+  color: #333;
+}
+
+.destination-stats {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Table Row States */
+.bulk-edit-row {
+  transition: background 0.15s;
+}
+
+.bulk-edit-row:hover {
+  background: #f8f9fa;
+}
+
+.bulk-edit-row.selected {
+  background: #e3f2fd;
+}
+
+.bulk-edit-row.edited {
+  border-left: 3px solid #ffc107;
+}
+
+.bulk-edit-row.selected.edited {
+  background: #fff3cd;
+}
+
+/* Checkbox Column */
+.checkbox-col {
+  width: 40px;
+  text-align: center;
+}
+
+.checkbox-col.resizable {
+  padding-right: 8px;
+}
+
+.row-checkbox {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+/* Actions Column */
+.actions-col {
+  width: 60px;
+  text-align: center;
+}
+
+/* Editable Cells */
+.editable-cell {
+  padding: 4px;
+}
+
+.readonly-cell {
+  padding: 8px;
+  color: #666;
+  font-size: 13px;
+  background: #fafafa;
+}
+
+.inline-edit {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  background: transparent;
+  transition: all 0.15s;
+}
+
+.inline-edit:hover {
+  border-color: #ddd;
+  background: white;
+}
+
+.inline-edit:focus {
+  outline: none;
+  border-color: #2563eb;
+  background: white;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* Specific input types */
+.inline-edit[type="number"] {
+  text-align: right;
+}
+
+.inline-edit[type="date"] {
+  max-width: 150px;
+}
+
+.inline-edit.category-cell select {
+  max-width: 150px;
+}
+
+textarea.inline-edit {
+  min-height: 32px;
+  resize: none;
+  font-family: inherit;
+  overflow: hidden;
+}
+
+textarea.inline-edit.auto-resize {
+  resize: none;
+  overflow-y: hidden;
+}
+
+/* Notes cell - special handling */
+.notes-cell {
+  max-width: 200px;
+}
+
+.notes-cell textarea {
+  white-space: pre-wrap;
+  overflow-y: auto;
+}
+
+/* Footer */
+.bulk-edit-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+/* Empty State */
+.bulk-edit-table .empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: #999;
+  font-style: italic;
+}
+
+/* Button Warning State */
+.btn-warning {
+  background: #ffc107 !important;
+  color: #000 !important;
+  animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(255, 193, 7, 0);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1400px) {
+  .bulk-edit-modal .modal-content {
+    width: 98vw;
+  }
+
+  .bulk-edit-table {
+    font-size: 12px;
+  }
+
+  .inline-edit {
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+}
+
+@media (max-width: 768px) {
+  .bulk-edit-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bulk-edit-filters {
+    flex-direction: column;
+  }
+
+  .bulk-edit-actions {
+    justify-content: space-between;
+  }
+}

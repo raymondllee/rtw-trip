@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bulk Edit Costs - RTW Trip Planner</title>
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./cost-styles.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #f5f5f5;
+    }
+
+    .bulk-edit-page {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: white;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .page-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .page-title h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .back-button:hover {
+      background: #f8f9fa;
+      border-color: #bbb;
+    }
+
+    .page-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .bulk-edit-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .bulk-edit-toolbar {
+      padding: 16px 24px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .bulk-edit-table-wrapper {
+      flex: 1;
+      overflow: auto;
+      padding: 0;
+    }
+
+    .bulk-edit-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .bulk-edit-table thead {
+      position: sticky;
+      top: 0;
+      background: white;
+      z-index: 10;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .loading-spinner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 48px;
+      font-size: 16px;
+      color: #666;
+    }
+
+    .stats-bar {
+      display: flex;
+      gap: 24px;
+      padding: 12px 24px;
+      background: #f8f9fa;
+      border-top: 1px solid #e0e0e0;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stat-value {
+      font-weight: 600;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="bulk-edit-page">
+    <div class="page-header">
+      <div class="page-title">
+        <a href="./index.html" class="back-button">
+          ← Back to Trip
+        </a>
+        <h1>📊 Bulk Edit Costs</h1>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" onclick="window.location.href='./index.html'">Cancel</button>
+        <button class="btn btn-primary" id="save-all-btn">Save All Changes</button>
+      </div>
+    </div>
+
+    <div class="bulk-edit-container">
+      <div class="bulk-edit-toolbar" id="bulk-edit-toolbar"></div>
+
+      <div class="bulk-edit-table-wrapper" id="table-container">
+        <div class="loading-spinner">
+          Loading costs...
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-bar" id="stats-bar">
+      <div class="stat-item">
+        <span>Total Costs:</span>
+        <span class="stat-value" id="total-costs">0</span>
+      </div>
+      <div class="stat-item">
+        <span>Total Amount:</span>
+        <span class="stat-value" id="total-amount">$0</span>
+      </div>
+      <div class="stat-item">
+        <span>Unsaved Changes:</span>
+        <span class="stat-value" id="unsaved-changes">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load Firebase and configuration -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getFirestore, doc, getDoc, collection, query, where, limit as firestoreLimit, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    // Check if running locally or in production
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      document.write('<script src="./config.dev.js"><\/script>');
+    } else {
+      document.write('<script src="./config.production.js"><\/script>');
+    }
+  </script>
+
+  <script src="./firestore-scenario-manager.js" type="module"></script>
+  <script src="./cost-bulk-edit.js"></script>
+
+  <script type="module">
+    import { FirestoreScenarioManager } from './firestore-scenario-manager.js';
+
+    // Get scenario ID from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const scenarioId = urlParams.get('scenario');
+
+    if (!scenarioId) {
+      alert('No scenario selected. Redirecting to main app...');
+      window.location.href = '/';
+    }
+
+    const scenarioManager = new FirestoreScenarioManager();
+    const bulkEditor = new CostBulkEdit('http://localhost:5001');
+    window.bulkEditor = bulkEditor;
+
+    // Load data and initialize
+    async function initialize() {
+      try {
+        console.log('🔄 Loading scenario:', scenarioId);
+
+        // Get scenario and version data
+        const scenario = await scenarioManager.getScenario(scenarioId);
+        if (!scenario) {
+          throw new Error('Scenario not found');
+        }
+
+        const currentVersion = scenario.currentVersion || 0;
+        console.log('📌 Current version number:', currentVersion);
+
+        const versionData = await scenarioManager.getVersion(scenarioId, currentVersion);
+        console.log('📦 Version data loaded:', versionData?.versionNumber);
+
+        if (!versionData || !versionData.itineraryData) {
+          throw new Error('Failed to load scenario data');
+        }
+
+        const locations = versionData.itineraryData.locations || [];
+        let costs = versionData.itineraryData.costs || [];
+
+        // CRITICAL FIX: Generate IDs for costs that don't have them
+        // This is needed because bulk-update matches costs by ID
+        let needsIdFix = false;
+        costs = costs.map((cost, index) => {
+          if (!cost.id) {
+            needsIdFix = true;
+            // Generate a stable ID based on destination_id, category, and index
+            const destId = cost.destination_id || 'unknown';
+            const category = cost.category || 'other';
+            const id = `${destId}_${category}_${index}`;
+            return { ...cost, id };
+          }
+          return cost;
+        });
+
+        if (needsIdFix) {
+          console.warn('⚠️ Generated IDs for costs without IDs. These will be saved on next bulk-update.');
+        }
+
+        console.log('✅ Loaded:', locations.length, 'destinations,', costs.length, 'costs');
+        console.log('Sample location:', locations[0]);
+        console.log('Sample cost (full):', JSON.stringify(costs[0], null, 2));
+        console.log('Cost keys:', costs[0] ? Object.keys(costs[0]) : 'no cost');
+        console.log('First 3 cost IDs:', costs.slice(0, 3).map(c => c.id));
+
+        // Set data
+        bulkEditor.setSessionId(scenarioId);
+        bulkEditor.setDestinations(locations);
+        bulkEditor.costs = costs;
+
+        // Render the table
+        renderTable();
+
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        alert('Failed to load scenario data: ' + error.message);
+      }
+    }
+
+    function renderTable() {
+      const toolbar = document.getElementById('bulk-edit-toolbar');
+      if (toolbar) {
+        toolbar.innerHTML = bulkEditor.createBulkEditToolbar();
+      }
+
+      const container = document.getElementById('table-container');
+      bulkEditor.columnWidths.clear();
+      bulkEditor.resizeHandlersInitialized = false;
+
+      // Create table HTML
+      container.innerHTML = bulkEditor.createBulkEditTable();
+
+      // Render rows
+      bulkEditor.renderTableRows();
+      bulkEditor.updateSelectionCount();
+
+      // Update stats
+      updateStats();
+
+      // Setup save button (bind once)
+      const saveBtn = document.getElementById('save-all-btn');
+      if (saveBtn && saveBtn.dataset.bound !== 'true') {
+        saveBtn.dataset.bound = 'true';
+        saveBtn.addEventListener('click', async () => {
+          if (bulkEditor.editedCosts.size === 0) {
+            alert('No changes to save');
+            return;
+          }
+
+          saveBtn.disabled = true;
+          const originalText = saveBtn.textContent;
+          saveBtn.textContent = 'Saving...';
+
+          try {
+            const updates = Array.from(bulkEditor.editedCosts.values());
+            await bulkEditor.bulkUpdateCosts(updates);
+            alert(`Successfully saved ${updates.length} change(s)!`);
+            bulkEditor.editedCosts.clear();
+            updateStats();
+            saveBtn.textContent = originalText;
+          } catch (error) {
+            alert('Failed to save: ' + error.message);
+            saveBtn.textContent = originalText;
+          } finally {
+            saveBtn.disabled = false;
+          }
+        });
+      }
+    }
+
+    function updateStats() {
+      document.getElementById('total-costs').textContent = bulkEditor.costs.length;
+
+      const totalAmount = bulkEditor.costs.reduce((sum, cost) =>
+        sum + (cost.amount_usd || cost.amount || 0), 0
+      );
+      document.getElementById('total-amount').textContent =
+        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalAmount);
+
+      document.getElementById('unsaved-changes').textContent = bulkEditor.editedCosts.size;
+    }
+
+    // Initialize when ready
+    initialize();
+
+    // Update stats when costs change
+    window.addEventListener('costs-updated', updateStats);
+  </script>
+</body>
+</html>

@@ -320,6 +320,7 @@ class CostUI {
     container.innerHTML = `
       <div class="cost-list-header">
         <button class="btn btn-primary" onclick="costUI.showAddCostModal()">+ Add Cost</button>
+        <button class="btn btn-secondary" onclick="costUI.showBulkEdit()">📊 Bulk Edit</button>
       </div>
       <div class="cost-items">
         ${costs.length === 0 ? '<p class="empty-state">No costs recorded yet</p>' : ''}
@@ -497,6 +498,43 @@ class CostUI {
   filterByDestination(destinationId) {
     // This would integrate with the main app filtering
     console.log('Filter by destination:', destinationId);
+  }
+
+  /**
+   * Show bulk edit interface
+   */
+  showBulkEdit() {
+    console.log('🔧 showBulkEdit called');
+
+    // Check if CostBulkEdit is loaded
+    if (typeof CostBulkEdit === 'undefined') {
+      console.error('CostBulkEdit not loaded. Make sure cost-bulk-edit.js is included.');
+      alert('Bulk edit feature not available. Please reload the page.');
+      return;
+    }
+
+    console.log('✅ CostBulkEdit is defined');
+
+    // Create or reuse bulk edit instance
+    if (!window.costBulkEditor) {
+      console.log('Creating new CostBulkEdit instance...');
+      window.costBulkEditor = new CostBulkEdit(this.apiBaseUrl);
+    }
+
+    console.log('Current session ID:', this.sessionId);
+    console.log('Current destinations:', this.currentDestinations?.length || 0);
+
+    // Set session ID and destinations (these should already be set by the caller)
+    if (this.sessionId) {
+      window.costBulkEditor.setSessionId(this.sessionId);
+    }
+    if (this.currentDestinations && this.currentDestinations.length > 0) {
+      window.costBulkEditor.setDestinations(this.currentDestinations);
+    }
+
+    // Show bulk edit modal
+    console.log('Calling showBulkEditModal...');
+    window.costBulkEditor.showBulkEditModal();
   }
 }
 

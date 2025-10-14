@@ -2790,6 +2790,21 @@ async function initMapApp() {
     openBulkCostUpdateModal();
   });
 
+  document.getElementById('bulk-edit-costs-btn').addEventListener('click', () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    scenarioActionsDropdown.style.display = 'none';
+    scenarioActionsBtn.classList.remove('active');
+
+    if (!currentScenarioId) {
+      alert('Please save or load a scenario first');
+      return;
+    }
+
+    // Navigate to full-screen bulk edit page
+    window.location.href = `./bulk-edit.html?scenario=${currentScenarioId}`;
+  });
+
   // Bulk cost update modal event listeners
   document.getElementById('select-all-destinations-btn').addEventListener('click', () => {
     const checkboxes = document.querySelectorAll('.bulk-destination-checkbox');
