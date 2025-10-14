@@ -73,15 +73,77 @@ class TravelConciergeChat {
       }
     }
 
-    // Restore chat open/closed UI state
-    if (this.chatContainer) {
-      const shouldBeOpen = savedState.chatOpen !== false; // default open if undefined
-      if (shouldBeOpen) {
-        this.openChat();
-      } else {
-        this.closeChat();
+    // Restore chat mode first
+    const chatMode = savedState.chatMode || 'sidebar';
+    console.log('🔄 Restoring chat mode:', chatMode);
+
+    // Apply the saved chat mode
+    setTimeout(() => {
+      switch (chatMode) {
+        case 'column':
+          this.moveToColumn();
+          // Restore column collapse state
+          if (savedState.columnCollapsed) {
+            setTimeout(() => {
+              this.collapseColumn();
+            }, 100);
+          }
+          // Restore column width
+          if (savedState.columnWidth) {
+            setTimeout(() => {
+              if (this.chatColumn) {
+                this.chatColumn.style.width = savedState.columnWidth;
+              }
+            }, 150);
+          }
+          break;
+        case 'floating':
+          this.undockChat();
+          // Restore floating chat position
+          if (savedState.floatingChatPosition && savedState.floatingChatPosition.x !== null) {
+            setTimeout(() => {
+              if (this.floatingChat) {
+                this.floatingChat.style.left = `${savedState.floatingChatPosition.x}px`;
+                this.floatingChat.style.top = `${savedState.floatingChatPosition.y}px`;
+                this.floatingChat.style.right = 'auto';
+                this.floatingChat.style.bottom = 'auto';
+              }
+            }, 100);
+          }
+          // Restore floating chat size
+          if (savedState.floatingChatSize && savedState.floatingChatSize.width !== null) {
+            setTimeout(() => {
+              if (this.floatingChat) {
+                this.floatingChat.style.width = `${savedState.floatingChatSize.width}px`;
+                if (savedState.floatingChatSize.height) {
+                  this.floatingChat.style.height = `${savedState.floatingChatSize.height}px`;
+                }
+              }
+            }, 150);
+          }
+          break;
+        default:
+          // Sidebar mode - restore sidebar chat height
+          if (savedState.sidebarChatHeight) {
+            setTimeout(() => {
+              if (this.sidebarChat) {
+                this.sidebarChat.style.height = savedState.sidebarChatHeight;
+              }
+            }, 100);
+          }
+          break;
       }
-    }
+
+      // Restore chat open/closed UI state
+      if (this.chatContainer) {
+        const shouldBeOpen = savedState.chatOpen !== false; // default open if undefined
+        if (shouldBeOpen) {
+          this.openChat();
+        } else {
+          this.closeChat();
+        }
+      }
+    }, 100);
   }
 
   initElements() {
@@ -337,6 +399,9 @@ class TravelConciergeChat {
     }
 
     this.isColumnCollapsed = true;
+
+    // Save column collapse state
+    this.statePersistence.saveColumnCollapsed(true);
   }
 
   expandColumn(suppressFocus = false) {
@@ -371,6 +436,12 @@ class TravelConciergeChat {
 
     this.isColumnCollapsed = false;
     this.columnExpandedStyles = null;
+
+    // Save column collapse state and width
+    this.statePersistence.saveColumnCollapsed(false);
+    if (this.chatColumn && this.chatColumn.style.width) {
+      this.statePersistence.saveColumnWidth(this.chatColumn.style.width);
+    }
 
     if (!suppressFocus && this.chatColumnInput && this.chatColumn.style.display !== 'none') {
       setTimeout(() => this.chatColumnInput.focus(), 0);
@@ -411,6 +482,9 @@ class TravelConciergeChat {
     this.floatingChat.style.display = 'flex';
     this.floatingChatContainer.classList.remove('hidden');
     this.floatingChatInput.focus();
+
+    // Save chat mode to persistence
+    this.statePersistence.saveChatMode('floating');
   }
 
   dockChat() {
@@ -433,6 +507,9 @@ class TravelConciergeChat {
       this.sidebarResizer.classList.remove('hidden');
     }
     this.chatInput.focus();
+
+    // Save chat mode to persistence
+    this.statePersistence.saveChatMode('sidebar');
   }
 
   moveToColumn() {
@@ -460,6 +537,9 @@ class TravelConciergeChat {
     if (this.chatColumnInput) {
       setTimeout(() => this.chatColumnInput.focus(), 0);
     }
+
+    // Save chat mode to persistence
+    this.statePersistence.saveChatMode('column');
   }
 
   dockFromColumn() {
@@ -494,6 +574,9 @@ class TravelConciergeChat {
       this.sidebarResizer.classList.remove('hidden');
     }
     this.chatInput.focus();
+
+    // Save chat mode to persistence
+    this.statePersistence.saveChatMode('sidebar');
   }
 
   toggleChatMenu() {
@@ -642,6 +725,11 @@ class TravelConciergeChat {
     });
 
     document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        // Save floating chat position when drag ends
+        const rect = element.getBoundingClientRect();
+        this.statePersistence.saveFloatingChatPosition(rect.left, rect.top);
+      }
       isDragging = false;
     });
   }
@@ -700,6 +788,10 @@ class TravelConciergeChat {
       });
 
       document.addEventListener('mouseup', () => {
+        if (isResizing) {
+          // Save floating chat size when resize ends
+          this.statePersistence.saveFloatingChatSize(element.offsetWidth, element.offsetHeight);
+        }
         isResizing = false;
       });
     });

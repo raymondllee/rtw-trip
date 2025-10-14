@@ -64,6 +64,13 @@ export class StatePersistence {
       sessionId: null,
       // Persist whether the sidebar chat is open (default true so input is visible on first load)
       chatOpen: true,
+      // Enhanced chat UI state persistence
+      chatMode: 'sidebar', // 'sidebar', 'column', 'floating'
+      columnCollapsed: false,
+      columnWidth: null, // Custom column width when set
+      floatingChatPosition: { x: null, y: null }, // Position of floating chat
+      floatingChatSize: { width: null, height: null }, // Size of floating chat
+      sidebarChatHeight: null, // Custom height for sidebar chat
       lastUpdated: null
     };
   }
@@ -110,6 +117,59 @@ export class StatePersistence {
    */
   saveChatOpenState(isOpen) {
     this.saveState({ chatOpen: !!isOpen });
+  }
+
+  /**
+   * Save chat mode (sidebar, column, floating)
+   */
+  saveChatMode(mode) {
+    this.saveState({ chatMode: mode });
+  }
+
+  /**
+   * Save column collapse state
+   */
+  saveColumnCollapsed(collapsed) {
+    this.saveState({ columnCollapsed: collapsed });
+  }
+
+  /**
+   * Save column width
+   */
+  saveColumnWidth(width) {
+    this.saveState({ columnWidth: width });
+  }
+
+  /**
+   * Save floating chat position
+   */
+  saveFloatingChatPosition(x, y) {
+    this.saveState({ 
+      floatingChatPosition: { x, y }
+    });
+  }
+
+  /**
+   * Save floating chat size
+   */
+  saveFloatingChatSize(width, height) {
+    this.saveState({ 
+      floatingChatSize: { width, height }
+    });
+  }
+
+  /**
+   * Save sidebar chat height
+   */
+  saveSidebarChatHeight(height) {
+    this.saveState({ sidebarChatHeight: height });
+  }
+
+  /**
+   * Save all chat UI state at once
+   */
+  saveChatUIState(chatState) {
+    this.saveState(chatState);
   }
 
   /**
