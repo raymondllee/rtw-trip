@@ -2272,6 +2272,379 @@ def cleanup_ai_estimates():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+
+# ============================================================================
+# Transport Segment API Endpoints
+# ============================================================================
+
+@app.route('/api/transport-segments', methods=['GET'])
+def get_transport_segments():
+    """
+    Get all transport segments for a scenario.
+    Query params: scenario_id
+    """
+    try:
+        from google.cloud import firestore
+
+        scenario_id = request.args.get('scenario_id')
+        if not scenario_id:
+            return jsonify({'error': 'scenario_id required'}), 400
+
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(scenario_id)
+
+        # Get latest version
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if not versions:
+            return jsonify({'transport_segments': []})
+
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        transport_segments = itinerary_data.get('transport_segments', [])
+
+        return jsonify({'transport_segments': transport_segments})
+
+    except Exception as e:
+        print(f"Error fetching transport segments: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/transport-segments', methods=['POST'])
+def create_transport_segment():
+    """
+    Create a new transport segment.
+    Body: segment data + scenario_id
+    """
+    try:
+        from google.cloud import firestore
+
+        data = request.get_json() or {}
+        scenario_id = data.get('scenario_id')
+
+        if not scenario_id:
+            return jsonify({'error': 'scenario_id required'}), 400
+
+        # Extract segment data
+        segment = {
+            'id': data.get('id') or str(uuid.uuid4()),
+            'from_destination_id': data.get('from_destination_id'),
+            'from_destination_name': data.get('from_destination_name'),
+            'to_destination_id': data.get('to_destination_id'),
+            'to_destination_name': data.get('to_destination_name'),
+            'transport_mode': data.get('transport_mode', 'plane'),
+            'transport_mode_icon': data.get('transport_mode_icon', '✈️'),
+            'distance_km': data.get('distance_km', 0),
+            'duration_hours': data.get('duration_hours'),
+            'estimated_cost_usd': data.get('estimated_cost_usd', 0),
+            'researched_cost_low': data.get('researched_cost_low'),
+            'researched_cost_mid': data.get('researched_cost_mid'),
+            'researched_cost_high': data.get('researched_cost_high'),
+            'actual_cost_usd': data.get('actual_cost_usd'),
+            'currency_local': data.get('currency_local'),
+            'amount_local': data.get('amount_local'),
+            'booking_status': data.get('booking_status', 'estimated'),
+            'confidence_level': data.get('confidence_level', 'low'),
+            'research_sources': data.get('research_sources', []),
+            'research_notes': data.get('research_notes'),
+            'researched_at': data.get('researched_at'),
+            'alternatives': data.get('alternatives', []),
+            'booking_link': data.get('booking_link'),
+            'booking_reference': data.get('booking_reference'),
+            'notes': data.get('notes'),
+            'num_travelers': data.get('num_travelers', 3),
+            'created_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat()
+        }
+
+        # Save to Firestore
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(scenario_id)
+
+        # Get latest version
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if not versions:
+            return jsonify({'error': 'No versions found'}), 404
+
+        latest_version_ref = versions[0].reference
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+
+        # Add segment to transport_segments array
+        transport_segments = itinerary_data.get('transport_segments', [])
+        transport_segments.append(segment)
+        itinerary_data['transport_segments'] = transport_segments
+
+        # Update Firestore
+        latest_version_ref.update({
+            'itineraryData': itinerary_data,
+            'lastModified': datetime.utcnow().isoformat()
+        })
+
+        return jsonify({'status': 'success', 'segment': segment})
+
+    except Exception as e:
+        print(f"Error creating transport segment: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/transport-segments/<segment_id>', methods=['PUT'])
+def update_transport_segment(segment_id):
+    """
+    Update an existing transport segment.
+    Body: updated segment data + scenario_id
+    """
+    try:
+        from google.cloud import firestore
+
+        data = request.get_json() or {}
+        scenario_id = data.get('scenario_id')
+
+        if not scenario_id:
+            return jsonify({'error': 'scenario_id required'}), 400
+
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(scenario_id)
+
+        # Get latest version
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if not versions:
+            return jsonify({'error': 'No versions found'}), 404
+
+        latest_version_ref = versions[0].reference
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        transport_segments = itinerary_data.get('transport_segments', [])
+
+        # Find and update the segment
+        segment_found = False
+        for i, segment in enumerate(transport_segments):
+            if segment.get('id') == segment_id:
+                # Update segment fields
+                segment.update({
+                    'transport_mode': data.get('transport_mode', segment.get('transport_mode')),
+                    'transport_mode_icon': data.get('transport_mode_icon', segment.get('transport_mode_icon')),
+                    'estimated_cost_usd': data.get('estimated_cost_usd', segment.get('estimated_cost_usd')),
+                    'researched_cost_low': data.get('researched_cost_low', segment.get('researched_cost_low')),
+                    'researched_cost_mid': data.get('researched_cost_mid', segment.get('researched_cost_mid')),
+                    'researched_cost_high': data.get('researched_cost_high', segment.get('researched_cost_high')),
+                    'actual_cost_usd': data.get('actual_cost_usd', segment.get('actual_cost_usd')),
+                    'currency_local': data.get('currency_local', segment.get('currency_local')),
+                    'amount_local': data.get('amount_local', segment.get('amount_local')),
+                    'booking_status': data.get('booking_status', segment.get('booking_status')),
+                    'confidence_level': data.get('confidence_level', segment.get('confidence_level')),
+                    'research_sources': data.get('research_sources', segment.get('research_sources', [])),
+                    'research_notes': data.get('research_notes', segment.get('research_notes')),
+                    'researched_at': data.get('researched_at', segment.get('researched_at')),
+                    'alternatives': data.get('alternatives', segment.get('alternatives', [])),
+                    'booking_link': data.get('booking_link', segment.get('booking_link')),
+                    'booking_reference': data.get('booking_reference', segment.get('booking_reference')),
+                    'notes': data.get('notes', segment.get('notes')),
+                    'duration_hours': data.get('duration_hours', segment.get('duration_hours')),
+                    'updated_at': datetime.utcnow().isoformat()
+                })
+                transport_segments[i] = segment
+                segment_found = True
+                break
+
+        if not segment_found:
+            return jsonify({'error': 'Segment not found'}), 404
+
+        # Update Firestore
+        itinerary_data['transport_segments'] = transport_segments
+        latest_version_ref.update({
+            'itineraryData': itinerary_data,
+            'lastModified': datetime.utcnow().isoformat()
+        })
+
+        return jsonify({'status': 'success', 'segment': segment})
+
+    except Exception as e:
+        print(f"Error updating transport segment: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/transport-segments/<segment_id>', methods=['DELETE'])
+def delete_transport_segment(segment_id):
+    """
+    Delete a transport segment.
+    Query params: scenario_id
+    """
+    try:
+        from google.cloud import firestore
+
+        scenario_id = request.args.get('scenario_id')
+        if not scenario_id:
+            return jsonify({'error': 'scenario_id required'}), 400
+
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(scenario_id)
+
+        # Get latest version
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if not versions:
+            return jsonify({'error': 'No versions found'}), 404
+
+        latest_version_ref = versions[0].reference
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        transport_segments = itinerary_data.get('transport_segments', [])
+
+        # Filter out the segment to delete
+        updated_segments = [s for s in transport_segments if s.get('id') != segment_id]
+
+        if len(updated_segments) == len(transport_segments):
+            return jsonify({'error': 'Segment not found'}), 404
+
+        # Update Firestore
+        itinerary_data['transport_segments'] = updated_segments
+        latest_version_ref.update({
+            'itineraryData': itinerary_data,
+            'lastModified': datetime.utcnow().isoformat()
+        })
+
+        return jsonify({'status': 'success'})
+
+    except Exception as e:
+        print(f"Error deleting transport segment: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/transport-segments/sync', methods=['POST'])
+def sync_transport_segments():
+    """
+    Synchronize transport segments based on current destination order.
+    Creates/updates/deletes segments to match the locations array.
+    Body: scenario_id
+    """
+    try:
+        from google.cloud import firestore
+
+        data = request.get_json() or {}
+        scenario_id = data.get('scenario_id')
+
+        if not scenario_id:
+            return jsonify({'error': 'scenario_id required'}), 400
+
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(scenario_id)
+
+        # Get latest version
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if not versions:
+            return jsonify({'error': 'No versions found'}), 404
+
+        latest_version_ref = versions[0].reference
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+
+        locations = itinerary_data.get('locations', [])
+        existing_segments = itinerary_data.get('transport_segments', [])
+
+        # Build segment map for quick lookup
+        segment_map = {}
+        for segment in existing_segments:
+            key = f"{segment.get('from_destination_id')}_{segment.get('to_destination_id')}"
+            segment_map[key] = segment
+
+        # Create new segments list based on current location order
+        new_segments = []
+        for i in range(len(locations) - 1):
+            from_loc = locations[i]
+            to_loc = locations[i + 1]
+
+            key = f"{from_loc.get('id')}_{to_loc.get('id')}"
+
+            # Use existing segment if found, otherwise create new
+            if key in segment_map:
+                new_segments.append(segment_map[key])
+            else:
+                # Create new segment with estimated cost
+                new_segment = {
+                    'id': str(uuid.uuid4()),
+                    'from_destination_id': from_loc.get('id'),
+                    'from_destination_name': from_loc.get('name', ''),
+                    'to_destination_id': to_loc.get('id'),
+                    'to_destination_name': to_loc.get('name', ''),
+                    'transport_mode': 'plane',  # Default
+                    'transport_mode_icon': '✈️',
+                    'distance_km': 0,  # Will be calculated on frontend
+                    'duration_hours': None,
+                    'estimated_cost_usd': 0,  # Will be calculated on frontend
+                    'booking_status': 'estimated',
+                    'confidence_level': 'low',
+                    'research_sources': [],
+                    'alternatives': [],
+                    'num_travelers': 3,
+                    'created_at': datetime.utcnow().isoformat(),
+                    'updated_at': datetime.utcnow().isoformat()
+                }
+                new_segments.append(new_segment)
+
+        # Update Firestore
+        itinerary_data['transport_segments'] = new_segments
+        latest_version_ref.update({
+            'itineraryData': itinerary_data,
+            'lastModified': datetime.utcnow().isoformat()
+        })
+
+        return jsonify({
+            'status': 'success',
+            'transport_segments': new_segments,
+            'created': len([s for s in new_segments if s.get('id') not in [es.get('id') for es in existing_segments]]),
+            'kept': len([s for s in new_segments if s.get('id') in [es.get('id') for es in existing_segments]]),
+            'removed': len(existing_segments) - len([s for s in new_segments if s.get('id') in [es.get('id') for es in existing_segments]])
+        })
+
+    except Exception as e:
+        print(f"Error syncing transport segments: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
 def _to_float(value) -> float:

@@ -1779,3 +1779,324 @@ input[type="checkbox"] {
   width: 20px;
   text-align: center;
 }
+
+/* ============================================
+   Transport Segment Styles
+   ============================================ */
+
+.transport-segment {
+  position: relative;
+  margin: 8px 0;
+  padding: 0 12px;
+}
+
+.transport-segment-line {
+  position: absolute;
+  left: 42px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, #ddd 0%, #ddd 50%, transparent 50%, transparent 100%);
+  background-size: 4px 8px;
+}
+
+.transport-segment-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-left: 30px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  transition: all 0.2s ease;
+}
+
+.transport-segment-content:hover {
+  background: #f0f2f5;
+  border-color: #3498db;
+  box-shadow: 0 2px 6px rgba(52, 152, 219, 0.1);
+}
+
+.transport-segment-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.transport-segment-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.transport-segment-route {
+  font-size: 14px;
+  font-weight: 500;
+  color: #2c3e50;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transport-segment-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.transport-segment-details span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.transport-mode {
+  text-transform: capitalize;
+  font-weight: 500;
+}
+
+.transport-distance::before {
+  content: "•";
+  margin-right: 4px;
+}
+
+.transport-duration::before {
+  content: "•";
+  margin-right: 4px;
+}
+
+.transport-segment-cost {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.transport-segment-cost .cost-amount {
+  color: #3498db;
+}
+
+.confidence-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.transport-segment-notes {
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.transport-segment-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.transport-edit-btn,
+.transport-research-btn {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.transport-edit-btn:hover {
+  background: #3498db;
+  border-color: #3498db;
+  transform: scale(1.05);
+}
+
+.transport-research-btn:hover {
+  background: #f39c12;
+  border-color: #f39c12;
+  transform: scale(1.05);
+}
+
+/* Compact view for transport segments */
+.transport-segment.compact .transport-segment-details,
+.transport-segment.compact .transport-segment-notes {
+  display: none;
+}
+
+/* Status-based styling */
+.transport-segment[data-booking-status="booked"] .transport-segment-content {
+  border-left: 4px solid #27ae60;
+}
+
+.transport-segment[data-booking-status="researched"] .transport-segment-content {
+  border-left: 4px solid #3498db;
+}
+
+.transport-segment[data-booking-status="estimated"] .transport-segment-content {
+  border-left: 4px solid #95a5a6;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .transport-segment-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .transport-segment-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .transport-segment-route {
+    white-space: normal;
+  }
+}
+
+/* ============================================
+   Transport Modal Styling
+   ============================================ */
+
+.transport-modal {
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.transport-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.form-section {
+  padding: 20px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:first-of-type {
+  padding-top: 0;
+}
+
+.form-section:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.section-title {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-row:last-child {
+  margin-bottom: 0;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #34495e;
+}
+
+.form-hint {
+  display: block;
+  font-size: 12px;
+  color: #7f8c8d;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.form-input {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.form-input:disabled {
+  background-color: #f5f5f5;
+  color: #7f8c8d;
+  cursor: not-allowed;
+}
+
+.form-input::placeholder {
+  color: #bdc3c7;
+}
+
+textarea.form-input {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* Responsive modal */
+@media (max-width: 768px) {
+  .transport-modal {
+    max-width: 95vw;
+    margin: 20px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+}

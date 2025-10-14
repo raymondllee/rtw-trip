@@ -375,3 +375,164 @@ class DestinationCostResearch(BaseModel):
     research_summary: str = Field(
         description="Overall insights, tips, and recommendations"
     )
+
+
+# ============================================================================
+# Transport Segment Types
+# ============================================================================
+
+class TransportSegment(BaseModel):
+    """Inter-destination transport segment with costs and details."""
+    id: str = Field(description="Unique identifier for the transport segment")
+    from_destination_id: str = Field(description="ID of the origin destination")
+    from_destination_name: str = Field(description="Name of the origin destination")
+    to_destination_id: str = Field(description="ID of the target destination")
+    to_destination_name: str = Field(description="Name of the target destination")
+
+    # Transport details
+    transport_mode: str = Field(
+        description="Primary transport mode: 'plane', 'train', 'bus', 'ferry', 'car', 'other'"
+    )
+    transport_mode_icon: str = Field(
+        default="✈️",
+        description="Emoji icon for transport mode"
+    )
+
+    # Distance and duration
+    distance_km: float = Field(description="Distance between destinations in kilometers")
+    duration_hours: Optional[float] = Field(
+        default=None,
+        description="Estimated travel duration in hours"
+    )
+
+    # Cost information
+    estimated_cost_usd: float = Field(
+        description="Estimated cost in USD for all travelers"
+    )
+    researched_cost_low: Optional[float] = Field(
+        default=None,
+        description="Researched low-end cost in USD"
+    )
+    researched_cost_mid: Optional[float] = Field(
+        default=None,
+        description="Researched typical cost in USD"
+    )
+    researched_cost_high: Optional[float] = Field(
+        default=None,
+        description="Researched high-end cost in USD"
+    )
+    actual_cost_usd: Optional[float] = Field(
+        default=None,
+        description="Actual booked cost in USD"
+    )
+    currency_local: Optional[str] = Field(
+        default=None,
+        description="Local currency code (ISO 4217)"
+    )
+    amount_local: Optional[float] = Field(
+        default=None,
+        description="Cost in local currency"
+    )
+
+    # Booking and status
+    booking_status: str = Field(
+        default="estimated",
+        description="Status: 'estimated', 'researched', 'booked', 'paid', 'completed'"
+    )
+    confidence_level: str = Field(
+        default="low",
+        description="Confidence in cost estimate: 'low', 'medium', 'high'"
+    )
+
+    # Research and sources
+    research_sources: list[str] = Field(
+        default_factory=list,
+        description="URLs and sources used for cost research"
+    )
+    research_notes: Optional[str] = Field(
+        default=None,
+        description="Key findings, tips, or booking recommendations"
+    )
+    researched_at: Optional[str] = Field(
+        default=None,
+        description="ISO timestamp when research was conducted"
+    )
+
+    # Additional details
+    alternatives: list[str] = Field(
+        default_factory=list,
+        description="Alternative transport options considered"
+    )
+    booking_link: Optional[str] = Field(
+        default=None,
+        description="URL for booking this transport"
+    )
+    booking_reference: Optional[str] = Field(
+        default=None,
+        description="Booking confirmation number"
+    )
+    notes: Optional[str] = Field(
+        default=None,
+        description="Additional notes, considerations, or reminders"
+    )
+
+    # Metadata
+    num_travelers: int = Field(
+        default=3,
+        description="Number of travelers for cost calculation"
+    )
+    created_at: Optional[str] = Field(
+        default=None,
+        description="ISO timestamp when segment was created"
+    )
+    updated_at: Optional[str] = Field(
+        default=None,
+        description="ISO timestamp when segment was last updated"
+    )
+
+
+class TransportResearchRequest(BaseModel):
+    """Request to research transport options between two destinations."""
+    segment_id: str = Field(description="ID of the transport segment to research")
+    from_destination_name: str = Field(description="Origin city/destination name")
+    to_destination_name: str = Field(description="Target city/destination name")
+    from_country: Optional[str] = Field(default=None, description="Origin country")
+    to_country: Optional[str] = Field(default=None, description="Target country")
+    departure_date: Optional[str] = Field(
+        default=None,
+        description="Approximate departure date in YYYY-MM-DD format"
+    )
+    num_travelers: int = Field(default=3, description="Number of travelers")
+    preferred_modes: list[str] = Field(
+        default_factory=list,
+        description="Preferred transport modes to research"
+    )
+    travel_style: str = Field(
+        default="mid-range",
+        description="Travel style: 'budget', 'mid-range', or 'luxury'"
+    )
+
+
+class TransportResearchResult(BaseModel):
+    """Research results for transport between destinations."""
+    segment_id: str = Field(description="ID of the transport segment")
+    transport_mode: str = Field(description="Researched transport mode")
+    cost_low: float = Field(description="Low-end cost estimate in USD")
+    cost_mid: float = Field(description="Typical cost estimate in USD")
+    cost_high: float = Field(description="High-end cost estimate in USD")
+    duration_hours: float = Field(description="Estimated travel duration in hours")
+    currency_local: str = Field(description="Local currency code")
+    amount_local: float = Field(description="Typical cost in local currency")
+    sources: list[str] = Field(
+        default_factory=list,
+        description="Research sources and URLs"
+    )
+    booking_tips: str = Field(
+        description="Recommendations for booking this transport"
+    )
+    alternatives: list[str] = Field(
+        default_factory=list,
+        description="Alternative transport options found"
+    )
+    confidence: str = Field(description="Confidence level: 'high', 'medium', 'low'")
+    researched_at: str = Field(description="ISO timestamp of research")

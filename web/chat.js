@@ -1242,36 +1242,41 @@ class TravelConciergeChat {
   /**
    * Create a new chat in Firestore
    */
-  async createNewChat() {
+  async createNewChat(scenarioId = null) {
     console.log('🆕 Creating new chat - current state:', {
       currentChatId: this.currentChatId,
       messagesCount: this.messages?.length || 0,
-      sessionId: this.sessionId
+      sessionId: this.sessionId,
+      scenarioId: scenarioId || window.currentScenarioId
     });
 
     try {
-      const chatRef = await addDoc(collection(db, 'chatHistory'), {
+      const chatData = {
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
         legName: this.currentLeg || 'All',
         subLegName: this.currentSubLeg || null,
         title: 'New Chat',
-        messageCount: 0
-      });
+        messageCount: 0,
+        scenarioId: scenarioId || window.currentScenarioId || null
+      };
+
+      const chatRef = await addDoc(collection(db, 'chatHistory'), chatData);
 
       this.currentChatId = chatRef.id;
       this.messages = [];
-      console.log('📝 Created new chat:', this.currentChatId);
+      console.log('📝 Created new chat:', this.currentChatId, 'for scenario:', chatData.scenarioId);
       console.log('🆕 Chat state after creation:', {
         currentChatId: this.currentChatId,
         messagesCount: this.messages?.length || 0,
-        sessionId: this.sessionId
+        sessionId: this.sessionId,
+        scenarioId: chatData.scenarioId
       });
 
       // Update UI with new chat title
       this.updateChatTitle('New Chat');
 
-      // Save chat state
+      // Save chat state with scenario association
       this.statePersistence.saveChatState(this.currentChatId, this.messages, this.sessionId);
 
       return chatRef.id;
@@ -1327,10 +1332,16 @@ class TravelConciergeChat {
         subLegName: this.currentSubLeg || null,
         title: title,
         messageCount: this.messages.length,
-        sessionId: this.sessionId || null
+        sessionId: this.sessionId || null,
+        scenarioId: window.currentScenarioId || null
       }, { merge: true });
 
       console.log('💾 Saved message to chat:', this.currentChatId);
+
+      // Save scenario-chat association
+      if (window.currentScenarioId) {
+        this.statePersistence.saveScenarioChatAssociation(window.currentScenarioId, this.currentChatId);
+      }
     } catch (error) {
       console.error('Error saving message:', error);
     }
@@ -1406,13 +1417,25 @@ class TravelConciergeChat {
   /**
    * Get all chat histories from Firestore
    */
-  async getChatHistories() {
+  async getChatHistories(scenarioId = null) {
     try {
-      const q = query(
-        collection(db, 'chatHistory'),
-        orderBy('updatedAt', 'desc'),
-        limit(50)
-      );
+      let q;
+      if (scenarioId) {
+        // Filter chats by scenario ID
+        q = query(
+          collection(db, 'chatHistory'),
+          where('scenarioId', '==', scenarioId),
+          orderBy('updatedAt', 'desc'),
+          limit(50)
+        );
+      } else {
+        // Get all chats (existing behavior)
+        q = query(
+          collection(db, 'chatHistory'),
+          orderBy('updatedAt', 'desc'),
+          limit(50)
+        );
+      }
 
       const querySnapshot = await getDocs(q);
       const chats = [];
@@ -1424,12 +1447,82 @@ class TravelConciergeChat {
         });
       });
 
-      console.log('📚 Retrieved', chats.length, 'chat histories');
+      console.log('📚 Retrieved', chats.length, 'chat histories' + (scenarioId ? ` for scenario ${scenarioId}` : ''));
       return chats;
     } catch (error) {
       console.error('Error getting chat histories:', error);
       return [];
     }
+  }
+
+  /**
+   * Get the most recent chat for a specific scenario
+   */
+  async getChatForScenario(scenarioId) {
+    try {
+      const q = query(
+        collection(db, 'chatHistory'),
+        where('scenarioId', '==', scenarioId),
+        orderBy('updatedAt', 'desc'),
+        limit(1)
+      );
+
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        console.log('📭 No chat found for scenario:', scenarioId);
+        return null;
+      }
+
+      const chatDoc = querySnapshot.docs[0];
+      const chatData = {
+        id: chatDoc.id,
+        ...chatDoc.data()
+      };
+
+      console.log('📂 Found chat for scenario:', scenarioId, chatData.id);
+      return chatData;
+    } catch (error) {
+      console.error('Error getting chat for scenario:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Switch chat session for a new scenario
+   */
+  async switchToScenario(scenarioId) {
+    console.log('🔄 Switching chat to scenario:', scenarioId);
+
+    // Try to load existing chat for this scenario
+    const existingChat = await this.getChatForScenario(scenarioId);
+    
+    if (existingChat) {
+      // Load existing chat
+      console.log('📂 Loading existing chat for scenario:', scenarioId);
+      await this.loadChat(existingChat.id);
+    } else {
+      // Create new chat for this scenario
+      console.log('🆕 Creating new chat for scenario:', scenarioId);
+      await this.createNewChat(scenarioId);
+      
+      // Add welcome message
+      this.addMessage(
+        "Hi! I'm your AI Travel Concierge. I can help you modify your trip by adding destinations, adjusting dates, managing costs, and optimizing your itinerary. What would you like to do?",
+        'bot',
+        false,
+        false,
+        false
+      );
+
+      // Sync welcome message to all chat containers
+      this.syncMessages(this.chatMessages, this.floatingChatMessages);
+      if (this.chatColumnMessages) {
+        this.syncMessages(this.chatMessages, this.chatColumnMessages);
+      }
+    }
+
+    return this.currentChatId;
   }
 
   /**
@@ -1456,7 +1549,7 @@ class TravelConciergeChat {
   /**
    * Show chat history panel
    */
-  async showChatHistory() {
+  async showChatHistory(scenarioId = null) {
     const historyPanel = document.getElementById('chat-history-panel');
     const historyList = document.getElementById('chat-history-list');
 
@@ -1469,8 +1562,8 @@ class TravelConciergeChat {
     historyList.innerHTML = '<div class="loading">Loading chat history...</div>';
     historyPanel.classList.remove('hidden');
 
-    // Load chat histories
-    const chats = await this.getChatHistories();
+    // Load chat histories (filtered by scenario if provided)
+    const chats = await this.getChatHistories(scenarioId);
 
     if (chats.length === 0) {
       historyList.innerHTML = '<div class="empty-state">No chat history yet</div>';
@@ -1482,12 +1575,18 @@ class TravelConciergeChat {
     chats.forEach(chat => {
       const chatItem = document.createElement('div');
       chatItem.className = 'chat-history-item';
+      
+      // Add scenario indicator if available
+      const scenarioIndicator = chat.scenarioId ? 
+        `<div class="chat-history-scenario">Scenario: ${chat.scenarioId.substring(0, 8)}...</div>` : '';
+
       chatItem.innerHTML = `
         <div class="chat-history-info">
           <div class="chat-history-title-container">
             <div class="chat-history-title" data-chat-id="${chat.id}">${chat.title || 'Untitled Chat'}</div>
             <button class="chat-history-ai-title-btn" data-chat-id="${chat.id}" title="Generate AI title">🤖</button>
           </div>
+          ${scenarioIndicator}
           <div class="chat-history-meta">
             ${chat.legName || 'All Legs'} • ${chat.messageCount || 0} messages
           </div>
@@ -1515,7 +1614,7 @@ class TravelConciergeChat {
       deleteBtn.addEventListener('click', async () => {
         if (confirm('Are you sure you want to delete this chat?')) {
           await this.deleteChat(chat.id);
-          await this.showChatHistory(); // Refresh list
+          await this.showChatHistory(scenarioId); // Refresh list
         }
       });
 

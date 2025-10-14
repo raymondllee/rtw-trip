@@ -386,19 +386,38 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
         
         // Add transportation icon at midpoint with cost information
         const distance = google.maps.geometry.spherical.computeDistanceBetween(
-          pathCoords[i], 
+          pathCoords[i],
           pathCoords[i + 1]
         );
-        const transportMode = getTransportationMode(fromLocation, toLocation, i);
-        const cost = getTransportationCost(fromLocation, toLocation, transportMode, distance);
-        const costText = cost > 0 ? `$${cost.toLocaleString()}` : 'Free';
-        
+
+        // Get transport segment if available, otherwise calculate
+        let segment = null;
+        let transportMode, cost, costText, transportIcon;
+
+        if (window.transportSegmentManager) {
+          segment = window.transportSegmentManager.getSegment(fromLocation.id, toLocation.id);
+        }
+
+        if (segment) {
+          // Use data from transport segment
+          transportMode = segment.transport_mode;
+          transportIcon = segment.transport_mode_icon;
+          cost = window.transportSegmentManager.getActiveCost(segment);
+          costText = cost > 0 ? `$${cost.toLocaleString()}` : 'Free';
+        } else {
+          // Fall back to old calculation
+          transportMode = getTransportationMode(fromLocation, toLocation, i);
+          transportIcon = getTransportationIcon(transportMode);
+          cost = getTransportationCost(fromLocation, toLocation, transportMode, distance);
+          costText = cost > 0 ? `$${cost.toLocaleString()}` : 'Free';
+        }
+
         const midpoint = google.maps.geometry.spherical.interpolate(
-          pathCoords[i], 
-          pathCoords[i + 1], 
+          pathCoords[i],
+          pathCoords[i + 1],
           0.5
         );
-        
+
         const transportMarker = new google.maps.Marker({
           position: midpoint,
           map: map,
@@ -406,40 +425,61 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
             url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
               <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="16" cy="16" r="14" fill="white" stroke="#1e88e5" stroke-width="2"/>
-                <text x="16" y="14" text-anchor="middle" font-size="12">${getTransportationIcon(transportMode)}</text>
+                <text x="16" y="14" text-anchor="middle" font-size="12">${transportIcon}</text>
                 <text x="16" y="26" text-anchor="middle" font-size="8" fill="#1e88e5" font-weight="bold">${costText}</text>
               </svg>
             `)}`,
             scaledSize: new google.maps.Size(32, 32),
             anchor: new google.maps.Point(16, 16)
           },
-          title: `${fromLocation.name} → ${toLocation.name}\nTravel by ${transportMode}\nCost: ${costText} (3 people)\nDistance: ${Math.round(distance/1000)}km`,
+          title: `${fromLocation.name} → ${toLocation.name}\nTravel by ${transportMode}\nCost: ${costText}\nDistance: ${Math.round(distance/1000)}km`,
           zIndex: 1000
         });
-        
+
         // Add click handler to show detailed cost breakdown
         transportMarker.addListener('click', () => {
-          const fromCode = getAirportCode(fromLocation);
-          const toCode = getAirportCode(toLocation);
-          const routeKey = `${fromCode}-${toCode}`;
-          const isKnownCost = knownFlightCosts[routeKey];
-          
+          let statusBadge = '';
+          let confidenceInfo = '';
+
+          if (segment) {
+            // Show segment-specific information
+            const statusColors = {
+              'estimated': '#999',
+              'researched': '#3498db',
+              'booked': '#27ae60',
+              'paid': '#27ae60',
+              'completed': '#27ae60'
+            };
+            const statusColor = statusColors[segment.booking_status] || '#999';
+            statusBadge = `<span style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; text-transform: uppercase;">${segment.booking_status}</span>`;
+
+            if (segment.confidence_level) {
+              const confidenceEmoji = segment.confidence_level === 'high' ? '✓✓' : segment.confidence_level === 'medium' ? '✓' : '~';
+              confidenceInfo = `<p style="margin: 4px 0; font-size: 12px; color: #888;">${confidenceEmoji} Confidence: ${segment.confidence_level}</p>`;
+            }
+          } else {
+            statusBadge = '<span style="background: #999; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; text-transform: uppercase;">estimated</span>';
+          }
+
           const infoContent = `
             <div style="max-width: 250px;">
-              <h4 style="margin: 0 0 8px 0;">${getTransportationIcon(transportMode)} ${fromLocation.name} → ${toLocation.name}</h4>
-              <p style="margin: 4px 0;"><strong>Transport:</strong> ${transportMode.charAt(0).toUpperCase() + transportMode.slice(1)}</p>
+              <h4 style="margin: 0 0 8px 0;">${transportIcon} ${fromLocation.name} → ${toLocation.name}</h4>
+              <p style="margin: 4px 0;"><strong>Transport:</strong> ${transportMode.charAt(0).toUpperCase() + transportMode.slice(1)} ${statusBadge}</p>
               <p style="margin: 4px 0;"><strong>Distance:</strong> ${Math.round(distance/1000)}km</p>
-              <p style="margin: 4px 0;"><strong>Total Cost:</strong> ${costText} (3 people)</p>
-              <p style="margin: 4px 0;"><strong>Per Person:</strong> $${Math.round(cost/3).toLocaleString()}</p>
-              ${isKnownCost ? '<p style="margin: 4px 0; font-size: 12px; color: #1e88e5;">✓ From original itinerary</p>' : '<p style="margin: 4px 0; font-size: 12px; color: #888;">~ Estimated cost</p>'}
+              ${segment && segment.duration_hours ? `<p style="margin: 4px 0;"><strong>Duration:</strong> ${Math.round(segment.duration_hours)}h</p>` : ''}
+              <p style="margin: 4px 0;"><strong>Total Cost:</strong> ${costText} (${segment ? segment.num_travelers : 3} people)</p>
+              <p style="margin: 4px 0;"><strong>Per Person:</strong> $${Math.round(cost/(segment ? segment.num_travelers : 3)).toLocaleString()}</p>
+              ${confidenceInfo}
+              ${segment && segment.notes ? `<p style="margin: 8px 0 4px 0; padding-top: 8px; border-top: 1px solid #eee; font-style: italic; font-size: 12px;">${segment.notes}</p>` : ''}
+              ${segment && segment.booking_reference ? `<p style="margin: 4px 0; font-size: 12px; color: #1e88e5;"><strong>Ref:</strong> ${segment.booking_reference}</p>` : ''}
             </div>
           `;
-          
+
           info.setContent(infoContent);
           info.setPosition(midpoint);
           info.open(map);
         });
-        
+
         routingElements.push(transportMarker);
       }
     } else {
@@ -672,6 +712,23 @@ async function initMapApp() {
     if (!workingData.locations) workingData.locations = [];
     if (!workingData.legs) workingData.legs = [];
     if (!workingData.costs) workingData.costs = [];
+
+    // Initialize transport segments
+    if (currentScenarioId && window.transportSegmentManager) {
+      console.log('🚗 Initializing transport segments...');
+      try {
+        await window.transportSegmentManager.loadSegments(currentScenarioId);
+        console.log(`✅ Loaded ${window.transportSegmentManager.getAllSegments().length} transport segments`);
+
+        // Sync segments with current destinations
+        if (workingData.locations && workingData.locations.length > 1) {
+          await window.transportSegmentManager.syncSegments(currentScenarioId, workingData.locations);
+          console.log('✅ Synced transport segments with destinations');
+        }
+      } catch (error) {
+        console.error('Error initializing transport segments:', error);
+      }
+    }
   } catch (error) {
     console.warn('Could not load from Firestore, using default data:', error);
     // Fall back to original data if Firestore fails
@@ -906,23 +963,38 @@ async function initMapApp() {
 
       // Add inter-destination travel costs only if includeTransport is true
       if (includeTransport) {
-        for (let i = 0; i < destinations.length - 1; i++) {
-          const fromLocation = destinations[i];
-          const toLocation = destinations[i + 1];
+        // Use transport segments if available, otherwise fall back to calculation
+        if (window.transportSegmentManager && window.transportSegmentManager.getAllSegments().length > 0) {
+          // Add costs from transport segments
+          for (let i = 0; i < destinations.length - 1; i++) {
+            const fromLocation = destinations[i];
+            const toLocation = destinations[i + 1];
+            const segment = window.transportSegmentManager.getSegment(fromLocation.id, toLocation.id);
 
-          // Calculate distance between destinations
-          const fromLL = toLatLng(fromLocation);
-          const toLL = toLatLng(toLocation);
+            if (segment) {
+              total += window.transportSegmentManager.getActiveCost(segment);
+            }
+          }
+        } else {
+          // Fall back to old calculation method
+          for (let i = 0; i < destinations.length - 1; i++) {
+            const fromLocation = destinations[i];
+            const toLocation = destinations[i + 1];
 
-          if (fromLL && toLL) {
-            const distance = google.maps.geometry.spherical.computeDistanceBetween(
-              new google.maps.LatLng(fromLL.lat, fromLL.lng),
-              new google.maps.LatLng(toLL.lat, toLL.lng)
-            );
+            // Calculate distance between destinations
+            const fromLL = toLatLng(fromLocation);
+            const toLL = toLatLng(toLocation);
 
-            const transportMode = getTransportationMode(fromLocation, toLocation, i);
-            const travelCost = getTransportationCost(fromLocation, toLocation, transportMode, distance);
-            total += travelCost;
+            if (fromLL && toLL) {
+              const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                new google.maps.LatLng(fromLL.lat, fromLL.lng),
+                new google.maps.LatLng(toLL.lat, toLL.lng)
+              );
+
+              const transportMode = getTransportationMode(fromLocation, toLocation, i);
+              const travelCost = getTransportationCost(fromLocation, toLocation, transportMode, distance);
+              total += travelCost;
+            }
           }
         }
       }
@@ -1374,6 +1446,47 @@ async function initMapApp() {
           <button class="delete-destination-btn" data-location-id="${loc.id}" title="Delete destination">×</button>
         </div>
       `);
+
+      // Add transport segment if not the last destination AND routing toggle is checked
+      const routingToggle = document.getElementById('routing-toggle');
+      const showTransport = routingToggle ? routingToggle.checked : true;
+
+      if (showTransport && idx < locations.length - 1 && window.transportSegmentManager) {
+        const nextLoc = locations[idx + 1];
+        const segment = window.transportSegmentManager.getSegment(loc.id, nextLoc.id);
+
+        if (segment) {
+          const activeCost = window.transportSegmentManager.getActiveCost(segment);
+          const formattedCost = window.transportSegmentManager.formatCurrency(activeCost);
+          const confidenceBadge = window.transportSegmentManager.getConfidenceBadge(segment);
+
+          sidebarItems.push(`
+            <div class="transport-segment" data-segment-id="${segment.id}" data-from-id="${loc.id}" data-to-id="${nextLoc.id}">
+              <div class="transport-segment-line"></div>
+              <div class="transport-segment-content">
+                <div class="transport-segment-icon">${segment.transport_mode_icon}</div>
+                <div class="transport-segment-info">
+                  <div class="transport-segment-route">${loc.name} → ${nextLoc.name}</div>
+                  <div class="transport-segment-details">
+                    <span class="transport-mode">${segment.transport_mode}</span>
+                    ${segment.distance_km ? `<span class="transport-distance">${Math.round(segment.distance_km)}km</span>` : ''}
+                    ${segment.duration_hours ? `<span class="transport-duration">${Math.round(segment.duration_hours)}h</span>` : ''}
+                  </div>
+                  <div class="transport-segment-cost">
+                    <span class="cost-amount">${formattedCost}</span>
+                    ${confidenceBadge}
+                  </div>
+                  ${segment.notes ? `<div class="transport-segment-notes">${segment.notes}</div>` : ''}
+                </div>
+                <div class="transport-segment-actions">
+                  <button class="transport-edit-btn" data-segment-id="${segment.id}" title="Edit transport">✏️</button>
+                  <button class="transport-research-btn" data-segment-id="${segment.id}" title="Research costs">💰</button>
+                </div>
+              </div>
+            </div>
+          `);
+        }
+      }
     });
     
     destinationList.innerHTML = sidebarItems.join('');
@@ -1445,6 +1558,24 @@ async function initMapApp() {
             toggleElement.classList.toggle('expanded');
           }
         }
+      });
+    });
+
+    // Add click handlers for transport segment edit buttons
+    destinationList.querySelectorAll('.transport-edit-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const segmentId = e.currentTarget.dataset.segmentId;
+        openTransportEditModal(segmentId);
+      });
+    });
+
+    // Add click handlers for transport segment research buttons
+    destinationList.querySelectorAll('.transport-research-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const segmentId = e.currentTarget.dataset.segmentId;
+        researchTransportCost(segmentId);
       });
     });
 
@@ -1906,7 +2037,136 @@ async function initMapApp() {
   function closeManageScenariosModal() {
     document.getElementById('manage-scenarios-modal').style.display = 'none';
   }
-  
+
+  // Transport segment modal functions
+  function openTransportEditModal(segmentId) {
+    const segment = window.transportSegmentManager.getAllSegments().find(s => s.id === segmentId);
+    if (!segment) {
+      console.error('Transport segment not found:', segmentId);
+      return;
+    }
+
+    const modal = document.getElementById('edit-transport-modal');
+    const form = document.getElementById('edit-transport-form');
+
+    // Populate form fields
+    document.getElementById('transport-route').value = `${segment.from_destination_name} → ${segment.to_destination_name}`;
+    document.getElementById('transport-mode').value = segment.transport_mode || 'plane';
+    document.getElementById('transport-cost').value = segment.estimated_cost_usd || '';
+    document.getElementById('transport-duration').value = segment.duration_hours || '';
+
+    // Researched costs
+    document.getElementById('transport-researched-low').value = segment.researched_cost_low || '';
+    document.getElementById('transport-researched-mid').value = segment.researched_cost_mid || '';
+    document.getElementById('transport-researched-high').value = segment.researched_cost_high || '';
+
+    // Actual cost
+    document.getElementById('transport-actual-cost').value = segment.actual_cost_usd || '';
+
+    // Local currency
+    document.getElementById('transport-currency-local').value = segment.currency_local || '';
+    document.getElementById('transport-amount-local').value = segment.amount_local || '';
+
+    // Booking details
+    document.getElementById('transport-booking-status').value = segment.booking_status || 'estimated';
+    document.getElementById('transport-confidence').value = segment.confidence_level || 'low';
+    document.getElementById('transport-booking-reference').value = segment.booking_reference || '';
+    document.getElementById('transport-booking-link').value = segment.booking_link || '';
+
+    // Notes
+    document.getElementById('transport-notes').value = segment.notes || '';
+    document.getElementById('edit-transport-segment-id').value = segmentId;
+
+    modal.style.display = 'flex';
+  }
+
+  function closeTransportEditModal() {
+    document.getElementById('edit-transport-modal').style.display = 'none';
+  }
+
+  async function saveTransportSegment(segmentId) {
+    const mode = document.getElementById('transport-mode').value;
+    const estimatedCost = parseFloat(document.getElementById('transport-cost').value) || 0;
+    const duration = parseFloat(document.getElementById('transport-duration').value) || null;
+
+    // Researched costs
+    const researchedLow = parseFloat(document.getElementById('transport-researched-low').value) || null;
+    const researchedMid = parseFloat(document.getElementById('transport-researched-mid').value) || null;
+    const researchedHigh = parseFloat(document.getElementById('transport-researched-high').value) || null;
+
+    // Actual cost
+    const actualCost = parseFloat(document.getElementById('transport-actual-cost').value) || null;
+
+    // Local currency
+    const currencyLocal = document.getElementById('transport-currency-local').value.toUpperCase() || null;
+    const amountLocal = parseFloat(document.getElementById('transport-amount-local').value) || null;
+
+    // Booking details
+    const bookingStatus = document.getElementById('transport-booking-status').value;
+    const confidenceLevel = document.getElementById('transport-confidence').value;
+    const bookingReference = document.getElementById('transport-booking-reference').value;
+    const bookingLink = document.getElementById('transport-booking-link').value;
+
+    // Notes
+    const notes = document.getElementById('transport-notes').value;
+
+    const updates = {
+      transport_mode: mode,
+      transport_mode_icon: window.transportSegmentManager.getTransportIcon(mode),
+      estimated_cost_usd: estimatedCost,
+      researched_cost_low: researchedLow,
+      researched_cost_mid: researchedMid,
+      researched_cost_high: researchedHigh,
+      actual_cost_usd: actualCost,
+      currency_local: currencyLocal,
+      amount_local: amountLocal,
+      duration_hours: duration,
+      booking_status: bookingStatus,
+      confidence_level: confidenceLevel,
+      booking_reference: bookingReference,
+      booking_link: bookingLink,
+      notes: notes
+    };
+
+    try {
+      await window.transportSegmentManager.updateSegment(segmentId, updates, currentScenarioId);
+      console.log('✅ Transport segment updated successfully');
+      closeTransportEditModal();
+
+      // Refresh the sidebar to show updated transport segment
+      const legName = legFilter ? legFilter.value : 'all';
+      const subLegName = subLegFilter ? subLegFilter.value : '';
+      const filtered = (subLegName && subLegName !== '')
+        ? filterBySubLeg(workingData, legName, subLegName)
+        : filterByLeg(workingData, legName);
+      updateSidebar(filtered);
+
+      // Trigger save
+      await autoSaveScenario();
+    } catch (error) {
+      console.error('Error updating transport segment:', error);
+      alert('Failed to update transport segment. Please try again.');
+    }
+  }
+
+  async function researchTransportCost(segmentId) {
+    const segment = window.transportSegmentManager.getAllSegments().find(s => s.id === segmentId);
+    if (!segment) {
+      console.error('Transport segment not found:', segmentId);
+      return;
+    }
+
+    console.log('🔍 Researching transport costs for:', segment);
+    alert(`Transport research for ${segment.from_destination_name} → ${segment.to_destination_name} will be implemented with AI agent integration.`);
+
+    // TODO: Integrate with AI agent for transport research
+    // This would involve:
+    // 1. Creating a TransportResearchRequest
+    // 2. Sending to the AI agent
+    // 3. Processing the TransportResearchResult
+    // 4. Updating the segment with researched costs
+  }
+
   async function updateScenarioList() {
     const scenarioList = document.getElementById('scenario-list');
 
@@ -1967,6 +2227,13 @@ async function initMapApp() {
 
         // Save scenario selection to state
         statePersistence.saveScenarioSelection(scenarioId);
+
+        // Switch chat to this scenario
+        if (chatInstance) {
+          await chatInstance.switchToScenario(scenarioId);
+          // Save the scenario-chat association
+          statePersistence.saveScenarioChatAssociation(scenarioId, chatInstance.currentChatId);
+        }
 
         // Update view summary button state
         await updateViewSummaryButtonState();
@@ -3059,7 +3326,15 @@ async function initMapApp() {
   document.getElementById('cancel-save-scenario-btn').addEventListener('click', closeSaveScenarioModal);
   document.getElementById('close-manage-scenarios-btn').addEventListener('click', closeManageScenariosModal);
   document.getElementById('cancel-import-btn').addEventListener('click', closeImportScenariosModal);
-  
+  document.getElementById('cancel-edit-transport-btn').addEventListener('click', closeTransportEditModal);
+
+  // Close transport modal on overlay click
+  document.getElementById('edit-transport-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'edit-transport-modal') {
+      closeTransportEditModal();
+    }
+  });
+
   // Form submissions
   document.getElementById('add-destination-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -3134,8 +3409,16 @@ async function initMapApp() {
       alert('Failed to save scenario. Please try again.');
     }
   });
-  
-      document.getElementById('confirm-import-btn').addEventListener('click', () => {
+
+  document.getElementById('edit-transport-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const segmentId = document.getElementById('edit-transport-segment-id').value;
+    if (segmentId) {
+      await saveTransportSegment(segmentId);
+    }
+  });
+
+  document.getElementById('confirm-import-btn').addEventListener('click', () => {
         const fileInput = document.getElementById('scenario-file');
         const overwrite = document.getElementById('overwrite-scenarios').checked;
     

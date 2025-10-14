@@ -113,6 +113,32 @@ export class StatePersistence {
   }
 
   /**
+   * Save scenario-chat association
+   */
+  saveScenarioChatAssociation(scenarioId, chatId) {
+    const scenarioChatMap = this.state.scenarioChatMap || {};
+    scenarioChatMap[scenarioId] = chatId;
+    this.saveState({ scenarioChatMap });
+  }
+
+  /**
+   * Get chat ID for a scenario
+   */
+  getChatIdForScenario(scenarioId) {
+    const scenarioChatMap = this.state.scenarioChatMap || {};
+    return scenarioChatMap[scenarioId] || null;
+  }
+
+  /**
+   * Clear scenario-chat association
+   */
+  clearScenarioChatAssociation(scenarioId) {
+    const scenarioChatMap = this.state.scenarioChatMap || {};
+    delete scenarioChatMap[scenarioId];
+    this.saveState({ scenarioChatMap });
+  }
+
+  /**
    * Save chat open/closed UI state
    */
   saveChatOpenState(isOpen) {
