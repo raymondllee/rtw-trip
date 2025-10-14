@@ -893,7 +893,7 @@ async function initMapApp() {
     let summaryText = '';
 
     // Helper function to calculate total cost for filtered destinations
-    const calculateTotalCost = (destinations) => {
+    const calculateTotalCost = (destinations, includeTransport = true) => {
       // Calculate destination costs
       let total = destinations.reduce((sum, loc) => {
         // Use the same cost calculation function used elsewhere for consistency
@@ -904,24 +904,26 @@ async function initMapApp() {
         return sum + locationCosts.total;
       }, 0);
 
-      // Add inter-destination travel costs
-      for (let i = 0; i < destinations.length - 1; i++) {
-        const fromLocation = destinations[i];
-        const toLocation = destinations[i + 1];
+      // Add inter-destination travel costs only if includeTransport is true
+      if (includeTransport) {
+        for (let i = 0; i < destinations.length - 1; i++) {
+          const fromLocation = destinations[i];
+          const toLocation = destinations[i + 1];
 
-        // Calculate distance between destinations
-        const fromLL = toLatLng(fromLocation);
-        const toLL = toLatLng(toLocation);
+          // Calculate distance between destinations
+          const fromLL = toLatLng(fromLocation);
+          const toLL = toLatLng(toLocation);
 
-        if (fromLL && toLL) {
-          const distance = google.maps.geometry.spherical.computeDistanceBetween(
-            new google.maps.LatLng(fromLL.lat, fromLL.lng),
-            new google.maps.LatLng(toLL.lat, toLL.lng)
-          );
+          if (fromLL && toLL) {
+            const distance = google.maps.geometry.spherical.computeDistanceBetween(
+              new google.maps.LatLng(fromLL.lat, fromLL.lng),
+              new google.maps.LatLng(toLL.lat, toLL.lng)
+            );
 
-          const transportMode = getTransportationMode(fromLocation, toLocation, i);
-          const travelCost = getTransportationCost(fromLocation, toLocation, transportMode, distance);
-          total += travelCost;
+            const transportMode = getTransportationMode(fromLocation, toLocation, i);
+            const travelCost = getTransportationCost(fromLocation, toLocation, transportMode, distance);
+            total += travelCost;
+          }
         }
       }
 
@@ -957,44 +959,47 @@ async function initMapApp() {
       return '';
     };
 
+    // Get the state of the "Show Transport" checkbox
+    const includeTransport = routingToggle ? routingToggle.checked : true;
+
     if (legName === 'all') {
-      const totalCost = calculateTotalCost(filtered);
+      const totalCost = calculateTotalCost(filtered, includeTransport);
       const totalDays = calculateTotalDuration(filtered);
       const dateRange = calculateDateRange(filtered);
       const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
 
       // Format: stops • duration • dates • cost
       summaryText = dateRange
-        ? `${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}`
-        : `${filtered.length} stops • ${totalDays} days • ${formattedCost}`;
+        ? `${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
+        : `${filtered.length} stops • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
     } else if (subLegName) {
       const leg = workingData.legs?.find(l => l.name === legName);
       const subLeg = leg?.sub_legs?.find(sl => sl.name === subLegName);
       if (subLeg) {
-        const totalCost = calculateTotalCost(filtered);
+        const totalCost = calculateTotalCost(filtered, includeTransport);
         const totalDays = calculateTotalDuration(filtered);
         const dateRange = calculateDateRange(filtered);
         const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
 
         // Format: leg name • stops • duration • dates • cost
         summaryText = dateRange
-          ? `${subLegName} • ${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}`
-          : `${subLegName} • ${filtered.length} stops • ${totalDays} days • ${formattedCost}`;
+          ? `${subLegName} • ${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
+          : `${subLegName} • ${filtered.length} stops • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
     } else {
       const leg = workingData.legs?.find(l => l.name === legName);
       if (leg) {
-        const totalCost = calculateTotalCost(filtered);
+        const totalCost = calculateTotalCost(filtered, includeTransport);
         const totalDays = calculateTotalDuration(filtered);
         const dateRange = calculateDateRange(filtered);
         const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
 
         // Format: leg name • stops • duration • dates • cost
         summaryText = dateRange
-          ? `${legName} • ${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}`
-          : `${legName} • ${filtered.length} stops • ${totalDays} days • ${formattedCost}`;
+          ? `${legName} • ${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
+          : `${legName} • ${filtered.length} stops • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
