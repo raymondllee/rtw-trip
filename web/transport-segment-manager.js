@@ -14,12 +14,19 @@ class TransportSegmentManager {
    */
   async loadSegments(scenarioId) {
     try {
-      const response = await fetch(`${this.apiBaseUrl}/api/transport-segments?scenario_id=${scenarioId}`);
+      const url = `${this.apiBaseUrl}/api/transport-segments?scenario_id=${scenarioId}`;
+      console.log(`🔄 TransportSegmentManager: Loading segments from ${url}`);
+
+      const response = await fetch(url);
+      console.log(`📡 TransportSegmentManager: Response received, status: ${response.status}`);
+
       const data = await response.json();
+      console.log(`✅ TransportSegmentManager: Parsed JSON, found ${data.transport_segments?.length || 0} segments`);
+
       this.segments = data.transport_segments || [];
       return this.segments;
     } catch (error) {
-      console.error('Error loading transport segments:', error);
+      console.error('❌ TransportSegmentManager: Error loading transport segments:', error);
       return [];
     }
   }

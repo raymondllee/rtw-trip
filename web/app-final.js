@@ -743,20 +743,32 @@ async function initMapApp() {
     if (!workingData.legs) workingData.legs = [];
     if (!workingData.costs) workingData.costs = [];
 
-    // Initialize transport segments
+    // Initialize transport segments with timeout to prevent hanging
     if (currentScenarioId && window.transportSegmentManager) {
       console.log('🚗 Initializing transport segments...');
       try {
-        await window.transportSegmentManager.loadSegments(currentScenarioId);
+        // Add 10-second timeout to prevent hanging on network issues
+        const loadPromise = window.transportSegmentManager.loadSegments(currentScenarioId);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Transport segment loading timed out after 10s')), 10000)
+        );
+
+        await Promise.race([loadPromise, timeoutPromise]);
         console.log(`✅ Loaded ${window.transportSegmentManager.getAllSegments().length} transport segments`);
 
         // Sync segments with current destinations
         if (workingData.locations && workingData.locations.length > 1) {
-          await window.transportSegmentManager.syncSegments(currentScenarioId, workingData.locations);
+          const syncPromise = window.transportSegmentManager.syncSegments(currentScenarioId, workingData.locations);
+          const syncTimeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Transport segment sync timed out after 10s')), 10000)
+          );
+
+          await Promise.race([syncPromise, syncTimeoutPromise]);
           console.log('✅ Synced transport segments with destinations');
         }
       } catch (error) {
         console.error('Error initializing transport segments:', error);
+        console.log('⚠️ Continuing without transport segments...');
       }
     }
   } catch (error) {

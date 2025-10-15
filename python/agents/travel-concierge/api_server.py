@@ -2287,12 +2287,16 @@ def get_transport_segments():
         from google.cloud import firestore
 
         scenario_id = request.args.get('scenario_id')
+        print(f"🚗 GET /api/transport-segments - scenario_id: {scenario_id}")
+
         if not scenario_id:
             return jsonify({'error': 'scenario_id required'}), 400
 
+        print("🔧 Creating Firestore client...")
         db = firestore.Client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
+        print(f"📡 Querying Firestore for scenario: {scenario_id}")
         # Get latest version
         versions = list(
             scenario_ref
@@ -2301,18 +2305,21 @@ def get_transport_segments():
                 .limit(1)
                 .stream()
         )
+        print(f"✅ Query completed, found {len(versions)} versions")
 
         if not versions:
+            print("⚠️ No versions found, returning empty array")
             return jsonify({'transport_segments': []})
 
         latest_version_data = versions[0].to_dict() or {}
         itinerary_data = latest_version_data.get('itineraryData', {}) or {}
         transport_segments = itinerary_data.get('transport_segments', [])
 
+        print(f"✅ Returning {len(transport_segments)} transport segments")
         return jsonify({'transport_segments': transport_segments})
 
     except Exception as e:
-        print(f"Error fetching transport segments: {str(e)}")
+        print(f"❌ Error fetching transport segments: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
