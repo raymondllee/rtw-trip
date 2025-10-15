@@ -336,6 +336,9 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
     pathCoords.push(ll);
     coordIndex.push(idx);
 
+    // Determine if destination is locked
+    const isLocked = loc.is_date_locked || false;
+
     const marker = new google.maps.Marker({
       position: ll,
       map,
@@ -345,14 +348,14 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
         fontSize: '12px',
         fontWeight: 'bold'
       },
-      title: `${loc.name}${loc.city ? ', ' + loc.city : ''}${loc.country ? ', ' + loc.country : ''}`,
+      title: `${loc.name}${loc.city ? ', ' + loc.city : ''}${loc.country ? ', ' + loc.country : ''}${isLocked ? ' 🔒 (Dates Locked)' : ''}`,
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
         scale: 10,
         fillColor: getActivityColor(loc.activity_type),
         fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2
+        strokeColor: isLocked ? '#ffc107' : '#ffffff',
+        strokeWeight: isLocked ? 4 : 2
       }
     });
     
@@ -583,10 +586,14 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
       </div>
     ` : '';
 
-    
+    // Check if destination is locked
+    const isLocked = location.is_date_locked || false;
+    const lockBadge = isLocked ? `<div style="display: inline-block; background: #ffc107; color: #333; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-bottom: 8px;">🔒 DATES LOCKED</div>` : '';
+
     const content = `
       <div style="min-width: 260px; padding: 12px 14px;">
         <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">${name}</div>
+        ${lockBadge}
         ${subtitle ? `<div style="color: #666; margin-bottom: 4px;">${subtitle}</div>` : ''}
         ${meta ? `<div style="color: #444; margin-bottom: 8px;">${meta}</div>` : ''}
         ${activity ? `<div style="display: inline-block; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 12px; margin-bottom: 8px; background: ${activityColor}">${activity}</div>` : ''}
@@ -913,28 +920,167 @@ async function initMapApp() {
     // from location data when needed, not stored as static metadata
   }
 
+  function detectDateConflicts(locations) {
+    const conflicts = [];
+
+    // Check for overlapping or gap issues between consecutive destinations
+    for (let i = 0; i < locations.length - 1; i++) {
+      const current = locations[i];
+      const next = locations[i + 1];
+
+      if (current.departure_date && next.arrival_date) {
+        const currentDep = new Date(current.departure_date + 'T00:00:00Z');
+        const nextArr = new Date(next.arrival_date + 'T00:00:00Z');
+        const daysDiff = Math.round((nextArr - currentDep) / (24 * 60 * 60 * 1000));
+
+        if (daysDiff < 1) {
+          conflicts.push({
+            type: 'overlap',
+            fromLocation: current.name,
+            toLocation: next.name,
+            days: Math.abs(daysDiff - 1),
+            message: `${current.name} → ${next.name}: ${Math.abs(daysDiff - 1)} day(s) overlap`
+          });
+        } else if (daysDiff > 1) {
+          conflicts.push({
+            type: 'gap',
+            fromLocation: current.name,
+            toLocation: next.name,
+            days: daysDiff - 1,
+            message: `${current.name} → ${next.name}: ${daysDiff - 1} day(s) gap`
+          });
+        }
+      }
+    }
+
+    // Check if total duration exceeds available time between locked boundaries
+    const firstLocked = locations.find(loc => loc.is_date_locked);
+    const lastLocked = [...locations].reverse().find(loc => loc.is_date_locked);
+
+    if (firstLocked && lastLocked && firstLocked !== lastLocked) {
+      const startDate = new Date(firstLocked.arrival_date + 'T00:00:00Z');
+      const endDate = new Date(lastLocked.departure_date + 'T00:00:00Z');
+      const availableDays = Math.round((endDate - startDate) / (24 * 60 * 60 * 1000)) + 1;
+
+      const firstIdx = locations.indexOf(firstLocked);
+      const lastIdx = locations.indexOf(lastLocked);
+      const totalDuration = locations.slice(firstIdx, lastIdx + 1)
+        .reduce((sum, loc) => sum + (loc.duration_days || 1), 0);
+
+      if (totalDuration > availableDays) {
+        conflicts.push({
+          type: 'duration_exceeded',
+          days: totalDuration - availableDays,
+          message: `Total itinerary exceeds available time by ${totalDuration - availableDays} day(s)`
+        });
+      }
+    }
+
+    return conflicts;
+  }
+
   function recalculateDates(locations, startDate) {
+    if (!locations || locations.length === 0) return { conflicts: [] };
+
     if (!startDate) startDate = workingData.trip?.start_date || '2026-06-12';
 
-    let currentDate = new Date(startDate + 'T00:00:00Z');
+    // Identify locked destinations and trip boundaries
+    const isStartLocked = workingData.trip?.start_date_locked || false;
+    const isEndLocked = workingData.trip?.end_date_locked || false;
 
-    locations.forEach((loc, idx) => {
-      if (idx === 0) {
-        loc.arrival_date = formatDate(currentDate);
-        loc.departure_date = formatDate(addDays(currentDate, (loc.duration_days || 1) - 1));
-      } else {
-        const previousDeparture = locations[idx - 1].departure_date;
-        if (previousDeparture) {
-          currentDate = addDays(new Date(previousDeparture + 'T00:00:00Z'), 1);
+    // Find all locked destinations (those with is_date_locked = true)
+    const lockedIndices = locations
+      .map((loc, idx) => (loc.is_date_locked ? idx : -1))
+      .filter(idx => idx !== -1);
+
+    // If no locked destinations, use simple forward calculation
+    if (lockedIndices.length === 0 && !isStartLocked) {
+      let currentDate = new Date(startDate + 'T00:00:00Z');
+
+      locations.forEach((loc, idx) => {
+        if (idx === 0) {
+          loc.arrival_date = formatDate(currentDate);
+          loc.departure_date = formatDate(addDays(currentDate, (loc.duration_days || 1) - 1));
+        } else {
+          const previousDeparture = locations[idx - 1].departure_date;
+          if (previousDeparture) {
+            currentDate = addDays(new Date(previousDeparture + 'T00:00:00Z'), 1);
+          }
+          loc.arrival_date = formatDate(currentDate);
+          loc.departure_date = formatDate(addDays(currentDate, (loc.duration_days || 1) - 1));
         }
-        loc.arrival_date = formatDate(currentDate);
-        loc.departure_date = formatDate(addDays(currentDate, (loc.duration_days || 1) - 1));
-      }
-      currentDate = new Date(loc.departure_date + 'T00:00:00Z');
+        currentDate = new Date(loc.departure_date + 'T00:00:00Z');
+      });
+
+      recalculateTripMetadata();
+      triggerAutosave();
+      return { conflicts: detectDateConflicts(locations) };
+    }
+
+    // Process segments between locked points
+    // Segment boundaries: start of trip, locked destinations, end of trip
+    const boundaries = [
+      { index: -1, date: startDate, locked: isStartLocked }
+    ];
+
+    lockedIndices.forEach(idx => {
+      const loc = locations[idx];
+      boundaries.push({
+        index: idx,
+        arrivalDate: loc.locked_arrival_date || loc.arrival_date,
+        departureDate: loc.locked_departure_date || loc.departure_date,
+        locked: true
+      });
     });
+
+    // Process each segment between boundaries
+    for (let i = 0; i < boundaries.length; i++) {
+      const segmentStart = boundaries[i];
+      const segmentEnd = boundaries[i + 1];
+
+      // Determine the range of unlocked destinations in this segment
+      const startIdx = segmentStart.index + 1;
+      const endIdx = segmentEnd ? segmentEnd.index : locations.length;
+
+      if (startIdx >= endIdx) continue; // No unlocked destinations in this segment
+
+      // Calculate dates for unlocked destinations
+      let currentDate;
+
+      if (segmentStart.index === -1) {
+        // Start of trip
+        currentDate = new Date(segmentStart.date + 'T00:00:00Z');
+      } else {
+        // After a locked destination
+        const prevLoc = locations[segmentStart.index];
+        const prevDeparture = prevLoc.locked_departure_date || prevLoc.departure_date;
+        currentDate = addDays(new Date(prevDeparture + 'T00:00:00Z'), 1);
+      }
+
+      // Forward-calculate dates for unlocked destinations in this segment
+      for (let j = startIdx; j < endIdx; j++) {
+        const loc = locations[j];
+
+        if (loc.is_date_locked) {
+          // This is a locked destination - use its locked dates
+          loc.arrival_date = loc.locked_arrival_date || loc.arrival_date;
+          loc.departure_date = loc.locked_departure_date || loc.departure_date;
+          currentDate = new Date(loc.departure_date + 'T00:00:00Z');
+        } else {
+          // Unlocked destination - calculate normally
+          loc.arrival_date = formatDate(currentDate);
+          loc.departure_date = formatDate(addDays(currentDate, (loc.duration_days || 1) - 1));
+          currentDate = addDays(new Date(loc.departure_date + 'T00:00:00Z'), 1);
+        }
+      }
+    }
 
     recalculateTripMetadata();
     triggerAutosave();
+
+    // Detect and return conflicts
+    const conflicts = detectDateConflicts(locations);
+    return { conflicts };
   }
   
   function render(legName, subLegName = null, useRouting = false, triggerAutoSave = true) {
@@ -962,6 +1108,10 @@ async function initMapApp() {
 
     updateSidebar(filtered);
     updateScenarioNameDisplay();
+
+    // Check for date conflicts and display warnings
+    const conflicts = detectDateConflicts(workingData.locations || []);
+    displayConflictWarnings(conflicts);
 
     // Trigger auto-save if scenario is loaded
     if (triggerAutoSave) {
@@ -1441,22 +1591,45 @@ async function initMapApp() {
         ` : '';
       }
 
-      
+
+      // Determine if dates are locked
+      const isDateLocked = loc.is_date_locked || false;
+      const lockedClass = isDateLocked ? 'destination-locked' : '';
+      const lockIcon = isDateLocked ? '🔒' : '🔓';
+
+      // Date picker HTML for locked destinations
+      const datePickerHTML = isDateLocked ? `
+        <div class="locked-date-pickers" style="margin-top: 8px; display: flex; gap: 8px; font-size: 12px;">
+          <label style="display: flex; flex-direction: column;">
+            <span style="color: #666;">Arrival:</span>
+            <input type="date" class="locked-arrival-date" value="${loc.locked_arrival_date || loc.arrival_date || ''}" data-location-id="${loc.id}" style="padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
+          </label>
+          <label style="display: flex; flex-direction: column;">
+            <span style="color: #666;">Departure:</span>
+            <input type="date" class="locked-departure-date" value="${loc.locked_departure_date || loc.departure_date || ''}" data-location-id="${loc.id}" style="padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
+          </label>
+        </div>
+      ` : '';
+
       // Add the destination item
       sidebarItems.push(`
-        <div class="destination-item" data-index="${idx}" data-location-id="${loc.id}" draggable="true" style="display: flex; align-items: flex-start;">
+        <div class="destination-item ${lockedClass}" data-index="${idx}" data-location-id="${loc.id}" draggable="true" style="display: flex; align-items: flex-start;">
           <div class="drag-handle">⋮⋮</div>
           <div class="destination-number" style="background: ${getActivityColor(loc.activity_type)}">${idx + 1}</div>
           <div class="destination-info">
-            <div class="destination-name">${loc.name}</div>
+            <div class="destination-name">
+              ${loc.name}
+              <button class="date-lock-toggle" data-location-id="${loc.id}" title="${isDateLocked ? 'Unlock dates' : 'Lock dates'}" style="margin-left: 8px; background: none; border: none; cursor: pointer; font-size: 16px; padding: 0;">${lockIcon}</button>
+            </div>
             <div class="destination-location">
               <span>${[loc.city, loc.country].filter(Boolean).join(', ')}</span>
               ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
             </div>
             <div class="destination-dates">
               ${dateRange ? `${dateRange} • ` : ''}
-              <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}"> days
+              <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}" ${isDateLocked ? 'disabled' : ''}> days
             </div>
+            ${datePickerHTML}
             ${costSummaryHTML}
             <div class="destination-cost-details" id="cost-details-${loc.id}">
               ${costBreakdownHTML}
@@ -1605,6 +1778,7 @@ async function initMapApp() {
     setupDragAndDrop(destinationList, locations);
     setupDurationEditing(destinationList, locations);
     setupNotesEditing(destinationList, locations);
+    setupDateLocking(destinationList);
   }
   
   function setupDragAndDrop(container, filteredLocations) {
@@ -1732,6 +1906,146 @@ async function initMapApp() {
     });
   }
   
+  function setupDateLocking(container) {
+    // Lock toggle buttons
+    container.querySelectorAll('.date-lock-toggle').forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const locationId = button.dataset.locationId;
+        const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
+
+        if (globalLocation) {
+          // Toggle the lock state
+          globalLocation.is_date_locked = !globalLocation.is_date_locked;
+
+          // If locking, capture current dates as locked dates
+          if (globalLocation.is_date_locked) {
+            globalLocation.locked_arrival_date = globalLocation.arrival_date;
+            globalLocation.locked_departure_date = globalLocation.departure_date;
+          } else {
+            // If unlocking, clear locked dates (keep them for reference but recalculate)
+            globalLocation.locked_arrival_date = null;
+            globalLocation.locked_departure_date = null;
+          }
+
+          // Recalculate dates and check for conflicts
+          const result = recalculateDates(workingData.locations);
+          displayConflictWarnings(result.conflicts);
+
+          // Re-render to show updated UI
+          render(legFilter.value, subLegFilter.value, routingToggle.checked);
+        }
+      });
+    });
+
+    // Locked arrival date inputs
+    container.querySelectorAll('.locked-arrival-date').forEach(input => {
+      input.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const locationId = input.dataset.locationId;
+        const newDate = e.target.value;
+        const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
+
+        if (globalLocation && globalLocation.is_date_locked) {
+          globalLocation.locked_arrival_date = newDate;
+          globalLocation.arrival_date = newDate; // Update the main arrival date too
+
+          // Recalculate duration based on new arrival and existing departure
+          if (globalLocation.locked_departure_date) {
+            const arrDate = new Date(newDate + 'T00:00:00Z');
+            const depDate = new Date(globalLocation.locked_departure_date + 'T00:00:00Z');
+            const durationDays = Math.round((depDate - arrDate) / (24 * 60 * 60 * 1000)) + 1;
+            globalLocation.duration_days = Math.max(1, durationDays);
+          }
+
+          const result = recalculateDates(workingData.locations);
+          displayConflictWarnings(result.conflicts);
+          render(legFilter.value, subLegFilter.value, routingToggle.checked);
+        }
+      });
+
+      input.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    });
+
+    // Locked departure date inputs
+    container.querySelectorAll('.locked-departure-date').forEach(input => {
+      input.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const locationId = input.dataset.locationId;
+        const newDate = e.target.value;
+        const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
+
+        if (globalLocation && globalLocation.is_date_locked) {
+          globalLocation.locked_departure_date = newDate;
+          globalLocation.departure_date = newDate; // Update the main departure date too
+
+          // Recalculate duration based on existing arrival and new departure
+          if (globalLocation.locked_arrival_date) {
+            const arrDate = new Date(globalLocation.locked_arrival_date + 'T00:00:00Z');
+            const depDate = new Date(newDate + 'T00:00:00Z');
+            const durationDays = Math.round((depDate - arrDate) / (24 * 60 * 60 * 1000)) + 1;
+            globalLocation.duration_days = Math.max(1, durationDays);
+          }
+
+          const result = recalculateDates(workingData.locations);
+          displayConflictWarnings(result.conflicts);
+          render(legFilter.value, subLegFilter.value, routingToggle.checked);
+        }
+      });
+
+      input.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    });
+  }
+
+  function displayConflictWarnings(conflicts) {
+    // Find or create conflict warning container
+    let warningContainer = document.getElementById('date-conflict-warnings');
+
+    if (!warningContainer) {
+      // Create the warning container if it doesn't exist - place it in the sidebar
+      const destinationList = document.getElementById('destination-list');
+      if (destinationList) {
+        warningContainer = document.createElement('div');
+        warningContainer.id = 'date-conflict-warnings';
+        warningContainer.style.cssText = `
+          background: #fff3cd;
+          border: 2px solid #ffc107;
+          border-radius: 8px;
+          padding: 12px 16px;
+          margin: 0 12px 12px 12px;
+          font-size: 13px;
+        `;
+        destinationList.parentNode.insertBefore(warningContainer, destinationList);
+      }
+    }
+
+    if (!conflicts || conflicts.length === 0) {
+      if (warningContainer) {
+        warningContainer.style.display = 'none';
+      }
+      return;
+    }
+
+    // Display conflicts
+    warningContainer.style.display = 'block';
+    warningContainer.innerHTML = `
+      <div style="display: flex; align-items: center; margin-bottom: 8px;">
+        <span style="font-size: 18px; margin-right: 8px;">⚠️</span>
+        <strong style="color: #856404; font-size: 13px;">Date Conflicts</strong>
+      </div>
+      <ul style="margin: 0; padding-left: 20px; color: #856404; font-size: 12px;">
+        ${conflicts.map(conflict => `<li style="margin: 4px 0;">${conflict.message}</li>`).join('')}
+      </ul>
+      <div style="margin-top: 8px; font-size: 11px; color: #666;">
+        Adjust destination durations or locked dates to resolve.
+      </div>
+    `;
+  }
+
   function updateSidebarHighlight(activeIndex) {
     const items = document.querySelectorAll('.destination-item');
     items.forEach((item, idx) => {
