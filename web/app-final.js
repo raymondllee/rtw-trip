@@ -1358,109 +1358,237 @@ async function initMapApp() {
     }, 1000); // Debounce by 1 second
   }
   
-  function buildCostAgentPrompt(destination, legName = '', subLegName = '') {
-    if (!destination) return '';
-
-    const locationBits = [];
-    if (destination.name) locationBits.push(destination.name);
-    if (destination.city && destination.city !== destination.name) locationBits.push(destination.city);
-    if (destination.country) locationBits.push(destination.country);
-    const locationLabel = locationBits.length ? locationBits.join(', ') : 'this destination';
-
-    const segments = [`Please research and add updated cost estimates for ${locationLabel}.`];
-
-    const scheduleBits = [];
-    if (destination.duration_days) scheduleBits.push(`${destination.duration_days} day stay`);
-    if (destination.arrival_date) scheduleBits.push(`arrival ${destination.arrival_date}`);
-    if (destination.departure_date) scheduleBits.push(`departure ${destination.departure_date}`);
-    if (scheduleBits.length) {
-      segments.push(`Schedule: ${scheduleBits.join(' • ')}.`);
+  async function requestCostUpdateFromAgent(destination, buttonEl, legName = '', subLegName = '', options = {}) {
+    if (!destination) {
+      console.warn('⚠️ Skipping cost update request - destination missing.');
+      return false;
     }
 
-    if (destination.activity_type) {
-      segments.push(`Primary focus: ${destination.activity_type}.`);
+    if (!currentScenarioId) {
+      alert('Please save or load a scenario before updating costs.');
+      return false;
     }
 
-    const highlights = Array.isArray(destination.highlights)
-      ? destination.highlights.filter(Boolean).slice(0, 3)
-      : [];
-    if (!highlights.length && typeof destination.notes === 'string') {
-      const trimmedNotes = destination.notes.trim();
-      if (trimmedNotes) {
-        highlights.push(trimmedNotes);
+    const apiBaseUrl = window.API_CONFIG?.BASE_URL || 'http://localhost:5001';
+    const destinationLabel = destination.name || destination.city || destination.id || 'Selected destination';
+
+    const normalizeDate = (value) => {
+      if (!value) return null;
+      const str = String(value).trim();
+      return str.length ? str : null;
+    };
+
+    const arrivalDate = normalizeDate(
+      destination.arrival_date ||
+      destination.arrivalDate ||
+      destination.start_date ||
+      destination.startDate
+    );
+    const departureDate = normalizeDate(
+      destination.departure_date ||
+      destination.departureDate ||
+      destination.end_date ||
+      destination.endDate
+    );
+
+    let durationDays = Number(destination.duration_days ?? destination.durationDays);
+    if (!Number.isFinite(durationDays) || durationDays <= 0) {
+      if (arrivalDate && departureDate) {
+        const start = new Date(`${arrivalDate}T00:00:00Z`);
+        const end = new Date(`${departureDate}T00:00:00Z`);
+        if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+          const diff = Math.max(0, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+          durationDays = Math.max(1, diff || 0) || 1;
+        }
       }
     }
-    if (highlights.length) {
-      segments.push(`Highlights or notes: ${highlights.join('; ')}.`);
+    if (!Number.isFinite(durationDays) || durationDays <= 0) {
+      durationDays = 3;
     }
 
-    if (legName && legName !== 'all') {
-      const legContext = subLegName ? `${legName} › ${subLegName}` : legName;
-      segments.push(`Leg context: ${legContext}.`);
-    }
+    const travelerCountCandidates = [
+      Array.isArray(workingData?.trip?.travelers) ? workingData.trip.travelers.length : null,
+      workingData?.trip?.num_travelers,
+      workingData?.trip?.traveler_count,
+      workingData?.trip?.travelers_count,
+      workingData?.trip?.party_size,
+      workingData?.trip?.partySize,
+      workingData?.trip?.guests,
+      workingData?.trip?.crew_size,
+    ];
+    const numTravelers = travelerCountCandidates.find((value) => Number.isFinite(value) && value > 0) || 2;
 
-    const idSource = destination.id ?? destination.destination_id ?? destination.destinationId ?? destination.normalizedId ?? '';
-    const destinationId = idSource ? normalizeId(idSource) : normalizeId(destination.name || locationLabel || 'unknown-destination');
-    segments.push(`Destination ID: ${destinationId}.`);
+    const normalizedId = (() => {
+      const idSource = destination.id
+        ?? destination.destination_id
+        ?? destination.destinationId
+        ?? destination.normalizedId
+        ?? destination.place_id
+        ?? destination.placeId;
+      if (idSource) {
+        return normalizeId(idSource);
+      }
+      const slugBase = destination.name || destination.city || destinationLabel;
+      return normalizeId(slugBase || 'destination');
+    })();
 
-    segments.push('Return 4-6 cost line items covering accommodation, transport, food, activities, and other key costs for the whole party.');
-    segments.push('Respond with a JSON array where each item follows our schema: category, description, amount, currency, amount_usd, date, booking_status, source="ai_estimate", notes.');
+    const lookupNeighborName = (offset) => {
+      const locations = workingData.locations || [];
+      const currentIndex = locations.findIndex((candidate) => idsEqual(candidate.id, destination.id));
+      if (currentIndex === -1) return null;
+      const neighbor = locations[currentIndex + offset];
+      if (!neighbor) return null;
+      return neighbor.name || neighbor.city || neighbor.place_name || null;
+    };
 
-    return segments.join('\n');
-  }
+    const previousDestination = lookupNeighborName(-1);
+    const nextDestination = lookupNeighborName(1);
 
-  function requestCostUpdateFromAgent(destination, buttonEl, legName = '', subLegName = '') {
-    const prompt = buildCostAgentPrompt(destination, legName, subLegName);
-    if (!prompt) {
-      console.warn('⚠️ Skipping cost update request - no prompt generated.');
-      return false;
-    }
+    const travelStyle =
+      destination.travel_style ||
+      destination.activity_type ||
+      workingData?.trip?.travel_style ||
+      workingData?.trip?.style ||
+      'mid-range';
 
-    if (!chatInstance) {
-      alert('The AI Travel Concierge chat is not ready yet. Please open the AI panel and try again.');
-      return false;
-    }
+    const sessionId =
+      chatInstance?.sessionId ||
+      statePersistence?.state?.sessionId ||
+      `session_cost_${Date.now()}`;
 
-    const targetForm = chatInstance.chatColumnForm || chatInstance.chatForm || chatInstance.floatingChatForm;
-    const targetInput = chatInstance.chatColumnInput || chatInstance.chatInput || chatInstance.floatingChatInput;
+    const payload = {
+      session_id: sessionId,
+      scenario_id: currentScenarioId,
+      destination_name: destinationLabel,
+      destination_id: normalizedId,
+      duration_days: Math.max(1, Math.round(durationDays)),
+      arrival_date: arrivalDate,
+      departure_date: departureDate,
+      num_travelers: Math.max(1, Math.round(numTravelers)),
+      travel_style: String(travelStyle || 'mid-range'),
+      previous_destination: previousDestination || undefined,
+      next_destination: nextDestination || undefined,
+    };
 
-    if (!targetForm || !targetInput) {
-      console.warn('⚠️ Unable to send cost request - chat form elements not found.');
-      return false;
-    }
-
-    if (typeof chatInstance.moveToColumn === 'function') {
-      chatInstance.moveToColumn();
-    }
-    if (typeof chatInstance.openChat === 'function') {
-      chatInstance.openChat();
-    }
-
-    targetInput.value = prompt;
-    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-    targetForm.dispatchEvent(submitEvent);
+    const externalWaitEntry = options?.waitEntry || null;
+    const buttonState = buttonEl
+      ? {
+          text: buttonEl.textContent,
+          disabled: buttonEl.disabled,
+        }
+      : null;
+    const waitEntry = externalWaitEntry || (buttonEl ? waitForNextCostUpdate(destinationLabel) : null);
+    const manageWaiterInternally = Boolean(waitEntry) && !externalWaitEntry && Boolean(buttonEl);
 
     if (buttonEl) {
-      const originalLabel = buttonEl.dataset.originalLabel || buttonEl.innerHTML;
-      buttonEl.dataset.originalLabel = originalLabel;
       buttonEl.disabled = true;
-      buttonEl.textContent = 'Request sent to cost agent';
       buttonEl.classList.add('update-costs-btn--sent');
-
-      let restored = false;
-      const restoreButton = () => {
-        if (restored) return;
-        restored = true;
-        buttonEl.disabled = false;
-        buttonEl.classList.remove('update-costs-btn--sent');
-        buttonEl.innerHTML = buttonEl.dataset.originalLabel || originalLabel;
-      };
-
-      setTimeout(restoreButton, 6000);
-      window.addEventListener('costs-updated', restoreButton, { once: true });
+      buttonEl.textContent = 'Researching...';
     }
 
-    return true;
+    if (chatInstance) {
+      chatInstance.addMessage(
+        `Researching updated costs for ${destinationLabel}...`,
+        'bot',
+        false,
+        false,
+        false,
+        false
+      );
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/costs/research`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        throw new Error('Received an invalid response from the cost research endpoint.');
+      }
+
+      if (!response.ok || data?.status !== 'success') {
+        const errorMessage = data?.error || data?.message || `Request failed with status ${response.status}`;
+        throw new Error(errorMessage);
+      }
+
+      const storageMode = data.storage || (data.saved_to_firestore ? 'firestore' : 'local');
+      console.log(`✅ Cost research completed for ${destinationLabel} (storage: ${storageMode})`);
+
+      if (chatInstance && data.response_text) {
+        chatInstance.addMessage(
+          data.response_text,
+          'bot',
+          false,
+          false,
+          false,
+          false
+        );
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('costs-updated', {
+          detail: {
+            reason: 'cost-research',
+            destinationId: normalizedId,
+            storage: storageMode,
+            costsSaved: data.costs_saved ?? (Array.isArray(data.research) ? data.research.length : undefined),
+          },
+        })
+      );
+
+      if (manageWaiterInternally) {
+        try {
+          await waitEntry.promise;
+        } catch (waitError) {
+          console.warn('⚠️ Cost refresh wait ended with warning:', waitError);
+        }
+      }
+
+      if (buttonEl && buttonState) {
+        buttonEl.classList.remove('update-costs-btn--sent');
+        buttonEl.classList.add('update-costs-btn--complete');
+        buttonEl.textContent = 'Updated!';
+        setTimeout(() => {
+          buttonEl.classList.remove('update-costs-btn--complete');
+          buttonEl.disabled = buttonState.disabled;
+          buttonEl.textContent = buttonState.text || 'Update Costs';
+        }, 2500);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ Cost research failed:', error);
+
+      if (waitEntry) {
+        waitEntry.cancel(error);
+      }
+
+      if (buttonEl && buttonState) {
+        buttonEl.classList.remove('update-costs-btn--sent');
+        buttonEl.disabled = buttonState.disabled;
+        buttonEl.textContent = buttonState.text || 'Update Costs';
+      }
+
+      if (chatInstance) {
+        chatInstance.addMessage(
+          `Sorry, I couldn't update the costs for ${destinationLabel}: ${error.message}`,
+          'bot',
+          false,
+          false,
+          false,
+          false
+        );
+      } else {
+        alert(`Failed to update costs for ${destinationLabel}: ${error.message}`);
+      }
+
+      return false;
+    }
   }
 
   function updateSidebar(locations) {
@@ -1700,7 +1828,7 @@ async function initMapApp() {
     destinationList.innerHTML = sidebarItems.join('');
 
     destinationList.querySelectorAll('.update-costs-btn').forEach((button) => {
-      button.addEventListener('click', (event) => {
+      button.addEventListener('click', async (event) => {
         event.preventDefault();
         event.stopPropagation();
         if (button.disabled) return;
@@ -1724,7 +1852,7 @@ async function initMapApp() {
         const legName = legFilter ? legFilter.value : '';
         const subLegName = subLegFilter ? subLegFilter.value : '';
 
-        requestCostUpdateFromAgent(destination, button, legName, subLegName);
+        await requestCostUpdateFromAgent(destination, button, legName, subLegName);
       });
     });
     
@@ -2227,14 +2355,10 @@ async function initMapApp() {
     const addressInfo = parseAddressComponents(placeData.address_components || []);
     const placeDetails = await fetchPlaceDetails(placeData.place_id);
 
-    const resolvedId = placeDetails?.place_id || placeData.place_id || null;
-    const existingIds = new Set((workingData.locations || []).map(loc => normalizeId(loc.id)));
-
-    if (resolvedId && existingIds.has(normalizeId(resolvedId))) {
-      alert('This destination is already in your itinerary with the same Place ID.');
-      closeAddDestinationModal();
-      return;
-    }
+    // Always generate a unique UUID for each destination instance
+    // This allows the same place to appear multiple times (e.g., Buenos Aires for transit)
+    const destinationId = generateNewLocationId();
+    const placeId = placeDetails?.place_id || placeData.place_id || null;
 
     const coordinates = placeDetails?.coordinates || {
       lat: placeData.location.lat,
@@ -2259,7 +2383,8 @@ async function initMapApp() {
     }
 
     const newLocation = {
-      id: resolvedId || generateNewLocationId(),
+      id: destinationId,
+      place_id: placeId, // Store Place ID as metadata, not primary key
       name: placeDetails?.name || placeData.name,
       city,
       country,
@@ -3076,15 +3201,18 @@ async function initMapApp() {
       }
       progressText.textContent = `Requesting cost update ${progressPrefix} for ${destinationLabel}`;
 
+      let waitEntry;
       try {
-        const dispatched = requestCostUpdateFromAgent(destination, null, legName, subLegName);
+        waitEntry = waitForNextCostUpdate(destinationLabel);
+        const dispatched = await requestCostUpdateFromAgent(destination, null, legName, subLegName, { waitEntry });
 
         if (!dispatched) {
           failed++;
+          waitEntry.cancel(new Error('Cost research request was not dispatched'));
           if (item) {
-            setBulkDestinationStatus(item, 'failed', 'Unable to send request. Open the AI panel and try again.');
+            setBulkDestinationStatus(item, 'failed', 'Unable to send request. Please ensure the scenario is loaded.');
           }
-          progressText.textContent = `Skipped ${destinationLabel} — chat interface not ready`;
+          progressText.textContent = `Skipped ${destinationLabel} — request could not be sent`;
           continue;
         }
 
@@ -3093,8 +3221,7 @@ async function initMapApp() {
         }
         progressText.textContent = `Waiting for AI to finish ${progressPrefix} ${destinationLabel}`;
 
-        const { promise } = waitForNextCostUpdate(destinationLabel);
-        const result = await promise;
+        const result = await waitEntry.promise;
 
         if (result.costRefreshSucceeded && result.summarySucceeded) {
           completed++;
@@ -3121,6 +3248,9 @@ async function initMapApp() {
         const errMsg = error?.message || error;
         if (item) {
           setBulkDestinationStatus(item, 'failed', `Error: ${errMsg}`);
+        }
+        if (waitEntry) {
+          waitEntry.cancel(error);
         }
         console.error(`Error updating costs for ${destinationLabel}:`, error);
         progressText.textContent = `Error updating ${destinationLabel}: ${errMsg}`;

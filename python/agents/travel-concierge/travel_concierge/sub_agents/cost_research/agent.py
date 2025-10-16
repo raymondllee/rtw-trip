@@ -24,11 +24,55 @@ from google.genai.types import (
     GenerateContentConfig,
     ToolConfig,
     FunctionCallingConfig,
+    FunctionDeclaration,
 )
 
 from travel_concierge.shared_libraries import types
 from travel_concierge.sub_agents.cost_research import prompt
 from travel_concierge.tools.search import google_search_grounding
+from google.adk.tools.base_tool import BaseTool
+
+
+class DestinationCostResearchOutputTool(BaseTool):
+    """Tool that captures the final structured cost research output."""
+
+    def __init__(self):
+        super().__init__(
+            name="DestinationCostResearch",
+            description=(
+                "Return the completed cost research JSON matching the"
+                " DestinationCostResearch schema."
+            ),
+        )
+
+    def _get_declaration(self):
+        schema = types.DestinationCostResearch.model_json_schema(
+            ref_template="#/$defs/{model}"
+        )
+        return FunctionDeclaration(
+            name=self.name,
+            description=self.description,
+            parameters=schema,
+        )
+
+    async def run_async(self, *, args: dict, tool_context):
+        """Echo back validated research data so the agent can summarize it."""
+        try:
+            validated = types.DestinationCostResearch.model_validate(args)
+            payload = validated.model_dump()
+            return {
+                "status": "received",
+                "research_data": payload,
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "message": f"Invalid DestinationCostResearch payload: {exc}",
+            }
+
+
+_destination_cost_output_tool = DestinationCostResearchOutputTool()
+_STRUCTURED_OUTPUT_STATE_KEY = "cost_research_structured_mode_enabled"
 
 
 def structured_output_callback(
@@ -67,11 +111,13 @@ def structured_output_callback(
         return parts or []
 
     tool_response_count = 0
+    state = callback_context.state
     for message in llm_request.contents or []:
         role_name = _role_name(message)
         if role_name == "user":
             # New user message marks the start of a turn; reset counts
             tool_response_count = 0
+            state[_STRUCTURED_OUTPUT_STATE_KEY] = False
             continue
 
         for part in _iter_parts(message):
@@ -79,14 +125,27 @@ def structured_output_callback(
                 tool_response_count += 1
 
     if tool_response_count >= 3:
-        # Switch to structured output phase (keep tools_dict intact to avoid
-        # ADK lookup errors)
-        llm_request.config.tools = None
-        # Set output schema for structured response
-        llm_request.set_output_schema(types.DestinationCostResearch)
+        # Switch to structured output phase:
+        #   - Disable search tools
+        #   - Allow only the structured output tool
+        llm_request.config.tools = []
+        llm_request.tools_dict = {}
+        llm_request.append_tools([_destination_cost_output_tool])
         llm_request.config.tool_config = ToolConfig(
-            function_calling_config=FunctionCallingConfig(mode="none")
+            function_calling_config=FunctionCallingConfig(
+                mode="any",
+                allowed_function_names=[_destination_cost_output_tool.name],
+            )
         )
+        if not state.get(_STRUCTURED_OUTPUT_STATE_KEY, False):
+            llm_request.append_instructions([
+                (
+                    "You have completed research. Call the DestinationCostResearch"
+                    " tool exactly once with the full JSON output, then send a short"
+                    " confirmation summarizing key findings."
+                )
+            ])
+            state[_STRUCTURED_OUTPUT_STATE_KEY] = True
 
 
 cost_research_agent = Agent(

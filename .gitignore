@@ -92,3 +92,14 @@ test-backfill-results.json
 
 # Railway deployment
 .railway/
+
+# @modelcontextprotocol/sdk build artifacts and dependencies
+package/dist/
+package/build/
+package/coverage/
+package/*.tsbuildinfo
+package/.eslintcache
+package/spec.types.ts
+package/jest.config.js
+package/tsconfig*.json
+package/node_modules/

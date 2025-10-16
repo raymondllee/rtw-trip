@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document explains the robust destination ID and cost linking system implemented for the RTW Trip planner. The platform now uses **Google Place IDs as the canonical identifier** for real-world destinations, with UUIDs retained as a fallback for custom or unmapped locations. This delivers stable, deduplicated identifiers while preserving backward compatibility with legacy data.
+This document explains the robust destination ID and cost linking system implemented for the RTW Trip planner. The platform uses **UUID-based instance IDs as the primary identifier** for each destination entry in an itinerary, with **Google Place IDs stored as metadata** for enrichment. This allows the same physical location to appear multiple times in an itinerary (essential for transit hubs and revisited cities) while maintaining stable references for costs, legs, and other associations.
 
 ## System Architecture
 
@@ -16,20 +16,32 @@ This document explains the robust destination ID and cost linking system impleme
 
 ### ID Structure
 
-- **Canonical Destinations**: Google Place IDs (e.g., `ChIJ51cu8IcbXWARiRtXIothAS4`)
-- **Custom Destinations**: UUID v4 fallback (e.g., `550e8400-e29b-41d4-a716-446655440000`)
+- **Destination Instance IDs**: UUID v4 for each destination instance (e.g., `550e8400-e29b-41d4-a716-446655440000`)
+  - This is the **primary key** used for cost linking, leg associations, and all internal references
+  - Each instance is unique, even if representing the same physical location
+  - Allows the same place to appear multiple times in an itinerary (e.g., Buenos Aires as both start and transit point)
+- **Place IDs (Metadata)**: Google Place IDs stored in the `place_id` field (e.g., `ChIJ51cu8IcbXWARiRtXIothAS4`)
+  - Used for enriching destination data (coordinates, timezone, formatted address)
+  - Not used as the primary identifier to allow duplicate locations
 - **Legacy Destinations**: Historic numeric IDs are still recognized and can be migrated
-- **Backward Compatibility**: UUIDs and numeric IDs remain valid; migration tools upgrade them to Place IDs where possible
+- **Backward Compatibility**: Existing itineraries with Place IDs as primary keys will continue to work
 
 ## How IDs Work
 
 ### Destination ID Assignment
 
-When a user selects a location via the Google Places-powered destination picker, the front-end calls `/api/places/details/<place_id>` to obtain the canonical ID and rich metadata (coordinates, timezone, formatted address). The resulting destination object looks like:
+When a user selects a location via the Google Places-powered destination picker, the system:
+
+1. **Generates a unique UUID** for the destination instance (via `generateDestinationId()`)
+2. **Fetches Place details** from `/api/places/details/<place_id>` for rich metadata
+3. **Stores the Place ID as metadata** in the `place_id` field (not as the primary key)
+
+The resulting destination object looks like:
 
 ```json
 {
-  "id": "ChIJ51cu8IcbXWARiRtXIothAS4",
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "place_id": "ChIJ51cu8IcbXWARiRtXIothAS4",
   "name": "Tokyo",
   "city": "Tokyo",
   "country": "Japan",
@@ -43,31 +55,33 @@ When a user selects a location via the Google Places-powered destination picker,
 }
 ```
 
-If a destination cannot be resolved to a Place ID (for example, a bespoke sailing route or a private island), the UI falls back to `generateDestinationId()` to issue a UUID.
+This approach allows the same city (e.g., Buenos Aires with `place_id: "ChIJvQz5TjvKvJURh47oiC6Bs6A"`) to appear multiple times in your itinerary with different UUIDs, each with its own costs, dates, and associations.
 
 ### Cost Linking
 
-Each cost item links to a destination via the `destination_id` field:
+Each cost item links to a destination **instance** via the UUID-based `destination_id` field:
 
 ```json
 {
   "id": "cost_123",
   "category": "accommodation",
-  "description": "Hotel in Tokyo",
+  "description": "Hotel in Tokyo - First Visit",
   "amount": 1200.0,
   "currency": "USD",
-  "destination_id": "ChIJ51cu8IcbXWARiRtXIothAS4",
+  "destination_id": "550e8400-e29b-41d4-a716-446655440000",
   // ... other fields
 }
 ```
 
+If you add Tokyo twice to your itinerary, each instance gets its own UUID, and costs link to the specific instance.
+
 ### Key Principles
 
-1. **Stable IDs**: Place IDs uniquely identify real-world locations and remain stable across sessions
-2. **Deduplication**: Adding "Tokyo, Japan" twice returns the same Place ID, preventing duplicates
-3. **Rich Metadata**: Every canonical destination includes timezone, address components, and coordinates
-4. **Referential Integrity**: Costs and legs reference canonical IDs; validation ensures they stay in sync
-5. **Fallback Support**: UUIDs continue to cover custom locations so no itinerary content is lost
+1. **Instance-Based IDs**: Each destination entry in the itinerary gets a unique UUID, regardless of physical location
+2. **Allow Duplicates**: The same city can appear multiple times (essential for transit hubs and multi-visit scenarios)
+3. **Rich Metadata**: Place IDs provide timezone, coordinates, and formatted addresses without being the primary key
+4. **Referential Integrity**: Costs and legs reference instance UUIDs; validation ensures they stay in sync
+5. **Place Enrichment**: Google Place API data enriches each destination instance with up-to-date information
 
 ## Data Migration
 
@@ -223,7 +237,7 @@ showDestinationDeletionDialog(destination, associatedCosts, (options) => {
 
 ## Integration Examples
 
-### Example 1: Adding a New Destination (Place ID workflow)
+### Example 1: Adding a New Destination (UUID + Place ID workflow)
 
 ```javascript
 import { generateDestinationId, normalizeId } from './destination-id-manager.js';
@@ -231,10 +245,13 @@ import { generateDestinationId, normalizeId } from './destination-id-manager.js'
 async function addNewDestination(data, locationQuery) {
   const placeInfo = await PlaceMigration.resolvePlaceId(locationQuery);
 
-  const id = placeInfo?.place_id ?? generateDestinationId(); // Fallback for custom locations
+  // Always generate a unique UUID for the instance
+  const id = generateDestinationId();
+  const placeId = placeInfo?.place_id ?? null;
 
   const newDestination = {
-    id,
+    id, // UUID - primary key
+    place_id: placeId, // Google Place ID - metadata only
     name: placeInfo?.name ?? locationQuery,
     country: placeInfo?.country ?? null,
     city: placeInfo?.city ?? null,
@@ -247,11 +264,7 @@ async function addNewDestination(data, locationQuery) {
     departure_date: null
   };
 
-  const existing = new Set((data.locations || []).map(loc => normalizeId(loc.id)));
-  if (existing.has(normalizeId(id))) {
-    throw new Error(`Destination already exists with ID ${id}`);
-  }
-
+  // No duplicate check needed - each instance is unique!
   return {
     ...data,
     locations: [...data.locations, newDestination]
@@ -320,11 +333,11 @@ costsByDest.forEach((costs, destinationId) => {
 
 ## Best Practices
 
-### 1. Always Resolve Canonical IDs First
+### 1. Always Generate UUID for Instance ID
 
-❌ **Don't** invent ad-hoc identifiers such as incremental numbers or custom strings.
+❌ **Don't** use Place IDs as the primary key/instance identifier.
 
-✅ **Do** resolve a Place ID via `PlaceMigration.resolvePlaceId()` or `/api/places/details/<place_id>` and only fall back to `generateDestinationId()` when the resolver cannot find a match (e.g., bespoke or offline destinations).
+✅ **Do** always call `generateDestinationId()` to create a unique UUID for each destination instance, and store the Place ID separately in the `place_id` field for enrichment purposes.
 
 ### 2. Validate Before Saving
 

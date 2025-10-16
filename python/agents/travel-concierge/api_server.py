@@ -26,6 +26,7 @@ from datetime import datetime
 
 from travel_concierge.tools.cost_tracker import CostTrackerService
 from travel_concierge.tools.cost_manager import _to_float
+from travel_concierge.shared_libraries.types import CostItem
 
 # Determine web directory path
 # In production (Railway), files are at /app/web
@@ -919,6 +920,142 @@ def get_cost_tracker(session_id):
         cost_trackers[session_id] = CostTrackerService()
     return cost_trackers[session_id]
 
+
+def _build_destination_aliases(raw_destination_id, normalized_destination_id, destination_name):
+    """Create a set of lowercase aliases used to match destination-specific costs."""
+    aliases = set()
+    for value in (raw_destination_id, normalized_destination_id):
+        if value is None:
+            continue
+        alias = str(value).strip().lower()
+        if alias:
+            aliases.add(alias)
+
+    if destination_name:
+        slug_alias = normalize_destination_id(None, destination_name)
+        if slug_alias:
+            aliases.add(str(slug_alias).strip().lower())
+
+    aliases.discard("")
+    return aliases
+
+
+def _sanitize_cost_for_tracker(cost_dict: dict) -> CostItem:
+    """Convert a raw cost dict into a CostItem for the in-memory tracker."""
+    amount = _to_float(cost_dict.get('amount', 0))
+    amount_usd = _to_float(cost_dict.get('amount_usd', amount))
+
+    if amount == 0 and amount_usd:
+        amount = amount_usd
+
+    currency = cost_dict.get('currency') or 'USD'
+    if isinstance(currency, str):
+        currency = currency.strip().upper() or 'USD'
+    else:
+        currency = 'USD'
+
+    dest_val = cost_dict.get('destination_id')
+    if dest_val is not None:
+        dest_str = str(dest_val).strip()
+        destination_id = dest_str or None
+    else:
+        destination_id = None
+
+    notes_parts = []
+    base_note = cost_dict.get('notes')
+    if base_note:
+        notes_parts.append(str(base_note).strip())
+
+    extras = []
+    confidence = cost_dict.get('confidence')
+    if confidence:
+        extras.append(f"confidence={confidence}")
+    sources = cost_dict.get('sources')
+    if sources:
+        extras.append("sources: " + ", ".join(sources))
+    researched_at = cost_dict.get('researched_at')
+    if researched_at:
+        extras.append(f"researched_at={researched_at}")
+    if extras:
+        notes_parts.append(" | ".join(extras))
+
+    sanitized = {
+        'id': str(cost_dict.get('id') or uuid.uuid4()),
+        'category': (cost_dict.get('category') or 'other').strip(),
+        'description': cost_dict.get('description') or f"{(cost_dict.get('category') or 'Cost').title()} estimate",
+        'amount': amount,
+        'currency': currency,
+        'amount_usd': amount_usd if amount_usd else amount,
+        'date': cost_dict.get('date') or datetime.now().strftime("%Y-%m-%d"),
+        'destination_id': destination_id,
+        'booking_status': cost_dict.get('booking_status') or 'researched',
+        'source': cost_dict.get('source') or 'web_research',
+        'notes': "\n".join(part for part in notes_parts if part).strip() or None,
+    }
+
+    return CostItem(**sanitized)
+
+
+def _replace_destination_costs_in_tracker(identifier: str, destination_aliases: set[str], cost_items: list[dict]):
+    """Replace researched costs for a destination in the in-memory tracker."""
+    tracker = get_cost_tracker(identifier)
+    aliases = {alias for alias in destination_aliases if alias}
+
+    preserved_costs = []
+    for cost in tracker.costs:
+        # Keep manual or already booked costs intact
+        if cost.source == 'manual' or cost.booking_status in ('confirmed', 'booked'):
+            preserved_costs.append(cost)
+            continue
+
+        dest_lower = (cost.destination_id or '').strip().lower()
+        if dest_lower and dest_lower in aliases:
+            continue
+
+        cost_id_lower = (cost.id or '').strip().lower()
+        if cost_id_lower and any(cost_id_lower.startswith(f"{alias}_") for alias in aliases):
+            continue
+
+        preserved_costs.append(cost)
+
+    tracker.costs = preserved_costs
+
+    new_costs = []
+    for item in cost_items:
+        try:
+            cost_model = _sanitize_cost_for_tracker(item)
+        except Exception as err:
+            print(f"⚠️ Skipping cost item due to validation error: {err}")
+            continue
+        tracker.costs.append(cost_model)
+        new_costs.append(cost_model)
+
+    return tracker.costs, new_costs
+
+
+def _apply_costs_to_local_store(destination_aliases, cost_items, primary_identifier, secondary_identifiers=None):
+    """Persist cost items to the in-memory tracker for the provided identifiers."""
+    identifiers = set()
+    if primary_identifier:
+        identifiers.add(primary_identifier)
+    if secondary_identifiers:
+        for ident in secondary_identifiers:
+            if ident:
+                identifiers.add(ident)
+
+    results = {}
+    for identifier in identifiers:
+        tracker_costs, new_costs = _replace_destination_costs_in_tracker(
+            identifier,
+            destination_aliases,
+            cost_items,
+        )
+        results[identifier] = {
+            'total_costs': len(tracker_costs),
+            'new_costs': len(new_costs),
+        }
+    return results
+
 @app.route('/api/costs', methods=['POST'])
 def add_cost():
     """Add a new cost item."""
@@ -1075,61 +1212,74 @@ def delete_cost(cost_id):
 def get_costs():
     """Get all costs or filtered costs from Firestore."""
     try:
-        from google.cloud import firestore
-
         session_id = request.args.get('session_id', 'default')
         destination_id = request.args.get('destination_id')
         category = request.args.get('category')
 
         print(f"📥 GET /api/costs - session_id: {session_id}, destination_id: {destination_id}, category: {category}")
 
-        # Try to fetch from Firestore first (session_id is actually scenario_id)
-        db = firestore.Client()
-        scenario_ref = db.collection('scenarios').document(session_id)
-        scenario_doc = scenario_ref.get()
-
         costs = []
+        fetched_from_firestore = False
 
-        if scenario_doc.exists:
-            print(f"✅ Found scenario in Firestore: {session_id}")
-            scenario_data = scenario_doc.to_dict()
+        try:
+            from google.cloud import firestore
 
-            # Get latest version
-            versions = list(
-                scenario_ref
-                    .collection('versions')
-                    .order_by('versionNumber', direction=firestore.Query.DESCENDING)
-                    .limit(1)
-                    .stream()
-            )
+            # Try to fetch from Firestore first (session_id is actually scenario_id)
+            db = firestore.Client()
+            scenario_ref = db.collection('scenarios').document(session_id)
+            scenario_doc = scenario_ref.get()
 
-            if versions:
-                latest_version_data = versions[0].to_dict() or {}
-                itinerary_data = latest_version_data.get('itineraryData', {}) or {}
-                costs_data = itinerary_data.get('costs', [])
+            if scenario_doc.exists:
+                print(f"✅ Found scenario in Firestore: {session_id}")
 
-                print(f"📦 Found {len(costs_data)} costs in Firestore")
+                versions = list(
+                    scenario_ref
+                        .collection('versions')
+                        .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                        .limit(1)
+                        .stream()
+                )
 
-                # Filter costs if needed
-                if destination_id:
-                    costs_data = [c for c in costs_data if str(c.get('destination_id', '')).strip() == str(destination_id).strip()]
-                if category:
-                    costs_data = [c for c in costs_data if c.get('category') == category]
+                if versions:
+                    latest_version_data = versions[0].to_dict() or {}
+                    itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+                    costs_data = itinerary_data.get('costs', [])
 
-                costs = costs_data
+                    print(f"📦 Found {len(costs_data)} costs in Firestore")
+
+                    if destination_id:
+                        costs_data = [
+                            c for c in costs_data
+                            if str(c.get('destination_id', '')).strip() == str(destination_id).strip()
+                        ]
+                    if category:
+                        costs_data = [c for c in costs_data if c.get('category') == category]
+
+                    costs = costs_data
+                    fetched_from_firestore = True
+                else:
+                    print(f"⚠️ No versions found for scenario: {session_id}")
             else:
-                print(f"⚠️ No versions found for scenario: {session_id}")
+                print(f"⚠️ Scenario not found in Firestore (id: {session_id})")
+        except Exception as firestore_error:
+            print(f"⚠️ Firestore unavailable for session {session_id}: {firestore_error}")
+
+        if fetched_from_firestore:
+            print(f"📤 Returning {len(costs)} costs from Firestore")
+            return jsonify({
+                'status': 'success',
+                'costs': costs
+            })
+
+        print(f"🔁 Falling back to in-memory cost tracker for session: {session_id}")
+        tracker = get_cost_tracker(session_id)
+        if any([destination_id, category]):
+            tracker_costs = tracker.filter_costs(destination_id=destination_id, category=category)
         else:
-            print(f"⚠️ Scenario not found in Firestore, falling back to in-memory tracker")
-            # Fall back to in-memory tracker
-            tracker = get_cost_tracker(session_id)
-            if any([destination_id, category]):
-                costs = tracker.filter_costs(destination_id=destination_id, category=category)
-            else:
-                costs = tracker.costs
-            costs = [cost.model_dump() for cost in costs]
+            tracker_costs = tracker.costs
+        costs = [cost.model_dump() for cost in tracker_costs]
 
-        print(f"📤 Returning {len(costs)} costs")
+        print(f"📤 Returning {len(costs)} costs from in-memory tracker")
         return jsonify({
             'status': 'success',
             'costs': costs
@@ -1232,74 +1382,66 @@ def bulk_save_costs():
     print("💾 BULK-SAVE ENDPOINT CALLED")
     print("="*100)
 
+    data = request.json
+    session_id = data.get('session_id')
+    scenario_id = data.get('scenario_id')
+    destination_name = data.get('destination_name')
+    raw_destination_id = data.get('destination_id')
+    destination_id = None
+    if raw_destination_id is not None or destination_name:
+        destination_id = normalize_destination_id(raw_destination_id, destination_name)
+    cost_items = data.get('cost_items', [])
+
+    print(f"📦 Received request:")
+    print(f"   Session ID: {session_id}")
+    print(f"   Scenario ID: {scenario_id}")
+    print(f"   Destination ID: {destination_id}")
+    print(f"   Destination Name: {destination_name}")
+    print(f"   Cost Items Count: {len(cost_items)}")
+    print(f"   Cost Items: {[item.get('category') for item in cost_items]}")
+
+    # Validate required fields
+    if not all([scenario_id, destination_id, cost_items]):
+        return jsonify({
+            'status': 'error',
+            'error': 'Missing required fields: scenario_id, destination_id, cost_items'
+        }), 400
+
+    print(f"💾 Bulk saving {len(cost_items)} costs for {destination_name} (ID: {destination_id})")
+
+    # Build alias set for matching (UUID, legacy IDs, slug)
+    destination_aliases = _build_destination_aliases(
+        raw_destination_id,
+        destination_id,
+        destination_name,
+    )
+
+    print(f"🔍 Looking for costs to remove with aliases: {sorted(destination_aliases)}")
+
+    # Validate destination IDs on incoming cost items
+    import re
+    uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', re.IGNORECASE)
+
+    for item in cost_items:
+        item_dest_id = item.get('destination_id')
+
+        if item_dest_id is None and destination_id is not None:
+            item['destination_id'] = destination_id
+            print(f"  📝 Set destination_id to {destination_id} for {item.get('category')}")
+        elif item_dest_id is not None:
+            item['destination_id'] = str(item_dest_id).strip() or destination_id
+
+        final_dest_id = item.get('destination_id')
+        if final_dest_id and not uuid_pattern.match(str(final_dest_id)):
+            print(f"  ⚠️ WARNING: Cost has non-UUID destination_id: {final_dest_id} for {item.get('category')}")
+            print(f"     This cost may become orphaned! Please use UUIDs only.")
+
     try:
         from google.cloud import firestore
 
-        data = request.json
-        session_id = data.get('session_id')
-        scenario_id = data.get('scenario_id')
-        destination_name = data.get('destination_name')
-        raw_destination_id = data.get('destination_id')
-        destination_id = None
-        if raw_destination_id is not None or destination_name:
-            destination_id = normalize_destination_id(raw_destination_id, destination_name)
-        cost_items = data.get('cost_items', [])
-
-        print(f"📦 Received request:")
-        print(f"   Session ID: {session_id}")
-        print(f"   Scenario ID: {scenario_id}")
-        print(f"   Destination ID: {destination_id}")
-        print(f"   Destination Name: {destination_name}")
-        print(f"   Cost Items Count: {len(cost_items)}")
-        print(f"   Cost Items: {[item.get('category') for item in cost_items]}")
-
-        # Validate required fields
-        if not all([scenario_id, destination_id, cost_items]):
-            return jsonify({
-                'status': 'error',
-                'error': 'Missing required fields: scenario_id, destination_id, cost_items'
-            }), 400
-
-        print(f"💾 Bulk saving {len(cost_items)} costs for {destination_name} (ID: {destination_id})")
-
-        # Build set of legacy destination identifiers that should map to this UUID
-        destination_aliases = set()
-        if raw_destination_id:
-            destination_aliases.add(str(raw_destination_id).strip().lower())
-        if destination_id:
-            destination_aliases.add(str(destination_id).strip().lower())
-        if destination_name:
-            slug_alias = normalize_destination_id(None, destination_name)
-            destination_aliases.add(slug_alias.lower())
-        destination_aliases.discard("")
-
-        print(f"🔍 Looking for costs to remove with aliases: {sorted(destination_aliases)}")
-
-        # Validate and ensure each cost item has a valid UUID destination_id
-        import re
-        uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', re.IGNORECASE)
-
-        for item in cost_items:
-            item_dest_id = item.get('destination_id')
-
-            # If no destination_id, use the provided destination_id
-            if item_dest_id is None and destination_id is not None:
-                item['destination_id'] = destination_id
-                print(f"  📝 Set destination_id to {destination_id} for {item.get('category')}")
-            elif item_dest_id is not None:
-                item['destination_id'] = str(item_dest_id).strip() or destination_id
-
-            # Validate the destination_id is a UUID
-            final_dest_id = item.get('destination_id')
-            if final_dest_id and not uuid_pattern.match(str(final_dest_id)):
-                print(f"  ⚠️ WARNING: Cost has non-UUID destination_id: {final_dest_id} for {item.get('category')}")
-                print(f"     This cost may become orphaned! Please use UUIDs only.")
-
-        # Initialize Firestore
         db = firestore.Client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
-        # Get current scenario
         scenario_doc = scenario_ref.get()
         if not scenario_doc.exists:
             return jsonify({
@@ -1308,10 +1450,8 @@ def bulk_save_costs():
             }), 404
 
         scenario_data = scenario_doc.to_dict()
-        # Update the latest version's itineraryData (this is what the UI loads!)
         current_version = scenario_data.get('currentVersion', 0)
 
-        # Get the latest version by highest versionNumber
         versions = list(
             scenario_ref
                 .collection('versions')
@@ -1320,29 +1460,25 @@ def bulk_save_costs():
                 .stream()
         )
 
+        version_filtered_costs = cost_items[:]
+
         if versions:
             latest_version_ref = versions[0].reference
             latest_version_data = versions[0].to_dict() or {}
 
-            # Get itineraryData from the version
             itinerary_data = latest_version_data.get('itineraryData', {}) or {}
             version_costs = itinerary_data.get('costs', []) or []
 
             print(f"📊 Total costs in database before removal: {len(version_costs)}")
             print(f"📊 Costs with descriptions containing '{destination_name.split(',')[0] if destination_name else ''}': {len([c for c in version_costs if destination_name and destination_name.split(',')[0].lower() in (c.get('description') or '').lower()])}")
 
-            # Remove existing estimates for this destination when new research is saved
-            # STRICT UUID MATCHING ONLY - no fallback to name-based matching
             def _belongs_to_destination(cost_item):
-                # Only match estimates for removal - keep manual and booked costs
                 cost_source = cost_item.get('source')
                 booking_status = cost_item.get('booking_status', 'estimated')
 
-                # Keep manual entries and booked items, remove all estimates
                 if cost_source == 'manual' or booking_status in ('confirmed', 'booked'):
                     return False
 
-                # Check if this estimate belongs to the destination by UUID
                 dest_val = cost_item.get('destination_id')
                 if dest_val:
                     dest_val_norm = str(dest_val).strip().lower()
@@ -1350,7 +1486,6 @@ def bulk_save_costs():
                         print(f"  ✓ Match by UUID: {dest_val} -> {cost_item.get('category')} ${cost_item.get('amount_usd', 0)}")
                         return True
 
-                # Check by cost ID prefix (for backward compatibility with old cost IDs)
                 item_id = cost_item.get('id')
                 if item_id:
                     lowered = str(item_id).strip().lower()
@@ -1369,7 +1504,6 @@ def bulk_save_costs():
             if removed_count:
                 print(f"🧹 Removed {removed_count} existing cost(s) for aliases {sorted(destination_aliases)}")
 
-            # Normalize destination_id to strings on remaining costs
             normalized_existing_costs = []
             for item in version_filtered_costs:
                 item_copy = dict(item)
@@ -1378,30 +1512,32 @@ def bulk_save_costs():
                 normalized_existing_costs.append(item_copy)
             version_filtered_costs = normalized_existing_costs
 
-            # Add new costs
             version_filtered_costs.extend(cost_items)
 
-            # If no change in costs, skip creating a new version
             try:
                 import json as _json
+
                 def _stable(obj):
                     return _json.dumps(obj, sort_keys=True, separators=(",", ":"))
+
                 if _stable(version_costs) == _stable(version_filtered_costs):
                     scenario_ref.update({
                         'updatedAt': firestore.SERVER_TIMESTAMP,
                     })
                     print(f"ℹ️ No cost changes detected; skipped new version creation")
+                    # Sync local cache even when no change detected
+                    _apply_costs_to_local_store(destination_aliases, cost_items, scenario_id, secondary_identifiers=[session_id])
                     return jsonify({
                         'status': 'success',
                         'message': 'No changes in costs; latest version left unchanged',
                         'costs_saved': 0,
-                        'total_costs': len(version_filtered_costs)
+                        'total_costs': len(version_filtered_costs),
+                        'storage': 'firestore'
                     })
             except Exception as _:
                 pass
 
-            # Prepare new version payload (create a new version instead of mutating latest)
-            new_version_number = max(int(scenario_data.get('currentVersion', 0) or 0), int(latest_version_data.get('versionNumber', 0) or 0)) + 1
+            new_version_number = max(int(current_version or 0), int(latest_version_data.get('versionNumber', 0) or 0)) + 1
             new_version_ref = scenario_ref.collection('versions').document()
             new_itinerary_data = dict(itinerary_data)
             new_itinerary_data['costs'] = version_filtered_costs
@@ -1416,7 +1552,6 @@ def bulk_save_costs():
                 'isAutosave': True,
             })
 
-            # Update scenario's currentVersion
             scenario_ref.update({
                 'currentVersion': new_version_number,
                 'updatedAt': firestore.SERVER_TIMESTAMP,
@@ -1425,9 +1560,26 @@ def bulk_save_costs():
             print(f"✅ Created new version v{new_version_number} with updated itineraryData")
             print(f"   Total costs in new version: {len(version_filtered_costs)}")
         else:
-            print(f"⚠️ Warning: No versions found for scenario {scenario_id}")
+            print(f"⚠️ Warning: No versions found for scenario {scenario_id}; storing costs locally only.")
+            local_results = _apply_costs_to_local_store(
+                destination_aliases,
+                cost_items,
+                scenario_id,
+                secondary_identifiers=[session_id],
+            )
+            primary_stats = local_results.get(
+                scenario_id,
+                {'total_costs': len(cost_items), 'new_costs': len(cost_items)}
+            )
+            print(f"💽 Saved costs locally for scenario {scenario_id} (no Firestore version available)")
+            return jsonify({
+                'status': 'success',
+                'message': f'Saved {primary_stats["new_costs"]} costs locally for {destination_name}',
+                'costs_saved': primary_stats['new_costs'],
+                'total_costs': primary_stats['total_costs'],
+                'storage': 'local'
+            })
 
-        # Lightweight snapshot summary on the scenario document (no full costs array)
         try:
             totals_by_category = {}
             for item in version_filtered_costs:
@@ -1439,25 +1591,66 @@ def bulk_save_costs():
                 'totalsByCategory': totals_by_category,
             })
             print(f"🧮 Updated scenario summary: {len(version_filtered_costs)} items")
-        except Exception as e:
-            print(f"Warning: failed to update scenario summary: {e}")
+        except Exception as summary_error:
+            print(f"Warning: failed to update scenario summary: {summary_error}")
+
+        # Keep in-memory cache aligned with Firestore (best effort)
+        try:
+            local_results = _apply_costs_to_local_store(
+                destination_aliases,
+                cost_items,
+                scenario_id,
+                secondary_identifiers=[session_id],
+            )
+            primary_stats = local_results.get(scenario_id, {'total_costs': len(version_filtered_costs), 'new_costs': len(cost_items)})
+            print(f"💾 Synced in-memory tracker for scenario {scenario_id}: {primary_stats}")
+        except Exception as sync_error:
+            print(f"⚠️ Failed to sync in-memory tracker after Firestore save: {sync_error}")
 
         return jsonify({
             'status': 'success',
             'message': f'Saved {len(cost_items)} costs for {destination_name}',
             'costs_saved': len(cost_items),
-            'total_costs': len(version_filtered_costs)
+            'total_costs': len(version_filtered_costs),
+            'storage': 'firestore'
         })
 
-    except Exception as e:
+    except Exception as firestore_error:
         import traceback
         error_details = traceback.format_exc()
-        print(f"Error in bulk-save endpoint: {error_details}")
-        return jsonify({
-            'status': 'error',
-            'error': str(e),
-            'error_details': error_details
-        }), 500
+        print(f"⚠️ Firestore save failed, switching to local storage: {firestore_error}")
+        print(error_details)
+
+        try:
+            local_results = _apply_costs_to_local_store(
+                destination_aliases,
+                cost_items,
+                scenario_id,
+                secondary_identifiers=[session_id],
+            )
+            primary_stats = local_results.get(
+                scenario_id,
+                {'total_costs': len(cost_items), 'new_costs': len(cost_items)}
+            )
+
+            message = f"Saved {primary_stats['new_costs']} costs locally for {destination_name} (offline mode)"
+            print(f"💽 {message}")
+
+            return jsonify({
+                'status': 'success',
+                'message': message,
+                'costs_saved': primary_stats['new_costs'],
+                'total_costs': primary_stats['total_costs'],
+                'storage': 'local'
+            })
+        except Exception as local_error:
+            error_details = traceback.format_exc()
+            print(f"Error in bulk-save endpoint (local fallback failed): {error_details}")
+            return jsonify({
+                'status': 'error',
+                'error': str(local_error),
+                'error_details': error_details
+            }), 500
 
 @app.route('/api/costs/bulk-update', methods=['PUT'])
 def bulk_update_costs():
@@ -1857,6 +2050,8 @@ For each category, provide low/mid/high estimates with sources.
                                     save_tool_called = True
                                     # Extract research data from the tool call args
                                     research_result = func_call.get("args", {}).get("research_data")
+                                if func_call.get("name") == "DestinationCostResearch":
+                                    research_result = func_call.get("args", {}) or research_result
 
                             # Also check function responses for save confirmation
                             if "function_response" in part:
@@ -1864,6 +2059,13 @@ For each category, provide low/mid/high estimates with sources.
                                 if func_resp.get("name") == "save_researched_costs":
                                     # Tool was successfully called
                                     save_tool_called = True
+                                if func_resp.get("name") == "DestinationCostResearch":
+                                    resp_payload = func_resp.get("response", {})
+                                    research_payload = resp_payload.get("research_data")
+                                    if isinstance(research_payload, dict):
+                                        research_result = research_payload
+                                    elif not research_result and resp_payload:
+                                        research_result = resp_payload
 
                 except json.JSONDecodeError:
                     continue

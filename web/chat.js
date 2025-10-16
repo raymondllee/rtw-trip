@@ -1125,7 +1125,13 @@ class TravelConciergeChat {
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    contentDiv.textContent = text;
+    
+    // Parse and render markdown for bot messages
+    if (sender === 'bot' && !isLoading) {
+      contentDiv.innerHTML = this.parseMarkdown(text);
+    } else {
+      contentDiv.textContent = text;
+    }
 
     messageDiv.appendChild(contentDiv);
 
@@ -1145,6 +1151,72 @@ class TravelConciergeChat {
     }
 
     return baseMessageId;
+  }
+
+  /**
+   * Parse markdown text and convert to HTML
+   * Supports basic markdown: bold, italic, lists, headers, links, code blocks
+   */
+  parseMarkdown(text) {
+    // Escape HTML first to prevent XSS
+    let html = this.escapeHtml(text);
+    
+    // Code blocks (must be processed first to preserve them)
+    html = html.replace(/```([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>');
+    
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    
+    // Headers
+    html = html.replace(/^### (.*$)/gim, '<h3 class="md-h3">$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2 class="md-h2">$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1 class="md-h1">$1</h1>');
+    
+    // Bold text
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="md-bold">$1</strong>');
+    
+    // Italic text
+    html = html.replace(/\*(.+?)\*/g, '<em class="md-italic">$1</em>');
+    
+    // Lists (handle both unordered and ordered)
+    html = html.replace(/^\* (.+)$/gim, '<li class="md-li">$1</li>');
+    html = html.replace(/^\d+\. (.+)$/gim, '<li class="md-li">$1</li>');
+    
+    // Wrap consecutive list items in ul/ol tags
+    html = html.replace(/(<li class="md-li">.*?<\/li>)/gs, (match) => {
+      // Check if this looks like an ordered list (starts with number)
+      const isOrdered = /^\d+\./.test(match.replace(/<[^>]*>/g, ''));
+      const tag = isOrdered ? 'ol' : 'ul';
+      return `<${tag} class="md-list">${match}</${tag}>`;
+    });
+    
+    // Line breaks
+    html = html.replace(/\n\n/g, '</p><p class="md-paragraph">');
+    html = html.replace(/\n/g, '<br class="md-br">');
+    
+    // Wrap in paragraphs
+    html = `<p class="md-paragraph">${html}</p>`;
+    
+    // Clean up empty paragraphs
+    html = html.replace(/<p class="md-paragraph"><\/p>/g, '');
+    html = html.replace(/<p class="md-paragraph">(.*?)<\/p>/g, (match, content) => {
+      // Don't wrap if content already contains block elements
+      if (content.includes('<h') || content.includes('<pre') || content.includes('<ul') || content.includes('<ol')) {
+        return content;
+      }
+      return match;
+    });
+    
+    return html;
+  }
+
+  /**
+   * Escape HTML to prevent XSS attacks
+   */
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   getMessageElement(messageId, isFloating = false) {
@@ -1386,7 +1458,7 @@ class TravelConciergeChat {
 
       // Render messages
       this.messages.forEach(msg => {
-        this.addMessage(msg.text, msg.sender, false, false, false);
+        this.addMessage(msg.text, msg.sender, false, false, false, false);
       });
 
       // Sync to floating and column chat
