@@ -649,11 +649,37 @@ async function initMapApp() {
   // Expose workingData globally for debugging and tools
   window.appWorkingData = workingData;
 
+  function ensureLocationCostBaseline(location) {
+    if (!location || typeof location !== 'object') return;
+
+    const hasBaseline = Object.prototype.hasOwnProperty.call(location, '__costDurationBaseline');
+    if (hasBaseline) return;
+
+    const rawDuration =
+      Number(location.duration_days ?? location.durationDays ?? location.duration);
+    const baseline = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 1;
+
+    Object.defineProperty(location, '__costDurationBaseline', {
+      value: baseline,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  }
+
+  function ensureAllLocationBaselines(data) {
+    if (!data || !Array.isArray(data.locations)) return;
+    data.locations.forEach(ensureLocationCostBaseline);
+  }
+
   // Helper to update workingData and keep global reference synced
   function updateWorkingData(newData) {
     workingData = newData;
+    ensureAllLocationBaselines(workingData);
     window.appWorkingData = workingData;
   }
+
+  ensureAllLocationBaselines(workingData);
 
   // Initialize cost tracking
   const costTracker = new CostTracker();
@@ -1511,7 +1537,46 @@ async function initMapApp() {
         throw new Error('Received an invalid response from the cost research endpoint.');
       }
 
-      if (!response.ok || data?.status !== 'success') {
+      if (!response.ok) {
+        const errorMessage = data?.error || data?.message || `Request failed with status ${response.status}`;
+        throw new Error(errorMessage);
+      }
+
+      if (data?.status === 'partial') {
+        const partialMessage = data?.message || 'The research run did not include structured pricing data.';
+        console.warn(`⚠️ Cost research returned partial result for ${destinationLabel}:`, data);
+
+        // Resolve the waiter with partial status - not an error, just no structured data
+        if (waitEntry && manageWaiterInternally) {
+          waitEntry.resolve({ status: 'partial', message: partialMessage });
+        }
+
+        if (buttonEl && buttonState) {
+          buttonEl.classList.remove('update-costs-btn--sent');
+          buttonEl.disabled = buttonState.disabled;
+          buttonEl.textContent = buttonState.text || 'Update Costs';
+        }
+
+        const supplementalNotes = data?.response_text ? `\n\nAgent notes:\n${data.response_text}` : '';
+        const userFacingMessage = `I researched costs for ${destinationLabel}, but the results came back without structured pricing to save.${supplementalNotes ? ` ${supplementalNotes}` : ''}\n\n${partialMessage} Try again in a bit or refine the request.`;
+
+        if (chatInstance) {
+          chatInstance.addMessage(
+            userFacingMessage,
+            'bot',
+            false,
+            false,
+            false,
+            false
+          );
+        } else {
+          alert(`Cost research for ${destinationLabel} returned narrative results but no structured pricing.\n\n${partialMessage}`);
+        }
+
+        return false;
+      }
+
+      if (data?.status !== 'success') {
         const errorMessage = data?.error || data?.message || `Request failed with status ${response.status}`;
         throw new Error(errorMessage);
       }
@@ -1991,6 +2056,7 @@ async function initMapApp() {
         
         const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
         if (globalLocation) {
+          ensureLocationCostBaseline(globalLocation);
           globalLocation.duration_days = newDuration;
           recalculateDates(workingData.locations);
           render(legFilter.value, subLegFilter.value, routingToggle.checked);
@@ -2419,6 +2485,8 @@ async function initMapApp() {
         raw: placeDetails.raw_data || null
       };
     }
+
+    ensureLocationCostBaseline(newLocation);
 
     workingData.locations.splice(insertIndex, 0, newLocation);
     recalculateDates(workingData.locations);
@@ -2993,7 +3061,16 @@ async function initMapApp() {
       entry.reject(reason || new Error(`Cancelled waiting for cost refresh${destinationLabel ? ` for ${destinationLabel}` : ''}`));
     };
 
-    return { promise, cancel };
+    const resolve = (result) => {
+      if (settled) return;
+      const index = costUpdateWaiters.indexOf(entry);
+      if (index !== -1) {
+        costUpdateWaiters.splice(index, 1);
+      }
+      entry.resolve(result);
+    };
+
+    return { promise, cancel, resolve };
   }
 
   function resolveNextCostUpdateWaiter(result) {

@@ -31,21 +31,57 @@ function buildCostDestinationMapping(costs, allLocations) {
 }
 
 /**
- * Match a location to costs using UUID-based matching ONLY
- * Logs warnings for costs that can't be matched to help identify orphaned costs
+ * Match a location to costs using enhanced matching logic
+ * Handles UUID matching, legacy ID matching, and fallback matching
  */
 function matchLocationToCosts(location, costs, allLocations) {
   const matched = [];
 
   costs.forEach(cost => {
-    // ONLY match by exact UUID
+    // Primary matching: exact UUID match
     if (cost.destination_id === location.id) {
       matched.push(cost);
+      return;
+    }
+
+    // Secondary matching: check if location has legacy ID and cost matches that
+    if (location._legacy_id && cost.destination_id === location._legacy_id) {
+      matched.push(cost);
+      console.log(`  ✓ Matched ${location.name} by legacy ID (${location._legacy_id}): ${cost.category} - ${cost.description?.substring(0, 30)}...`);
+      return;
+    }
+
+    // Tertiary matching: check if cost has legacy destination_id reference
+    if (cost._legacy_destination_id === location.id) {
+      matched.push(cost);
+      console.log(`  ✓ Matched ${location.name} by cost legacy reference: ${cost.category} - ${cost.description?.substring(0, 30)}...`);
+      return;
+    }
+
+    // Fallback matching: name-based matching for orphaned costs
+    if (!cost.destination_id || cost.destination_id === 'undefined') {
+      const locationName = location.name || location.city || '';
+      const costDesc = cost.description || '';
+      
+      // Check if cost description contains location name
+      if (locationName && costDesc.toLowerCase().includes(locationName.toLowerCase())) {
+        matched.push(cost);
+        console.log(`  ✓ Matched ${location.name} by name fallback: ${cost.category} - ${cost.description?.substring(0, 30)}...`);
+        return;
+      }
     }
   });
 
   if (matched.length > 0) {
     console.log(`  ✓ Matched ${location.name} (${location.id}): ${matched.length} costs`);
+  } else {
+    // Debug: show why no costs matched
+    console.log(`  ⚠️ No costs matched for ${location.name} (${location.id})`);
+    console.log(`     Location legacy ID: ${location._legacy_id || 'none'}`);
+    
+    // Show first few cost destination_ids for debugging
+    const relevantCosts = costs.slice(0, 5);
+    console.log(`     Available cost destination_ids: ${relevantCosts.map(c => c.destination_id).join(', ')}`);
   }
 
   return matched;
@@ -67,6 +103,187 @@ function findOrphanedCosts(costs, allLocations) {
   }
 
   return orphaned;
+}
+
+const DURATION_SCALE_CATEGORIES = new Set(['accommodation', 'activity', 'food', 'transport', 'other']);
+
+function normalizePositiveNumber(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) {
+    return null;
+  }
+  return num;
+}
+
+function normalizeNumber(value, fallback = 0) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function resolveNumericField(source, fields, fallback = 0) {
+  if (!source || typeof source !== 'object') {
+    return fallback;
+  }
+  for (const field of fields) {
+    if (Object.prototype.hasOwnProperty.call(source, field)) {
+      const value = Number(source[field]);
+      if (Number.isFinite(value)) {
+        return value;
+      }
+    }
+  }
+  return fallback;
+}
+
+function deriveDurationFromDates(location) {
+  if (!location) return null;
+  const arrival = location.arrival_date || location.arrivalDate || null;
+  const departure = location.departure_date || location.departureDate || null;
+
+  if (!arrival || !departure) return null;
+
+  const start = new Date(`${arrival}T00:00:00Z`);
+  const end = new Date(`${departure}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+
+  const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  if (!Number.isFinite(diffDays) || diffDays <= 0) {
+    return null;
+  }
+  return diffDays;
+}
+
+function getBaselineDuration(location) {
+  if (!location || typeof location !== 'object') return null;
+
+  const candidates = [
+    location.__costDurationBaseline,
+    location.original_duration_days,
+    location.originalDurationDays,
+    location.duration_days_original,
+    location.durationDaysOriginal,
+    location.base_duration_days,
+    location.baseDurationDays,
+    location.duration_baseline,
+    location.durationBaseline
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizePositiveNumber(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  const duration = normalizePositiveNumber(
+    location.duration_days ?? location.durationDays
+  );
+  if (duration) {
+    return duration;
+  }
+
+  return normalizePositiveNumber(deriveDurationFromDates(location));
+}
+
+function getCurrentDuration(location, fallback = null) {
+  if (!location || typeof location !== 'object') return fallback;
+
+  const candidates = [
+    location.duration_days,
+    location.durationDays,
+    location.current_duration_days,
+    location.currentDurationDays
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizePositiveNumber(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  const fromDates = normalizePositiveNumber(deriveDurationFromDates(location));
+  if (fromDates) {
+    return fromDates;
+  }
+
+  return fallback;
+}
+
+function getDurationScalingInfo(location) {
+  const baseDuration = getBaselineDuration(location);
+  const currentDuration = getCurrentDuration(location, baseDuration);
+
+  if (!baseDuration || !currentDuration) {
+    const fallback = normalizePositiveNumber(baseDuration || currentDuration || 1) || 1;
+    return {
+      ratio: 1,
+      baseDuration: fallback,
+      currentDuration: fallback
+    };
+  }
+
+  const ratio = currentDuration / baseDuration;
+  return {
+    ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
+    baseDuration,
+    currentDuration
+  };
+}
+
+function shouldScaleWithDuration(cost, category) {
+  if (!cost || typeof cost !== 'object') return false;
+
+  if (cost.duration_invariant === true || cost.durationInvariant === true) return false;
+  if (cost.scale_with_duration === false || cost.scaleWithDuration === false) return false;
+  if (cost.duration_sensitive === true || cost.durationSensitive === true) return true;
+  if (cost.scale_with_duration === true || cost.scaleWithDuration === true) return true;
+
+  const meta = String(
+    cost.pricing_model ??
+    cost.pricingModel ??
+    cost.cost_basis ??
+    cost.costBasis ??
+    cost.billing_cycle ??
+    cost.billingCycle ??
+    ''
+  ).toLowerCase();
+  if (meta.includes('per_day') ||
+      meta.includes('perday') ||
+      meta.includes('per-night') ||
+      meta.includes('per night') ||
+      meta.includes('nightly') ||
+      meta.includes('daily')) {
+    return true;
+  }
+
+  const unit = String(cost.unit ?? cost.time_unit ?? cost.period ?? '').toLowerCase();
+  if (unit === 'day' ||
+      unit === 'night' ||
+      unit === 'daily' ||
+      unit === 'per_day' ||
+      unit === 'per-night' ||
+      unit === 'nightly') {
+    return true;
+  }
+
+  if (cost.amount_per_day != null || cost.amountPerDay != null) return true;
+  if (cost.daily_rate != null || cost.dailyRate != null) return true;
+
+  const notes = String(cost.notes ?? '').toLowerCase();
+  if (/per\s*day|per-day|daily|per\s*night|per-night|nightly/.test(notes)) return true;
+
+  const description = String(cost.description ?? '').toLowerCase();
+  if (/per\s*day|per-day|daily|per\s*night|per-night|nightly/.test(description)) return true;
+
+  const frequency = String(cost.frequency ?? cost.cadence ?? '').toLowerCase();
+  if (frequency === 'daily' || frequency === 'nightly') return true;
+
+  if (category && DURATION_SCALE_CATEGORIES.has(category)) return true;
+
+  return false;
 }
 
 // Calculate costs for a specific destination
@@ -98,26 +315,63 @@ function calculateDestinationCosts(destinationId, costs, location = null, allLoc
     other: 0
   };
 
+  const { ratio: durationRatio, baseDuration, currentDuration } = getDurationScalingInfo(location);
+  const applyDurationScaling = Number.isFinite(durationRatio) && durationRatio !== 1;
+
   let total = 0;
 
-  destinationCosts.forEach(cost => {
-    const amount = parseFloat(cost.amount_usd) || 0;
-    const category = cost.category || 'other';
+  const scaledItems = destinationCosts.map(cost => {
+    const categoryRaw = (cost.category || 'other').toLowerCase();
+    const category = byCategory.hasOwnProperty(categoryRaw) ? categoryRaw : 'other';
+
+    const baseAmountUSD = resolveNumericField(cost, [
+      'base_amount_usd',
+      'original_amount_usd',
+      'amount_usd',
+      'amountUSD',
+      'total_usd',
+      'totalUSD',
+      'amount'
+    ], 0);
+
+    const baseAmount = resolveNumericField(cost, [
+      'base_amount',
+      'original_amount',
+      'amount',
+      'amount_local',
+      'amountLocal'
+    ], baseAmountUSD);
+
+    const shouldScale = applyDurationScaling && shouldScaleWithDuration(cost, category);
+    const scaledAmountUSD = shouldScale ? baseAmountUSD * durationRatio : baseAmountUSD;
+    const scaledAmount = shouldScale ? baseAmount * durationRatio : baseAmount;
 
     if (byCategory.hasOwnProperty(category)) {
-      byCategory[category] += amount;
+      byCategory[category] += scaledAmountUSD;
     } else {
-      byCategory.other += amount;
+      byCategory.other += scaledAmountUSD;
     }
 
-    total += amount;
+    total += scaledAmountUSD;
+
+    return {
+      ...cost,
+      scaled_amount_usd: scaledAmountUSD,
+      scaled_amount: scaledAmount,
+      base_amount_usd: baseAmountUSD,
+      base_amount: baseAmount,
+      scaling_applied: shouldScale ? durationRatio : 1
+    };
   });
 
   return {
     total,
     byCategory,
-    count: destinationCosts.length,
-    items: destinationCosts  // Include individual cost items for detailed display
+    count: scaledItems.length,
+    items: scaledItems,  // Include individual cost items for detailed display
+    duration_ratio: durationRatio,
+    base_duration_days: baseDuration,
+    current_duration_days: currentDuration
   };
 }
 
@@ -194,10 +448,16 @@ function generateCostBreakdownHTML(costs, showEmpty = false, destinationName = '
   // Enhanced detailed view with all metadata
   if (costs.items && costs.items.length > 0) {
     const breakdownItems = costs.items
-      .sort((a, b) => (b.amount_usd || b.amount) - (a.amount_usd || a.amount))
+      .slice()
+      .sort((a, b) => {
+        const amountA = resolveNumericField(a, ['scaled_amount_usd', 'amount_usd', 'amountUSD', 'amount'], 0);
+        const amountB = resolveNumericField(b, ['scaled_amount_usd', 'amount_usd', 'amountUSD', 'amount'], 0);
+        return amountB - amountA;
+      })
       .map(cost => {
-        const amount = cost.amount_usd || cost.amount;
-        const percentage = costs.total > 0 ? (amount / costs.total * 100).toFixed(1) : 0;
+        const amountUSD = resolveNumericField(cost, ['scaled_amount_usd', 'amount_usd', 'amountUSD', 'amount'], 0);
+        const amountLocal = resolveNumericField(cost, ['scaled_amount', 'amount', 'amount_local', 'amountLocal'], amountUSD);
+        const percentage = costs.total > 0 ? (amountUSD / costs.total * 100).toFixed(1) : 0;
         const confidenceColor = cost.confidence === 'high' ? '#22c55e' : cost.confidence === 'low' ? '#f59e0b' : '#3b82f6';
         const confidenceBadge = cost.confidence ? `<span style="background: ${confidenceColor}; color: white; font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-left: 4px; text-transform: capitalize;">${cost.confidence}</span>` : '';
 
@@ -219,12 +479,14 @@ function generateCostBreakdownHTML(costs, showEmpty = false, destinationName = '
                 ${confidenceBadge}
               </span>
               <div style="display: flex; align-items: center; gap: 6px;">
-                <span class="cost-amount-editable" data-cost-id="${cost.id}" data-original-amount="${amount}" data-currency="${cost.currency || 'USD'}" style="font-weight: 700; color: #333; font-size: 13px; cursor: pointer; padding: 2px 4px; border-radius: 3px; transition: background 0.2s;" title="Click to edit amount">
-                  ${formatCurrency(amount)} <span style="font-size: 10px; color: #888;">(${percentage}%)</span>
+                <span class="cost-amount-editable" data-cost-id="${cost.id}" data-original-amount="${amountUSD}" data-currency="${cost.currency || 'USD'}" style="font-weight: 700; color: #333; font-size: 13px; cursor: pointer; padding: 2px 4px; border-radius: 3px; transition: background 0.2s;" title="Click to edit amount">
+                  ${formatCurrency(amountUSD)} <span style="font-size: 10px; color: #888;">(${percentage}%)</span>
                 </span>
               </div>
             </div>
-            ${cost.currency && cost.currency !== 'USD' && cost.currency !== 'N/A' ? `<div style="font-size: 10px; color: #888; margin-bottom: 4px;">${formatCurrency(cost.amount, cost.currency)}</div>` : ''}
+            ${cost.currency && cost.currency !== 'USD' && cost.currency !== 'N/A'
+              ? `<div style="font-size: 10px; color: #888; margin-bottom: 4px;">${formatCurrency(amountLocal, cost.currency)}</div>`
+              : ''}
             ${cost.notes ? `<div style="font-size: 11px; color: #666; margin-top: 4px; line-height: 1.4; font-style: italic;">${cost.notes}</div>` : ''}
             <div style="font-size: 9px; color: #999; margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
               <span style="display: flex; align-items: center; gap: 4px;">
@@ -446,11 +708,12 @@ function startInlineEdit(element) {
 
   // Track if save is in progress to prevent multiple saves
   let saveInProgress = false;
+  let editCancelled = false;
 
   // Handle save
   const saveEdit = async () => {
-    if (saveInProgress) {
-      console.log('⏳ Save already in progress, skipping...');
+    if (saveInProgress || editCancelled) {
+      console.log('⏳ Save already in progress or edit cancelled, skipping...');
       return;
     }
     saveInProgress = true;
@@ -467,8 +730,12 @@ function startInlineEdit(element) {
     if (newAmount === originalAmount) {
       // No change, just restore if element still exists
       if (document.body.contains(element)) {
-        element.innerHTML = originalHTML;
-        element.classList.remove('cost-amount-editing');
+        try {
+          element.innerHTML = originalHTML;
+          element.classList.remove('cost-amount-editing');
+        } catch (err) {
+          console.warn('Could not restore element (no change):', err);
+        }
       }
       saveInProgress = false;
       return;
@@ -476,7 +743,11 @@ function startInlineEdit(element) {
 
     // Show saving state if element still exists
     if (document.body.contains(element)) {
-      element.innerHTML = '💾 Saving...';
+      try {
+        element.innerHTML = '💾 Saving...';
+      } catch (err) {
+        console.warn('Could not update element to saving state:', err);
+      }
     }
 
     try {
@@ -496,8 +767,12 @@ function startInlineEdit(element) {
       alert(`Failed to update cost: ${error.message}`);
       // Restore original only if element still exists
       if (document.body.contains(element)) {
-        element.innerHTML = originalHTML;
-        element.classList.remove('cost-amount-editing');
+        try {
+          element.innerHTML = originalHTML;
+          element.classList.remove('cost-amount-editing');
+        } catch (err) {
+          console.warn('Could not restore element after error:', err);
+        }
       }
     } finally {
       saveInProgress = false;
@@ -506,16 +781,21 @@ function startInlineEdit(element) {
 
   // Handle cancel
   const cancelEdit = () => {
-    if (document.body.contains(element)) {
-      element.innerHTML = originalHTML;
-      element.classList.remove('cost-amount-editing');
+    editCancelled = true;
+    if (document.body.contains(element) && element.contains(input)) {
+      try {
+        element.innerHTML = originalHTML;
+        element.classList.remove('cost-amount-editing');
+      } catch (err) {
+        console.warn('Could not restore element during cancel:', err);
+      }
     }
   };
 
   // Event listeners
   input.addEventListener('blur', (e) => {
-    // Only save on blur if the element still exists in the DOM
-    if (document.body.contains(element)) {
+    // Only save on blur if the element still exists and edit wasn't cancelled
+    if (!editCancelled && document.body.contains(element)) {
       saveEdit();
     }
   });

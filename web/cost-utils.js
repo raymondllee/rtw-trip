@@ -2,8 +2,195 @@
  * Cost utilities for calculating and displaying trip cost information
  */
 
+const DURATION_SCALE_CATEGORIES = new Set(['accommodation', 'activity', 'food', 'transport', 'other']);
+
+function normalizePositiveNumber(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  return num;
+}
+
+function resolveNumericField(source, fields, fallback = 0) {
+  if (!source || typeof source !== 'object') {
+    return fallback;
+  }
+  for (const field of fields) {
+    if (Object.prototype.hasOwnProperty.call(source, field)) {
+      const num = Number(source[field]);
+      if (Number.isFinite(num)) {
+        return num;
+      }
+    }
+  }
+  return fallback;
+}
+
+function deriveDurationFromDates(location) {
+  if (!location) return null;
+  const arrival = location.arrival_date || location.arrivalDate || null;
+  const departure = location.departure_date || location.departureDate || null;
+  if (!arrival || !departure) return null;
+
+  const start = new Date(`${arrival}T00:00:00Z`);
+  const end = new Date(`${departure}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+
+  const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  if (!Number.isFinite(diffDays) || diffDays <= 0) return null;
+  return diffDays;
+}
+
+function getBaselineDuration(location) {
+  if (!location || typeof location !== 'object') return null;
+
+  const candidates = [
+    location.__costDurationBaseline,
+    location.original_duration_days,
+    location.originalDurationDays,
+    location.duration_days_original,
+    location.durationDaysOriginal,
+    location.base_duration_days,
+    location.baseDurationDays,
+    location.duration_baseline,
+    location.durationBaseline
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizePositiveNumber(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  const duration = normalizePositiveNumber(
+    location.duration_days ?? location.durationDays
+  );
+  if (duration) {
+    return duration;
+  }
+
+  return normalizePositiveNumber(deriveDurationFromDates(location));
+}
+
+function getCurrentDuration(location, fallback = null) {
+  if (!location || typeof location !== 'object') return fallback;
+
+  const candidates = [
+    location.duration_days,
+    location.durationDays,
+    location.current_duration_days,
+    location.currentDurationDays
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizePositiveNumber(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  const fromDates = normalizePositiveNumber(deriveDurationFromDates(location));
+  if (fromDates) {
+    return fromDates;
+  }
+
+  return fallback;
+}
+
+function getDurationScalingInfo(location) {
+  const baseDuration = getBaselineDuration(location);
+  const currentDuration = getCurrentDuration(location, baseDuration);
+
+  if (!baseDuration || !currentDuration) {
+    const fallback = normalizePositiveNumber(baseDuration || currentDuration || 1) || 1;
+    return {
+      ratio: 1,
+      baseDuration: fallback,
+      currentDuration: fallback
+    };
+  }
+
+  const ratio = currentDuration / baseDuration;
+  return {
+    ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
+    baseDuration,
+    currentDuration
+  };
+}
+
+function shouldScaleWithDuration(cost, category) {
+  if (!cost || typeof cost !== 'object') return false;
+
+  if (cost.duration_invariant === true || cost.durationInvariant === true) return false;
+  if (cost.scale_with_duration === false || cost.scaleWithDuration === false) return false;
+  if (cost.duration_sensitive === true || cost.durationSensitive === true) return true;
+  if (cost.scale_with_duration === true || cost.scaleWithDuration === true) return true;
+
+  const meta = String(
+    cost.pricing_model ??
+    cost.pricingModel ??
+    cost.cost_basis ??
+    cost.costBasis ??
+    cost.billing_cycle ??
+    cost.billingCycle ??
+    ''
+  ).toLowerCase();
+
+  if (meta.includes('per_day') ||
+      meta.includes('perday') ||
+      meta.includes('per-night') ||
+      meta.includes('per night') ||
+      meta.includes('nightly') ||
+      meta.includes('daily')) {
+    return true;
+  }
+
+  const unit = String(cost.unit ?? cost.time_unit ?? cost.period ?? '').toLowerCase();
+  if (unit === 'day' ||
+      unit === 'night' ||
+      unit === 'daily' ||
+      unit === 'per_day' ||
+      unit === 'per-night' ||
+      unit === 'nightly') {
+    return true;
+  }
+
+  if (cost.amount_per_day != null || cost.amountPerDay != null) return true;
+  if (cost.daily_rate != null || cost.dailyRate != null) return true;
+
+  const notes = String(cost.notes ?? '').toLowerCase();
+  if (/per\s*day|per-day|daily|per\s*night|per-night|nightly/.test(notes)) return true;
+
+  const description = String(cost.description ?? '').toLowerCase();
+  if (/per\s*day|per-day|daily|per\s*night|per-night|nightly/.test(description)) return true;
+
+  const frequency = String(cost.frequency ?? cost.cadence ?? '').toLowerCase();
+  if (frequency === 'daily' || frequency === 'nightly') return true;
+
+  if (category && DURATION_SCALE_CATEGORIES.has(category)) return true;
+
+  return false;
+}
+
+function normalizeCategory(category) {
+  const normalized = String(category || '').toLowerCase();
+  switch (normalized) {
+    case 'accommodation':
+    case 'flight':
+    case 'activity':
+    case 'food':
+    case 'transport':
+    case 'other':
+      return normalized;
+    default:
+      return 'other';
+  }
+}
+
 // Calculate costs for a specific destination
-export function calculateDestinationCosts(destinationId, costs) {
+export function calculateDestinationCosts(destinationId, costs, location = null) {
   if (!costs || !Array.isArray(costs)) {
     return {
       total: 0,
@@ -12,7 +199,8 @@ export function calculateDestinationCosts(destinationId, costs) {
     };
   }
 
-  const destinationCosts = costs.filter(cost => cost.destination_id === destinationId);
+  const targetId = location?.id ?? destinationId;
+  const destinationCosts = costs.filter(cost => cost.destination_id === targetId);
 
   const byCategory = {
     accommodation: 0,
@@ -23,25 +211,62 @@ export function calculateDestinationCosts(destinationId, costs) {
     other: 0
   };
 
+  const { ratio: durationRatio, baseDuration, currentDuration } = getDurationScalingInfo(location);
+  const applyDurationScaling = Number.isFinite(durationRatio) && durationRatio !== 1;
+
   let total = 0;
 
-  destinationCosts.forEach(cost => {
-    const amount = parseFloat(cost.amount_usd) || 0;
-    const category = cost.category || 'other';
+  const scaledItems = destinationCosts.map(cost => {
+    const category = normalizeCategory(cost.category);
+
+    const baseAmountUSD = resolveNumericField(cost, [
+      'base_amount_usd',
+      'original_amount_usd',
+      'amount_usd',
+      'amountUSD',
+      'total_usd',
+      'totalUSD',
+      'amount'
+    ], 0);
+
+    const baseAmountLocal = resolveNumericField(cost, [
+      'base_amount',
+      'original_amount',
+      'amount',
+      'amount_local',
+      'amountLocal'
+    ], baseAmountUSD);
+
+    const shouldScale = applyDurationScaling && shouldScaleWithDuration(cost, category);
+    const scaledAmountUSD = shouldScale ? baseAmountUSD * durationRatio : baseAmountUSD;
+    const scaledAmountLocal = shouldScale ? baseAmountLocal * durationRatio : baseAmountLocal;
 
     if (byCategory.hasOwnProperty(category)) {
-      byCategory[category] += amount;
+      byCategory[category] += scaledAmountUSD;
     } else {
-      byCategory.other += amount;
+      byCategory.other += scaledAmountUSD;
     }
 
-    total += amount;
+    total += scaledAmountUSD;
+
+    return {
+      ...cost,
+      scaled_amount_usd: scaledAmountUSD,
+      scaled_amount: scaledAmountLocal,
+      base_amount_usd: baseAmountUSD,
+      base_amount: baseAmountLocal,
+      scaling_applied: shouldScale ? durationRatio : 1
+    };
   });
 
   return {
     total,
     byCategory,
-    count: destinationCosts.length
+    count: scaledItems.length,
+    items: scaledItems,
+    duration_ratio: durationRatio,
+    base_duration_days: baseDuration,
+    current_duration_days: currentDuration
   };
 }
 
@@ -72,7 +297,7 @@ export function calculateLegCosts(destinationIds, costs) {
 
   legCosts.forEach(cost => {
     const amount = parseFloat(cost.amount_usd) || 0;
-    const category = cost.category || 'other';
+    const category = normalizeCategory(cost.category);
 
     if (byCategory.hasOwnProperty(category)) {
       byCategory[category] += amount;
@@ -130,6 +355,57 @@ export function getCategoryDisplayName(category) {
 export function generateCostBreakdownHTML(costs, showEmpty = false, destinationName = '') {
   if (!costs || !costs.byCategory) {
     return '<div class="cost-breakdown-empty">No cost data available</div>';
+  }
+
+  if (costs.items && costs.items.length > 0) {
+    const breakdownItems = costs.items
+      .slice()
+      .sort((a, b) => {
+        const amountA = resolveNumericField(a, ['scaled_amount_usd', 'amount_usd', 'amountUSD', 'amount'], 0);
+        const amountB = resolveNumericField(b, ['scaled_amount_usd', 'amount_usd', 'amountUSD', 'amount'], 0);
+        return amountB - amountA;
+      })
+      .map(cost => {
+        const amountUSD = resolveNumericField(cost, ['scaled_amount_usd', 'amount_usd', 'amountUSD', 'amount'], 0);
+        const amountLocal = resolveNumericField(cost, ['scaled_amount', 'amount', 'amount_local', 'amountLocal'], amountUSD);
+        const percentage = costs.total > 0 ? (amountUSD / costs.total * 100).toFixed(1) : 0;
+
+        return `
+          <div class="cost-breakdown-item" data-cost-id="${cost.id || ''}">
+            <div class="cost-category">
+              <span class="cost-icon">${getCategoryIcon(cost.category)}</span>
+              <span class="cost-name">${getCategoryDisplayName(cost.category)}</span>
+            </div>
+            <div class="cost-amount">
+              <span class="cost-value">${formatCurrency(amountUSD)}</span>
+              <span class="cost-percentage">${percentage}%</span>
+            </div>
+            ${cost.currency && cost.currency !== 'USD' && cost.currency !== 'N/A'
+              ? `<div class="cost-meta">${formatCurrency(amountLocal, cost.currency)}</div>`
+              : ''}
+          </div>
+        `;
+      })
+      .join('');
+
+    const updateButton = destinationName ? `
+      <div class="destination-cost-update">
+        <button
+          class="update-costs-btn"
+          data-destination-name="${destinationName}"
+          title="Ask AI to research costs"
+        >
+          💰 Update costs for ${destinationName}
+        </button>
+      </div>
+    ` : '';
+
+    return `
+      ${updateButton}
+      <div class="cost-breakdown">
+        ${breakdownItems}
+      </div>
+    `;
   }
 
   const categories = [
@@ -258,7 +534,7 @@ export function generateSidebarCostSummary(costs, durationDays = 0, destinationN
         <span class="cost-amount">${formatCurrency(total)}</span>
         ${durationDays > 0 ? `<span class="cost-per-day">${formatCurrency(costPerDay)}/day</span>` : ''}
       </div>
-      <div class="cost-breakdown-toggle" data-destination-id="">
+      <div class="cost-breakdown-toggle">
         <span class="toggle-icon">▼</span>
         <span class="toggle-text">Details</span>
       </div>

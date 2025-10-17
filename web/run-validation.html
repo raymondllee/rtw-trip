@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Validation Runner</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .result-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Quick Validation Runner</h1>
+
+        <div class="input-group">
+            <label for="scenarioId">Scenario ID:</label>
+            <input type="text" id="scenarioId" placeholder="Enter scenario ID">
+        </div>
+
+        <div>
+            <button onclick="runValidation()">Run Full Validation</button>
+            <button onclick="clearOutput()">Clear Output</button>
+        </div>
+
+        <div id="status"></div>
+        <div id="results"></div>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script type="module">
+        import {
+            validateDataIntegrity,
+            findOrphanedCosts,
+            isUUID,
+            isPlaceId
+        } from './destination-id-manager.js';
+
+        window.DestIdMgr = {
+            validateDataIntegrity,
+            findOrphanedCosts,
+            isUUID,
+            isPlaceId
+        };
+    </script>
+
+    <script>
+        const logDiv = document.getElementById('log');
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+
+        // Capture console output
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function appendToLog(type, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            appendToLog('log', ...args);
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            appendToLog('error', '❌', ...args);
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            appendToLog('warn', '⚠️', ...args);
+        };
+
+        function showStatus(message, type = 'info') {
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function showResults(validation) {
+            const summary = validation.summary;
+
+            resultsDiv.innerHTML = `
+                <div class="results">
+                    <h3>📊 Validation Results</h3>
+
+                    <div class="result-item">
+                        <strong>Total Locations:</strong> ${summary.total_locations}
+                    </div>
+
+                    <div class="result-item">
+                        <strong>Total Costs:</strong> ${summary.total_costs}
+                    </div>
+
+                    <div class="result-item">
+                        <strong>ID Distribution:</strong><br>
+                        - UUID IDs: ${summary.uuid_ids}<br>
+                        - Place IDs: ${summary.place_ids}<br>
+                        - Legacy IDs: ${summary.legacy_ids}
+                    </div>
+
+                    <div class="result-item" style="border-left-color: ${summary.orphaned_costs > 0 ? '#f5576c' : '#4facfe'}">
+                        <strong>Orphaned Costs:</strong> ${summary.orphaned_costs}
+                        ${summary.orphaned_costs > 0 ? '⚠️ Needs attention!' : '✅ All good!'}
+                    </div>
+
+                    <div class="result-item">
+                        <strong>Validation Status:</strong>
+                        ${validation.valid ? '✅ Valid' : '❌ Has errors'}<br>
+                        ${validation.errors.length > 0 ? `Errors: ${validation.errors.length}<br>` : ''}
+                        ${validation.warnings.length > 0 ? `Warnings: ${validation.warnings.length}` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        window.runValidation = async function() {
+            const scenarioId = document.getElementById('scenarioId').value.trim();
+
+            if (!scenarioId) {
+                showStatus('⚠️ Please enter a scenario ID', 'error');
+                return;
+            }
+
+            showStatus('🔍 Running validation...', 'info');
+            logDiv.textContent = '';
+            resultsDiv.innerHTML = '';
+
+            try {
+                console.log('═══════════════════════════════════════════════════════');
+                console.log('🚀 Starting Data Validation');
+                console.log(`Scenario ID: ${scenarioId}`);
+                console.log('═══════════════════════════════════════════════════════\n');
+
+                // Fetch data
+                console.log('📦 Fetching data...');
+                const costsResponse = await fetch(`/api/costs?session_id=${scenarioId}`);
+
+                if (!costsResponse.ok) {
+                    throw new Error(`Failed to fetch costs: ${costsResponse.statusText}`);
+                }
+
+                const costsData = await costsResponse.json();
+                const costs = costsData.costs || [];
+
+                let locations = [];
+                if (window.appWorkingData && window.appWorkingData.locations) {
+                    locations = window.appWorkingData.locations;
+                } else {
+                    console.warn('⚠️ No location data in window.appWorkingData');
+                }
+
+                console.log(`✅ Loaded ${locations.length} locations and ${costs.length} costs\n`);
+
+                // Run validation
+                console.log('🔍 Running comprehensive validation...\n');
+                const data = { locations, costs };
+                const validation = window.DestIdMgr.validateDataIntegrity(data);
+
+                // Display summary
+                console.log('📊 VALIDATION SUMMARY');
+                console.log('═══════════════════════════════════════════════════════');
+                console.log(`Total Locations: ${validation.summary.total_locations}`);
+                console.log(`Total Costs: ${validation.summary.total_costs}`);
+                console.log(`\nID Type Distribution:`);
+                console.log(`  - UUID IDs: ${validation.summary.uuid_ids}`);
+                console.log(`  - Place IDs: ${validation.summary.place_ids}`);
+                console.log(`  - Legacy IDs: ${validation.summary.legacy_ids}`);
+                console.log(`\n⚠️ ISSUES:`);
+                console.log(`  - Orphaned costs: ${validation.summary.orphaned_costs}`);
+
+                if (validation.errors.length > 0) {
+                    console.log('\n❌ ERRORS:');
+                    validation.errors.forEach(err => {
+                        console.log(`  - ${err.message}`);
+                    });
+                }
+
+                if (validation.warnings.length > 0) {
+                    console.log('\n⚠️ WARNINGS:');
+                    validation.warnings.forEach(warn => {
+                        console.log(`  - ${warn.message}`);
+                    });
+                }
+
+                console.log('═══════════════════════════════════════════════════════\n');
+
+                // Show orphaned costs details if any
+                if (validation.summary.orphaned_costs > 0) {
+                    console.log('💰 ORPHANED COSTS DETAILS:\n');
+                    const orphanedCosts = window.DestIdMgr.findOrphanedCosts(costs, locations);
+
+                    orphanedCosts.forEach((cost, index) => {
+                        console.log(`${index + 1}. ${cost.category} - ${cost.description || 'N/A'}`);
+                        console.log(`   Invalid destination_id: ${cost.destination_id}`);
+                        console.log(`   Amount: $${cost.amount_usd || cost.amount || 0}`);
+                        console.log('');
+                    });
+                }
+
+                // Show recommendations
+                if (validation.summary.legacy_ids > 0) {
+                    console.log('💡 RECOMMENDATIONS:');
+                    console.log(`  1. Migrate ${validation.summary.legacy_ids} legacy IDs to UUIDs`);
+                }
+                if (validation.summary.orphaned_costs > 0) {
+                    console.log(`  2. Clean up ${validation.summary.orphaned_costs} orphaned costs`);
+                }
+                if (validation.warnings.some(w => w.type === 'mixed_id_types')) {
+                    console.log('  3. Standardize ID types across all locations');
+                }
+
+                showResults(validation);
+                showStatus('✅ Validation complete! Review the results above.', 'success');
+
+            } catch (error) {
+                console.error('Validation failed:', error);
+                showStatus(`❌ Validation failed: ${error.message}`, 'error');
+            }
+        };
+
+        window.clearOutput = function() {
+            logDiv.textContent = '';
+            resultsDiv.innerHTML = '';
+            statusDiv.innerHTML = '';
+        };
+
+        // Auto-populate if scenario ID available
+        if (window.currentScenarioId) {
+            document.getElementById('scenarioId').value = window.currentScenarioId;
+        }
+
+        console.log('✅ Validation runner loaded and ready!');
+        console.log('Enter your scenario ID and click "Run Full Validation"');
+    </script>
+</body>
+</html>

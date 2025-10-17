@@ -20,6 +20,7 @@ import json
 import os
 import re
 import time
+import uuid
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -132,22 +133,21 @@ def _get_session_id(tool_context: ToolContext) -> str:
     return "default_session"
 
 
-def _next_location_id(itinerary: Dict[str, Any]) -> int:
-    """Produce a unique numeric id for a new location."""
+def _next_location_id(itinerary: Dict[str, Any]) -> str:
+    """Generate a unique UUID for a new location.
 
-    max_id = 0
-    for loc in itinerary.get("locations", []):
-        try:
-            current = int(loc.get("id", 0))
-        except (TypeError, ValueError):
-            continue
-        max_id = max(max_id, current)
+    This ensures consistency with the frontend UUID-based ID system
+    and prevents issues with cost research lookups.
+    """
+    # Generate a UUID v4
+    new_id = str(uuid.uuid4())
 
-    if max_id > 0:
-        return max_id + 1
+    # Ensure uniqueness (extremely rare collision, but defensive)
+    existing_ids = {str(loc.get("id", "")).lower() for loc in itinerary.get("locations", [])}
+    while new_id.lower() in existing_ids:
+        new_id = str(uuid.uuid4())
 
-    # Fallback when no numeric ids exist yet
-    return int(time.time())
+    return new_id
 
 
 def _lookup_reference(name: str, city: Optional[str]) -> Optional[Dict[str, Any]]:

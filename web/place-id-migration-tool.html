@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Place ID to UUID Migration</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 { color: #333; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 30px; line-height: 1.6; }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        .input-group { margin: 20px 0; }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #444;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: translateY(-2px); }
+        button.secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        button.success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .status {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .success-status { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+        .error-status { background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
+        .info-status { background: #d1ecf1; color: #0c5460; border: 2px solid #bee5eb; }
+        .warning-status { background: #fff3cd; color: #856404; border: 2px solid #ffeaa7; }
+        .log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Place ID to UUID Migration</h1>
+        <p class="subtitle">
+            Migrate destinations from using Google Place IDs as primary keys to UUIDs,
+            while preserving Place IDs as metadata. This matches the current architecture
+            for new destinations.
+        </p>
+
+        <div class="info-box">
+            <h3>Why Migrate?</h3>
+            <ul>
+                <li><strong>Consistency:</strong> New destinations already use UUIDs</li>
+                <li><strong>Flexibility:</strong> Allow same place to appear multiple times</li>
+                <li><strong>Future-proof:</strong> Not dependent on Google's Place ID system</li>
+                <li><strong>Safe:</strong> Place IDs are preserved in the <code>place_id</code> field</li>
+            </ul>
+        </div>
+
+        <div class="info-box" style="background: #fff3cd; border-left-color: #ffc107;">
+            <h3>What Gets Changed?</h3>
+            <ul>
+                <li><code>id</code>: ChIJ... → UUID (a1b2c3d4-...)</li>
+                <li><code>place_id</code>: ChIJ... (preserved)</li>
+                <li><code>_legacy_id</code>: ChIJ... (backup)</li>
+                <li>All cost <code>destination_id</code> references updated</li>
+            </ul>
+        </div>
+
+        <div class="input-group">
+            <label for="scenarioId">Scenario ID:</label>
+            <input type="text" id="scenarioId" placeholder="Enter scenario ID">
+        </div>
+
+        <div class="button-group">
+            <button class="success" onclick="runPreview()">
+                👁️ Preview Migration (Safe)
+            </button>
+            <button class="secondary" onclick="runMigration()">
+                🚀 Execute Migration
+            </button>
+        </div>
+
+        <div id="status"></div>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script type="module">
+        import { migratePlaceIdsToUUIDs, previewPlaceIdMigration } from './place-id-to-uuid-migration.js';
+
+        window.migratePlaceIdsToUUIDs = migratePlaceIdsToUUIDs;
+        window.previewPlaceIdMigration = previewPlaceIdMigration;
+    </script>
+
+    <script>
+        const logDiv = document.getElementById('log');
+        const statusDiv = document.getElementById('status');
+
+        // Console capture
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function appendToLog(type, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            appendToLog('log', ...args);
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            appendToLog('error', '❌', ...args);
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            appendToLog('warn', '⚠️', ...args);
+        };
+
+        function showStatus(message, type = 'info') {
+            statusDiv.innerHTML = `<div class="status ${type}-status">${message}</div>`;
+        }
+
+        function getScenarioId() {
+            let scenarioId = document.getElementById('scenarioId').value.trim();
+            if (!scenarioId && window.currentScenarioId) {
+                scenarioId = window.currentScenarioId;
+                document.getElementById('scenarioId').value = scenarioId;
+            }
+            if (!scenarioId) {
+                showStatus('⚠️ Please enter a scenario ID', 'error');
+                return null;
+            }
+            return scenarioId;
+        }
+
+        window.runPreview = async function() {
+            const scenarioId = getScenarioId();
+            if (!scenarioId) return;
+
+            logDiv.textContent = '';
+            showStatus('👁️ Running migration preview...', 'info');
+
+            try {
+                const result = await window.previewPlaceIdMigration(scenarioId);
+
+                if (result.success) {
+                    const msg = `✅ Preview complete! Would migrate ${result.migrated} locations from Place IDs to UUIDs. All ${result.migrated} Place IDs will be preserved in the place_id field.`;
+                    showStatus(msg, 'success');
+                } else {
+                    showStatus(`❌ Preview failed: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        };
+
+        window.runMigration = async function() {
+            const scenarioId = getScenarioId();
+            if (!scenarioId) return;
+
+            if (!confirm('⚠️ This will migrate Place ID locations to UUIDs. The Place IDs will be preserved as metadata. Continue?')) {
+                return;
+            }
+
+            logDiv.textContent = '';
+            showStatus('🚀 Executing migration...', 'warning');
+
+            try {
+                const result = await window.migratePlaceIdsToUUIDs(scenarioId, {
+                    dryRun: false,
+                    saveToDB: true
+                });
+
+                if (result.success && result.saved) {
+                    showStatus(`✅ Migration complete! Migrated ${result.migrated} locations. Costs saved successfully. IMPORTANT: Now save your scenario to persist location changes!`, 'success');
+
+                    setTimeout(() => {
+                        if (confirm('Migration complete! You need to save the scenario in the main app to persist changes. Open the main app now?')) {
+                            window.location.href = '/index.html';
+                        }
+                    }, 3000);
+                } else if (result.success) {
+                    showStatus(`⚠️ Migration completed but save may have failed. Check console for details.`, 'warning');
+                } else {
+                    showStatus(`❌ Migration failed: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        };
+
+        // Auto-populate scenario ID
+        if (window.currentScenarioId) {
+            document.getElementById('scenarioId').value = window.currentScenarioId;
+        }
+
+        console.log('✅ Place ID to UUID Migration Tool loaded!');
+        console.log('Click "Preview Migration" to see what will change (safe, no modifications).');
+    </script>
+</body>
+</html>

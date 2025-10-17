@@ -498,8 +498,9 @@ CRITICAL REMINDERS:
                         base_local = _to_float(cat_data.get('amount_local', 0))
                         currency_local = cat_data.get('currency_local', 'USD')
 
-                        # Generate stable cost item ID
-                        cost_id = f"{actual_destination_id}_{itinerary_cat}"
+                        # Generate UUID for cost item
+                        import uuid
+                        cost_id = str(uuid.uuid4())
 
                         cost_items.append({
                             'id': cost_id,
@@ -1192,11 +1193,92 @@ def update_cost(cost_id):
 
 @app.route('/api/costs/<cost_id>', methods=['DELETE'])
 def delete_cost(cost_id):
-    """Delete a cost item."""
+    """Delete a cost item from Firestore or in-memory tracker."""
     try:
-        data = request.json or {}
-        session_id = data.get('session_id', 'default')
+        from google.cloud import firestore
 
+        data = request.json or {}
+        # Accept session_id from query params or JSON body
+        session_id = request.args.get('session_id') or data.get('session_id', 'default')
+        scenario_id = session_id  # Using session_id as scenario_id
+
+        print(f"🗑️ DELETE /api/costs/{cost_id} - session_id: {session_id}")
+
+        # Try Firestore first
+        try:
+            db = firestore.Client()
+            scenario_ref = db.collection('scenarios').document(scenario_id)
+            scenario_doc = scenario_ref.get()
+
+            if scenario_doc.exists:
+                print(f"✅ Found scenario in Firestore: {scenario_id}")
+                scenario_data = scenario_doc.to_dict()
+
+                # Get the latest version
+                versions = list(
+                    scenario_ref
+                        .collection('versions')
+                        .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                        .limit(1)
+                        .stream()
+                )
+
+                if not versions:
+                    print(f"⚠️ No versions found for scenario: {scenario_id}")
+                    raise Exception("No versions found")
+
+                latest_version_data = versions[0].to_dict() or {}
+                itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+                version_costs = itinerary_data.get('costs', []) or []
+
+                # Find and remove the cost
+                print(f"🔍 Looking for cost_id: {cost_id} in {len(version_costs)} costs")
+                cost_found = False
+                updated_costs = []
+
+                for cost in version_costs:
+                    if cost.get('id') == cost_id:
+                        cost_found = True
+                        print(f"✓ Found cost to delete: {cost.get('category')} ${cost.get('amount', 0)}")
+                    else:
+                        updated_costs.append(cost)
+
+                if not cost_found:
+                    print(f"❌ Cost not found with id={cost_id}")
+                    return jsonify({'status': 'error', 'error': 'Cost not found'}), 404
+
+                # Create a new version with the cost removed
+                new_version_number = max(int(scenario_data.get('currentVersion', 0) or 0), int(latest_version_data.get('versionNumber', 0) or 0)) + 1
+                new_version_ref = scenario_ref.collection('versions').document()
+                new_itinerary_data = dict(itinerary_data)
+                new_itinerary_data['costs'] = updated_costs
+
+                new_version_ref.set({
+                    'versionNumber': new_version_number,
+                    'versionName': '',
+                    'isNamed': False,
+                    'itineraryData': new_itinerary_data,
+                    'createdAt': firestore.SERVER_TIMESTAMP,
+                    'itineraryDataHash': None,
+                    'isAutosave': True,
+                })
+
+                # Update scenario's currentVersion
+                scenario_ref.update({
+                    'currentVersion': new_version_number,
+                    'updatedAt': firestore.SERVER_TIMESTAMP,
+                })
+
+                print(f"✅ Created new version v{new_version_number} with cost deleted")
+                print(f"   Costs before: {len(version_costs)}, after: {len(updated_costs)}")
+
+                return jsonify({'status': 'success'})
+
+        except Exception as firestore_error:
+            print(f"⚠️ Firestore error, falling back to in-memory tracker: {firestore_error}")
+
+        # Fallback to in-memory tracker
+        print(f"🔁 Using in-memory cost tracker for session: {session_id}")
         tracker = get_cost_tracker(session_id)
         success = tracker.delete_cost(cost_id)
 
@@ -1204,8 +1286,11 @@ def delete_cost(cost_id):
             return jsonify({'status': 'success'})
         else:
             return jsonify({'status': 'error', 'error': 'Cost not found'}), 404
+
     except Exception as e:
-        print(f"Error deleting cost: {e}")
+        print(f"❌ Error deleting cost: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route('/api/costs', methods=['GET'])
@@ -1846,6 +1931,54 @@ def bulk_update_costs():
             'error': str(e),
             'error_details': error_details
         }), 500
+
+@app.route('/api/working-data', methods=['GET'])
+def get_working_data():
+    """Get working data including locations for a scenario.
+
+    Query params: session_id (or scenario_id for compatibility)
+    Returns: {'locations': [...], 'itineraryData': {...}}
+    """
+    try:
+        from google.cloud import firestore
+
+        session_id = request.args.get('session_id') or request.args.get('scenario_id')
+
+        if not session_id:
+            return jsonify({'error': 'session_id or scenario_id required'}), 400
+
+        print(f"📊 GET /api/working-data - session_id: {session_id}")
+
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(session_id)
+
+        # Get latest version
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if not versions:
+            return jsonify({'locations': [], 'itineraryData': {}}), 200
+
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        locations = itinerary_data.get('locations', [])
+
+        return jsonify({
+            'locations': locations,
+            'itineraryData': itinerary_data
+        })
+
+    except Exception as e:
+        print(f"Error fetching working data: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Return empty data instead of error to allow graceful degradation
+        return jsonify({'locations': [], 'itineraryData': {}}), 200
 
 @app.route('/api/itinerary/summary', methods=['POST'])
 def generate_summary():

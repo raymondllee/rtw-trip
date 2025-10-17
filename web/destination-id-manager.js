@@ -54,7 +54,10 @@ export function isPlaceId(id) {
  * @returns {string}
  */
 export function normalizeId(id) {
-  return String(id);
+  if (id === null || id === undefined) {
+    return '';
+  }
+  return String(id).trim();
 }
 
 // ============================================================================

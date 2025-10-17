@@ -124,7 +124,11 @@ def structured_output_callback(
             if _has_tool_response(part):
                 tool_response_count += 1
 
-    if tool_response_count >= 3:
+    # Previously we required at least three tool responses before forcing the
+    # agent into structured-output mode. In practice, some runs complete after a
+    # single search/tool call, so relax the threshold to reduce the chance of
+    # exiting without emitting the DestinationCostResearch payload.
+    if tool_response_count >= 2:
         # Switch to structured output phase:
         #   - Disable search tools
         #   - Allow only the structured output tool
