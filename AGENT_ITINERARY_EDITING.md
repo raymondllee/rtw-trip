@@ -62,7 +62,7 @@ This starts on port 5001.
 
 ```bash
 # From project root
-npm run serve
+npm run dev
 ```
 
 This starts on port 5173.
@@ -178,7 +178,7 @@ Defined in `/python/agents/travel-concierge/api_server.py`:
 
 ### Frontend Integration
 
-In `/web/chat.js` and `/web/app-final.js`:
+In `web/src/chat/travelConciergeChat.ts` and `web/src/app/initMapApp.ts`:
 
 - Chat polls for changes every 2 seconds when open
 - Changes are applied to `workingData.locations`

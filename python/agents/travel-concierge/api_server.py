@@ -17,16 +17,241 @@
 from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
 import json
+import logging
 import re
 import time
 import uuid
 import requests
 import os
 from datetime import datetime
+from typing import Any, Dict, List
+
+try:
+    from google.cloud import firestore
+except Exception:  # pragma: no cover - Firestore optional
+    firestore = None
 
 from travel_concierge.tools.cost_tracker import CostTrackerService
 from travel_concierge.tools.cost_manager import _to_float
 from travel_concierge.shared_libraries.types import CostItem
+
+
+class SessionStore:
+    """Session and cost tracker persistence with Firestore fallback."""
+
+    def __init__(self, collection_name: str = 'web_sessions') -> None:
+        self._logger = logging.getLogger(__name__)
+        self._collection_name = collection_name
+        self._use_firestore = firestore is not None
+        self._client = None
+        self._collection = None
+        self._session_cache: Dict[str, Dict[str, Any]] = {}
+        self._cost_cache: Dict[str, CostTrackerService] = {}
+        self._metadata: Dict[str, Dict[str, float]] = {}
+        self._metadata_loaded = False
+
+        # In-memory fallback structures
+        self._fallback_sessions: Dict[str, Dict[str, Any]] = {}
+        self._fallback_costs: Dict[str, CostTrackerService] = {}
+
+        if self._use_firestore:
+            try:
+                self._client = firestore.Client()
+                self._collection = self._client.collection(self._collection_name)
+                self._logger.info('SessionStore using Firestore backend')
+            except Exception as exc:  # pragma: no cover
+                self._logger.warning('Firestore client unavailable (%s); using in-memory store', exc)
+                self._use_firestore = False
+
+    @staticmethod
+    def _now() -> float:
+        return time.time()
+
+    def _load_session_from_firestore(self, session_id: str) -> Dict[str, Any]:
+        if not self._collection:
+            return {'changes': [], 'last_activity_epoch': self._now(), 'created_at_epoch': self._now()}
+
+        doc = self._collection.document(session_id).get()
+        if doc.exists:
+            data = doc.to_dict() or {}
+            data.setdefault('changes', [])
+            data.setdefault('last_activity_epoch', self._now())
+            data.setdefault('created_at_epoch', data.get('last_activity_epoch', self._now()))
+            return data
+
+        return {'changes': [], 'last_activity_epoch': self._now(), 'created_at_epoch': self._now()}
+
+    def _ensure_session_cache(self, session_id: str) -> Dict[str, Any]:
+        if session_id in self._session_cache:
+            return self._session_cache[session_id]
+
+        if self._use_firestore:
+            data = self._load_session_from_firestore(session_id)
+        else:
+            data = self._fallback_sessions.setdefault(
+                session_id,
+                {'changes': [], 'last_activity_epoch': self._now(), 'created_at_epoch': self._now()},
+            )
+
+        self._session_cache[session_id] = data
+        self._metadata[session_id] = {
+            'last_activity_epoch': data.get('last_activity_epoch', self._now()),
+            'created_at_epoch': data.get('created_at_epoch', self._now()),
+        }
+        return data
+
+    def _persist_session(self, session_id: str) -> None:
+        data = self._session_cache.get(session_id)
+        if not data:
+            return
+
+        last_activity = data.get('last_activity_epoch', self._now())
+        created_at = data.get('created_at_epoch', last_activity)
+        self._metadata[session_id] = {
+            'last_activity_epoch': last_activity,
+            'created_at_epoch': created_at,
+        }
+
+        if self._use_firestore and self._collection:
+            payload = {
+                'changes': data.get('changes', []),
+                'last_activity': firestore.SERVER_TIMESTAMP,
+                'last_activity_epoch': last_activity,
+                'created_at_epoch': created_at,
+            }
+            if 'created_at' not in data:
+                payload['created_at'] = firestore.SERVER_TIMESTAMP
+                data['created_at'] = True
+            self._collection.document(session_id).set(payload, merge=True)
+        else:
+            self._fallback_sessions[session_id] = data
+
+    def append_change(self, session_id: str, change: Dict[str, Any]) -> int:
+        data = self._ensure_session_cache(session_id)
+        data.setdefault('changes', []).append(change)
+        data['last_activity_epoch'] = self._now()
+        self._session_cache[session_id] = data
+        self._persist_session(session_id)
+        return len(data['changes'])
+
+    def touch_session(self, session_id: str) -> None:
+        data = self._ensure_session_cache(session_id)
+        data['last_activity_epoch'] = self._now()
+        self._session_cache[session_id] = data
+        if self._use_firestore and self._collection:
+            self._collection.document(session_id).set(
+                {
+                    'last_activity': firestore.SERVER_TIMESTAMP,
+                    'last_activity_epoch': data['last_activity_epoch'],
+                },
+                merge=True,
+            )
+        else:
+            self._fallback_sessions[session_id] = data
+        self._metadata[session_id] = {
+            'last_activity_epoch': data['last_activity_epoch'],
+            'created_at_epoch': data.get('created_at_epoch', data['last_activity_epoch']),
+        }
+
+    def pop_changes(self, session_id: str) -> List[Dict[str, Any]]:
+        data = self._ensure_session_cache(session_id)
+        changes = list(data.get('changes', []))
+        data['changes'] = []
+        self._session_cache[session_id] = data
+        self._persist_session(session_id)
+        return changes
+
+    def delete_session(self, session_id: str) -> None:
+        self._session_cache.pop(session_id, None)
+        self._cost_cache.pop(session_id, None)
+        self._metadata.pop(session_id, None)
+        if self._use_firestore and self._collection:
+            try:
+                self._collection.document(session_id).delete()
+            except Exception as exc:  # pragma: no cover
+                self._logger.warning('Failed to delete session %s from Firestore: %s', session_id, exc)
+        else:
+            self._fallback_sessions.pop(session_id, None)
+            self._fallback_costs.pop(session_id, None)
+
+    def get_cost_tracker(self, session_id: str) -> CostTrackerService:
+        if session_id in self._cost_cache:
+            return self._cost_cache[session_id]
+
+        if self._use_firestore and self._collection:
+            doc = self._collection.document(session_id).get()
+            costs_data = []
+            if doc.exists:
+                doc_data = doc.to_dict() or {}
+                costs_data = doc_data.get('costs', [])
+        else:
+            tracker = self._fallback_costs.get(session_id)
+            if tracker:
+                self._cost_cache[session_id] = tracker
+                return tracker
+            costs_data = []
+
+        tracker = CostTrackerService()
+        for item in costs_data:
+            try:
+                tracker.costs.append(CostItem(**item))
+            except Exception as exc:
+                self._logger.warning('Skipping malformed cost item for session %s: %s', session_id, exc)
+
+        self._cost_cache[session_id] = tracker
+        return tracker
+
+    def save_cost_tracker(self, session_id: str, tracker: CostTrackerService) -> None:
+        self._cost_cache[session_id] = tracker
+        now_epoch = self._now()
+        self._metadata.setdefault(session_id, {
+            'created_at_epoch': now_epoch,
+            'last_activity_epoch': now_epoch,
+        })
+        self._metadata[session_id]['last_activity_epoch'] = now_epoch
+
+        if self._use_firestore and self._collection:
+            payload = {
+                'costs': [cost.model_dump() for cost in tracker.costs],
+                'costs_updated_at': firestore.SERVER_TIMESTAMP,
+                'last_activity': firestore.SERVER_TIMESTAMP,
+                'last_activity_epoch': now_epoch,
+            }
+            self._collection.document(session_id).set(payload, merge=True)
+        else:
+            self._fallback_costs[session_id] = tracker
+
+    def list_sessions(self) -> Dict[str, Dict[str, float]]:
+        if self._use_firestore and self._collection and not self._metadata_loaded:
+            for doc in self._collection.stream():
+                data = doc.to_dict() or {}
+                self._metadata[doc.id] = {
+                    'last_activity_epoch': data.get('last_activity_epoch', 0.0),
+                    'created_at_epoch': data.get('created_at_epoch', 0.0),
+                }
+            self._metadata_loaded = True
+
+        if not self._use_firestore:
+            for sid, data in self._fallback_sessions.items():
+                self._metadata[sid] = {
+                    'last_activity_epoch': data.get('last_activity_epoch', 0.0),
+                    'created_at_epoch': data.get('created_at_epoch', 0.0),
+                }
+
+        return self._metadata
+
+    def get_recent_sessions(self, exclude_default: bool = False) -> List[str]:
+        metadata = self.list_sessions()
+        sessions = [
+            sid for sid in metadata
+            if not (exclude_default and sid == 'default_session')
+        ]
+        sessions.sort(key=lambda sid: metadata[sid].get('last_activity_epoch', 0.0))
+        return sessions
+
+
+session_store = SessionStore()
+logger = logging.getLogger('travel_concierge.api')
 
 # Determine web directory path
 # In production (Railway), files are at /app/web
@@ -43,13 +268,6 @@ CORS(app)  # Enable CORS for frontend requests
 ADK_API_URL = "http://127.0.0.1:8000"
 APP_NAME = "travel_concierge"
 USER_ID = "web_user"
-
-# Store sessions in memory (use Redis/DB for production)
-sessions = {}
-
-# Cost tracker service (one instance per session - in production use DB)
-cost_trackers = {}
-
 
 def normalize_destination_id(raw_id, name):
     """Return destination identifiers as stable strings."""
@@ -68,6 +286,34 @@ def normalize_destination_id(raw_id, name):
 
     # Fallback unique identifier when no usable name exists
     return str(uuid.uuid4())
+
+
+def resolve_session_id(requested_session_id: str) -> str:
+    """Resolve legacy default_session identifiers to the most recent active session."""
+    if requested_session_id != 'default_session':
+        return requested_session_id
+
+    metadata = session_store.list_sessions()
+    now = time.time()
+    recent_sessions = session_store.get_recent_sessions(exclude_default=True)
+
+    for session_id in reversed(recent_sessions):
+        last_activity = metadata.get(session_id, {}).get('last_activity_epoch')
+        if last_activity and (now - last_activity) < 600:
+            return session_id
+
+    if recent_sessions:
+        return recent_sessions[-1]
+
+    return requested_session_id
+
+
+def record_itinerary_change(session_id: str, change: Dict[str, Any]) -> tuple[str, int]:
+    """Store an itinerary change and return the resolved session ID and pending count."""
+    resolved_session = resolve_session_id(session_id or 'default_session')
+    session_store.touch_session(resolved_session)
+    pending = session_store.append_change(resolved_session, change)
+    return resolved_session, pending
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -214,6 +460,15 @@ CRITICAL REMINDERS:
         if scenario_id:
             adk_payload["state"]["scenario_id"] = scenario_id
 
+        logger.info(
+            "Dispatching chat request",
+            extra={
+                'session_id': session_id,
+                'scenario_id': scenario_id,
+                'initialize_itinerary': initialize_itinerary,
+                'destination_count': len(context.get('destinations', [])) if context else 0,
+            }
+        )
         print(f"\n🔧 ADK STATE DEBUG:")
         print(f"   Session ID being passed: {session_id}")
         print(f"   Scenario ID being passed: {scenario_id}")
@@ -221,9 +476,7 @@ CRITICAL REMINDERS:
         print(f"{'='*50}\n")
 
         # Track session activity for the default_session fix
-        if session_id not in sessions:
-            sessions[session_id] = {'changes': []}
-        sessions[session_id]['last_activity'] = time.time()
+        session_store.touch_session(session_id)
 
         # ALWAYS pass itinerary data when context has destinations
         # This ensures tools like generate_itinerary_summary can access the itinerary
@@ -566,6 +819,7 @@ CRITICAL REMINDERS:
     except requests.exceptions.ConnectionError:
         import traceback
         error_details = traceback.format_exc()
+        logger.error("ADK API connection error", exc_info=True)
         print(f"Connection error: {error_details}")
         return jsonify({
             'error': 'Could not connect to ADK API server. Please run: adk api_server travel_concierge',
@@ -574,6 +828,7 @@ CRITICAL REMINDERS:
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
+        logger.exception("Chat endpoint failure: %s", e)
         print(f"Error in chat endpoint: {error_details}")
         return jsonify({
             'error': str(e),
@@ -584,8 +839,7 @@ CRITICAL REMINDERS:
 @app.route('/api/sessions/<session_id>', methods=['DELETE'])
 def delete_session(session_id):
     """Delete a session"""
-    if session_id in sessions:
-        del sessions[session_id]
+    session_store.delete_session(session_id)
     return jsonify({'status': 'success'})
 
 # Itinerary modification endpoints
@@ -597,37 +851,13 @@ def add_destination_endpoint():
     data = request.json
     destination = data.get('destination', {})
     insert_after = data.get('insert_after')
-    session_id = data.get('session_id')
-
-    # Fix for default_session issue - if tools are sending default_session,
-    # try to find a more appropriate session
-    if session_id == 'default_session':
-        # Look for recently active sessions (with activity in last 10 minutes)
-        current_time = time.time()
-        for sid, session_data in sessions.items():
-            if sid != 'default_session' and 'last_activity' in session_data:
-                if current_time - session_data['last_activity'] < 600:  # 10 minutes
-                    session_id = sid
-                    print(f"🔧 FIXED: Replaced default_session with active session: {session_id}")
-                    break
-
-        # If no active session found, use the most recent session
-        if session_id == 'default_session' and len(sessions) > 1:
-            # Find the most recently created session (excluding default_session)
-            recent_sessions = [sid for sid in sessions.keys() if sid != 'default_session']
-            if recent_sessions:
-                session_id = recent_sessions[-1]  # Use last created session
-                print(f"🔧 FIXED: Replaced default_session with most recent session: {session_id}")
+    session_id = resolve_session_id(data.get('session_id') or 'default_session')
+    session_store.touch_session(session_id)
 
     print(f"📍 ADD DESTINATION called:")
     print(f"   Session ID: {session_id}")
     print(f"   Destination: {destination.get('name')}")
     print(f"   Insert after: {insert_after}")
-
-    # Store the change to be picked up by the frontend
-    if session_id not in sessions:
-        sessions[session_id] = {'changes': []}
-        print(f"   Created new session entry for {session_id}")
 
     change = {
         'type': 'add',
@@ -636,9 +866,9 @@ def add_destination_endpoint():
         'timestamp': json.dumps(datetime.now(), default=str)
     }
 
-    sessions[session_id]['changes'].append(change)
+    pending = session_store.append_change(session_id, change)
 
-    print(f"   ✅ Change stored. Total changes pending: {len(sessions[session_id]['changes'])}")
+    print(f"   ✅ Change stored. Total changes pending: {pending}")
 
     return jsonify({
         'status': 'success',
@@ -651,20 +881,16 @@ def remove_destination_endpoint():
     """Remove a destination from the itinerary"""
     data = request.json
     destination_name = data.get('destination_name')
-    session_id = data.get('session_id')
-
-    if session_id not in sessions:
-        sessions[session_id] = {'changes': []}
-
     change = {
         'type': 'remove',
         'destination_name': destination_name,
         'timestamp': json.dumps(datetime.now(), default=str)
     }
 
-    sessions[session_id]['changes'].append(change)
+    session_id, pending = record_itinerary_change(data.get('session_id'), change)
 
     print(f"Removed destination: {destination_name}")
+    print(f"   Pending changes for {session_id}: {pending}")
 
     return jsonify({
         'status': 'success',
@@ -677,11 +903,6 @@ def update_duration_endpoint():
     data = request.json
     destination_name = data.get('destination_name')
     new_duration_days = data.get('new_duration_days')
-    session_id = data.get('session_id')
-
-    if session_id not in sessions:
-        sessions[session_id] = {'changes': []}
-
     change = {
         'type': 'update_duration',
         'destination_name': destination_name,
@@ -689,9 +910,10 @@ def update_duration_endpoint():
         'timestamp': json.dumps(datetime.now(), default=str)
     }
 
-    sessions[session_id]['changes'].append(change)
+    session_id, pending = record_itinerary_change(data.get('session_id'), change)
 
     print(f"Updated duration for {destination_name}: {new_duration_days} days")
+    print(f"   Pending changes for {session_id}: {pending}")
 
     return jsonify({
         'status': 'success',
@@ -704,11 +926,6 @@ def update_destination_endpoint():
     data = request.json
     destination_name = data.get('destination_name')
     updates = data.get('updates', {})
-    session_id = data.get('session_id')
-
-    if session_id not in sessions:
-        sessions[session_id] = {'changes': []}
-
     change = {
         'type': 'update',
         'destination_name': destination_name,
@@ -716,9 +933,10 @@ def update_destination_endpoint():
         'timestamp': json.dumps(datetime.now(), default=str)
     }
 
-    sessions[session_id]['changes'].append(change)
+    session_id, pending = record_itinerary_change(data.get('session_id'), change)
 
     print(f"Updated destination {destination_name}: {updates}")
+    print(f"   Pending changes for {session_id}: {pending}")
 
     return jsonify({
         'status': 'success',
@@ -729,22 +947,18 @@ def update_destination_endpoint():
 @app.route('/api/itinerary/changes/<session_id>', methods=['GET'])
 def get_changes(session_id):
     """Get pending changes for a session (polled by frontend)"""
-    if session_id in sessions and 'changes' in sessions[session_id]:
-        changes = sessions[session_id]['changes']
-        if changes:  # Only log when there are actual changes
-            print(f"🔔 CHANGES ENDPOINT POLLED:")
-            print(f"   Session ID: {session_id}")
-            print(f"   Changes to send: {len(changes)}")
-            print(f"   Changes: {changes}")
-        # Clear changes after sending
-        sessions[session_id]['changes'] = []
-        return jsonify({
-            'status': 'success',
-            'changes': changes
-        })
+    resolved_session = resolve_session_id(session_id)
+    changes = session_store.pop_changes(resolved_session)
+
+    if changes:
+        print(f"🔔 CHANGES ENDPOINT POLLED:")
+        print(f"   Session ID: {resolved_session}")
+        print(f"   Changes to send: {len(changes)}")
+        print(f"   Changes: {changes}")
+
     return jsonify({
         'status': 'success',
-        'changes': []
+        'changes': changes
     })
 
 @app.route('/api/generate-title', methods=['POST'])
@@ -915,11 +1129,12 @@ def health():
 # Cost Tracking API Endpoints
 # ============================================================================
 
-def get_cost_tracker(session_id):
-    """Get or create cost tracker for a session."""
-    if session_id not in cost_trackers:
-        cost_trackers[session_id] = CostTrackerService()
-    return cost_trackers[session_id]
+def get_cost_tracker(session_id: str) -> tuple[CostTrackerService, str]:
+    """Get or create cost tracker for a session and return it with the resolved session ID."""
+    resolved_session = resolve_session_id(session_id or 'default_session')
+    session_store.touch_session(resolved_session)
+    tracker = session_store.get_cost_tracker(resolved_session)
+    return tracker, resolved_session
 
 
 def _build_destination_aliases(raw_destination_id, normalized_destination_id, destination_name):
@@ -998,8 +1213,8 @@ def _sanitize_cost_for_tracker(cost_dict: dict) -> CostItem:
 
 
 def _replace_destination_costs_in_tracker(identifier: str, destination_aliases: set[str], cost_items: list[dict]):
-    """Replace researched costs for a destination in the in-memory tracker."""
-    tracker = get_cost_tracker(identifier)
+    """Replace researched costs for a destination in the session tracker."""
+    tracker, resolved_identifier = get_cost_tracker(identifier)
     aliases = {alias for alias in destination_aliases if alias}
 
     preserved_costs = []
@@ -1030,6 +1245,8 @@ def _replace_destination_costs_in_tracker(identifier: str, destination_aliases: 
             continue
         tracker.costs.append(cost_model)
         new_costs.append(cost_model)
+
+    session_store.save_cost_tracker(resolved_identifier, tracker)
 
     return tracker.costs, new_costs
 
@@ -1064,7 +1281,7 @@ def add_cost():
         data = request.json
         session_id = data.get('session_id', 'default')
 
-        tracker = get_cost_tracker(session_id)
+        tracker, resolved_session = get_cost_tracker(session_id)
 
         cost_item = tracker.add_cost(
             category=data.get('category'),
@@ -1077,6 +1294,8 @@ def add_cost():
             source=data.get('source', 'manual'),
             notes=data.get('notes')
         )
+
+        session_store.save_cost_tracker(resolved_session, tracker)
 
         return jsonify({
             'status': 'success',
@@ -1110,9 +1329,10 @@ def update_cost(cost_id):
         if not scenario_doc.exists:
             # Fallback to in-memory tracker for backward compatibility
             print(f"⚠️ Scenario not found in Firestore, using in-memory tracker")
-            tracker = get_cost_tracker(session_id)
+            tracker, resolved_session = get_cost_tracker(session_id)
             cost_item = tracker.update_cost(cost_id, **updates)
             if cost_item:
+                session_store.save_cost_tracker(resolved_session, tracker)
                 return jsonify({'status': 'success', 'cost': cost_item.model_dump()})
             else:
                 return jsonify({'status': 'error', 'error': 'Cost not found'}), 404
@@ -1179,6 +1399,10 @@ def update_cost(cost_id):
         })
 
         print(f"✅ Created new version v{new_version_number} with updated cost")
+
+        tracker, resolved_session = get_cost_tracker(session_id)
+        tracker.update_cost(cost_id, **updates)
+        session_store.save_cost_tracker(resolved_session, tracker)
 
         return jsonify({
             'status': 'success',
@@ -1272,6 +1496,10 @@ def delete_cost(cost_id):
                 print(f"✅ Created new version v{new_version_number} with cost deleted")
                 print(f"   Costs before: {len(version_costs)}, after: {len(updated_costs)}")
 
+                tracker, resolved_session = get_cost_tracker(session_id)
+                tracker.delete_cost(cost_id)
+                session_store.save_cost_tracker(resolved_session, tracker)
+
                 return jsonify({'status': 'success'})
 
         except Exception as firestore_error:
@@ -1279,8 +1507,10 @@ def delete_cost(cost_id):
 
         # Fallback to in-memory tracker
         print(f"🔁 Using in-memory cost tracker for session: {session_id}")
-        tracker = get_cost_tracker(session_id)
+        tracker, resolved_session = get_cost_tracker(session_id)
         success = tracker.delete_cost(cost_id)
+        if success:
+            session_store.save_cost_tracker(resolved_session, tracker)
 
         if success:
             return jsonify({'status': 'success'})
@@ -1357,7 +1587,7 @@ def get_costs():
             })
 
         print(f"🔁 Falling back to in-memory cost tracker for session: {session_id}")
-        tracker = get_cost_tracker(session_id)
+        tracker, _ = get_cost_tracker(session_id)
         if any([destination_id, category]):
             tracker_costs = tracker.filter_costs(destination_id=destination_id, category=category)
         else:
@@ -1385,7 +1615,7 @@ def get_cost_summary():
         traveler_count = data.get('traveler_count')
         total_days = data.get('total_days')
 
-        tracker = get_cost_tracker(session_id)
+        tracker, _ = get_cost_tracker(session_id)
         summary = tracker.get_cost_summary(
             destinations=destinations,
             traveler_count=traveler_count,
@@ -1405,7 +1635,7 @@ def export_costs():
     """Export all costs as JSON."""
     try:
         session_id = request.args.get('session_id', 'default')
-        tracker = get_cost_tracker(session_id)
+        tracker, _ = get_cost_tracker(session_id)
 
         return jsonify({
             'status': 'success',
@@ -1423,8 +1653,9 @@ def import_costs():
         session_id = data.get('session_id', 'default')
         costs_data = data.get('costs', [])
 
-        tracker = get_cost_tracker(session_id)
+        tracker, resolved_session = get_cost_tracker(session_id)
         tracker.load_costs(costs_data)
+        session_store.save_cost_tracker(resolved_session, tracker)
 
         return jsonify({
             'status': 'success',

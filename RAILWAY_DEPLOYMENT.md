@@ -190,11 +190,7 @@ Instead:
 - Users can create/load scenarios through the UI
 - All data is persisted in Firebase Firestore
 
-This is configured in `web/app-final.js`:
-```javascript
-// Try to load from static file (local dev only)
-// Falls back to empty data and loads from Firestore
-```
+This behaviour is implemented in `web/src/app/initMapApp.ts` which initialises an empty dataset and hydrates from Firestore during startup.
 
 ## 🐛 Troubleshooting
 

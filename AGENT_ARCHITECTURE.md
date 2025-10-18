@@ -746,9 +746,9 @@ setInterval(async () => {
 
 ### Change Application
 
-**File**: `web/app-final.js`
+**File**: `web/src/app/initMapApp.ts`
 
-**Function**: `applyItineraryChanges(changes)`
+**Function**: `handleItineraryChanges(changes)`
 
 ```javascript
 for (const change of changes) {

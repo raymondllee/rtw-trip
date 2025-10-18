@@ -47,6 +47,8 @@ function buildConfig() {
   console.log('  FIREBASE_PROJECT_ID:', env.FIREBASE_PROJECT_ID || 'NOT SET');
   console.log('  FIREBASE_API_KEY:', env.FIREBASE_API_KEY ? '***' + env.FIREBASE_API_KEY.slice(-4) : 'NOT SET');
   console.log('  GOOGLE_MAPS_API_KEY:', env.GOOGLE_MAPS_API_KEY ? '***' + env.GOOGLE_MAPS_API_KEY.slice(-4) : 'NOT SET');
+  console.log('  FIREBASE_AUTH_DOMAIN:', env.FIREBASE_AUTH_DOMAIN || 'NOT SET');
+  console.log('  FIREBASE_PROJECT_ID:', env.FIREBASE_PROJECT_ID || 'NOT SET');
   console.log('  RAILWAY_PUBLIC_DOMAIN:', env.RAILWAY_PUBLIC_DOMAIN || 'NOT SET');
 
   // Determine API base URL (use RAILWAY_PUBLIC_DOMAIN if available, otherwise localhost)
@@ -60,7 +62,9 @@ function buildConfig() {
 // API configuration
 window.API_CONFIG = {
   BASE_URL: '${apiBaseUrl}',
-  TIMEOUT: 300000
+  TIMEOUT: ${Number(env.API_TIMEOUT || 300000)},
+  CHAT_ENDPOINT: '${env.CHAT_API_ENDPOINT || ''}',
+  ITINERARY_CHANGES_ENDPOINT: '${env.ITINERARY_CHANGES_ENDPOINT || ''}'
 };
 
 // Application configuration
@@ -68,9 +72,16 @@ window.RTW_CONFIG = {
   googleCloudProjectId: "${env.GOOGLE_CLOUD_PROJECT || env.GOOGLE_CLOUD_PROJECT_ID || 'YOUR_GOOGLE_CLOUD_PROJECT_ID'}",
   googleCloudLocation: "${env.GOOGLE_CLOUD_LOCATION || 'us-central1'}",
   googleOAuthClientId: "${env.GOOGLE_OAUTH_CLIENT_ID || 'YOUR_GOOGLE_OAUTH_CLIENT_ID'}",
-  googleOAuthClientSecret: "${env.GOOGLE_OAUTH_CLIENT_SECRET || 'YOUR_GOOGLE_OAUTH_CLIENT_SECRET'}",
   googleMapsApiKey: "${env.GOOGLE_MAPS_API_KEY || 'YOUR_MAPS_API_KEY_HERE'}",
-  firebaseApiKey: "${env.FIREBASE_API_KEY || 'YOUR_FIREBASE_API_KEY_HERE'}"
+  firebase: {
+    apiKey: "${env.FIREBASE_API_KEY || 'YOUR_FIREBASE_API_KEY_HERE'}",
+    authDomain: "${env.FIREBASE_AUTH_DOMAIN || 'YOUR_FIREBASE_AUTH_DOMAIN'}",
+    projectId: "${env.FIREBASE_PROJECT_ID || 'YOUR_FIREBASE_PROJECT_ID'}",
+    storageBucket: "${env.FIREBASE_STORAGE_BUCKET || ''}",
+    messagingSenderId: "${env.FIREBASE_MESSAGING_SENDER_ID || ''}",
+    appId: "${env.FIREBASE_APP_ID || ''}",
+    measurementId: "${env.FIREBASE_MEASUREMENT_ID || ''}"
+  }
 };
 `;
 
@@ -89,45 +100,5 @@ window.RTW_CONFIG = {
   console.log('✓ Config file written to:', configPath);
 }
 
-// Build the Firebase config file
-function buildFirebaseConfig() {
-  const env = loadEnv();
-
-  const firebaseTemplate = `// Firebase Configuration and Initialization
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
-
-const firebaseConfig = {
-  apiKey: "${env.FIREBASE_API_KEY || 'YOUR_FIREBASE_API_KEY_HERE'}",
-  authDomain: "${env.FIREBASE_AUTH_DOMAIN || 'YOUR_FIREBASE_AUTH_DOMAIN'}",
-  projectId: "${env.FIREBASE_PROJECT_ID || 'YOUR_FIREBASE_PROJECT_ID'}",
-  storageBucket: "${env.FIREBASE_STORAGE_BUCKET || 'YOUR_FIREBASE_STORAGE_BUCKET'}",
-  messagingSenderId: "${env.FIREBASE_MESSAGING_SENDER_ID || 'YOUR_FIREBASE_MESSAGING_SENDER_ID'}",
-  appId: "${env.FIREBASE_APP_ID || 'YOUR_FIREBASE_APP_ID'}",
-  measurementId: "${env.FIREBASE_MEASUREMENT_ID || 'YOUR_FIREBASE_MEASUREMENT_ID'}"
-};
-
-console.log('🔧 Initializing Firebase with config:', {
-  projectId: firebaseConfig.projectId,
-  authDomain: firebaseConfig.authDomain
-});
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-console.log('✅ Firebase initialized successfully');
-
-export { db };
-`;
-
-  const firebaseConfigPath = path.join(__dirname, '..', 'web', 'firebase-config.js');
-
-  // Create/overwrite firebase-config.js
-  fs.writeFileSync(firebaseConfigPath, firebaseTemplate);
-  console.log('✓ Firebase config built successfully');
-  console.log('✓ Firebase config file written to:', firebaseConfigPath);
-}
-
 // Run the build
 buildConfig();
-buildFirebaseConfig();

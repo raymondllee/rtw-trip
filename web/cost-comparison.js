@@ -360,6 +360,10 @@ class CostComparison {
 }
 
 // Export for use in other modules
+if (typeof window !== 'undefined') {
+  window.CostComparison = CostComparison;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { CostComparison };
 }

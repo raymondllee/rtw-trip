@@ -474,35 +474,14 @@
     </div>
   </div>
 
-  <script src="./config.js"></script>
-  <!-- Production fallback for environment variables -->
+  <script type="module" src="/config.js"></script>
   <script>
-    // Check if we're in production and config.js failed to load
-    if (window.location.hostname !== 'localhost' && !window.RTW_CONFIG) {
-      document.write('<script src="./config.production.js"><\/script>');
+    if (!window.RTW_CONFIG) {
+      const fallback = document.createElement('script');
+      fallback.src = '/config.production.js';
+      document.head.appendChild(fallback);
     }
   </script>
-  <script src="./sidebar-resize.js"></script>
-  <script src="./transport-segment-manager.js"></script>
-  <script src="./cost-tracker.js"></script>
-  <script src="./cost-ui.js"></script>
-  <script src="./cost-comparison.js"></script>
-  <script src="./cost-bulk-edit.js"></script>
-  <script src="./cost-utils-standalone.js"></script>
-  <script src="./place-id-migration.js"></script>
-  <script type="module" src="./chat.js"></script>
-  <script type="module" src="./app-final.js"></script>
-  <script>
-    // Load Google Maps with API key after config is available
-    (function loadGoogleMaps(){
-      if (!window.RTW_CONFIG || !window.RTW_CONFIG.googleMapsApiKey) {
-        return setTimeout(loadGoogleMaps, 50);
-      }
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.RTW_CONFIG.googleMapsApiKey)}&libraries=places,geometry&loading=async`;
-      script.async = true;
-      document.head.appendChild(script);
-    })();
-  </script>
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

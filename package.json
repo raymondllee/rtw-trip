@@ -6,11 +6,17 @@
   "scripts": {
     "build:data": "node scripts/build-data.js",
     "build:config": "node scripts/build-web-config.js",
+    "build:web": "npm run build:config && vite build",
+    "build": "npm run build:web",
     "parse": "node scripts/parse-itinerary.js",
     "geocode": "node scripts/geocode.js",
     "validate": "node scripts/validate-destinations.cjs",
-    "start": "npm run build:data && npm run build:config",
-    "serve": "npm run build:config && npx http-server -c-1 -p 5173 | cat"
+    "lint": "eslint web/src --ext .ts,.js",
+    "test": "vitest",
+    "start": "npm run build:data && npm run build:web",
+    "dev": "npm run build:config && vite",
+    "preview": "vite preview",
+    "serve": "npm run dev"
   },
   "keywords": [],
   "author": "",
@@ -18,5 +24,16 @@
   "description": "",
   "dependencies": {
     "firebase": "^10.14.1"
+  },
+  "devDependencies": {
+    "@types/google.maps": "^3.55.7",
+    "@types/node": "^20.12.7",
+    "@typescript-eslint/eslint-plugin": "^7.2.0",
+    "@typescript-eslint/parser": "^7.2.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-import": "^2.29.1",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.8",
+    "vitest": "^1.5.0"
   }
 }

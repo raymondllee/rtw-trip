@@ -95,6 +95,7 @@ test-backfill-results.json
 
 # @modelcontextprotocol/sdk build artifacts and dependencies
 package/dist/
+web/dist/
 package/build/
 package/coverage/
 package/*.tsbuildinfo

@@ -70,7 +70,7 @@ service cloud.firestore {
 ### 5. Test It! (30 seconds)
 
 ```bash
-npm run serve
+npm run dev
 ```
 
 Open http://localhost:5173 in your browser.
@@ -158,7 +158,7 @@ await manager.migrateFromLocalStorage();
 → Run `npm install` again
 
 ### CORS errors
-→ Use `npm run serve`, don't open HTML directly
+→ Use `npm run dev`, don't open HTML directly
 
 ### Nothing happens after changes
 → Open console, look for errors
@@ -178,7 +178,7 @@ await manager.migrateFromLocalStorage();
 2. Register app          → Get config object
 3. Configure env (.env)  → Then run `node scripts/build-web-config.js`
 4. Set security rules    → Copy/paste rules
-5. npm run serve         → Test it!
+5. npm run dev           → Test it!
 ```
 
 **Total time: ~5 minutes**

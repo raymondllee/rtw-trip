@@ -539,6 +539,10 @@ class CostUI {
 }
 
 // Export for use in other modules
+if (typeof window !== 'undefined') {
+  window.CostUI = CostUI;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { CostUI };
 }

@@ -131,7 +131,7 @@ This copies all localStorage scenarios to Firestore without deleting the origina
 - `VERSIONING_SYSTEM.md` - This file
 
 ### Modified Files
-- `web/app-final.js` - Updated to use Firestore instead of localStorage
+- `web/src/app/initMapApp.ts` - Updated to use Firestore instead of localStorage
   - Auto-save now creates Firestore versions
   - Scenario loading/saving uses Firestore
   - Added version history UI

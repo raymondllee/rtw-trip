@@ -87,7 +87,7 @@ echo "✅ ADK API Server started (PID: $ADK_PID)"
 echo ""
 echo "🌐 Starting Frontend Server (Port 5173)..."
 cd "$SCRIPT_DIR"
-npm run serve > "$SCRIPT_DIR/logs/frontend.log" 2>&1 &
+npm run dev -- --host > "$SCRIPT_DIR/logs/frontend.log" 2>&1 &
 FRONTEND_PID=$!
 echo "✅ Frontend Server started (PID: $FRONTEND_PID)"
 
@@ -115,7 +115,7 @@ else
 fi
 
 # Check Frontend
-if curl -s http://localhost:5173/web/ >/dev/null 2>&1; then
+if curl -s http://localhost:5173/ >/dev/null 2>&1; then
     echo "✅ Frontend Server is running on http://localhost:5173"
 else
     echo "❌ Frontend Server failed to start"
@@ -125,7 +125,7 @@ fi
 echo ""
 echo "🎉 Travel Concierge is ready!"
 echo "=============================="
-echo "📱 Frontend:    http://localhost:5173/web/"
+echo "📱 Frontend:    http://localhost:5173/"
 echo "🔧 API Backend: http://localhost:5001"
 echo "🤖 ADK API:     http://localhost:8000/docs"
 echo ""

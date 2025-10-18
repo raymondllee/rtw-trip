@@ -132,8 +132,8 @@ TRAVEL_CONCIERGE_SCENARIO=travel_concierge/profiles/itinerary_empty_default.json
 
 **Option 2: Start manually:**
 ```bash
-# Terminal 1: Frontend server
-npm run serve
+# Terminal 1: Frontend server (Vite dev server)
+npm run dev
 
 # Terminal 2: Flask API server
 cd python/agents/travel-concierge
@@ -146,7 +146,7 @@ eval $(poetry env activate)
 adk api_server travel_concierge
 ```
 
-Open http://localhost:5173/web/ in your browser.
+Open http://localhost:5173/ in your browser.
 
 ### What's Running?
 
@@ -158,14 +158,18 @@ Open http://localhost:5173/web/ in your browser.
 
 ```
 rtw-trip/
-├── web/                           # Frontend application
-│   ├── index.html                 # Main HTML file
-│   ├── app.js                     # Map application logic
-│   ├── styles.css                 # Styling
-│   ├── config.js                  # API configuration (not in repo)
-│   ├── chat.js                    # AI chat interface
-│   ├── sidebar-resize.js          # Responsive sidebar
-│   └── app-final.js               # Complete application logic
+├── web/                           # Frontend application (Vite project root)
+│   ├── index.html                 # HTML entry point loaded by Vite
+│   ├── config.js                  # Runtime configuration (generated at build)
+│   ├── src/                       # TypeScript/ES module source
+│   │   ├── main.ts                # Frontend bootstrap (loads map + chat)
+│   │   ├── app/                   # Map + itinerary application logic
+│   │   ├── chat/                  # AI chat experience
+│   │   ├── firebase/              # Firebase initialization helpers
+│   │   ├── firestore/             # Scenario/version management API
+│   │   └── types/                 # Shared TypeScript definitions
+│   ├── styles.css                 # Global styling
+│   └── cost-styles.css            # Cost UI styling
 ├── python/agents/travel-concierge # AI Travel Concierge
 │   ├── travel_concierge/          # Agent modules
 │   │   ├── sub_agents/            # Specialized travel agents
@@ -198,10 +202,11 @@ rtw-trip/
 ## 🔧 Available Scripts
 
 ### Frontend Scripts
-- `npm run serve` - Start frontend development server (port 5173)
+- `npm run dev` - Start Vite development server (port 5173)
 - `npm run build:data` - Parse and geocode itinerary data
 - `npm run parse` - Parse itinerary markdown only
 - `npm run geocode` - Geocode locations only
+- `npm run build` - Generate production bundle in `web/dist`
 
 ### Application Scripts
 - `./start-travel-concierge.sh` - Start all services (frontend + backend + AI)
@@ -276,6 +281,8 @@ A static version of the map interface is also available:
 
 **URL**: https://raymondllee.github.io/rtw-trip/
 
+To publish updates, run `npm run build` and deploy the contents of `web/dist/` alongside a generated `web/config.js` file (copy both into the `/web` directory on the `gh-pages` branch). The static build includes the full map + itinerary UI but omits backend-dependent features.
+
 *Note: AI features and Firestore integration are not available in the GitHub Pages deployment.*
 
 ## 🗺️ Data Sources
@@ -340,7 +347,7 @@ Edit `web/styles.css` to customize:
 
 1. **Check server status**:
    ```bash
-   curl http://localhost:5173/web/  # Frontend
+   curl http://localhost:5173/  # Frontend
    curl http://localhost:5001/health  # Flask API
    curl http://localhost:8000/docs    # ADK API
    ```
@@ -360,7 +367,7 @@ Edit `web/styles.css` to customize:
 
 4. **Debug mode in browser**:
    ```
-   http://localhost:5173/web/?debug=true
+   http://localhost:5173/?debug=true
    ```
 
 ### Port Conflicts
@@ -430,7 +437,7 @@ For questions or issues:
 ./start-travel-concierge.sh
 
 # Check if everything is working
-curl http://localhost:5173/web/ && echo "Frontend ✅"
+curl http://localhost:5173/ && echo "Frontend ✅"
 curl http://localhost:5001/health && echo "Flask API ✅"
 curl http://localhost:8000/docs && echo "ADK API ✅"
 

@@ -383,6 +383,10 @@ class CostTracker {
 // Export
 // ============================================================================
 
+if (typeof window !== 'undefined') {
+  window.CostTracker = CostTracker;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { CostTracker };
 }

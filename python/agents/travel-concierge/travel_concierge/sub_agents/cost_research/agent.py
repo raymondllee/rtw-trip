@@ -49,6 +49,21 @@ class DestinationCostResearchOutputTool(BaseTool):
         schema = types.DestinationCostResearch.model_json_schema(
             ref_template="#/$defs/{model}"
         )
+        # Inline referenced definitions to satisfy pydantic FunctionDeclaration validation
+        defs = schema.pop("$defs", {})
+        properties = schema.get("properties", {})
+        for prop_name, prop_schema in properties.items():
+            ref = prop_schema.get("$ref")
+            if ref:
+                def_key = ref.split("/")[-1]
+                definition = defs.get(def_key)
+                if definition:
+                    merged = {k: v for k, v in prop_schema.items() if k != "$ref"}
+                    merged.update(definition)
+                    properties[prop_name] = merged
+                else:
+                    # If definition missing, drop the $ref to avoid validation error
+                    prop_schema.pop("$ref", None)
         return FunctionDeclaration(
             name=self.name,
             description=self.description,
@@ -124,11 +139,9 @@ def structured_output_callback(
             if _has_tool_response(part):
                 tool_response_count += 1
 
-    # Previously we required at least three tool responses before forcing the
-    # agent into structured-output mode. In practice, some runs complete after a
-    # single search/tool call, so relax the threshold to reduce the chance of
-    # exiting without emitting the DestinationCostResearch payload.
-    if tool_response_count >= 2:
+    # Even a single grounding call can yield enough data; as soon as the agent
+    # has produced any tool response, force it to emit structured output.
+    if tool_response_count >= 1:
         # Switch to structured output phase:
         #   - Disable search tools
         #   - Allow only the structured output tool
@@ -162,7 +175,7 @@ cost_research_agent = Agent(
         " low/mid/high estimates and source citations."
     ),
     instruction=prompt.COST_RESEARCH_AGENT_INSTR,
-    tools=[google_search_grounding],
+    tools=[google_search_grounding, _destination_cost_output_tool],
     before_model_callback=structured_output_callback,
     generate_content_config=GenerateContentConfig(
         temperature=0.1,  # Low temperature for consistent, factual research

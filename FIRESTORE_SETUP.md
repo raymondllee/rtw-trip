@@ -96,7 +96,7 @@ service cloud.firestore {
 
 1. Start your development server:
    ```bash
-   npm run serve
+   npm run dev
    ```
 
 2. Open http://localhost:5173 in your browser
@@ -128,7 +128,7 @@ service cloud.firestore {
 - Make sure `firebase` is in `package.json` dependencies
 
 ### CORS errors
-- Make sure you're accessing via the development server (`npm run serve`)
+- Make sure you're accessing via the development server (`npm run dev`)
 - Don't open the HTML file directly (`file://`)
 
 ## Optional: Add Authentication

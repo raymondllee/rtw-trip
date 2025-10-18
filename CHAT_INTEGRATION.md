@@ -53,7 +53,7 @@ The proxy server will start on `http://localhost:5001`
 
 ```bash
 # In the project root directory
-npm run serve
+npm run dev
 ```
 
 The web app will be available at `http://localhost:5173`
@@ -117,7 +117,7 @@ Response:
 ### Modified Files:
 - `web/index.html` - Added chat UI HTML
 - `web/styles.css` - Added chat styling
-- `web/app-final.js` - Integrated chat with leg filter
+- `web/src/app/initMapApp.ts` - Integrated chat with leg filter
 
 ## Future Enhancements
 
