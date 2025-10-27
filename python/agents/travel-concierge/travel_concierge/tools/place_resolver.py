@@ -181,10 +181,11 @@ class PlaceResolver:
         """
         Parse Google address components into structured data.
 
-        Extracts: country, city, administrative_area, postal_code
+        Extracts: country, country_code, city, administrative_area, postal_code
         """
         parsed = {
             'country': None,
+            'country_code': None,
             'city': None,
             'administrative_area': None,
             'postal_code': None
@@ -195,6 +196,7 @@ class PlaceResolver:
 
             if 'country' in types:
                 parsed['country'] = component.get('long_name')
+                parsed['country_code'] = component.get('short_name')  # ISO 3166-1 alpha-2
             elif 'locality' in types:
                 parsed['city'] = component.get('long_name')
             elif 'administrative_area_level_1' in types:
@@ -238,6 +240,7 @@ class PlaceResolver:
         Get full details for a known Place ID.
 
         Useful for resolving Place IDs back to location information.
+        Includes: country, country_code, city, administrative_area, coordinates, timezone
         """
         if not self.is_place_id(place_id):
             print(f"❌ Invalid Place ID: {place_id}")
@@ -254,7 +257,11 @@ class PlaceResolver:
 
             if result['status'] == 'OK':
                 details = result['result']
-                return {
+                parsed_address = self._parse_address_components(
+                    details.get('address_component', details.get('address_components', []))
+                )
+
+                place_info = {
                     'place_id': place_id,
                     'name': details.get('name'),
                     'coordinates': {
@@ -263,8 +270,23 @@ class PlaceResolver:
                     },
                     'formatted_address': details.get('formatted_address'),
                     'types': details.get('types', details.get('type', [])),
-                    **self._parse_address_components(details.get('address_component', details.get('address_components', [])))
+                    **parsed_address
                 }
+
+                # Get timezone for this location
+                try:
+                    from datetime import datetime, timezone as tz
+                    lat = place_info['coordinates']['lat']
+                    lng = place_info['coordinates']['lng']
+                    timestamp = int(datetime.now(tz.utc).timestamp())
+                    tz_result = self.gmaps.timezone((lat, lng), timestamp=timestamp)
+                    if tz_result['status'] == 'OK':
+                        place_info['timezone'] = tz_result['timeZoneId']
+                        place_info['timezone_name'] = tz_result['timeZoneName']
+                except Exception as e:
+                    print(f"⚠️ Could not get timezone for {place_id}: {e}")
+
+                return place_info
 
             return None
 

@@ -3,7 +3,9 @@ import { FirestoreScenarioManager } from '../firestore/scenarioManager';
 import { StatePersistence } from '../statePersistence';
 import { summaryManager } from '../summaryManager';
 import { showDataIntegrityPanel, validateDataIntegrity } from '../dataIntegrityUi';
+import { showGeographicValidationPanel, showValidationWarningBanner, hasGeographicDataIssues } from '../dataValidationUi';
 import { generateDestinationId, normalizeId } from '../destinationIdManager';
+import { getRegionForCountry } from '../data/regionMappings';
 import {
   showDestinationDeletionDialog,
   handleDestinationDeletion,
@@ -109,24 +111,65 @@ function filterByLeg(data, legName) {
   if (legRegions.length === 0) return data.locations || [];
 
   return (data.locations || []).filter(location => {
+    // VALIDATION: Warn about missing region field
+    if (!location.region) {
+      console.warn(`⚠️ Location "${location.name}" (ID: ${location.id}) is missing region field - will not appear in leg view`);
+      return false;
+    }
+
     return legRegions.includes(location.region);
   });
 }
 
 function filterBySubLeg(data, legName, subLegName) {
+  console.log(`🔍 filterBySubLeg called: leg="${legName}", subLeg="${subLegName}"`);
+
   if (!subLegName) return filterByLeg(data, legName);
 
   const leg = data.legs?.find(l => l.name === legName);
-  if (!leg) return [];
+  if (!leg) {
+    console.warn(`⚠️ Leg "${legName}" not found`);
+    return [];
+  }
 
   const subLeg = leg.sub_legs?.find(sl => sl.name === subLegName);
-  if (!subLeg) return [];
+  if (!subLeg) {
+    console.warn(`⚠️ Sub-leg "${subLegName}" not found in leg "${legName}"`);
+    return [];
+  }
 
   // Filter locations by country (geographic relationship)
   const subLegCountries = subLeg.countries || [];
-  return (data.locations || []).filter(location =>
-    location.country && subLegCountries.includes(location.country)
-  );
+  console.log(`📋 Sub-leg "${subLegName}" has ${subLegCountries.length} countries:`, subLegCountries);
+
+  // SPECIAL CASE: If sub-leg has no countries defined OR has an empty array,
+  // treat it as "All Destinations" for this leg - filter by region only
+  if (subLegCountries.length === 0) {
+    console.log(`ℹ️ Sub-leg "${subLegName}" has no countries defined - showing all destinations for leg "${legName}"`);
+    return filterByLeg(data, legName);
+  }
+
+  // Enhanced filtering with validation
+  const filtered = (data.locations || []).filter(location => {
+    // VALIDATION: Warn about missing country field
+    if (!location.country) {
+      console.warn(`⚠️ Location "${location.name}" (ID: ${location.id}) is missing country field - will not appear in sub-leg view`);
+      return false;
+    }
+
+    // Filter by country match
+    const matches = subLegCountries.includes(location.country);
+
+    // DEBUG: Log why a location is filtered out
+    if (!matches && location.region && leg.regions?.includes(location.region)) {
+      console.warn(`❌ Location "${location.name}" has region "${location.region}" but country "${location.country}" NOT in sub-leg countries:`, subLegCountries);
+    }
+
+    return matches;
+  });
+
+  console.log(`✅ Filtered to ${filtered.length} locations for sub-leg "${subLegName}"`);
+  return filtered;
 }
 
 function getActivityColor(activityType) {
@@ -838,6 +881,21 @@ export async function initMapApp() {
     render(legFilter.value, subLegFilter.value, showRouting);
   }
 
+  function refreshGeographicValidationBadge() {
+    const badge = document.getElementById('geo-validation-badge');
+    if (!badge) return;
+
+    if (hasGeographicDataIssues(workingData)) {
+      badge.textContent = '⚠️';
+      badge.title = 'Geographic data issues detected';
+      badge.style.color = '#ff9800';
+    } else {
+      badge.textContent = '✓';
+      badge.title = 'All destinations have valid geographic data';
+      badge.style.color = '#4caf50';
+    }
+  }
+
   function refreshDataIntegrityButton() {
     // Update the badge in the dropdown instead of adding a separate button
     const badge = document.getElementById('data-integrity-badge');
@@ -1127,6 +1185,7 @@ export async function initMapApp() {
   
   function render(legName, subLegName = null, useRouting = false, triggerAutoSave = true) {
     refreshDataIntegrityButton();
+    refreshGeographicValidationBadge();
 
     currentMarkers.forEach(m => m.setMap(null));
     currentMarkers = [];
@@ -2434,9 +2493,29 @@ export async function initMapApp() {
       lng: placeData.location.lng
     };
 
+    // Get country from Places API (REQUIRED)
     const country = placeDetails?.country || addressInfo.country;
     const city = placeDetails?.city || addressInfo.city;
-    const region = placeDetails?.administrative_area || addressInfo.region || 'Custom';
+    const administrative_area = placeDetails?.administrative_area || addressInfo.region;
+    const country_code = placeDetails?.country_code;
+
+    // Derive region from country using authoritative mapping (REQUIRED)
+    let region = null;
+    let continent = null;
+    if (country) {
+      const regionMapping = getRegionForCountry(country);
+      if (regionMapping) {
+        region = regionMapping.region;
+        continent = regionMapping.continent;
+      } else {
+        console.warn(`⚠️ No region mapping found for country: ${country}`);
+        region = 'Custom'; // Fallback
+      }
+    } else {
+      console.error(`❌ Cannot add destination without country: ${placeData.name}`);
+      alert(`Cannot add destination: Unable to determine country for "${placeData.name}". Please try a more specific location.`);
+      return;
+    }
 
     // Determine leg and sub_leg from neighbor
     let leg = null;
@@ -2452,13 +2531,23 @@ export async function initMapApp() {
     }
 
     const newLocation = {
+      // Primary identifiers
       id: destinationId,
-      place_id: placeId, // Store Place ID as metadata, not primary key
       name: placeDetails?.name || placeData.name,
+
+      // Geographic hierarchy (REQUIRED)
+      country,           // REQUIRED: from Places API
+      region,            // REQUIRED: derived from country mapping
       city,
-      country,
-      region,
+      administrative_area,
+      country_code,
+      continent,
+
+      // Places API metadata
+      place_id: placeId, // Store Place ID as metadata, not primary key
       coordinates,
+
+      // Trip planning
       duration_days: duration,
       activity_type: 'city exploration',
       highlights: [],
@@ -3675,6 +3764,24 @@ export async function initMapApp() {
     showDataIntegrityPanel(workingData, handleDataUpdate);
   });
 
+  document.getElementById('geo-validation-btn').addEventListener('click', async () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    if (scenarioActionsDropdown) scenarioActionsDropdown.style.display = 'none';
+    if (scenarioActionsBtn) scenarioActionsBtn.classList.remove('active');
+
+    // Create save callback that saves to Firestore
+    const saveToFirestore = async () => {
+      if (!currentScenarioId) {
+        throw new Error('No scenario ID - cannot save');
+      }
+      await scenarioManager.saveVersion(currentScenarioId, workingData, false);
+      console.log('✅ Geographic data saved to Firestore');
+    };
+
+    await showGeographicValidationPanel(workingData, handleDataUpdate, saveToFirestore);
+  });
+
   document.getElementById('compare-costs-btn').addEventListener('click', async () => {
     const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
     const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
@@ -4253,8 +4360,59 @@ export async function initMapApp() {
     setTimeout(() => updateChatContext(initialLeg, initialSubLeg), 100);
   }
 
+  // Check for geographic data issues and show warning banner if needed
+  if (hasGeographicDataIssues(workingData)) {
+    showValidationWarningBanner(workingData, async () => {
+      // Create save callback that saves to Firestore
+      const saveToFirestore = async () => {
+        if (!currentScenarioId) {
+          throw new Error('No scenario ID - cannot save');
+        }
+        await scenarioManager.saveVersion(currentScenarioId, workingData, false);
+        console.log('✅ Geographic data saved to Firestore');
+      };
+
+      await showGeographicValidationPanel(workingData, handleDataUpdate, saveToFirestore);
+    });
+  }
+
   // Initialize view summary button state
   updateViewSummaryButtonState();
+
+  // Expose debug functions globally
+  window.debugRTW = {
+    getLegs: () => workingData.legs,
+    getLocations: () => workingData.locations,
+    findLocation: (name) => workingData.locations.find(l => l.name.toLowerCase().includes(name.toLowerCase())),
+    showLegStructure: () => {
+      console.log('=== LEG STRUCTURE ===');
+      workingData.legs?.forEach(leg => {
+        console.log(`\n📍 Leg: "${leg.name}"`);
+        console.log(`   Regions:`, leg.regions);
+        if (leg.sub_legs?.length > 0) {
+          console.log(`   Sub-legs:`);
+          leg.sub_legs.forEach(sl => {
+            console.log(`      - "${sl.name}": ${sl.countries?.length || 0} countries`, sl.countries);
+          });
+        }
+      });
+    },
+    showLocation: (name) => {
+      const loc = workingData.locations.find(l => l.name.toLowerCase().includes(name.toLowerCase()));
+      if (loc) {
+        console.log('=== LOCATION DATA ===');
+        console.log('Name:', loc.name);
+        console.log('Country:', loc.country);
+        console.log('Region:', loc.region);
+        console.log('City:', loc.city);
+        console.log('Country Code:', loc.country_code);
+        console.log('Continent:', loc.continent);
+        console.log('Full data:', loc);
+      } else {
+        console.log('Location not found:', name);
+      }
+    }
+  };
 
   console.log('✅ App initialized with state:', {
     scenarioId: currentScenarioId,

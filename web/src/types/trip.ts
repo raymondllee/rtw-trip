@@ -4,20 +4,52 @@ export interface Coordinates {
 }
 
 export interface TripLocation {
+  // Primary identifiers
   id: string | number | null;
   name: string;
-  city?: string;
-  country?: string;
-  region?: string;
+
+  // Geographic hierarchy (REQUIRED for proper filtering)
+  // These fields are populated from Google Places API + region mappings
+  country: string;                 // REQUIRED: Official country name from Places API
+  region: string;                  // REQUIRED: Geographic region for filtering (e.g., "East Asia")
+  city?: string;                   // City/locality from Places API
+  administrative_area?: string;    // State/province from Places API
+  country_code?: string;           // ISO 3166-1 alpha-2 code (e.g., "JP" for Japan)
+  continent?: string;              // Continent (e.g., "Asia")
+
+  // Trip planning details
   arrival_date?: string;
   departure_date?: string;
   duration_days?: number;
   activity_type?: string;
   highlights?: string[];
-  coordinates?: Coordinates;
   airport_code?: string;
   transport_from_previous?: string;
   transport_segments?: TransportSegment[];
+
+  // Places API metadata
+  coordinates?: Coordinates;
+  place_id?: string;               // Google Place ID (e.g., "ChIJ...")
+  place_data?: PlaceData;          // Full Places API response
+  timezone?: string;               // IANA timezone (e.g., "Asia/Tokyo")
+
+  // Migration/legacy support
+  _legacy_id?: string | number;
+  _legacy_uuid?: string;
+  _migrated_at?: string;
+  _migration_source?: string;
+
+  // Allow additional fields
+  [key: string]: unknown;
+}
+
+export interface PlaceData {
+  formatted_address?: string;
+  types?: string[];
+  country?: string;
+  city?: string;
+  administrative_area?: string;
+  timezone?: string;
   [key: string]: unknown;
 }
 
