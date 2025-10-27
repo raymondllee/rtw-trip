@@ -12,6 +12,7 @@ import {
   populateReassignDropdown
 } from '../destinationDeletionHandler';
 import { getRuntimeConfig } from '../config';
+import { getLegsForData, generateDynamicLegs, getLegSummary } from '../utils/dynamicLegManager';
 
 const { apiBaseUrl } = getRuntimeConfig();
 
@@ -31,8 +32,13 @@ async function loadData() {
 }
 
 function toLatLng(location) {
-  if (location.coordinates && typeof location.coordinates.lat === 'number' && typeof location.coordinates.lng === 'number') {
-    return { lat: location.coordinates.lat, lng: location.coordinates.lng };
+  // Prefer display_coordinates if present (for special cases like Antarctica)
+  // This allows destinations to have logical coordinates (e.g., Ushuaia for departure port)
+  // while displaying at the correct location on the map (e.g., Antarctic Peninsula)
+  const coords = location.display_coordinates || location.coordinates;
+
+  if (coords && typeof coords.lat === 'number' && typeof coords.lng === 'number') {
+    return { lat: coords.lat, lng: coords.lng };
   }
   return null;
 }
@@ -87,28 +93,36 @@ function addDays(date, days) {
 }
 
 function groupLegs(data) {
-  if (data.legs && Array.isArray(data.legs)) {
-    return data.legs.map(leg => leg.name);
-  }
-  const set = new Set();
-  for (const l of data.locations || []) if (l.region) set.add(l.region);
-  return Array.from(set);
+  // Use dynamic leg generation from destinations
+  const legs = getLegsForData(data, { useDynamic: true });
+  return legs.map(leg => leg.name);
 }
 
 function getSubLegsForLeg(data, legName) {
-  const leg = data.legs?.find(l => l.name === legName);
+  // Get dynamic legs
+  const legs = getLegsForData(data, { useDynamic: true });
+  const leg = legs.find(l => l.name === legName);
   return leg?.sub_legs || [];
 }
 
 function filterByLeg(data, legName) {
   if (!legName || legName === 'all') return data.locations || [];
 
-  const leg = data.legs?.find(l => l.name === legName);
-  if (!leg) return data.locations || [];
+  // Get dynamic legs
+  const legs = getLegsForData(data, { useDynamic: true });
+  const leg = legs.find(l => l.name === legName);
 
-  // Filter by regions, not by static date ranges
+  if (!leg) {
+    console.warn(`⚠️ Leg "${legName}" not found in dynamic legs`);
+    return data.locations || [];
+  }
+
+  // Filter by regions (continent-based)
   const legRegions = leg.regions || [];
-  if (legRegions.length === 0) return data.locations || [];
+  if (legRegions.length === 0) {
+    console.warn(`⚠️ Leg "${legName}" has no regions defined`);
+    return data.locations || [];
+  }
 
   return (data.locations || []).filter(location => {
     // VALIDATION: Warn about missing region field
@@ -126,9 +140,12 @@ function filterBySubLeg(data, legName, subLegName) {
 
   if (!subLegName) return filterByLeg(data, legName);
 
-  const leg = data.legs?.find(l => l.name === legName);
+  // Get dynamic legs
+  const legs = getLegsForData(data, { useDynamic: true });
+  const leg = legs.find(l => l.name === legName);
+
   if (!leg) {
-    console.warn(`⚠️ Leg "${legName}" not found`);
+    console.warn(`⚠️ Leg "${legName}" not found in dynamic legs`);
     return [];
   }
 
@@ -2520,6 +2537,12 @@ export async function initMapApp() {
     }
     document.getElementById('selected-place').value = '';
 
+    // Clear search source indicator
+    const indicator = document.getElementById('search-source-indicator');
+    if (indicator) {
+      indicator.style.display = 'none';
+    }
+
     modal.style.display = 'flex';
     console.log('Modal display set to flex, computed style:', window.getComputedStyle(modal).display);
     searchInput.focus();
@@ -2579,7 +2602,97 @@ export async function initMapApp() {
     
     return result;
   }
-  
+
+  /**
+   * Enhanced Google search functions for special locations
+   * Uses Text Search and Geocoding as fallbacks to find places not in Autocomplete
+   */
+
+  // Places API Text Search - broader than Autocomplete, finds natural features
+  async function searchPlacesTextSearch(query) {
+    return new Promise((resolve) => {
+      const request = {
+        query: query,
+        fields: ['place_id', 'name', 'geometry', 'formatted_address', 'types']
+      };
+
+      const service = new google.maps.places.PlacesService(map);
+      service.textSearch(request, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+          console.log(`✅ Text Search found: ${results[0].name}`);
+          resolve({
+            place_id: results[0].place_id,
+            name: results[0].name,
+            location: {
+              lat: results[0].geometry.location.lat(),
+              lng: results[0].geometry.location.lng()
+            },
+            formatted_address: results[0].formatted_address,
+            types: results[0].types,
+            source: 'text_search'
+          });
+        } else {
+          console.log(`❌ Text Search failed: ${status}`);
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  // Geocoding API - broadest search, last resort before manual entry
+  async function searchGeocoding(query) {
+    return new Promise((resolve) => {
+      const geocoder = new google.maps.Geocoder();
+      geocoder.geocode({ address: query }, (results, status) => {
+        if (status === 'OK' && results && results.length > 0) {
+          console.log(`✅ Geocoding found: ${results[0].formatted_address}`);
+
+          // Extract place name from formatted_address (first component)
+          const addressParts = results[0].formatted_address.split(',');
+          const placeName = addressParts[0].trim();
+
+          resolve({
+            place_id: results[0].place_id,
+            name: placeName,
+            location: {
+              lat: results[0].geometry.location.lat(),
+              lng: results[0].geometry.location.lng()
+            },
+            formatted_address: results[0].formatted_address,
+            address_components: results[0].address_components,
+            types: results[0].types,
+            source: 'geocoding'
+          });
+        } else {
+          console.log(`❌ Geocoding failed: ${status}`);
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  // Unified search with fallback chain: Text Search → Geocoding
+  async function searchLocationBroadly(query) {
+    console.log(`🔍 Enhanced search for: "${query}"`);
+
+    // Try Text Search first (finds Drake Passage, Lemaire Channel, etc.)
+    let result = await searchPlacesTextSearch(query);
+    if (result) {
+      console.log(`✅ Found via Places Text Search`);
+      return result;
+    }
+
+    // Fallback to Geocoding (broadest search)
+    result = await searchGeocoding(query);
+    if (result) {
+      console.log(`✅ Found via Geocoding API`);
+      return result;
+    }
+
+    console.log(`❌ Location "${query}" not found in Google APIs`);
+    return null;
+  }
+
   async function addNewDestination(insertIndex, placeData, duration) {
     const addressInfo = parseAddressComponents(placeData.address_components || []);
     const placeDetails = await fetchPlaceDetails(placeData.place_id);
@@ -2595,10 +2708,24 @@ export async function initMapApp() {
     };
 
     // Get country from Places API (REQUIRED)
-    const country = placeDetails?.country || addressInfo.country;
+    let country = placeDetails?.country || addressInfo.country;
     const city = placeDetails?.city || addressInfo.city;
     const administrative_area = placeDetails?.administrative_area || addressInfo.region;
     const country_code = placeDetails?.country_code;
+
+    // Special handling for Antarctic locations (Drake Passage, etc.) that don't have a country
+    const isAntarcticLocation =
+      !country && (
+        placeData.name.toLowerCase().includes('antarc') ||
+        placeData.name.toLowerCase().includes('drake') ||
+        placeData.formatted_address?.toLowerCase().includes('antarc') ||
+        (coordinates.lat < -60) // Roughly Antarctic Circle
+      );
+
+    if (isAntarcticLocation) {
+      console.log(`🧊 Detected Antarctic location without country: ${placeData.name}`);
+      country = 'Antarctica';
+    }
 
     // Derive region from country using authoritative mapping (REQUIRED)
     let region = null;
@@ -2611,6 +2738,7 @@ export async function initMapApp() {
       } else {
         console.warn(`⚠️ No region mapping found for country: ${country}`);
         region = 'Custom'; // Fallback
+        continent = 'Custom';
       }
     } else {
       console.error(`❌ Cannot add destination without country: ${placeData.name}`);
@@ -2647,6 +2775,7 @@ export async function initMapApp() {
       // Places API metadata
       place_id: placeId, // Store Place ID as metadata, not primary key
       coordinates,
+      data_source: placeData.data_source || 'autocomplete', // Track where data came from
 
       // Trip planning
       duration_days: duration,
@@ -4078,6 +4207,72 @@ export async function initMapApp() {
   document.getElementById('cancel-import-btn').addEventListener('click', closeImportScenariosModal);
   document.getElementById('cancel-edit-transport-btn').addEventListener('click', closeTransportEditModal);
 
+  // Broad search button handler (uses Text Search + Geocoding for broader coverage)
+  document.getElementById('broad-search-btn').addEventListener('click', async () => {
+    const searchInput = document.getElementById('location-search');
+    const query = searchInput.value.trim();
+
+    if (!query) {
+      alert('Please enter a location to search for.');
+      return;
+    }
+
+    const btn = document.getElementById('broad-search-btn');
+    const originalText = btn.textContent;
+    btn.textContent = '🔍 Searching...';
+    btn.disabled = true;
+
+    try {
+      console.log(`🔍 Broad search for: "${query}"`);
+      const result = await searchLocationBroadly(query);
+
+      if (result) {
+        console.log(`✅ Found via ${result.source}:`, result);
+
+        // Store in hidden input (same format as autocomplete)
+        document.getElementById('selected-place').value = JSON.stringify({
+          place_id: result.place_id,
+          name: result.name,
+          formatted_address: result.formatted_address,
+          location: result.location,
+          address_components: result.address_components,
+          data_source: result.source  // Track where it came from
+        });
+
+        // Show source indicator
+        const indicator = document.getElementById('search-source-indicator');
+        const icon = document.getElementById('search-source-icon');
+        const text = document.getElementById('search-source-text');
+
+        if (result.source === 'text_search') {
+          icon.textContent = '🗺️ ';
+          text.textContent = `Found: ${result.name} (via Google Places Text Search)`;
+        } else if (result.source === 'geocoding') {
+          icon.textContent = '📍 ';
+          text.textContent = `Found: ${result.name} (via Google Geocoding)`;
+        }
+
+        indicator.style.display = 'block';
+        indicator.style.color = '#2e7d32';
+
+      } else {
+        console.log(`❌ No results found for "${query}"`);
+        alert(`Could not find "${query}". Try:\n• Being more specific (e.g., "Drake Passage, Antarctica")\n• Using different keywords\n• Checking spelling`);
+
+        // Clear previous selection and indicator
+        document.getElementById('selected-place').value = '';
+        document.getElementById('search-source-indicator').style.display = 'none';
+      }
+
+    } catch (error) {
+      console.error('Broad search error:', error);
+      alert(`Search error: ${error.message}`);
+    } finally {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  });
+
   // Close transport modal on overlay click
   document.getElementById('edit-transport-modal').addEventListener('click', (e) => {
     if (e.target.id === 'edit-transport-modal') {
@@ -4467,12 +4662,14 @@ export async function initMapApp() {
 
   // Expose debug functions globally
   window.debugRTW = {
-    getLegs: () => workingData.legs,
+    getLegs: () => getLegsForData(workingData, { useDynamic: true }),
+    getStoredLegs: () => workingData.legs, // Access original stored legs
     getLocations: () => workingData.locations,
     findLocation: (name) => workingData.locations.find(l => l.name.toLowerCase().includes(name.toLowerCase())),
     showLegStructure: () => {
-      console.log('=== LEG STRUCTURE ===');
-      workingData.legs?.forEach(leg => {
+      const legs = getLegsForData(workingData, { useDynamic: true });
+      console.log('=== DYNAMIC LEG STRUCTURE ===');
+      legs.forEach(leg => {
         console.log(`\n📍 Leg: "${leg.name}"`);
         console.log(`   Regions:`, leg.regions);
         if (leg.sub_legs?.length > 0) {
@@ -4482,6 +4679,11 @@ export async function initMapApp() {
           });
         }
       });
+    },
+    showDynamicLegs: () => {
+      const { legs, stats } = generateDynamicLegs(workingData);
+      console.log(getLegSummary(legs));
+      console.log('Stats:', stats);
     },
     showLocation: (name) => {
       const loc = workingData.locations.find(l => l.name.toLowerCase().includes(name.toLowerCase()));

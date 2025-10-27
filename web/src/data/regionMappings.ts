@@ -244,6 +244,9 @@ export const COUNTRY_TO_REGION: Record<string, RegionMapping> = {
   'Australia': { continent: 'Oceania', region: 'Australia and New Zealand', subregion: 'Australia and New Zealand' },
   'New Zealand': { continent: 'Oceania', region: 'Australia and New Zealand', subregion: 'Australia and New Zealand' },
 
+  // Antarctica (special case - not technically a country, but used for expedition destinations)
+  'Antarctica': { continent: 'Antarctica', region: 'Antarctica', subregion: 'Antarctica' },
+
   // Oceania - Pacific Islands
   'Fiji': { continent: 'Oceania', region: 'Pacific Islands', subregion: 'Melanesia' },
   'Papua New Guinea': { continent: 'Oceania', region: 'Pacific Islands', subregion: 'Melanesia' },

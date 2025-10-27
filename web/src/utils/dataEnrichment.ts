@@ -96,10 +96,21 @@ export async function enrichDestination(
   if (!location.timezone) missingFields.push('timezone');
   if (!location.city) missingFields.push('city');
 
-  console.log('   Missing fields:', missingFields);
+  // Check if this is an Antarctic destination that needs correction
+  const isAntarcticDestination =
+    location.name.toLowerCase().includes('antarc') ||
+    location.notes?.toLowerCase().includes('antarc') ||
+    location.activity_type?.toLowerCase().includes('antarc');
 
-  // Skip if all fields are complete and not forcing refresh
-  if (!options.forceRefresh && missingFields.length === 0) {
+  const needsAntarcticCorrection = isAntarcticDestination && location.country !== 'Antarctica';
+
+  console.log('   Missing fields:', missingFields);
+  if (needsAntarcticCorrection) {
+    console.log('   🧊 Antarctic destination with wrong country - needs correction');
+  }
+
+  // Skip if all fields are complete and not forcing refresh and doesn't need Antarctic correction
+  if (!options.forceRefresh && missingFields.length === 0 && !needsAntarcticCorrection) {
     console.log('   ⏭️  Skipping - all fields complete');
     return {
       enriched: false,
@@ -170,6 +181,28 @@ export async function enrichDestination(
     messages.push('Got country from place_data');
   }
 
+  // Step 2b: Special handling for Antarctica (reuse isAntarcticDestination from earlier)
+  // Antarctic expeditions often depart from Argentina/Chile but should be classified as Antarctica
+  if (isAntarcticDestination && updated.country !== 'Antarctica') {
+    console.log(`   🧊 Detected Antarctic destination - overriding country to "Antarctica"`);
+    console.log(`      Original country: "${updated.country}"`);
+    updated.country = 'Antarctica';
+
+    // Set display coordinates to Antarctic Peninsula for map visualization
+    // (keeps actual coordinates as departure port for logistics/routing)
+    if (!updated.display_coordinates) {
+      updated.display_coordinates = {
+        lat: -64.8,  // Antarctic Peninsula
+        lng: -62.5
+      };
+      console.log(`   📍 Set display coordinates to Antarctic Peninsula (-64.8, -62.5)`);
+      messages.push('Set display coordinates to Antarctic Peninsula');
+    }
+
+    enriched = true;
+    messages.push('Detected as Antarctic destination - set country to Antarctica');
+  }
+
   // Step 3: Derive region and continent from country using mapping (if we have country)
   if (updated.country) {
     console.log(`   🗺️  Looking up region mapping for country: "${updated.country}"`);
@@ -187,12 +220,14 @@ export async function enrichDestination(
         messages.push(`Updated region to "${correctRegion}"`);
       }
 
-      // Always update continent if missing (even if region exists)
-      if (!updated.continent) {
-        console.log(`   🌍 Setting continent: "${regionMapping.continent}"`);
-        updated.continent = regionMapping.continent;
+      // ALWAYS update continent from mapping if it doesn't match
+      // This fixes cases where continent is incorrect (e.g., Antarctica showing as South America)
+      const correctContinent = regionMapping.continent;
+      if (updated.continent !== correctContinent) {
+        console.log(`   🔄 Correcting continent: "${updated.continent}" → "${correctContinent}"`);
+        updated.continent = correctContinent;
         enriched = true;
-        messages.push('Derived continent from country mapping');
+        messages.push(`Updated continent to "${correctContinent}"`);
       }
     } else {
       console.log(`   ⚠️  No region mapping found for country: "${updated.country}"`);
@@ -346,13 +381,37 @@ export function validateDestinations(tripData: TripData): ValidationResult {
     // NEW: Check if region doesn't match the mapping (e.g., "Shandong" instead of "East Asia")
     if (location.country && location.region) {
       const regionMapping = getRegionForCountry(location.country);
-      if (regionMapping && location.region !== regionMapping.region) {
-        console.log(`⚠️ ${location.name}: region "${location.region}" doesn't match mapping "${regionMapping.region}"`);
-        result.missingRegion++; // Count as missing region so button stays enabled
-        result.locations.missingRegion.push(location);
-        isValid = false;
-        needsEnrichment = true;
+      if (regionMapping) {
+        if (location.region !== regionMapping.region) {
+          console.log(`⚠️ ${location.name}: region "${location.region}" doesn't match mapping "${regionMapping.region}"`);
+          result.missingRegion++; // Count as missing region so button stays enabled
+          result.locations.missingRegion.push(location);
+          isValid = false;
+          needsEnrichment = true;
+        }
+        // Also check if continent doesn't match
+        if (location.continent !== regionMapping.continent) {
+          console.log(`⚠️ ${location.name}: continent "${location.continent}" doesn't match mapping "${regionMapping.continent}"`);
+          result.missingRegion++; // Count as issue so button stays enabled
+          result.locations.missingRegion.push(location);
+          isValid = false;
+          needsEnrichment = true;
+        }
       }
+    }
+
+    // NEW: Check for Antarctic destinations with wrong classification
+    const isAntarcticDestination =
+      location.name.toLowerCase().includes('antarc') ||
+      location.notes?.toLowerCase().includes('antarc') ||
+      location.activity_type?.toLowerCase().includes('antarc');
+
+    if (isAntarcticDestination && location.country !== 'Antarctica') {
+      console.log(`⚠️ ${location.name}: Antarctic destination incorrectly classified as "${location.country}"`);
+      result.missingCountry++; // Count as missing so button stays enabled
+      result.locations.missingCountry.push(location);
+      isValid = false;
+      needsEnrichment = true;
     }
 
     // NEW: Check for missing other important fields

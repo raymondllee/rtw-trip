@@ -29,9 +29,11 @@ export interface TripLocation {
 
   // Places API metadata
   coordinates?: Coordinates;
+  display_coordinates?: Coordinates; // Override for map display (e.g., Antarctica shows at Peninsula, not Ushuaia)
   place_id?: string;               // Google Place ID (e.g., "ChIJ...")
   place_data?: PlaceData;          // Full Places API response
   timezone?: string;               // IANA timezone (e.g., "Asia/Tokyo")
+  data_source?: 'autocomplete' | 'text_search' | 'geocoding' | 'manual'; // Track where data came from
 
   // Migration/legacy support
   _legacy_id?: string | number;
