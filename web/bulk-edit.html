@@ -174,19 +174,10 @@
     </div>
   </div>
 
-  <!-- Load Firebase and configuration -->
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-    import { getFirestore, doc, getDoc, collection, query, where, limit as firestoreLimit, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+  <!-- Load configuration first (synchronously, before modules) -->
+  <script src="./config.js"></script>
 
-    // Check if running locally or in production
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      document.write('<script src="./config.dev.js"><\/script>');
-    } else {
-      document.write('<script src="./config.production.js"><\/script>');
-    }
-  </script>
-
+  <!-- Load Firebase and other scripts -->
   <script src="./firestore-scenario-manager.js" type="module"></script>
   <script src="./cost-bulk-edit.js"></script>
 

@@ -2389,6 +2389,104 @@ For each category, provide low/mid/high estimates with sources.
         response_text = ""
         save_tool_called = False
 
+        def _coerce_json(value):
+            """Convert ADK tool payloads that may arrive as JSON strings into dicts."""
+            if isinstance(value, dict):
+                return value
+            if isinstance(value, str):
+                candidate = value.strip()
+                if not candidate:
+                    return {}
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    # Some tool payloads arrive double-encoded (e.g. {"json": "{...}"})
+                    try:
+                        return json.loads(candidate.replace("'", '"'))
+                    except Exception:
+                        return {"__raw__": value}
+            return value or {}
+
+        def _extract_research_from_args(raw_args):
+            args = _coerce_json(raw_args)
+            if not isinstance(args, dict):
+                return args
+            research_payload = (
+                args.get("research_data")
+                or args.get("researchData")
+                or args.get("research")
+            )
+            if isinstance(research_payload, dict):
+                return research_payload
+            return args
+
+        def _handle_tool_call(tool_call):
+            nonlocal research_result, save_tool_called
+            if not tool_call:
+                return
+            tool_name = tool_call.get("name")
+            raw_args = (
+                tool_call.get("args")
+                or tool_call.get("arguments")
+                or tool_call.get("input")
+            )
+            print(f"[DEBUG] _handle_tool_call: tool_name={tool_name}, raw_args type={type(raw_args)}")
+            if tool_name == "save_researched_costs":
+                save_tool_called = True
+                candidate = _extract_research_from_args(raw_args)
+                if isinstance(candidate, dict):
+                    research_result = candidate or research_result
+                    print(f"[DEBUG] Set research_result from save_researched_costs, keys: {research_result.keys()}")
+            elif tool_name == "DestinationCostResearch":
+                candidate = _extract_research_from_args(raw_args)
+                print(f"[DEBUG] DestinationCostResearch candidate type: {type(candidate)}, is_dict: {isinstance(candidate, dict)}")
+                if isinstance(candidate, dict):
+                    print(f"[DEBUG] Candidate keys: {candidate.keys()}")
+                    research_result = candidate or research_result
+                    print(f"[DEBUG] Set research_result from DestinationCostResearch tool call")
+
+        def _handle_tool_response(tool_resp):
+            nonlocal research_result, save_tool_called
+            if not tool_resp:
+                return
+            tool_name = tool_resp.get("name")
+            payload = (
+                tool_resp.get("response")
+                or tool_resp.get("responseData")
+                or tool_resp.get("result")
+                or tool_resp.get("data")
+            )
+            print(f"[DEBUG] _handle_tool_response: tool_name={tool_name}, payload type before coerce={type(payload)}")
+            payload = _coerce_json(payload)
+            print(f"[DEBUG] _handle_tool_response: payload type after coerce={type(payload)}, is_dict={isinstance(payload, dict)}")
+            if isinstance(payload, dict):
+                print(f"[DEBUG] Payload keys: {payload.keys()}")
+            if not isinstance(payload, dict):
+                print(f"[DEBUG] Payload is not a dict, returning")
+                return
+
+            if tool_name == "save_researched_costs":
+                save_tool_called = True
+                candidate = (
+                    payload.get("research_data")
+                    or payload.get("researchData")
+                    or payload.get("saved_costs")
+                )
+                if isinstance(candidate, dict):
+                    research_result = candidate or research_result
+                    print(f"[DEBUG] Set research_result from save_researched_costs response")
+            elif tool_name == "DestinationCostResearch":
+                candidate = (
+                    payload.get("research_data")
+                    or payload.get("researchData")
+                    or payload
+                )
+                print(f"[DEBUG] DestinationCostResearch response candidate type: {type(candidate)}, is_dict: {isinstance(candidate, dict)}")
+                if isinstance(candidate, dict):
+                    print(f"[DEBUG] Candidate keys: {candidate.keys()}")
+                    research_result = candidate or research_result
+                    print(f"[DEBUG] Set research_result from DestinationCostResearch tool response")
+
         with requests.post(
             run_endpoint,
             data=json.dumps(adk_payload),
@@ -2403,6 +2501,9 @@ For each category, provide low/mid/high estimates with sources.
                 try:
                     event = json.loads(json_string)
 
+                    # DEBUG: Print all events to understand structure
+                    print(f"[DEBUG] Received event keys: {event.keys()}")
+
                     # Extract text responses
                     if "content" in event and "parts" in event["content"]:
                         for part in event["content"]["parts"]:
@@ -2410,34 +2511,37 @@ For each category, provide low/mid/high estimates with sources.
                                 response_text += part["text"]
 
                             # Check if save_researched_costs tool was called
-                            if "function_call" in part:
-                                func_call = part["function_call"]
-                                if func_call.get("name") == "save_researched_costs":
-                                    save_tool_called = True
-                                    # Extract research data from the tool call args
-                                    research_result = func_call.get("args", {}).get("research_data")
-                                if func_call.get("name") == "DestinationCostResearch":
-                                    research_result = func_call.get("args", {}) or research_result
+                            func_call = part.get("function_call") or part.get("functionCall")
+                            if func_call:
+                                print(f"[DEBUG] Found function_call in part: {func_call.get('name')}")
+                                _handle_tool_call(func_call)
 
                             # Also check function responses for save confirmation
-                            if "function_response" in part:
-                                func_resp = part["function_response"]
-                                if func_resp.get("name") == "save_researched_costs":
-                                    # Tool was successfully called
-                                    save_tool_called = True
-                                if func_resp.get("name") == "DestinationCostResearch":
-                                    resp_payload = func_resp.get("response", {})
-                                    research_payload = resp_payload.get("research_data")
-                                    if isinstance(research_payload, dict):
-                                        research_result = research_payload
-                                    elif not research_result and resp_payload:
-                                        research_result = resp_payload
+                            func_resp = part.get("function_response") or part.get("functionResponse")
+                            if func_resp:
+                                print(f"[DEBUG] Found function_response in part: {func_resp.get('name')}")
+                                print(f"[DEBUG] Response payload keys: {func_resp.get('response', {}).keys() if isinstance(func_resp.get('response'), dict) else 'not a dict'}")
+                                _handle_tool_response(func_resp)
+
+                    # Some ADK responses surface tool calls at the top level rather than within content.
+                    top_level_call = event.get("function_call") or event.get("functionCall")
+                    if top_level_call:
+                        print(f"[DEBUG] Found top_level function_call: {top_level_call.get('name')}")
+                        _handle_tool_call(top_level_call)
+
+                    top_level_response = event.get("function_response") or event.get("functionResponse")
+                    if top_level_response:
+                        print(f"[DEBUG] Found top_level function_response: {top_level_response.get('name')}")
+                        _handle_tool_response(top_level_response)
 
                 except json.JSONDecodeError:
                     continue
 
         # Try to extract JSON from response_text if we don't have structured data
+        print(f"[DEBUG] After streaming: research_result is {'SET' if research_result else 'NOT SET'}")
+        print(f"[DEBUG] After streaming: save_tool_called={save_tool_called}")
         if not research_result and response_text:
+            print(f"[DEBUG] Attempting to extract JSON from response_text (length={len(response_text)})")
             # Look for JSON in the response text
             import re
             json_match = re.search(r'\{[\s\S]*"destination_name"[\s\S]*\}', response_text)
@@ -2446,7 +2550,10 @@ For each category, provide low/mid/high estimates with sources.
                     research_result = json.loads(json_match.group())
                     print(f"✅ Extracted JSON from response text")
                 except:
+                    print(f"[DEBUG] Failed to parse JSON from response_text")
                     pass
+            else:
+                print(f"[DEBUG] No JSON pattern found in response_text")
 
         # Alternative C: If we have structured research JSON but no save tool call,
         # save the data server-side via /api/costs/bulk-save and also generate a

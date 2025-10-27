@@ -1646,8 +1646,13 @@ export async function initMapApp() {
         console.warn(`⚠️ Cost research returned partial result for ${destinationLabel}:`, data);
 
         // Resolve the waiter with partial status - not an error, just no structured data
-        if (waitEntry && manageWaiterInternally) {
-          waitEntry.resolve({ status: 'partial', message: partialMessage });
+        if (waitEntry) {
+          waitEntry.resolve({
+            costRefreshSucceeded: false,
+            summarySucceeded: false,
+            partial: true,
+            partialMessage,
+          });
         }
 
         if (buttonEl && buttonState) {
@@ -1672,7 +1677,7 @@ export async function initMapApp() {
           alert(`Cost research for ${destinationLabel} returned narrative results but no structured pricing.\n\n${partialMessage}`);
         }
 
-        return false;
+        return { ok: true, status: 'partial', message: partialMessage };
       }
 
       if (data?.status !== 'success') {
@@ -1724,7 +1729,7 @@ export async function initMapApp() {
         }, 2500);
       }
 
-      return true;
+      return { ok: true, status: 'success', storageMode };
     } catch (error) {
       console.error('❌ Cost research failed:', error);
 
@@ -1751,7 +1756,7 @@ export async function initMapApp() {
         alert(`Failed to update costs for ${destinationLabel}: ${error.message}`);
       }
 
-      return false;
+      return { ok: false, status: 'error', error };
     }
   }
 
@@ -1897,9 +1902,22 @@ export async function initMapApp() {
 
 
       // Determine if dates are locked
-      const isDateLocked = loc.is_date_locked || false;
-      const lockedClass = isDateLocked ? 'destination-locked' : '';
-      const lockIcon = isDateLocked ? '🔒' : '🔓';
+    const isDateLocked = loc.is_date_locked || false;
+    const lockedClass = isDateLocked ? 'destination-locked' : '';
+    const lockIcon = isDateLocked ? '🔒' : '🔓';
+
+    // Add duration editing state indicator for visual feedback
+    const isDurationUpdating = loc._is_duration_updating || false;
+    const durationUpdateClass = isDurationUpdating ? 'duration-updating' : '';
+
+    // Show visual feedback during duration update
+    if (isDurationUpdating) {
+      // Add updating class to duration input for visual feedback
+      const durationInput = container.querySelector(`.editable-duration[data-location-id="${loc.id}"]`);
+      if (durationInput) {
+        durationInput.classList.add('duration-updating');
+      }
+    }
 
       // Date picker HTML for locked destinations
       const datePickerHTML = isDateLocked ? `
@@ -1929,10 +1947,10 @@ export async function initMapApp() {
               <span>${[loc.city, loc.country].filter(Boolean).join(', ')}</span>
               ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
             </div>
-            <div class="destination-dates">
-              ${dateRange ? `${dateRange} • ` : ''}
-              <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}" ${isDateLocked ? 'disabled' : ''}> days
-            </div>
+              <div class="destination-dates">
+                ${dateRange ? `${dateRange} • ` : ''}
+                <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}" ${isDateLocked ? 'disabled' : ''}> days
+              </div>
             ${datePickerHTML}
             ${costSummaryHTML}
             <div class="destination-cost-details" id="cost-details-${loc.id}">
@@ -2155,10 +2173,23 @@ export async function initMapApp() {
         
         const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
         if (globalLocation) {
+          // Only allow duration editing for unlocked destinations
+          if (globalLocation.is_date_locked) {
+            console.warn('⚠️ Duration change blocked: destination is locked', globalLocation.name);
+            // Reset input to original value
+            e.target.value = globalLocation.duration_days || 1;
+            return;
+          }
+
           ensureLocationCostBaseline(globalLocation);
           globalLocation.duration_days = newDuration;
-          recalculateDates(workingData.locations);
+          
+          // Recalculate dates and update UI
+          const result = recalculateDates(workingData.locations);
+          displayConflictWarnings(result.conflicts);
           render(legFilter.value, subLegFilter.value, routingToggle.checked);
+          
+          console.log(`✅ Updated duration for unlocked destination "${globalLocation.name}" to ${newDuration} days`);
         }
       });
       
@@ -2950,7 +2981,14 @@ export async function initMapApp() {
     if (confirm('Delete this scenario and all its versions?')) {
       try {
         await scenarioManager.deleteScenario(scenarioId);
-        await updateScenarioList();
+
+        // Check if dynamic modal exists to determine which refresh to use
+        const dynamicModal = document.getElementById('manage-scenarios-modal-dyn');
+        if (dynamicModal) {
+          await window.showManageScenarios();
+        } else {
+          await updateScenarioList();
+        }
 
         // If we deleted the current scenario, reset
         if (currentScenarioId === scenarioId) {
@@ -3443,13 +3481,23 @@ export async function initMapApp() {
       let waitEntry;
       try {
         waitEntry = waitForNextCostUpdate(destinationLabel);
-        const dispatched = await requestCostUpdateFromAgent(destination, null, legName, subLegName, { waitEntry });
+        const dispatchResult = await requestCostUpdateFromAgent(destination, null, legName, subLegName, { waitEntry });
+        const dispatchOk = dispatchResult && dispatchResult.ok !== false;
 
-        if (!dispatched) {
+        if (!dispatchOk) {
           failed++;
-          waitEntry.cancel(new Error('Cost research request was not dispatched'));
+          const dispatchError =
+            (dispatchResult && dispatchResult.error) ||
+            new Error('Cost research request was not dispatched');
+          waitEntry.cancel(dispatchError);
+          // Swallow the rejection since we intentionally cancelled the waiter
+          waitEntry.promise.catch(() => {});
           if (item) {
-            setBulkDestinationStatus(item, 'failed', 'Unable to send request. Please ensure the scenario is loaded.');
+            const failureMessage =
+              typeof dispatchError === 'string'
+                ? dispatchError
+                : dispatchError?.message || 'Unable to send request. Please ensure the scenario is loaded.';
+            setBulkDestinationStatus(item, 'failed', failureMessage);
           }
           progressText.textContent = `Skipped ${destinationLabel} — request could not be sent`;
           continue;
@@ -3462,7 +3510,7 @@ export async function initMapApp() {
 
         const result = await waitEntry.promise;
 
-        if (result.costRefreshSucceeded && result.summarySucceeded) {
+        if (result?.costRefreshSucceeded && result?.summarySucceeded) {
           completed++;
           if (item) {
             setBulkDestinationStatus(item, 'complete');
@@ -3471,16 +3519,23 @@ export async function initMapApp() {
         } else {
           failed++;
           if (item) {
-            if (!result.costRefreshSucceeded) {
+            if (result?.partial) {
+              const note = result.partialMessage || 'AI returned narrative details but no structured pricing.';
+              setBulkDestinationStatus(item, 'failed', note);
+            } else if (!result?.costRefreshSucceeded) {
               setBulkDestinationStatus(item, 'failed', 'AI did not refresh costs. Ensure the scenario is saved.');
-            } else if (!result.summarySucceeded) {
+            } else if (!result?.summarySucceeded) {
               const errText = result.summaryError?.message || result.summaryError || 'Summary refresh failed.';
               setBulkDestinationStatus(item, 'failed', `Summary failed: ${errText}`);
             } else {
               setBulkDestinationStatus(item, 'failed', 'Unknown issue completing update.');
             }
           }
-          progressText.textContent = `Issue updating ${destinationLabel}. Review status for details.`;
+          if (result?.partial) {
+            progressText.textContent = `AI returned narrative-only results for ${destinationLabel}. Review notes and retry if needed.`;
+          } else {
+            progressText.textContent = `Issue updating ${destinationLabel}. Review status for details.`;
+          }
         }
       } catch (error) {
         failed++;
@@ -3723,45 +3778,6 @@ export async function initMapApp() {
     } catch {}
     await window.showManageScenarios();
   });
-  const versionHistoryBtn = document.getElementById('version-history-btn');
-  if (versionHistoryBtn) {
-    versionHistoryBtn.addEventListener('click', async () => {
-      try {
-        const dropdown = document.getElementById('scenario-actions-dropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        if (!currentScenarioId) {
-          alert('Please select or save a scenario first.');
-          return;
-        }
-        await window.showVersionHistory(currentScenarioId);
-      } catch (err) {
-        console.error('Error opening version history:', err);
-      }
-    });
-  }
-
-  // Save Named Version action
-  const saveNamedVersionBtn = document.getElementById('save-named-version-btn');
-  if (saveNamedVersionBtn) {
-    saveNamedVersionBtn.addEventListener('click', async () => {
-      try {
-        const dropdown = document.getElementById('scenario-actions-dropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        if (!currentScenarioId) {
-          alert('Please select or save a scenario first.');
-          return;
-        }
-        const name = prompt('Enter a label for this version:');
-        if (!name || !name.trim()) return;
-        const res = await scenarioManager.saveVersion(currentScenarioId, workingData, true, name.trim());
-        console.log(`📌 Saved named version v${res.versionNumber || 'n/a'}: ${name.trim()}`);
-        alert(`Saved version: ${name.trim()}`);
-      } catch (err) {
-        console.error('Error saving named version:', err);
-        alert('Failed to save named version');
-      }
-    });
-  }
 
   // Add destination quick button
   document.getElementById('add-destination-bar-btn').addEventListener('click', () => {

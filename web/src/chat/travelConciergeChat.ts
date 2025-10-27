@@ -1329,6 +1329,7 @@ export class TravelConciergeChat {
 
     try {
       const chatData = {
+        messages: [],
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
         legName: this.currentLeg || 'All',
@@ -1450,6 +1451,9 @@ export class TravelConciergeChat {
       }
 
       const chatData = chatDoc.data();
+      console.log('📂 Retrieved chatData from Firestore:', chatData);
+      console.log('📂 Messages field:', chatData.messages);
+      console.log('📂 Messages length:', chatData.messages?.length || 0);
       this.currentChatId = chatId;
       this.messages = chatData.messages || [];
       this.sessionId = chatData.sessionId || null;
