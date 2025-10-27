@@ -1210,6 +1210,9 @@ export async function initMapApp() {
     updateSidebar(filtered);
     updateScenarioNameDisplay();
 
+    // Setup compact mode toggle (only needs to be called once)
+    setupCompactModeToggle();
+
     // Check for date conflicts and display warnings
     const conflicts = detectDateConflicts(workingData.locations || []);
     displayConflictWarnings(conflicts);
@@ -1283,6 +1286,34 @@ export async function initMapApp() {
       }, 0);
     };
 
+    // Helper function to count unique continents
+    const countUniqueContinents = (destinations) => {
+      try {
+        if (!destinations || !Array.isArray(destinations)) return 0;
+        const continents = new Set(destinations
+          .map(loc => loc?.continent)
+          .filter(Boolean));
+        return continents.size;
+      } catch (e) {
+        console.warn('Error counting continents:', e);
+        return 0;
+      }
+    };
+
+    // Helper function to count unique countries
+    const countUniqueCountries = (destinations) => {
+      try {
+        if (!destinations || !Array.isArray(destinations)) return 0;
+        const countries = new Set(destinations
+          .map(loc => loc?.country)
+          .filter(Boolean));
+        return countries.size;
+      } catch (e) {
+        console.warn('Error counting countries:', e);
+        return 0;
+      }
+    };
+
     // Helper function to calculate date range from filtered locations
     const calculateDateRange = (destinations) => {
       if (destinations.length === 0) return '';
@@ -1312,12 +1343,14 @@ export async function initMapApp() {
       const totalCost = calculateTotalCost(filtered, includeTransport);
       const totalDays = calculateTotalDuration(filtered);
       const dateRange = calculateDateRange(filtered);
+      const continentCount = countUniqueContinents(filtered);
+      const countryCount = countUniqueCountries(filtered);
       const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
 
-      // Format: stops • duration • dates • cost
+      // Format: stops • continents • countries • duration • dates • cost
       summaryText = dateRange
-        ? `${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
-        : `${filtered.length} stops • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
+        ? `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
+        : `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
     } else if (subLegName) {
       const leg = workingData.legs?.find(l => l.name === legName);
       const subLeg = leg?.sub_legs?.find(sl => sl.name === subLegName);
@@ -1325,12 +1358,14 @@ export async function initMapApp() {
         const totalCost = calculateTotalCost(filtered, includeTransport);
         const totalDays = calculateTotalDuration(filtered);
         const dateRange = calculateDateRange(filtered);
+        const continentCount = countUniqueContinents(filtered);
+        const countryCount = countUniqueCountries(filtered);
         const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
 
-        // Format: leg name • stops • duration • dates • cost
+        // Format: leg name • stops • continents • countries • duration • dates • cost
         summaryText = dateRange
-          ? `${subLegName} • ${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
-          : `${subLegName} • ${filtered.length} stops • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
+          ? `${subLegName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
+          : `${subLegName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
@@ -1340,12 +1375,14 @@ export async function initMapApp() {
         const totalCost = calculateTotalCost(filtered, includeTransport);
         const totalDays = calculateTotalDuration(filtered);
         const dateRange = calculateDateRange(filtered);
+        const continentCount = countUniqueContinents(filtered);
+        const countryCount = countUniqueCountries(filtered);
         const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
 
-        // Format: leg name • stops • duration • dates • cost
+        // Format: leg name • stops • continents • countries • duration • dates • cost
         summaryText = dateRange
-          ? `${legName} • ${filtered.length} stops • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
-          : `${legName} • ${filtered.length} stops • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
+          ? `${legName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
+          : `${legName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
@@ -2312,6 +2349,39 @@ export async function initMapApp() {
         Adjust destination durations or locked dates to resolve.
       </div>
     `;
+  }
+
+  // Compact Mode Toggle
+  let compactModeInitialized = false;
+  function setupCompactModeToggle() {
+    const toggle = document.getElementById('compact-mode-toggle');
+    const destinationList = document.getElementById('destination-list');
+
+    if (!toggle || !destinationList) return;
+
+    // Load saved compact mode state from localStorage
+    const isCompactMode = localStorage.getItem('rtw-compact-mode') === 'true';
+
+    // Apply initial state (always sync state with localStorage)
+    if (isCompactMode) {
+      destinationList.classList.add('compact-mode');
+      toggle.classList.add('active');
+    } else {
+      destinationList.classList.remove('compact-mode');
+      toggle.classList.remove('active');
+    }
+
+    // Only add event listener once
+    if (!compactModeInitialized) {
+      compactModeInitialized = true;
+      toggle.addEventListener('click', () => {
+        const isCurrentlyCompact = destinationList.classList.toggle('compact-mode');
+        toggle.classList.toggle('active');
+
+        // Save to localStorage
+        localStorage.setItem('rtw-compact-mode', isCurrentlyCompact.toString());
+      });
+    }
   }
 
   function updateSidebarHighlight(activeIndex) {

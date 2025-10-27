@@ -752,7 +752,6 @@ CRITICAL REMINDERS:
                         currency_local = cat_data.get('currency_local', 'USD')
 
                         # Generate UUID for cost item
-                        import uuid
                         cost_id = str(uuid.uuid4())
 
                         cost_items.append({
@@ -1610,6 +1609,7 @@ def get_cost_summary():
     """Get comprehensive cost summary."""
     try:
         data = request.json or {}
+        print(f"[DEBUG] Received cost summary request with data: {data}")
         session_id = data.get('session_id', 'default')
         destinations = data.get('destinations')
         traveler_count = data.get('traveler_count')
@@ -1627,7 +1627,9 @@ def get_cost_summary():
             'summary': summary.model_dump()
         })
     except Exception as e:
+        import traceback
         print(f"Error getting cost summary: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route('/api/costs/export', methods=['GET'])

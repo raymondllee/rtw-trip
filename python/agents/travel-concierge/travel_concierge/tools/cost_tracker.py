@@ -261,6 +261,9 @@ class CostTrackerService:
             dest_id_str = str(dest_id).strip() if dest_id is not None else None
             dest_name = dest.get("name", "Unknown")
             duration_days = dest.get("duration_days", 0)
+            # Ensure duration_days is not None
+            if duration_days is None:
+                duration_days = 0
 
             # Get costs for this destination
             dest_costs = self.filter_costs(destination_id=dest_id_str)
@@ -275,7 +278,7 @@ class CostTrackerService:
                 )
 
             # Calculate cost per day
-            cost_per_day = total_usd / duration_days if duration_days > 0 else 0
+            cost_per_day = total_usd / duration_days if duration_days and duration_days > 0 else 0
 
             result.append(
                 DestinationCost(

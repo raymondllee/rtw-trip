@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>RTW Trip Map</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="./styles.css?v=20251014">
   <link rel="stylesheet" href="./cost-styles.css?v=20251014">
 </head>
@@ -36,7 +37,12 @@
     <div id="sidebar-resizer" class="sidebar-resizer"></div>
     <aside class="sidebar">
       <div class="sidebar-title">
-        <div class="header-primary">Destinations</div>
+        <div class="header-primary">
+          Destinations
+          <button id="compact-mode-toggle" class="compact-mode-toggle" title="Toggle compact mode">
+            <span class="compact-icon">⊟</span>
+          </button>
+        </div>
         <div id="sidebar-summary" class="header-secondary"></div>
       </div>
       <div id="planning-controls" class="planning-controls" style="padding: 4px 12px;"></div>
@@ -479,7 +485,7 @@
     </div>
   </div>
 
-  <script type="module" src="/config.js"></script>
+  <script src="/config.js"></script>
   <script>
     if (!window.RTW_CONFIG) {
       const fallback = document.createElement('script');

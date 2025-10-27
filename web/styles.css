@@ -306,6 +306,150 @@ html, body {
   background: #d32f2f;
 }
 
+/* Compact Mode Toggle */
+.compact-mode-toggle {
+  background: transparent;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 3px 8px;
+  margin-left: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: #666;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compact-mode-toggle:hover {
+  background: #f0f0f0;
+  border-color: #bbb;
+  color: #333;
+}
+
+.compact-mode-toggle.active {
+  background: #1e88e5;
+  border-color: #1e88e5;
+  color: white;
+}
+
+.compact-icon {
+  display: inline-block;
+  font-weight: bold;
+}
+
+/* Compact Mode Styles */
+.destination-list.compact-mode .destination-item {
+  padding: 4px 8px;
+  gap: 4px;
+}
+
+.destination-list.compact-mode .destination-number {
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  font-size: 9px;
+}
+
+.destination-list.compact-mode .drag-handle {
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.destination-list.compact-mode .destination-name {
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.destination-list.compact-mode .destination-location {
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.destination-list.compact-mode .destination-dates {
+  font-size: 9px;
+}
+
+.destination-list.compact-mode .destination-activity {
+  font-size: 9px;
+  padding: 1px 4px;
+}
+
+.destination-list.compact-mode .editable-duration {
+  font-size: 10px;
+  width: 40px;
+}
+
+/* Hide notes in compact mode */
+.destination-list.compact-mode .destination-notes {
+  display: none;
+}
+
+.destination-list.compact-mode .editable-notes {
+  display: none;
+}
+
+.destination-list.compact-mode .delete-destination-btn {
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  top: 4px;
+  right: 4px;
+}
+
+.destination-list.compact-mode .date-lock-toggle {
+  font-size: 14px;
+}
+
+/* Hide locked date pickers in compact mode */
+.destination-list.compact-mode .locked-date-pickers {
+  display: none !important;
+}
+
+/* Hide cost details and affordances in compact mode */
+.destination-list.compact-mode .destination-cost-summary {
+  display: none;
+}
+
+.destination-list.compact-mode .destination-cost-details {
+  display: none;
+}
+
+.destination-list.compact-mode .destination-cost-missing {
+  display: none;
+}
+
+.destination-list.compact-mode .update-costs-btn {
+  display: none;
+}
+
+.destination-list.compact-mode .cost-category {
+  display: none;
+}
+
+.destination-list.compact-mode .transport-segment {
+  padding: 4px 8px;
+}
+
+.destination-list.compact-mode .transport-segment-icon {
+  font-size: 14px;
+  margin-right: 4px;
+}
+
+.destination-list.compact-mode .transport-segment-route {
+  font-size: 11px;
+}
+
+.destination-list.compact-mode .transport-segment-details {
+  font-size: 9px;
+}
+
+.destination-list.compact-mode .transport-segment-cost {
+  font-size: 10px;
+}
+
 /* Unified Filter Section */
 .unified-filter-section {
   display: flex;
