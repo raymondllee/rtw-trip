@@ -348,27 +348,28 @@ class CostResearchResult(BaseModel):
 
 
 class DestinationCostResearch(BaseModel):
-    """Complete cost research results for a destination."""
+    """Complete cost research results for a destination.
+
+    NOTE: 'flights' field removed - inter-destination flights are tracked separately
+    via TransportSegment objects to avoid double-counting costs.
+    """
     destination_id: str = Field(description="ID of the destination")
     destination_name: str = Field(description="Name of the destination")
     accommodation: CostResearchResult = Field(
         description="Accommodation costs (total for stay)"
     )
-    flights: CostResearchResult = Field(
-        description="Flight costs (inbound and/or outbound)"
-    )
     food_daily: CostResearchResult = Field(
         description="Daily food costs per person"
     )
     transport_daily: CostResearchResult = Field(
-        description="Daily local transport costs per person"
+        description="Daily local transport costs per person (taxis, buses, subway, etc. within destination)"
     )
     activities: CostResearchResult = Field(
         description="Total activity and attraction costs for stay"
     )
-    total_low: float = Field(description="Total low estimate in USD")
-    total_mid: float = Field(description="Total typical estimate in USD")
-    total_high: float = Field(description="Total high estimate in USD")
+    total_low: float = Field(description="Total low estimate in USD (sum of 4 categories)")
+    total_mid: float = Field(description="Total typical estimate in USD (sum of 4 categories)")
+    total_high: float = Field(description="Total high estimate in USD (sum of 4 categories)")
     cost_per_day_mid: float = Field(
         description="Average cost per day (mid estimate) in USD"
     )

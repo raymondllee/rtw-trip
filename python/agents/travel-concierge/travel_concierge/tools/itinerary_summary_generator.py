@@ -91,13 +91,17 @@ def _extract_itinerary(tool_context: ToolContext) -> Dict[str, Any]:
 def _calculate_costs(itinerary: Dict[str, Any]) -> Dict[str, Any]:
     """Calculate cost summaries for the itinerary."""
     costs = itinerary.get("costs", [])
-    if not costs:
-        return {"total_cost": 0, "by_category": {}, "by_destination": {}}
+    transport_segments = itinerary.get("transport_segments", [])
+
+    if not costs and not transport_segments:
+        return {"total_cost": 0, "by_category": {}, "by_destination": {}, "transport_total": 0}
 
     total_cost = 0
     by_category: Dict[str, float] = {}
     by_destination: Dict[str, float] = {}
+    transport_total = 0
 
+    # Sum destination costs (accommodation, food, local transport, activities)
     for cost_item in costs:
         amount = float(cost_item.get("amount_usd", cost_item.get("amount", 0)))
         total_cost += amount
@@ -109,11 +113,30 @@ def _calculate_costs(itinerary: Dict[str, Any]) -> Dict[str, Any]:
         if dest_id:
             by_destination[str(dest_id)] = by_destination.get(str(dest_id), 0) + amount
 
+    # Add inter-destination transport costs (flights, trains, etc. between destinations)
+    for segment in transport_segments:
+        # Use the most accurate cost available: actual > researched_mid > estimated
+        amount = 0
+        if segment.get("actual_cost_usd"):
+            amount = float(segment.get("actual_cost_usd", 0))
+        elif segment.get("researched_cost_mid"):
+            amount = float(segment.get("researched_cost_mid", 0))
+        elif segment.get("estimated_cost_usd"):
+            amount = float(segment.get("estimated_cost_usd", 0))
+
+        if amount > 0:
+            transport_total += amount
+            total_cost += amount
+            # Add to inter-destination transport category
+            by_category["inter_destination_transport"] = by_category.get("inter_destination_transport", 0) + amount
+
     return {
         "total_cost": total_cost,
         "by_category": by_category,
         "by_destination": by_destination,
-        "count": len(costs)
+        "transport_total": transport_total,
+        "count": len(costs),
+        "transport_segment_count": len(transport_segments)
     }
 
 
@@ -284,13 +307,31 @@ def generate_itinerary_summary(
                 }
             }
         except Exception as llm_error:
+            error_str = str(llm_error)
             logger.error(f"[itinerary_summary] Failed to generate summary with LLM: {llm_error}")
-            # Fallback: return the prompt so the agent can try
-            return {
-                "status": "error",
-                "message": f"Failed to generate summary automatically: {str(llm_error)}. Please try again.",
-                "prompt": prompt,
-            }
+
+            # Check for specific error types and provide user-friendly messages
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                return {
+                    "status": "error",
+                    "error_code": "rate_limit",
+                    "message": "The AI service is currently experiencing high demand. Please wait a moment and try again. This is a temporary limitation from Google's Vertex AI service.",
+                    "retry_after": 60,  # Suggest retry after 60 seconds
+                }
+            elif "quota" in error_str.lower():
+                return {
+                    "status": "error",
+                    "error_code": "quota_exceeded",
+                    "message": "Daily API quota has been exceeded. Please try again later or contact support if this persists.",
+                }
+            else:
+                # Generic error fallback
+                return {
+                    "status": "error",
+                    "error_code": "generation_failed",
+                    "message": f"Failed to generate summary: {error_str}. Please try again in a few moments.",
+                    "prompt": prompt,
+                }
 
     except Exception as exc:
         logger.error(f"[itinerary_summary] Error preparing summary: {exc}")

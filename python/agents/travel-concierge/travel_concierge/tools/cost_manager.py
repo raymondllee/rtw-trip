@@ -105,12 +105,13 @@ def save_researched_costs(
     # Convert research data to cost items
     cost_items = []
 
+    # NOTE: 'flights' removed - inter-destination flights are tracked via TransportSegment objects
+    # to avoid double-counting costs. Only local/daily costs are included here.
     categories_map = {
         'accommodation': 'accommodation',
-        'flights': 'flight',
         'activities': 'activity',
         'food_daily': 'food',
-        'transport_daily': 'transport'
+        'transport_daily': 'transport'  # Local transport only (taxis, buses, subway within destination)
     }
 
     for research_cat, itinerary_cat in categories_map.items():
@@ -136,13 +137,11 @@ def save_researched_costs(
 
         # Scale per category semantics:
         # - food_daily, transport_daily: per-day per-person → scale by duration_days * num_travelers
-        # - flights: typically per-person → scale by num_travelers
         # - accommodation, activities: totals for stay → no scaling
+        # NOTE: flights removed - tracked separately via TransportSegment objects
         multiplier = 1
         if research_cat in ('food_daily', 'transport_daily'):
             multiplier = max(1, int(duration_days)) * max(1, int(num_travelers))
-        elif research_cat == 'flights':
-            multiplier = max(1, int(num_travelers))
 
         amount_usd = base_usd * multiplier
         amount_local = base_local * multiplier if base_local else amount_usd  # fallback if local not provided
@@ -263,7 +262,7 @@ save_researched_costs_tool = Tool(
                     },
                     "research_data": {
                         "type": "object",
-                        "description": "The complete cost research data with all categories (accommodation, flights, food_daily, transport_daily, activities)"
+                        "description": "The complete cost research data with all 4 categories (accommodation, food_daily, transport_daily, activities). NOTE: flights removed - tracked via TransportSegment."
                     }
                 },
                 "required": ["destination_name", "destination_id", "duration_days", "num_travelers", "research_data"]
@@ -296,7 +295,7 @@ save_researched_costs_tool = Tool(
                     },
                     "research_data": {
                         "type": "object",
-                        "description": "The complete cost research data with all categories (accommodation, flights, food_daily, transport_daily, activities)"
+                        "description": "The complete cost research data with all 4 categories (accommodation, food_daily, transport_daily, activities). NOTE: flights removed - tracked via TransportSegment."
                     }
                 },
                 "required": ["destination_name", "destination_id", "duration_days", "num_travelers", "research_data"]

@@ -1,0 +1,23 @@
+// Firebase Configuration generated during build from environment variables
+// This file is an ES module for use with type="module" scripts
+
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
+import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDrVceNED8eEiof1IYc5q7SGW0__i1xfJA",
+  authDomain: "pdf-extract-393514.firebaseapp.com",
+  projectId: "pdf-extract-393514",
+  storageBucket: "pdf-extract-393514.firebasestorage.app",
+  messagingSenderId: "755108588357",
+  appId: "1:755108588357:web:164e14af0c2ea4c4196c2c",
+  measurementId: "G-E9JS8CSNCP"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Initialize Firestore
+const db = getFirestore(app);
+
+export { db };

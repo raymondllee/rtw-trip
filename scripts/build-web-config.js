@@ -98,6 +98,46 @@ window.RTW_CONFIG = {
   fs.writeFileSync(configPath, configTemplate);
   console.log('✓ Web config built successfully');
   console.log('✓ Config file written to:', configPath);
+
+  // Also generate firebase-config.js as an ES module
+  const firebaseConfigTemplate = `// Firebase Configuration generated during build from environment variables
+// This file is an ES module for use with type="module" scripts
+
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
+import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "${env.FIREBASE_API_KEY || 'YOUR_FIREBASE_API_KEY_HERE'}",
+  authDomain: "${env.FIREBASE_AUTH_DOMAIN || 'YOUR_FIREBASE_AUTH_DOMAIN'}",
+  projectId: "${env.FIREBASE_PROJECT_ID || 'YOUR_FIREBASE_PROJECT_ID'}",
+  storageBucket: "${env.FIREBASE_STORAGE_BUCKET || ''}",
+  messagingSenderId: "${env.FIREBASE_MESSAGING_SENDER_ID || ''}",
+  appId: "${env.FIREBASE_APP_ID || ''}",
+  measurementId: "${env.FIREBASE_MEASUREMENT_ID || ''}"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Initialize Firestore
+const db = getFirestore(app);
+
+export { db };
+`;
+
+  const firebaseConfigPath = path.join(__dirname, '..', 'web', 'firebase-config.js');
+
+  // Create backup of existing firebase-config if it exists
+  if (fs.existsSync(firebaseConfigPath)) {
+    const backupPath = firebaseConfigPath + '.backup';
+    fs.copyFileSync(firebaseConfigPath, backupPath);
+    console.log('✓ Firebase config backup created:', backupPath);
+  }
+
+  // Write firebase config
+  fs.writeFileSync(firebaseConfigPath, firebaseConfigTemplate);
+  console.log('✓ Firebase config built successfully');
+  console.log('✓ Firebase config file written to:', firebaseConfigPath);
 }
 
 // Run the build

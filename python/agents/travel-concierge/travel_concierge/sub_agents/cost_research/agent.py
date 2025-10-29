@@ -171,8 +171,8 @@ cost_research_agent = Agent(
     description=(
         "Research accurate, real-world travel costs for destinations using web"
         " search. Returns structured JSON with cost breakdowns for"
-        " accommodation, flights, food, transport, and activities with"
-        " low/mid/high estimates and source citations."
+        " accommodation, food, local transport, and activities with"
+        " low/mid/high estimates and source citations. NOTE: flights excluded - tracked via TransportSegment."
     ),
     instruction=prompt.COST_RESEARCH_AGENT_INSTR,
     tools=[google_search_grounding, _destination_cost_output_tool],

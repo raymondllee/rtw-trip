@@ -490,7 +490,12 @@
         if (result.status === 'success') {
           return result;
         } else {
-          throw new Error(result.error || 'Failed to generate summary');
+          // Create a custom error object with additional info
+          const error = new Error(result.error || 'Failed to generate summary');
+          error.errorCode = result.error_code;
+          error.retryAfter = result.retry_after;
+          error.statusCode = response.status;
+          throw error;
         }
       } catch (error) {
         console.error('Error generating summary:', error);
@@ -575,14 +580,16 @@
     }
 
     // Initialize
-    async function init() {
+    async function init(isRetry = false) {
       try {
-        // Check if we have a saved summary
-        if (summaryId) {
-          const saved = await loadExistingSummary(summaryId);
-          if (saved) {
-            await displaySummary(saved);
-            return;
+        if (!isRetry) {
+          // Check if we have a saved summary
+          if (summaryId) {
+            const saved = await loadExistingSummary(summaryId);
+            if (saved) {
+              await displaySummary(saved);
+              return;
+            }
           }
         }
 
@@ -603,6 +610,12 @@
           currentScenarioId = storedScenarioId;
         }
 
+        // Show loading if retrying
+        if (isRetry) {
+          document.getElementById('loading').style.display = 'block';
+          document.getElementById('error').style.display = 'none';
+        }
+
         // Generate the summary
         const result = await generateSummary(itineraryData);
         await displaySummary(result);
@@ -612,8 +625,23 @@
         sessionStorage.setItem(summaryKey, JSON.stringify(result));
       } catch (error) {
         document.getElementById('loading').style.display = 'none';
-        document.getElementById('error').textContent = 'Error: ' + error.message;
-        document.getElementById('error').style.display = 'block';
+        const errorEl = document.getElementById('error');
+
+        // Check if this is a rate limit error
+        if (error.errorCode === 'rate_limit' || error.statusCode === 429) {
+          const retryAfter = error.retryAfter || 60;
+          errorEl.innerHTML = `
+            <strong>Service Temporarily Busy</strong>
+            <p>${error.message}</p>
+            <p>Suggested wait time: ${retryAfter} seconds</p>
+            <button class="btn btn-primary" onclick="window.location.reload()" style="margin-top: 1rem;">
+              🔄 Retry Now
+            </button>
+          `;
+        } else {
+          errorEl.textContent = 'Error: ' + error.message;
+        }
+        errorEl.style.display = 'block';
       }
     }
 

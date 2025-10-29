@@ -2260,11 +2260,31 @@ def generate_summary():
             })
         else:
             print(f"❌ Summary generation failed: {result.get('message')}")
-            return jsonify({
+
+            # Determine appropriate HTTP status code based on error type
+            error_code = result.get('error_code', 'unknown')
+            if error_code == 'rate_limit':
+                status_code = 429
+            elif error_code == 'quota_exceeded':
+                status_code = 429
+            else:
+                status_code = 500
+
+            response = {
                 'status': 'error',
                 'error': result.get('message'),
-                'prompt': result.get('prompt')  # Return prompt for debugging
-            }), 500
+                'error_code': error_code
+            }
+
+            # Add retry_after if present (for rate limiting)
+            if 'retry_after' in result:
+                response['retry_after'] = result['retry_after']
+
+            # Add prompt for debugging non-rate-limit errors
+            if error_code not in ['rate_limit', 'quota_exceeded'] and 'prompt' in result:
+                response['prompt'] = result['prompt']
+
+            return jsonify(response), status_code
 
     except Exception as e:
         import traceback
@@ -2332,17 +2352,18 @@ Travel Style: {travel_style}
 """
 
         if previous_destination:
-            research_prompt += f"Previous Destination: {previous_destination} (for flight pricing)\n"
+            research_prompt += f"Previous Destination: {previous_destination}\n"
         if next_destination:
-            research_prompt += f"Next Destination: {next_destination} (for flight pricing)\n"
+            research_prompt += f"Next Destination: {next_destination}\n"
 
         research_prompt += """
 Please provide comprehensive cost research including:
 1. Accommodation costs (total for stay)
-2. Flight costs (if applicable)
-3. Daily food costs per person
-4. Daily local transport costs per person
-5. Activity and attraction costs
+2. Daily food costs per person
+3. Daily local transport costs per person (taxis, buses, subway, etc. within the destination)
+4. Activity and attraction costs
+
+NOTE: Do NOT research flight costs - inter-destination flights are tracked separately via TransportSegment objects.
 
 For each category, provide low/mid/high estimates with sources.
 """
@@ -2564,12 +2585,12 @@ For each category, provide low/mid/high estimates with sources.
         if research_result and not save_tool_called:
             try:
                 # Build cost_items similar to save_researched_costs tool
+                # NOTE: 'flights' removed - inter-destination flights tracked via TransportSegment
                 categories_map = {
                     'accommodation': 'accommodation',
-                    'flights': 'flight',
                     'activities': 'activity',
                     'food_daily': 'food',
-                    'transport_daily': 'transport'
+                    'transport_daily': 'transport'  # Local transport only
                 }
 
                 cost_items = []
@@ -2582,11 +2603,12 @@ For each category, provide low/mid/high estimates with sources.
                     base_local = _to_float(cat_data.get('amount_local', 0))
                     currency_local = cat_data.get('currency_local', 'USD')
 
+                    # Scale per category semantics:
+                    # - food_daily, transport_daily: per-day per-person → scale by duration_days * num_travelers
+                    # - accommodation, activities: totals for stay → no scaling
                     multiplier = 1
                     if research_cat in ('food_daily', 'transport_daily'):
                         multiplier = max(1, int(duration_days)) * max(1, int(num_travelers))
-                    elif research_cat == 'flights':
-                        multiplier = max(1, int(num_travelers))
 
                     amount_usd = base_usd * multiplier
                     amount_local = base_local * multiplier if base_local else amount_usd

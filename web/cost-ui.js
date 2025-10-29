@@ -189,24 +189,24 @@ class CostUI {
 
       <div class="cost-summary-breakdown">
         <div class="cost-category-row">
-          <span>✈️ Flights</span>
-          <span>${formatCurrency(summary.costsByCategory.flight)}</span>
-        </div>
-        <div class="cost-category-row">
           <span>🏨 Accommodation</span>
           <span>${formatCurrency(summary.costsByCategory.accommodation)}</span>
-        </div>
-        <div class="cost-category-row">
-          <span>🎯 Activities</span>
-          <span>${formatCurrency(summary.costsByCategory.activity)}</span>
         </div>
         <div class="cost-category-row">
           <span>🍽️ Food</span>
           <span>${formatCurrency(summary.costsByCategory.food)}</span>
         </div>
         <div class="cost-category-row">
-          <span>🚗 Transport</span>
+          <span>🚗 Local Transport</span>
           <span>${formatCurrency(summary.costsByCategory.transport)}</span>
+        </div>
+        <div class="cost-category-row">
+          <span>🎯 Activities</span>
+          <span>${formatCurrency(summary.costsByCategory.activity)}</span>
+        </div>
+        <div class="cost-category-row">
+          <span>✈️ Inter-destination Transport</span>
+          <span>${formatCurrency(summary.costsByCategory.inter_destination_transport)}</span>
         </div>
         <div class="cost-category-row">
           <span>📌 Other</span>
@@ -307,11 +307,11 @@ class CostUI {
 
     const getCategoryIcon = (category) => {
       const icons = {
-        flight: '✈️',
         accommodation: '🏨',
         activity: '🎯',
         food: '🍽️',
         transport: '🚗',
+        inter_destination_transport: '✈️',
         other: '📌'
       };
       return icons[category] || '📌';
