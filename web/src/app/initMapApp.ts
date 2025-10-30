@@ -1986,17 +1986,36 @@ export async function initMapApp() {
       const routingToggle = document.getElementById('routing-toggle');
       const showTransport = routingToggle ? routingToggle.checked : true;
 
+      console.log(`[Transport Debug] idx=${idx}, showTransport=${showTransport}, hasManager=${!!window.transportSegmentManager}, isLastDest=${idx >= locations.length - 1}`);
+
       if (showTransport && idx < locations.length - 1 && window.transportSegmentManager) {
         const nextLoc = locations[idx + 1];
         const segment = window.transportSegmentManager.getSegment(loc.id, nextLoc.id);
+        console.log(`[Transport Debug] Looking for segment from ${loc.id} to ${nextLoc.id}, found:`, segment);
 
         if (segment) {
-          const activeCost = window.transportSegmentManager.getActiveCost(segment);
-          const formattedCost = window.transportSegmentManager.formatCurrency(activeCost);
-          const confidenceBadge = window.transportSegmentManager.getConfidenceBadge(segment);
+          try {
+            const activeCost = window.transportSegmentManager.getActiveCost(segment);
+            const formattedCost = window.transportSegmentManager.formatCurrency(activeCost);
+            const confidenceBadge = window.transportSegmentManager.getConfidenceBadge(segment);
+
+          // Add auto-update indicator and research status
+          const autoUpdatedIndicator = segment.auto_updated ? '<span class="auto-updated-badge" title="Costs auto-updated from research">✨</span>' : '';
+          const researchStatus = segment.booking_status === 'researched' ? 'RES' : (segment.booking_status === 'estimated' ? 'EST' : '');
+          const statusBadge = researchStatus ? `<span class="status-badge status-${segment.booking_status}">${researchStatus}</span>` : '';
+
+          // Show airlines if researched
+          const airlinesInfo = segment.researched_airlines && segment.researched_airlines.length > 0
+            ? `<div class="transport-airlines">${segment.researched_airlines.slice(0, 2).join(', ')}</div>`
+            : '';
+
+          // Show alternatives indicator if available (click edit to view)
+          const alternativesInfo = segment.researched_alternatives && segment.researched_alternatives.length > 0
+            ? `<span class="alternatives-indicator" title="${segment.researched_alternatives.length} alternative routes found - click ✏️ to view">🔀 ${segment.researched_alternatives.length}</span>`
+            : '';
 
           sidebarItems.push(`
-            <div class="transport-segment" data-segment-id="${segment.id}" data-from-id="${loc.id}" data-to-id="${nextLoc.id}">
+            <div class="transport-segment ${segment.auto_updated ? 'auto-updated' : ''}" data-segment-id="${segment.id}" data-from-id="${loc.id}" data-to-id="${nextLoc.id}">
               <div class="transport-segment-line"></div>
               <div class="transport-segment-content">
                 <div class="transport-segment-icon">${segment.transport_mode_icon}</div>
@@ -2009,17 +2028,25 @@ export async function initMapApp() {
                   </div>
                   <div class="transport-segment-cost">
                     <span class="cost-amount">${formattedCost}</span>
+                    ${statusBadge}
                     ${confidenceBadge}
+                    ${autoUpdatedIndicator}
                   </div>
+                  ${airlinesInfo}
                   ${segment.notes ? `<div class="transport-segment-notes">${segment.notes}</div>` : ''}
                 </div>
                 <div class="transport-segment-actions">
+                  ${alternativesInfo}
                   <button class="transport-edit-btn" data-segment-id="${segment.id}" title="Edit transport">✏️</button>
-                  <button class="transport-research-btn" data-segment-id="${segment.id}" title="Research costs">💰</button>
+                  <button class="transport-research-btn" data-segment-id="${segment.id}" title="AI Research costs">🤖</button>
                 </div>
               </div>
             </div>
           `);
+          } catch (error) {
+            console.error('Error rendering transport segment:', error);
+            console.error('Segment:', segment);
+          }
         }
       }
     });
@@ -2931,6 +2958,71 @@ export async function initMapApp() {
     document.getElementById('transport-currency-local').value = segment.currency_local || '';
     document.getElementById('transport-amount-local').value = segment.amount_local || '';
 
+    // Research data (AI agent results)
+    document.getElementById('transport-researched-duration').value = segment.researched_duration_hours || '';
+    document.getElementById('transport-researched-stops').value = segment.researched_stops || '';
+    document.getElementById('transport-airlines').value = segment.researched_airlines ? segment.researched_airlines.join(', ') : '';
+    document.getElementById('transport-research-notes').value = segment.research_notes || '';
+    document.getElementById('transport-research-sources').value = segment.research_sources ? segment.research_sources.join(', ') : '';
+
+    // Alternative routes (full details integrated)
+    const alternativesSection = document.getElementById('transport-alternatives-section');
+    const alternativesDisplay = document.getElementById('transport-alternatives-display');
+    if (segment.researched_alternatives && segment.researched_alternatives.length > 0) {
+      alternativesSection.style.display = 'block';
+
+      // Show primary route for comparison
+      const primaryInfo = `
+        <div style="margin-bottom: 12px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
+          <strong>Primary Route:</strong> ${segment.from_destination_name} → ${segment.to_destination_name}<br>
+          <strong>Estimated Cost:</strong> $${segment.researched_cost_mid?.toFixed(0) || segment.estimated_cost_usd?.toFixed(0) || 'N/A'}
+        </div>
+      `;
+
+      const alternativesHtml = segment.researched_alternatives.map((alt, idx) => {
+        const savingsClass = alt.savings_vs_primary > 0 ? 'color: #2e7d32;' : 'color: #d32f2f;';
+        const savingsText = alt.savings_vs_primary > 0
+          ? `💰 Save $${alt.savings_vs_primary.toFixed(0)}`
+          : `💸 Extra $${Math.abs(alt.savings_vs_primary).toFixed(0)}`;
+
+        return `
+          <div style="margin-bottom: 12px; padding: 10px; background: white; border: 1px solid #e0e0e0; border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <strong style="font-size: 15px;">#${idx + 1}: ${alt.from_location} → ${alt.to_location}</strong>
+              <span style="${savingsClass} font-weight: bold;">${savingsText}</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; margin-bottom: 8px;">
+              <div><strong>Cost Range:</strong> $${alt.cost_low?.toFixed(0) || 'N/A'} - $${alt.cost_high?.toFixed(0) || 'N/A'}</div>
+              <div><strong>Mid Cost:</strong> $${alt.cost_mid?.toFixed(0) || 'N/A'}</div>
+              ${alt.airlines && alt.airlines.length > 0 ? `
+                <div style="grid-column: 1 / -1;"><strong>Airlines:</strong> ${alt.airlines.join(', ')}</div>
+              ` : ''}
+              ${alt.typical_duration_hours ? `
+                <div><strong>Duration:</strong> ${alt.typical_duration_hours.toFixed(1)} hrs</div>
+              ` : ''}
+              ${alt.typical_stops !== undefined ? `
+                <div><strong>Stops:</strong> ${alt.typical_stops === 0 ? 'Direct' : alt.typical_stops}</div>
+              ` : ''}
+              ${alt.distance_from_original_km > 0 ? `
+                <div style="grid-column: 1 / -1;"><strong>Distance from original:</strong> ${alt.distance_from_original_km.toFixed(0)} km</div>
+              ` : ''}
+            </div>
+
+            ${alt.notes ? `
+              <div style="font-size: 13px; color: #666; font-style: italic; padding-top: 8px; border-top: 1px solid #f0f0f0;">
+                ${alt.notes}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+
+      alternativesDisplay.innerHTML = primaryInfo + alternativesHtml;
+    } else {
+      alternativesSection.style.display = 'none';
+    }
+
     // Booking details
     document.getElementById('transport-booking-status').value = segment.booking_status || 'estimated';
     document.getElementById('transport-confidence').value = segment.confidence_level || 'low';
@@ -2965,6 +3057,15 @@ export async function initMapApp() {
     const currencyLocal = document.getElementById('transport-currency-local').value.toUpperCase() || null;
     const amountLocal = parseFloat(document.getElementById('transport-amount-local').value) || null;
 
+    // Research data (AI agent results)
+    const researchedDuration = parseFloat(document.getElementById('transport-researched-duration').value) || null;
+    const researchedStops = parseInt(document.getElementById('transport-researched-stops').value) || null;
+    const airlinesText = document.getElementById('transport-airlines').value;
+    const airlines = airlinesText ? airlinesText.split(',').map(a => a.trim()).filter(a => a) : [];
+    const researchNotes = document.getElementById('transport-research-notes').value;
+    const sourcesText = document.getElementById('transport-research-sources').value;
+    const sources = sourcesText ? sourcesText.split(',').map(s => s.trim()).filter(s => s) : [];
+
     // Booking details
     const bookingStatus = document.getElementById('transport-booking-status').value;
     const confidenceLevel = document.getElementById('transport-confidence').value;
@@ -2985,6 +3086,11 @@ export async function initMapApp() {
       currency_local: currencyLocal,
       amount_local: amountLocal,
       duration_hours: duration,
+      researched_duration_hours: researchedDuration,
+      researched_stops: researchedStops,
+      researched_airlines: airlines,
+      research_notes: researchNotes,
+      research_sources: sources,
       booking_status: bookingStatus,
       confidence_level: confidenceLevel,
       booking_reference: bookingReference,
@@ -3021,14 +3127,93 @@ export async function initMapApp() {
     }
 
     console.log('🔍 Researching transport costs for:', segment);
-    alert(`Transport research for ${segment.from_destination_name} → ${segment.to_destination_name} will be implemented with AI agent integration.`);
 
-    // TODO: Integrate with AI agent for transport research
-    // This would involve:
-    // 1. Creating a TransportResearchRequest
-    // 2. Sending to the AI agent
-    // 3. Processing the TransportResearchResult
-    // 4. Updating the segment with researched costs
+    // Find the button and show loading state
+    const button = document.querySelector(`[data-segment-id="${segmentId}"]`);
+    const originalText = button ? button.innerHTML : '';
+    if (button) {
+      button.innerHTML = '⏳';
+      button.disabled = true;
+    }
+
+    try {
+      // Get session ID
+      const sessionId = window.sessionManager?.getSessionId() || 'default';
+
+      // Prepare research request
+      const researchRequest = {
+        session_id: sessionId,
+        segment_id: segmentId,
+        from_destination_name: segment.from_destination_name,
+        to_destination_name: segment.to_destination_name,
+        from_country: segment.from_country || '',
+        to_country: segment.to_country || '',
+        departure_date: segment.departure_date || ''
+      };
+
+      console.log('📤 Sending transport research request:', researchRequest);
+
+      // Call the research API
+      const response = await fetch('http://localhost:5001/api/transport/research', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(researchRequest)
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'success' && result.research_result) {
+        console.log('✅ Transport research completed:', result.research_result);
+
+        // Save the research results to Firestore
+        try {
+          const updateResponse = await fetch('http://localhost:5001/api/transport/update-research', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              session_id: sessionId,
+              scenario_id: window.currentScenarioId,  // Include scenario_id directly
+              segment_id: segmentId,
+              research_data: result.research_result
+            })
+          });
+
+          const updateResult = await updateResponse.json();
+          console.log('💾 Segment updated in Firestore:', updateResult);
+        } catch (updateError) {
+          console.error('Failed to save research to Firestore:', updateError);
+        }
+
+        // Show success message with key findings
+        const research = result.research_result;
+        const costMid = research.cost_mid || 0;
+        const airlines = research.airlines?.slice(0, 3).join(', ') || 'various carriers';
+        const alternatives = research.alternatives?.length || 0;
+
+        alert(`✅ Research complete! $${costMid.toFixed(0)} estimated (${airlines}). Found ${alternatives} alternative routes.`);
+
+        // The segment will be updated via polling mechanism
+        // The frontend polls /api/itinerary/changes every 2 seconds and will pick up the update
+
+      } else {
+        console.warn('⚠️ Partial research result:', result);
+        alert(`⚠️ Research completed with limited data. Check console for details.`);
+      }
+
+    } catch (error) {
+      console.error('❌ Error researching transport costs:', error);
+      alert(`❌ Failed to research transport costs: ${error.message}`);
+    } finally {
+      // Restore button state
+      if (button) {
+        button.innerHTML = originalText || '🤖';
+        button.disabled = false;
+      }
+    }
   }
 
   async function updateScenarioList() {
@@ -4453,7 +4638,7 @@ export async function initMapApp() {
     return clone;
   }
 
-  function handleItineraryChanges(changes) {
+  async function handleItineraryChanges(changes) {
     // ⚠️ CRITICAL NOTE: This function is called as a workaround for non-deterministic AI behavior.
     // Even when the AI chat claims it cannot access the itinerary, the backend may still
     // process and apply changes that are detected via polling. This function ensures those
@@ -4464,7 +4649,8 @@ export async function initMapApp() {
     console.log('📍 Current workingData.locations count:', workingData.locations?.length || 0);
     console.trace('🚨 Stack trace for handleItineraryChanges call:');
 
-    changes.forEach(change => {
+    // Process all changes, waiting for async ones
+    for (const change of changes) {
       console.log(`🎯 Processing change type: ${change.type}`, change);
       switch (change.type) {
         case 'add':
@@ -4479,11 +4665,14 @@ export async function initMapApp() {
         case 'update':
           updateDestinationDetails(change.destination_name, change.updates);
           break;
+        case 'transport_segment_updated':
+          await handleTransportSegmentUpdated(change.segment_id);
+          break;
         default:
           console.warn('⚠️ Unknown change type:', change.type);
           break;
       }
-    });
+    }
 
     console.log('📍 After changes, workingData.locations count:', workingData.locations?.length || 0);
     console.log('🔄 Recalculating dates and re-rendering...');
@@ -4553,6 +4742,40 @@ export async function initMapApp() {
     if (location) {
       Object.assign(location, updates);
       console.log(`Updated ${destinationName}:`, updates);
+    }
+  }
+
+  async function handleTransportSegmentUpdated(segmentId) {
+    console.log(`🚌 Transport segment updated: ${segmentId}`);
+
+    // Reload the transport segments from Firestore
+    try {
+      if (!window.transportSegmentManager) {
+        console.error('Transport segment manager not available');
+        return;
+      }
+
+      // Reload segments from Firestore - this will sync with the latest data
+      await window.transportSegmentManager.loadSegments(window.currentScenarioId);
+      console.log(`✅ Reloaded transport segments from Firestore`);
+
+      // Find the updated segment and log it
+      const updatedSegment = window.transportSegmentManager.getAllSegments().find(s => s.id === segmentId);
+      if (updatedSegment) {
+        console.log(`✨ Updated segment details:`, {
+          id: updatedSegment.id,
+          from: updatedSegment.from_name,
+          to: updatedSegment.to_name,
+          booking_status: updatedSegment.booking_status,
+          cost_mid: updatedSegment.researched_cost_mid,
+          airlines: updatedSegment.researched_airlines?.length || 0,
+          alternatives: updatedSegment.researched_alternatives?.length || 0
+        });
+      } else {
+        console.warn(`⚠️ Segment ${segmentId} not found after reload`);
+      }
+    } catch (error) {
+      console.error('Error reloading transport segment:', error);
     }
   }
 

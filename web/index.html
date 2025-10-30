@@ -357,6 +357,51 @@
           </div>
         </div>
 
+        <!-- Research Data (AI Agent Results) -->
+        <div class="form-section">
+          <h4 class="section-title">Research Data 🤖</h4>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="transport-researched-duration">Duration (hours)</label>
+              <input type="number" id="transport-researched-duration" class="form-input" min="0" step="0.5" placeholder="Flight duration">
+              <small class="form-hint">From AI research</small>
+            </div>
+            <div class="form-group">
+              <label for="transport-researched-stops">Stops</label>
+              <input type="number" id="transport-researched-stops" class="form-input" min="0" step="1" placeholder="Number of stops">
+              <small class="form-hint">Typical stops</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="transport-airlines">Airlines</label>
+            <textarea id="transport-airlines" class="form-input" rows="2" placeholder="e.g., Hawaiian Airlines, Qantas, United Airlines"></textarea>
+            <small class="form-hint">Comma-separated list of airlines found during research</small>
+          </div>
+
+          <div class="form-group">
+            <label for="transport-research-notes">Booking Tips & Research Notes</label>
+            <textarea id="transport-research-notes" class="form-input" rows="3" placeholder="Tips from AI research, booking windows, seasonal considerations..."></textarea>
+            <small class="form-hint">Insights from AI agent research</small>
+          </div>
+
+          <div class="form-group">
+            <label for="transport-research-sources">Research Sources</label>
+            <textarea id="transport-research-sources" class="form-input" rows="2" placeholder="URLs or sources used for research"></textarea>
+            <small class="form-hint">Comma-separated list of sources</small>
+          </div>
+
+          <!-- Alternative Routes (Full details) -->
+          <div class="form-group" id="transport-alternatives-section" style="display: none;">
+            <label>Alternative Routes Found 🔀</label>
+            <div id="transport-alternatives-display" style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 400px; overflow-y: auto;">
+              <!-- Alternatives will be populated here -->
+            </div>
+            <small class="form-hint">Alternative routes discovered during AI research - compare costs and routing options</small>
+          </div>
+        </div>
+
         <!-- Booking Details -->
         <div class="form-section">
           <h4 class="section-title">Booking Details</h4>

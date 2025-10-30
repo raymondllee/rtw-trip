@@ -36,6 +36,20 @@ from travel_concierge.tools.cost_manager import _to_float
 from travel_concierge.shared_libraries.types import CostItem
 
 
+def get_transport_icon(transport_mode: str) -> str:
+    """Return the emoji icon for a given transport mode."""
+    icons = {
+        'plane': '✈️',
+        'train': '🚂',
+        'bus': '🚌',
+        'car': '🚗',
+        'ferry': '🚢',
+        'walking': '🚶',
+        'other': '🚶'
+    }
+    return icons.get(transport_mode, '✈️')
+
+
 class SessionStore:
     """Session and cost tracker persistence with Firestore fallback."""
 
@@ -3347,6 +3361,351 @@ def sync_transport_segments():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/transport/research', methods=['POST'])
+def research_transport():
+    """
+    Research transport costs for a segment using the transport_research_agent.
+
+    Expected request body:
+    {
+        "session_id": "session_abc123",
+        "segment_id": "segment_uuid",
+        "from_destination_name": "San Francisco",
+        "to_destination_name": "Sydney",
+        "from_country": "USA",
+        "to_country": "Australia",
+        "departure_date": "2026-06-15"
+    }
+    """
+    try:
+        data = request.json
+        session_id = data.get('session_id', 'default')
+        segment_id = data.get('segment_id')
+
+        # Build the research request message
+        from_destination_name = data.get('from_destination_name')
+        to_destination_name = data.get('to_destination_name')
+        from_country = data.get('from_country', '')
+        to_country = data.get('to_country', '')
+        departure_date = data.get('departure_date')
+
+        # Validate required fields
+        if not all([segment_id, from_destination_name, to_destination_name]):
+            return jsonify({
+                'status': 'error',
+                'error': 'Missing required fields: segment_id, from_destination_name, to_destination_name'
+            }), 400
+
+        # Create context for the agent
+        research_prompt = f"""Please research accurate, real-world flight and transport costs for the following route:
+
+From: {from_destination_name}{', ' + from_country if from_country else ''}
+To: {to_destination_name}{', ' + to_country if to_country else ''}
+Departure Date: {departure_date or 'flexible'}
+Segment ID: {segment_id}
+
+Please provide comprehensive transport research including:
+1. Primary route costs (low/mid/high estimates)
+2. Airlines that serve this route
+3. Flight duration and typical number of stops
+4. Alternative airports in the same metro area
+5. Alternative routing options (different cities, multi-leg) that could save significant money
+6. Booking tips and recommendations
+
+Search for 2 adults + 1 child (13 years old).
+Check ±3 days around the departure date for better pricing.
+"""
+
+        # Create or get session
+        session_endpoint = f"{ADK_API_URL}/apps/{APP_NAME}/users/{USER_ID}/sessions/{session_id}"
+        try:
+            session_resp = requests.post(session_endpoint)
+            if session_resp.status_code != 200:
+                print(f"Warning: Session creation response: {session_resp.status_code}")
+        except Exception as e:
+            print(f"Session creation warning: {e}")
+
+        # Prepare ADK payload to invoke transport_research_agent
+        adk_payload = {
+            "session_id": session_id,
+            "app_name": APP_NAME,
+            "user_id": USER_ID,
+            "agent_name": "transport_research_agent",
+            "new_message": {
+                "role": "user",
+                "parts": [{"text": research_prompt}],
+            },
+            "state": {
+                "web_session_id": session_id,
+                "segment_id": segment_id,
+            }
+        }
+
+        print(f"🔍 Triggering transport research for: {from_destination_name} → {to_destination_name}")
+
+        # Call ADK API
+        run_endpoint = f"{ADK_API_URL}/run_sse"
+        headers = {
+            "Content-Type": "application/json; charset=UTF-8",
+            "Accept": "text/event-stream",
+        }
+
+        research_result = None
+        response_text = ""
+
+        def _coerce_json(value):
+            """Convert ADK tool payloads that may arrive as JSON strings into dicts."""
+            if isinstance(value, dict):
+                return value
+            if isinstance(value, str):
+                candidate = value.strip()
+                if not candidate:
+                    return {}
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    try:
+                        return json.loads(candidate.replace("'", '"'))
+                    except Exception:
+                        return {"__raw__": value}
+            return value or {}
+
+        def _extract_research_from_args(raw_args):
+            args = _coerce_json(raw_args)
+            if not isinstance(args, dict):
+                return args
+            research_payload = args.get("research_data") or args
+            if isinstance(research_payload, dict):
+                return research_payload
+            return args
+
+        def _handle_tool_call(tool_call):
+            nonlocal research_result
+            if not tool_call:
+                return
+            tool_name = tool_call.get("name")
+            raw_args = tool_call.get("args") or tool_call.get("arguments") or tool_call.get("input")
+
+            if tool_name == "TransportResearchResult":
+                candidate = _extract_research_from_args(raw_args)
+                if isinstance(candidate, dict):
+                    research_result = candidate or research_result
+                    print(f"[DEBUG] Set research_result from TransportResearchResult tool call")
+
+        def _handle_tool_response(tool_resp):
+            nonlocal research_result
+            if not tool_resp:
+                return
+            tool_name = tool_resp.get("name")
+            payload = tool_resp.get("response") or tool_resp.get("result") or tool_resp.get("data")
+            payload = _coerce_json(payload)
+
+            if not isinstance(payload, dict):
+                return
+
+            if tool_name == "TransportResearchResult":
+                candidate = payload.get("research_data") or payload
+                if isinstance(candidate, dict):
+                    research_result = candidate or research_result
+                    print(f"[DEBUG] Set research_result from TransportResearchResult tool response")
+
+        with requests.post(
+            run_endpoint,
+            data=json.dumps(adk_payload),
+            headers=headers,
+            stream=True,
+            timeout=180  # Transport research may take time due to multiple searches
+        ) as r:
+            event_count = 0
+            for chunk in r.iter_lines():
+                if not chunk:
+                    continue
+                json_string = chunk.decode("utf-8").removeprefix("data: ").strip()
+                try:
+                    event = json.loads(json_string)
+                    event_count += 1
+
+                    # Log every 10th event and any that contain function calls/responses
+                    if event_count % 10 == 0 or any(key in str(event) for key in ['function_call', 'functionCall', 'function_response', 'functionResponse', 'TransportResearchResult']):
+                        print(f"[SSE Event {event_count}] Keys: {list(event.keys())}")
+
+                    # Extract text responses
+                    if "content" in event and "parts" in event["content"]:
+                        for part in event["content"]["parts"]:
+                            if "text" in part:
+                                response_text += part["text"]
+
+                            func_call = part.get("function_call") or part.get("functionCall")
+                            if func_call:
+                                _handle_tool_call(func_call)
+
+                            func_resp = part.get("function_response") or part.get("functionResponse")
+                            if func_resp:
+                                _handle_tool_response(func_resp)
+
+                    # Check top level
+                    top_level_call = event.get("function_call") or event.get("functionCall")
+                    if top_level_call:
+                        _handle_tool_call(top_level_call)
+
+                    top_level_response = event.get("function_response") or event.get("functionResponse")
+                    if top_level_response:
+                        _handle_tool_response(top_level_response)
+
+                except json.JSONDecodeError:
+                    continue
+
+        if research_result:
+            return jsonify({
+                'status': 'success',
+                'research_result': research_result,
+                'response_text': response_text
+            })
+        else:
+            return jsonify({
+                'status': 'partial',
+                'message': 'Research completed but no structured data returned',
+                'response_text': response_text
+            }), 200
+
+    except Exception as e:
+        print(f"Error researching transport: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/transport/update-research', methods=['POST'])
+def update_transport_research():
+    """
+    Update a transport segment with research results.
+
+    Expected request body:
+    {
+        "session_id": "session_abc123",
+        "segment_id": "segment_uuid",
+        "research_data": { TransportResearchResult object }
+    }
+    """
+    try:
+        from google.cloud import firestore
+
+        data = request.get_json() or {}
+        session_id = data.get('session_id')
+        segment_id = data.get('segment_id')
+        research_data = data.get('research_data', {})
+        scenario_id = data.get('scenario_id')  # Allow direct scenario_id in request
+
+        print(f"\n[UPDATE-RESEARCH] Received request:")
+        print(f"  session_id: {session_id}")
+        print(f"  segment_id: {segment_id}")
+        print(f"  scenario_id: {scenario_id}")
+        print(f"  research_data keys: {list(research_data.keys()) if research_data else 'None'}")
+
+        if not segment_id or not research_data:
+            return jsonify({'error': 'segment_id and research_data required'}), 400
+
+        # Get scenario_id from session cache if not provided directly
+        if not scenario_id and session_id:
+            session_data = session_store._session_cache.get(session_id, {})
+            scenario_id = session_data.get('scenario_id')
+            print(f"  Retrieved scenario_id from session cache: {scenario_id}")
+
+        if not scenario_id:
+            return jsonify({'error': 'No active scenario found. Please provide scenario_id or valid session_id.'}), 400
+
+        db = firestore.Client()
+        scenario_ref = db.collection('scenarios').document(scenario_id)
+
+        # Get latest version
+        versions = list(
+            scenario_ref
+                .collection('versions')
+                .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+        )
+
+        if not versions:
+            return jsonify({'error': 'No versions found'}), 404
+
+        latest_version_ref = versions[0].reference
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+
+        transport_segments = itinerary_data.get('transport_segments', [])
+
+        # Find and update the segment
+        segment_found = False
+        for segment in transport_segments:
+            if segment.get('id') == segment_id:
+                segment_found = True
+                print(f"  Found segment: {segment.get('type')} from {segment.get('from_name')} to {segment.get('to_name')}")
+                # Update with research data
+                transport_mode = research_data.get('transport_mode', 'plane')
+                segment['transport_mode'] = transport_mode
+                segment['transport_mode_icon'] = get_transport_icon(transport_mode)
+                segment['researched_cost_low'] = research_data.get('cost_low')
+                segment['researched_cost_mid'] = research_data.get('cost_mid')
+                segment['researched_cost_high'] = research_data.get('cost_high')
+                segment['researched_duration_hours'] = research_data.get('typical_duration_hours')
+                segment['researched_stops'] = research_data.get('typical_stops', 0)
+                segment['researched_airlines'] = research_data.get('airlines', [])
+                segment['researched_alternatives'] = research_data.get('alternatives', [])
+                segment['research_sources'] = research_data.get('sources', [])
+                segment['research_notes'] = research_data.get('booking_tips', '')
+                segment['researched_at'] = research_data.get('researched_at', datetime.utcnow().isoformat())
+                segment['booking_status'] = 'researched'
+                segment['confidence_level'] = research_data.get('confidence', 'medium')
+                segment['auto_updated'] = True
+                segment['updated_at'] = datetime.utcnow().isoformat()
+                print(f"  Updated segment with:")
+                print(f"    cost_mid: {segment['researched_cost_mid']}")
+                print(f"    airlines: {len(segment['researched_airlines'])} airlines")
+                print(f"    alternatives: {len(segment['researched_alternatives'])} alternatives")
+                print(f"    booking_status: {segment['booking_status']}")
+                break
+
+        if not segment_found:
+            print(f"  ERROR: Segment {segment_id} not found in {len(transport_segments)} transport segments")
+            return jsonify({'error': f'Segment {segment_id} not found'}), 404
+
+        # Update Firestore
+        itinerary_data['transport_segments'] = transport_segments
+        latest_version_ref.update({
+            'itineraryData': itinerary_data,
+            'lastModified': datetime.utcnow().isoformat()
+        })
+        print(f"  ✅ Firestore updated successfully")
+
+        # Queue change for frontend polling
+        if session_id in session_store._session_cache:
+            if 'pending_changes' not in session_store._session_cache[session_id]:
+                session_store._session_cache[session_id]['pending_changes'] = []
+
+            session_store._session_cache[session_id]['pending_changes'].append({
+                'type': 'transport_segment_updated',
+                'segment_id': segment_id,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+            print(f"  ✅ Queued change notification for session {session_id}")
+        else:
+            print(f"  ⚠️ Session {session_id} not found in cache - polling may not detect change")
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Transport segment updated with research data',
+            'segment_id': segment_id
+        })
+
+    except Exception as e:
+        print(f"Error updating transport research: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 
 if __name__ == '__main__':

@@ -17,11 +17,13 @@
 import os
 import re
 import requests
+import logging
 from datetime import datetime
 from google.genai.types import Tool, FunctionDeclaration
 from google.adk.tools import ToolContext
 
 
+logger = logging.getLogger(__name__)
 FLASK_API_URL = os.getenv("FLASK_API_URL", "http://127.0.0.1:5001")
 
 
@@ -229,6 +231,74 @@ def update_destination_cost(
         num_travelers=num_travelers,
         research_data=research_data,
     )
+
+
+def save_transport_research(
+    tool_context: ToolContext,
+    segment_id: str,
+    research_data: dict
+) -> dict:
+    """
+    Save transport research results to Firestore for a transport segment.
+
+    This tool saves the transport research results directly to the user's active
+    scenario in Firestore, updating the transport segment with researched costs,
+    airlines, alternatives, and booking tips.
+
+    Args:
+        segment_id: ID of the transport segment to update
+        research_data: The transport research JSON data from TransportResearchResult
+
+    Returns:
+        Status message indicating success/failure
+    """
+
+    # Extract session ID from context
+    state = getattr(tool_context, "state", {}) or {}
+    session_id = state.get("web_session_id", "default")
+
+    logger.info(f"[save_transport_research] Saving transport research for segment {segment_id}, session {session_id}")
+
+    # Call Flask API to update transport segment with research data
+    try:
+        response = requests.post(
+            f"{FLASK_API_URL}/api/transport/update-research",
+            json={
+                "session_id": session_id,
+                "segment_id": segment_id,
+                "research_data": research_data
+            },
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            cost_mid = research_data.get('cost_mid', 0)
+            num_alternatives = len(research_data.get('alternatives', []))
+            airlines = ', '.join(research_data.get('airlines', [])[:3])
+
+            return {
+                "status": "success",
+                "message": (
+                    f"Saved transport research for segment (${cost_mid:.0f} mid-range estimate). "
+                    f"Found {num_alternatives} alternative routes. Airlines: {airlines}"
+                ),
+                "cost_mid": cost_mid,
+                "alternatives_found": num_alternatives
+            }
+        else:
+            logger.error(f"[save_transport_research] API error: {response.status_code} - {response.text}")
+            return {
+                "status": "error",
+                "message": f"Failed to save transport research: {response.text}"
+            }
+
+    except Exception as e:
+        logger.error(f"[save_transport_research] Exception: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Error saving transport research: {str(e)}"
+        }
 
 
 # Tool declaration for the agent

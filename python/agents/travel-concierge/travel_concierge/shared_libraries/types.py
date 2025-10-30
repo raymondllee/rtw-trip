@@ -382,6 +382,35 @@ class DestinationCostResearch(BaseModel):
 # Transport Segment Types
 # ============================================================================
 
+class AlternativeRoute(BaseModel):
+    """Alternative routing option for transport between destinations."""
+    from_location: str = Field(description="Alternative origin airport/city")
+    to_location: str = Field(description="Alternative destination airport/city")
+    cost_low: float = Field(description="Low-end cost estimate in USD for this route")
+    cost_mid: float = Field(description="Typical cost estimate in USD for this route")
+    cost_high: float = Field(description="High-end cost estimate in USD for this route")
+    savings_vs_primary: float = Field(
+        description="Cost savings compared to primary route (negative if more expensive)"
+    )
+    distance_from_original_km: float = Field(
+        description="Distance in km from the intended origin/destination"
+    )
+    airlines: list[str] = Field(
+        default_factory=list,
+        description="Airlines that serve this alternative route"
+    )
+    typical_stops: int = Field(
+        default=0,
+        description="Number of stops: 0=direct, 1=one-stop, etc."
+    )
+    typical_duration_hours: float = Field(
+        description="Typical flight duration in hours"
+    )
+    notes: str = Field(
+        description="Why this alternative is worth considering (e.g., 'Save $800 with one layover')"
+    )
+
+
 class TransportSegment(BaseModel):
     """Inter-destination transport segment with costs and details."""
     id: str = Field(description="Unique identifier for the transport segment")
@@ -464,6 +493,26 @@ class TransportSegment(BaseModel):
         default_factory=list,
         description="Alternative transport options considered"
     )
+    researched_alternatives: list[AlternativeRoute] = Field(
+        default_factory=list,
+        description="Detailed alternative routing options with cost savings"
+    )
+    researched_airlines: list[str] = Field(
+        default_factory=list,
+        description="Airlines/carriers found during research"
+    )
+    researched_duration_hours: Optional[float] = Field(
+        default=None,
+        description="Researched typical flight/travel duration in hours"
+    )
+    researched_stops: Optional[int] = Field(
+        default=None,
+        description="Researched number of stops (0=direct, 1=one-stop, etc.)"
+    )
+    auto_updated: bool = Field(
+        default=False,
+        description="Flag indicating costs were auto-updated from research"
+    )
     booking_link: Optional[str] = Field(
         default=None,
         description="URL for booking this transport"
@@ -480,7 +529,7 @@ class TransportSegment(BaseModel):
     # Metadata
     num_travelers: int = Field(
         default=3,
-        description="Number of travelers for cost calculation"
+        description="Number of travelers for cost calculation (2 adults + 1 child)"
     )
     created_at: Optional[str] = Field(
         default=None,
@@ -503,7 +552,7 @@ class TransportResearchRequest(BaseModel):
         default=None,
         description="Approximate departure date in YYYY-MM-DD format"
     )
-    num_travelers: int = Field(default=3, description="Number of travelers")
+    num_travelers: int = Field(default=3, description="Number of travelers (2 adults + 1 child)")
     preferred_modes: list[str] = Field(
         default_factory=list,
         description="Preferred transport modes to research"
@@ -531,9 +580,20 @@ class TransportResearchResult(BaseModel):
     booking_tips: str = Field(
         description="Recommendations for booking this transport"
     )
-    alternatives: list[str] = Field(
+    alternatives: list[AlternativeRoute] = Field(
         default_factory=list,
-        description="Alternative transport options found"
+        description="Alternative routing options found (different airports/cities)"
+    )
+    airlines: list[str] = Field(
+        default_factory=list,
+        description="Airlines/carriers that serve this route"
+    )
+    typical_duration_hours: float = Field(
+        description="Typical flight/travel duration in hours"
+    )
+    typical_stops: int = Field(
+        default=0,
+        description="Number of stops: 0=direct, 1=one-stop, etc."
     )
     confidence: str = Field(description="Confidence level: 'high', 'medium', 'low'")
     researched_at: str = Field(description="ISO timestamp of research")

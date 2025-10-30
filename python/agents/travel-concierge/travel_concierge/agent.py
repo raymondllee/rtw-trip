@@ -25,6 +25,7 @@ from travel_concierge.sub_agents.planning.agent import planning_agent
 from travel_concierge.sub_agents.post_trip.agent import post_trip_agent
 from travel_concierge.sub_agents.pre_trip.agent import pre_trip_agent
 from travel_concierge.sub_agents.cost_research.agent import cost_research_agent
+from travel_concierge.sub_agents.transport_research.agent import transport_research_agent
 # Don't use itinerary_editor as a sub_agent - it causes tool calling conflicts
 # from travel_concierge.sub_agents.itinerary_editor.agent import itinerary_editor_agent
 
@@ -42,6 +43,7 @@ from travel_concierge.tools.itinerary_summary_generator import (
 from travel_concierge.tools.cost_manager import (
     save_researched_costs,
     update_destination_cost,
+    save_transport_research,
 )
 
 
@@ -58,6 +60,7 @@ root_agent = Agent(
         in_trip_agent,
         post_trip_agent,
         cost_research_agent,
+        transport_research_agent,
         # itinerary_editor_agent,  # Removed - using tools directly on root agent instead
     ],
     # Add itinerary editing tools directly to root agent to avoid sub-agent tool calling conflicts
@@ -70,6 +73,7 @@ root_agent = Agent(
         generate_itinerary_summary,
         save_researched_costs,  # Save cost research results from cost_research_agent
         update_destination_cost,  # Backwards-compatible alias for legacy tool calls
+        save_transport_research,  # Save transport research results from transport_research_agent
     ],
     before_agent_callback=_load_precreated_itinerary,
 )
