@@ -3,6 +3,8 @@
 // Handles generating, saving, and viewing itinerary summaries
 
 import { getRuntimeConfig } from './config';
+import { prepareSummaryData, DEFAULT_SUMMARY_OPTIONS, SummaryOptions } from './utils/summaryGenerator';
+import { generateSummaryHTML } from './utils/summaryTemplates';
 
 const { apiBaseUrl } = getRuntimeConfig();
 const API_URL = apiBaseUrl;
@@ -24,7 +26,7 @@ export class SummaryManager {
   /**
    * Generate summary and open in new page
    */
-  async generateAndView(itineraryData = null, scenarioId = null) {
+  async generateAndView(itineraryData = null, scenarioId = null, options = DEFAULT_SUMMARY_OPTIONS, scenarioMetadata = null) {
     const data = itineraryData || this.currentItinerary;
     const scenario = scenarioId || this.currentScenarioId;
 
@@ -34,8 +36,12 @@ export class SummaryManager {
 
     // Store data in sessionStorage for the summary page to access
     sessionStorage.setItem('summaryItineraryData', JSON.stringify(data));
+    sessionStorage.setItem('summaryOptions', JSON.stringify(options));
     if (scenario) {
       sessionStorage.setItem('summaryScenarioId', scenario);
+    }
+    if (scenarioMetadata) {
+      sessionStorage.setItem('summaryScenarioMetadata', JSON.stringify(scenarioMetadata));
     }
 
     // Open summary viewer in new tab/window
@@ -46,6 +52,23 @@ export class SummaryManager {
 
     const url = `summary-viewer.html${params.toString() ? '?' + params.toString() : ''}`;
     window.open(url, '_blank');
+  }
+
+  /**
+   * Generate summary HTML (non-AI generator)
+   */
+  generateSummaryHTML(itineraryData, options = DEFAULT_SUMMARY_OPTIONS, scenarioMetadata = null) {
+    if (!itineraryData || !itineraryData.locations || itineraryData.locations.length === 0) {
+      throw new Error('No itinerary data available to generate summary');
+    }
+
+    // Prepare summary data
+    const summaryData = prepareSummaryData(itineraryData, scenarioMetadata);
+
+    // Generate HTML
+    const html = generateSummaryHTML(summaryData, options);
+
+    return html;
   }
 
   /**

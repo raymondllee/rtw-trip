@@ -39,6 +39,10 @@
       <div class="sidebar-title">
         <div class="header-primary">
           Destinations
+          <label class="country-view-toggle-label" for="country-view-toggle" style="margin-left: 12px; font-size: 13px; font-weight: normal; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            <input type="checkbox" id="country-view-toggle" style="cursor: pointer;">
+            <span>Country View</span>
+          </label>
           <button id="compact-mode-toggle" class="compact-mode-toggle" title="Toggle compact mode">
             <span class="compact-icon">⊟</span>
           </button>
@@ -276,6 +280,50 @@
         <div class="modal-actions">
           <button type="button" class="btn-secondary" id="cancel-import-btn">Cancel</button>
           <button type="button" class="btn-primary" id="confirm-import-btn">Import</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Options Modal -->
+  <div id="summary-options-modal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <h3>Generate Itinerary Summary</h3>
+      <div class="modal-form">
+        <div class="form-group">
+          <label style="font-weight: 600; margin-bottom: 8px; display: block;">Sections to Include</label>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="include-executive" checked>
+              <span>Executive Summary (Overview & Stats)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="include-detailed" checked>
+              <span>Detailed Itinerary (Full Breakdown)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="include-financial" checked>
+              <span>Financial Summary (Budget & Costs)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="include-timeline" checked>
+              <span>Timeline View (Chronological)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="show-costs" style="font-weight: 600; margin-bottom: 8px; display: block;">Cost Visibility</label>
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="show-costs" checked>
+            <span>Show costs throughout summary</span>
+          </label>
+          <small style="color: #666; font-size: 12px;">You can toggle this on/off in the summary viewer</small>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-summary-btn">Cancel</button>
+          <button type="button" class="btn-primary" id="generate-summary-confirm-btn">Generate Summary</button>
         </div>
       </div>
     </div>

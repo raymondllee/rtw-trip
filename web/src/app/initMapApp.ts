@@ -13,6 +13,7 @@ import {
 } from '../destinationDeletionHandler';
 import { getRuntimeConfig } from '../config';
 import { getLegsForData, generateDynamicLegs, getLegSummary } from '../utils/dynamicLegManager';
+import { aggregateByCountry, groupByContinent, groupByRegion, calculateCountryStats, CountryStay, RegionStay } from '../utils/countryAggregator';
 
 const { apiBaseUrl } = getRuntimeConfig();
 
@@ -1204,6 +1205,15 @@ export async function initMapApp() {
     refreshDataIntegrityButton();
     refreshGeographicValidationBadge();
 
+    // Check if country view is enabled
+    const countryViewToggle = document.getElementById('country-view-toggle');
+    if (countryViewToggle && countryViewToggle.checked) {
+      // In country view mode, just render the country rollup without updating map
+      renderCountryRollupView(workingData);
+      updateScenarioNameDisplay();
+      return;
+    }
+
     currentMarkers.forEach(m => m.setMap(null));
     currentMarkers = [];
 
@@ -1775,6 +1785,293 @@ export async function initMapApp() {
 
       return { ok: false, status: 'error', error };
     }
+  }
+
+  // Country rollup view rendering
+  function renderCountryRollupView(tripData, showCosts = false) {
+    const countryStays = aggregateByCountry(tripData);
+    const continentGroups = groupByContinent(countryStays);
+    const regionGroups = groupByRegion(countryStays);
+    const stats = calculateCountryStats(countryStays);
+
+    const destinationList = document.getElementById('destination-list');
+    const sidebarItems = [];
+
+    sidebarItems.push(`
+      <div class="country-rollup-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; gap: 8px;">
+          <button id="expand-all-btn" style="padding: 6px 12px; background: #4a90e2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">
+            ▼ Expand All
+          </button>
+          <button id="collapse-all-btn" style="padding: 6px 12px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">
+            ▶ Collapse All
+          </button>
+        </div>
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; user-select: none;">
+          <input type="checkbox" id="show-costs-toggle" ${showCosts ? 'checked' : ''} style="cursor: pointer;">
+          <span>Show Costs</span>
+        </label>
+      </div>
+      <div class="country-rollup-stats" style="padding: 12px; background: #f5f5f5; border-radius: 8px; margin-bottom: 12px;">
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 14px;">
+          <div>
+            <div style="color: #666; font-size: 12px;">Total Countries</div>
+            <div style="font-size: 20px; font-weight: bold; color: #333;">${stats.totalCountries}</div>
+          </div>
+          <div>
+            <div style="color: #666; font-size: 12px;">Total Days</div>
+            <div style="font-size: 20px; font-weight: bold; color: #333;">${stats.totalDays}</div>
+          </div>
+          <div>
+            <div style="color: #666; font-size: 12px;">Avg Days/Country</div>
+            <div style="font-size: 20px; font-weight: bold; color: #333;">${stats.averageDaysPerCountry}</div>
+          </div>
+          ${showCosts ? `
+          <div>
+            <div style="color: #666; font-size: 12px;">Total Costs</div>
+            <div style="font-size: 20px; font-weight: bold; color: #333;">$${stats.totalCosts.toLocaleString()}</div>
+          </div>
+          ` : '<div></div>'}
+        </div>
+      </div>
+    `);
+
+    // Render countries grouped by continent with region summaries
+    for (const [continent, countries] of continentGroups) {
+      // Get all regions for this continent
+      const continentRegions = Array.from(regionGroups.values())
+        .filter(r => r.continent === continent)
+        .sort((a, b) => {
+          if (!a.startDate) return 1;
+          if (!b.startDate) return -1;
+          return a.startDate.localeCompare(b.startDate);
+        });
+
+      // Calculate continent totals
+      const continentTotalDays = countries.reduce((sum, c) => sum + c.totalDays, 0);
+      const continentTotalWeeks = Math.round((continentTotalDays / 7) * 10) / 10;
+      const continentWeeksText = continentTotalWeeks === 1 ? '1 week' : `${continentTotalWeeks} weeks`;
+
+      const continentId = continent.replace(/\s+/g, '-').toLowerCase();
+
+      sidebarItems.push(`
+        <div class="continent-group" style="margin-bottom: 24px;" data-continent="${continentId}">
+          <div class="continent-header" style="font-size: 16px; font-weight: bold; color: #333; margin-bottom: 12px; padding: 8px; background: #e8f4f8; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;" data-continent-id="${continentId}">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="collapse-icon" style="font-size: 14px; transition: transform 0.2s;">▼</span>
+              <span>${continent}</span>
+            </div>
+            <span style="font-size: 14px; font-weight: 600; color: #555;">${continentTotalDays} days (${continentWeeksText})</span>
+          </div>
+          <div class="continent-content" data-continent-content="${continentId}">
+      `);
+
+      // Render region summaries for this continent
+      continentRegions.forEach(regionStay => {
+        const weeksText = regionStay.totalWeeks === 1 ? '1 week' : `${regionStay.totalWeeks} weeks`;
+        const countriesText = regionStay.countries.length === 1
+          ? regionStay.countries[0]
+          : `${regionStay.countries.length} countries`;
+
+        const regionId = `${continentId}-${regionStay.region.replace(/\s+/g, '-').toLowerCase()}`;
+
+        sidebarItems.push(`
+          <div class="region-group" style="margin-bottom: 16px;" data-region="${regionId}">
+            <div class="region-summary" style="padding: 10px; background: #f9f9f9; border-left: 4px solid #4a90e2; border-radius: 4px; cursor: pointer; user-select: none;" data-region-id="${regionId}">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                  <span class="collapse-icon" style="font-size: 12px; transition: transform 0.2s;">▼</span>
+                  <div>
+                    <div style="font-size: 14px; font-weight: 600; color: #4a90e2; margin-bottom: 4px;">
+                      ${regionStay.region}
+                    </div>
+                    <div style="font-size: 12px; color: #666;">
+                      ${countriesText}
+                    </div>
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 16px; font-weight: bold; color: #333;">
+                    ${regionStay.totalDays} days
+                  </div>
+                  <div style="font-size: 11px; color: #888;">
+                    (${weeksText})
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="region-content" data-region-content="${regionId}">
+        `);
+
+        // Render countries within this region
+        regionStay.countryStays.forEach((countryStay, idx) => {
+          const dateRange = formatDateCompact(countryStay.startDate, countryStay.endDate);
+          const costPerDay = countryStay.totalDays > 0
+            ? Math.round(countryStay.totalCosts / countryStay.totalDays)
+            : 0;
+
+          sidebarItems.push(`
+            <div class="country-item" style="margin-bottom: 12px; margin-left: 12px; padding: 12px; background: white; border: 1px solid #e0e0e0; border-radius: 6px; cursor: pointer;" data-country="${countryStay.country}">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="flex: 1;">
+                  <div style="font-size: 15px; font-weight: 600; color: #333; margin-bottom: 4px;">
+                    ${countryStay.country}
+                  </div>
+                  <div style="font-size: 13px; color: #888;">
+                    ${dateRange || 'Dates TBD'}
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 20px; font-weight: bold; color: #2c3e50;">
+                    ${countryStay.totalDays}
+                  </div>
+                  <div style="font-size: 11px; color: #888; text-transform: uppercase;">
+                    ${countryStay.totalDays === 1 ? 'day' : 'days'}
+                  </div>
+                </div>
+              </div>
+
+              ${showCosts && countryStay.totalCosts > 0 ? `
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
+                  <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                    <span style="color: #666;">Total Cost:</span>
+                    <span style="font-weight: 600; color: #333;">$${countryStay.totalCosts.toLocaleString()}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13px; margin-top: 4px;">
+                    <span style="color: #666;">Per Day:</span>
+                    <span style="font-weight: 600; color: #333;">$${costPerDay.toLocaleString()}</span>
+                  </div>
+                </div>
+              ` : ''}
+
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0;">
+                <div style="font-size: 12px; color: #666;">
+                  ${countryStay.destinations.length} ${countryStay.destinations.length === 1 ? 'destination' : 'destinations'}:
+                  <span style="color: #888; margin-left: 4px;">
+                    ${countryStay.destinations.map(d => d.name).join(', ')}
+                  </span>
+                </div>
+              </div>
+            </div>
+          `);
+        });
+
+        sidebarItems.push(`
+            </div>
+          </div>
+        `);
+      });
+
+      sidebarItems.push(`
+          </div>
+        </div>
+      `);
+    }
+
+    destinationList.innerHTML = sidebarItems.join('');
+
+    // Add collapse/expand handlers for continents
+    destinationList.querySelectorAll('.continent-header').forEach(header => {
+      header.addEventListener('click', (e) => {
+        const continentId = header.dataset.continentId;
+        const content = destinationList.querySelector(`[data-continent-content="${continentId}"]`);
+        const icon = header.querySelector('.collapse-icon');
+
+        if (content.style.display === 'none') {
+          content.style.display = 'block';
+          icon.style.transform = 'rotate(0deg)';
+        } else {
+          content.style.display = 'none';
+          icon.style.transform = 'rotate(-90deg)';
+        }
+      });
+    });
+
+    // Add collapse/expand handlers for regions
+    destinationList.querySelectorAll('.region-summary').forEach(summary => {
+      summary.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent continent collapse when clicking region
+        const regionId = summary.dataset.regionId;
+        const content = destinationList.querySelector(`[data-region-content="${regionId}"]`);
+        const icon = summary.querySelector('.collapse-icon');
+
+        if (content.style.display === 'none') {
+          content.style.display = 'block';
+          icon.style.transform = 'rotate(0deg)';
+        } else {
+          content.style.display = 'none';
+          icon.style.transform = 'rotate(-90deg)';
+        }
+      });
+    });
+
+    // Add expand all button handler
+    const expandAllBtn = document.getElementById('expand-all-btn');
+    if (expandAllBtn) {
+      expandAllBtn.addEventListener('click', () => {
+        // Expand all continents
+        destinationList.querySelectorAll('[data-continent-content]').forEach(content => {
+          content.style.display = 'block';
+        });
+        destinationList.querySelectorAll('.continent-header .collapse-icon').forEach(icon => {
+          icon.style.transform = 'rotate(0deg)';
+        });
+
+        // Expand all regions
+        destinationList.querySelectorAll('[data-region-content]').forEach(content => {
+          content.style.display = 'block';
+        });
+        destinationList.querySelectorAll('.region-summary .collapse-icon').forEach(icon => {
+          icon.style.transform = 'rotate(0deg)';
+        });
+      });
+    }
+
+    // Add collapse all button handler
+    const collapseAllBtn = document.getElementById('collapse-all-btn');
+    if (collapseAllBtn) {
+      collapseAllBtn.addEventListener('click', () => {
+        // Collapse all continents
+        destinationList.querySelectorAll('[data-continent-content]').forEach(content => {
+          content.style.display = 'none';
+        });
+        destinationList.querySelectorAll('.continent-header .collapse-icon').forEach(icon => {
+          icon.style.transform = 'rotate(-90deg)';
+        });
+
+        // Note: regions are inside continents, so they'll be hidden when continents collapse
+        // But we'll reset their icons to collapsed state for consistency
+        destinationList.querySelectorAll('.region-summary .collapse-icon').forEach(icon => {
+          icon.style.transform = 'rotate(-90deg)';
+        });
+        destinationList.querySelectorAll('[data-region-content]').forEach(content => {
+          content.style.display = 'none';
+        });
+      });
+    }
+
+    // Add show costs toggle handler
+    const showCostsToggle = document.getElementById('show-costs-toggle');
+    if (showCostsToggle) {
+      showCostsToggle.addEventListener('change', (e) => {
+        // Re-render the country view with the new showCosts setting
+        renderCountryRollupView(tripData, e.target.checked);
+      });
+    }
+
+    // Add click handlers to expand to show individual destinations
+    destinationList.querySelectorAll('.country-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const country = item.dataset.country;
+        // Switch back to destination view and filter to that country's destinations
+        const viewToggle = document.getElementById('country-view-toggle');
+        if (viewToggle) {
+          viewToggle.checked = false;
+          // Trigger update to show destinations
+          updateDestinationView();
+        }
+      });
+    });
   }
 
   function updateSidebar(locations) {
@@ -3915,6 +4212,20 @@ export async function initMapApp() {
     statePersistence.saveLegSelection(legFilter.value, e.target.value || null);
   });
   routingToggle.addEventListener('change', updateMap);
+
+  // Country view toggle
+  const countryViewToggle = document.getElementById('country-view-toggle');
+  if (countryViewToggle) {
+    countryViewToggle.addEventListener('change', function(e) {
+      if (e.target.checked) {
+        // Show country rollup view
+        renderCountryRollupView(workingData);
+      } else {
+        // Show regular destination view
+        updateMap();
+      }
+    });
+  }
   
   // Export scenario button
   document.getElementById('export-scenario-btn').addEventListener('click', () => {
@@ -4310,9 +4621,40 @@ export async function initMapApp() {
 
   document.getElementById('import-scenarios-btn').addEventListener('click', openImportScenariosModal);
 
-  // Summary generation button
-  document.getElementById('generate-summary-btn').addEventListener('click', async () => {
+  // Summary generation button - shows options modal
+  document.getElementById('generate-summary-btn').addEventListener('click', () => {
+    // Check if we have locations
+    if (!workingData.locations || workingData.locations.length === 0) {
+      alert('No locations in itinerary to generate summary');
+      return;
+    }
+
+    // Show summary options modal
+    document.getElementById('summary-options-modal').style.display = 'flex';
+  });
+
+  // Cancel summary generation
+  document.getElementById('cancel-summary-btn').addEventListener('click', () => {
+    document.getElementById('summary-options-modal').style.display = 'none';
+  });
+
+  // Confirm summary generation with options
+  document.getElementById('generate-summary-confirm-btn').addEventListener('click', async () => {
     try {
+      // Get options from modal
+      const options = {
+        showCosts: document.getElementById('show-costs').checked,
+        includeExecutive: document.getElementById('include-executive').checked,
+        includeDetailed: document.getElementById('include-detailed').checked,
+        includeFinancial: document.getElementById('include-financial').checked,
+        includeTimeline: document.getElementById('include-timeline').checked,
+        detailLevel: 'full',
+        groupBy: 'country'
+      };
+
+      // Close modal
+      document.getElementById('summary-options-modal').style.display = 'none';
+
       // Build itinerary data from current state
       const itineraryData = {
         trip: workingData.trip || {},
@@ -4321,13 +4663,25 @@ export async function initMapApp() {
         costs: workingData.costs || []
       };
 
-      if (!itineraryData.locations || itineraryData.locations.length === 0) {
-        alert('No locations in itinerary to generate summary');
-        return;
+      // Build scenario metadata
+      let scenarioMetadata = null;
+      if (currentScenarioId) {
+        try {
+          const scenario = await scenarioManager.getScenario(currentScenarioId);
+          if (scenario) {
+            scenarioMetadata = {
+              name: scenario.name,
+              version: scenario.currentVersion,
+              updatedAt: scenario.updatedAt?.toDate?.()?.toISOString() || scenario.updatedAt
+            };
+          }
+        } catch (error) {
+          console.error('Error fetching scenario metadata:', error);
+        }
       }
 
-      // Generate and view summary
-      await summaryManager.generateAndView(itineraryData, currentScenarioId);
+      // Generate and view summary with options
+      await summaryManager.generateAndView(itineraryData, currentScenarioId, options, scenarioMetadata);
 
       // Update view summary button state after generation
       await updateViewSummaryButtonState();
@@ -4551,21 +4905,26 @@ export async function initMapApp() {
   document.getElementById('confirm-import-btn').addEventListener('click', () => {
         const fileInput = document.getElementById('scenario-file');
         const overwrite = document.getElementById('overwrite-scenarios').checked;
-    
+
     if (!fileInput.files.length) {
       alert('Please select a file to import.');
       return;
     }
-    
+
     const file = fileInput.files[0];
     const reader = new FileReader();
-    
-    reader.onload = (e) => {
+
+    reader.onload = async (e) => {
       try {
-        const success = scenarioManager.importScenarios(e.target.result, overwrite);
+        const success = await scenarioManager.importScenarios(e.target.result, overwrite);
         if (success) {
           closeImportScenariosModal();
-          updateScenarioNameDisplay();
+
+          // Reload the imported scenario
+          if (scenarioManager.currentScenarioId) {
+            await window.loadScenarioById(scenarioManager.currentScenarioId);
+          }
+
           alert('Scenarios imported successfully!');
         } else {
           alert('Failed to import scenarios. Please check the file format.');
@@ -4575,7 +4934,7 @@ export async function initMapApp() {
         alert('Error importing scenarios. Please check the file format.');
       }
     };
-    
+
     reader.readAsText(file);
   });
   

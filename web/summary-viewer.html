@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Itinerary Summary</title>
+  <link rel="stylesheet" href="summary-print.css">
   <style>
     * {
       margin: 0;
@@ -19,47 +20,57 @@
       overflow-x: hidden;
       word-wrap: break-word;
       overflow-wrap: break-word;
+      display: flex;
+      min-height: 100vh;
     }
 
-    .header {
+    .sidebar {
       background: white;
-      border-bottom: 1px solid #ddd;
-      padding: 1rem 2rem;
-      position: sticky;
+      border-right: 1px solid #ddd;
+      padding: 1.5rem 1rem;
+      position: fixed;
+      left: 0;
       top: 0;
+      bottom: 0;
+      width: 220px;
       z-index: 100;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .header-content {
-      max-width: 1200px;
-      margin: 0 auto;
+      box-shadow: 2px 0 4px rgba(0,0,0,0.1);
       display: flex;
-      justify-content: space-between;
-      align-items: center;
+      flex-direction: column;
+      gap: 1rem;
     }
 
-    .header h1 {
-      font-size: 1.5rem;
+    .sidebar h1 {
+      font-size: 1.2rem;
       color: #1e88e5;
+      margin-bottom: 0.5rem;
     }
 
-    .header-actions {
+    .sidebar-actions {
       display: flex;
+      flex-direction: column;
       gap: 0.5rem;
+    }
+
+    .main-content {
+      margin-left: 220px;
+      flex: 1;
+      min-width: 0;
     }
 
     .btn {
-      padding: 0.5rem 1rem;
+      padding: 0.5rem 0.75rem;
       border: none;
       border-radius: 4px;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       cursor: pointer;
       transition: all 0.2s;
       text-decoration: none;
-      display: inline-flex;
+      display: flex;
       align-items: center;
+      justify-content: center;
       gap: 0.5rem;
+      width: 100%;
     }
 
     .btn-primary {
@@ -82,16 +93,15 @@
     }
 
     .container {
-      max-width: 900px;
+      max-width: 1400px;
       margin: 2rem auto;
       background: white;
-      padding: 3rem;
+      padding: 2rem;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       border-radius: 8px;
       word-wrap: break-word;
       overflow-wrap: break-word;
       overflow-x: hidden;
-      max-width: calc(100vw - 4rem);
     }
 
     .loading {
@@ -249,23 +259,34 @@
 
     /* Responsive styles */
     @media (max-width: 768px) {
-      .header-content {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
+      .sidebar {
+        position: relative;
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #ddd;
       }
 
-      .header-actions {
-        width: 100%;
-        justify-content: space-between;
+      .main-content {
+        margin-left: 0;
+      }
+
+      .sidebar-actions {
+        flex-direction: row;
         flex-wrap: wrap;
-        gap: 0.5rem;
+      }
+
+      .btn {
+        width: auto;
+        flex: 1;
+      }
+
+      body {
+        flex-direction: column;
       }
 
       .container {
         margin: 1rem;
         padding: 1.5rem;
-        max-width: calc(100vw - 2rem);
       }
 
       .summary-content {
@@ -377,11 +398,15 @@
     @media print {
       body {
         background: white;
+        display: block;
       }
 
-      .header,
-      .header-actions {
+      .sidebar {
         display: none;
+      }
+
+      .main-content {
+        margin-left: 0;
       }
 
       .container {
@@ -413,243 +438,27 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-  <header class="header">
-    <div class="header-content">
-      <h1>Itinerary Summary</h1>
-      <div class="header-actions">
-        <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
-        <button class="btn btn-secondary" id="save-btn">💾 Save to Scenario</button>
-        <a href="index.html" class="btn btn-primary">← Back to Map</a>
+  <aside class="sidebar">
+    <h1>Itinerary Summary</h1>
+    <div class="sidebar-actions">
+      <button class="btn btn-secondary" id="toggle-costs-btn">💰 Hide Costs</button>
+      <button class="btn btn-secondary" onclick="window.print()">🖨️ Print PDF</button>
+      <button class="btn btn-secondary" id="save-btn">💾 Save</button>
+      <a href="index.html" class="btn btn-primary">← Back</a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="container">
+      <div id="loading" class="loading">
+        Generating your itinerary summary
       </div>
+      <div id="error" class="error" style="display: none;"></div>
+      <div id="meta-info" class="meta-info" style="display: none;"></div>
+      <div id="summary-content" class="summary-content" style="display: none;"></div>
     </div>
-  </header>
+  </main>
 
-  <div class="container">
-    <div id="loading" class="loading">
-      Generating your itinerary summary
-    </div>
-    <div id="error" class="error" style="display: none;"></div>
-    <div id="meta-info" class="meta-info" style="display: none;"></div>
-    <div id="summary-content" class="summary-content" style="display: none;"></div>
-  </div>
-
-  <script type="module">
-    import { db } from './firebase-config.js';
-    import { doc, updateDoc, getDoc, Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
-
-    const API_URL = 'http://localhost:5001';
-
-    // Get summary data from URL params or sessionStorage
-    const urlParams = new URLSearchParams(window.location.search);
-    const summaryId = urlParams.get('id');
-    const scenarioId = urlParams.get('scenario');
-
-    let currentSummary = null;
-    let currentScenarioId = scenarioId;
-
-    async function loadExistingSummary(id) {
-      // Load a previously saved summary from sessionStorage or Firebase
-      if (id === 'saved' && currentScenarioId) {
-        // Load saved summary from Firestore
-        try {
-          const scenarioDoc = await getDoc(doc(db, 'scenarios', currentScenarioId));
-          if (scenarioDoc.exists() && scenarioDoc.data().summary) {
-            return {
-              summary: scenarioDoc.data().summary.markdown,
-              itinerary_data: scenarioDoc.data().summary.metadata,
-              generatedAt: scenarioDoc.data().summaryGeneratedAt?.toDate()
-            };
-          }
-        } catch (error) {
-          console.error('Error loading saved summary from Firestore:', error);
-        }
-        return null;
-      }
-
-      const saved = sessionStorage.getItem(`summary_${id}`);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-      return null;
-    }
-
-    async function generateSummary(itineraryData) {
-      try {
-        const response = await fetch(`${API_URL}/api/itinerary/summary`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            itinerary: itineraryData
-          })
-        });
-
-        const result = await response.json();
-
-        if (result.status === 'success') {
-          return result;
-        } else {
-          // Create a custom error object with additional info
-          const error = new Error(result.error || 'Failed to generate summary');
-          error.errorCode = result.error_code;
-          error.retryAfter = result.retry_after;
-          error.statusCode = response.status;
-          throw error;
-        }
-      } catch (error) {
-        console.error('Error generating summary:', error);
-        throw error;
-      }
-    }
-
-    async function displaySummary(summaryData) {
-      const loadingEl = document.getElementById('loading');
-      const errorEl = document.getElementById('error');
-      const metaEl = document.getElementById('meta-info');
-      const contentEl = document.getElementById('summary-content');
-
-      loadingEl.style.display = 'none';
-
-      if (summaryData.error) {
-        errorEl.textContent = summaryData.error;
-        errorEl.style.display = 'block';
-        return;
-      }
-
-      // Display metadata
-      const generatedTime = summaryData.generatedAt || new Date();
-      if (summaryData.itinerary_data) {
-        const meta = summaryData.itinerary_data;
-        metaEl.innerHTML = `
-          <div><strong>Generated:</strong> ${generatedTime.toLocaleString()}</div>
-          <div><strong>Locations:</strong> ${meta.locations_count || 0}</div>
-          <div><strong>Legs:</strong> ${meta.legs_count || 0}</div>
-          ${meta.cost_summary?.total_cost ? `<div><strong>Total Cost:</strong> $${meta.cost_summary.total_cost.toLocaleString()}</div>` : ''}
-        `;
-        metaEl.style.display = 'block';
-      } else if (summaryData.generatedAt) {
-        // If we have a saved summary with just the generation time
-        metaEl.innerHTML = `
-          <div><strong>Generated:</strong> ${generatedTime.toLocaleString()}</div>
-          <div><strong>Type:</strong> Saved Summary</div>
-        `;
-        metaEl.style.display = 'block';
-      }
-
-      // Convert markdown to HTML and display
-      const summaryMarkdown = summaryData.summary || summaryData.text || '';
-      const summaryHtml = marked.parse(summaryMarkdown);
-      contentEl.innerHTML = summaryHtml;
-      contentEl.style.display = 'block';
-
-      currentSummary = {
-        markdown: summaryMarkdown,
-        html: summaryHtml,
-        metadata: summaryData.itinerary_data,
-        generatedAt: new Date().toISOString()
-      };
-    }
-
-    async function saveSummaryToScenario() {
-      if (!currentSummary || !currentScenarioId) {
-        alert('No summary or scenario to save to');
-        return;
-      }
-
-      try {
-        const scenarioRef = doc(db, 'scenarios', currentScenarioId);
-        const scenarioDoc = await getDoc(scenarioRef);
-
-        if (!scenarioDoc.exists()) {
-          alert('Scenario not found');
-          return;
-        }
-
-        await updateDoc(scenarioRef, {
-          summary: currentSummary,
-          summaryGeneratedAt: Timestamp.now(),
-          updatedAt: Timestamp.now()
-        });
-
-        alert('Summary saved to scenario!');
-      } catch (error) {
-        console.error('Error saving summary:', error);
-        alert('Failed to save summary: ' + error.message);
-      }
-    }
-
-    // Initialize
-    async function init(isRetry = false) {
-      try {
-        if (!isRetry) {
-          // Check if we have a saved summary
-          if (summaryId) {
-            const saved = await loadExistingSummary(summaryId);
-            if (saved) {
-              await displaySummary(saved);
-              return;
-            }
-          }
-        }
-
-        // Otherwise, get itinerary data from sessionStorage
-        const itineraryDataStr = sessionStorage.getItem('summaryItineraryData');
-        if (!itineraryDataStr) {
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('error').textContent = 'No itinerary data found. Please generate from the main page.';
-          document.getElementById('error').style.display = 'block';
-          return;
-        }
-
-        const itineraryData = JSON.parse(itineraryDataStr);
-
-        // Store scenario ID if provided
-        const storedScenarioId = sessionStorage.getItem('summaryScenarioId');
-        if (storedScenarioId) {
-          currentScenarioId = storedScenarioId;
-        }
-
-        // Show loading if retrying
-        if (isRetry) {
-          document.getElementById('loading').style.display = 'block';
-          document.getElementById('error').style.display = 'none';
-        }
-
-        // Generate the summary
-        const result = await generateSummary(itineraryData);
-        await displaySummary(result);
-
-        // Save to sessionStorage for future reference
-        const summaryKey = `summary_${Date.now()}`;
-        sessionStorage.setItem(summaryKey, JSON.stringify(result));
-      } catch (error) {
-        document.getElementById('loading').style.display = 'none';
-        const errorEl = document.getElementById('error');
-
-        // Check if this is a rate limit error
-        if (error.errorCode === 'rate_limit' || error.statusCode === 429) {
-          const retryAfter = error.retryAfter || 60;
-          errorEl.innerHTML = `
-            <strong>Service Temporarily Busy</strong>
-            <p>${error.message}</p>
-            <p>Suggested wait time: ${retryAfter} seconds</p>
-            <button class="btn btn-primary" onclick="window.location.reload()" style="margin-top: 1rem;">
-              🔄 Retry Now
-            </button>
-          `;
-        } else {
-          errorEl.textContent = 'Error: ' + error.message;
-        }
-        errorEl.style.display = 'block';
-      }
-    }
-
-    // Event listeners
-    document.getElementById('save-btn').addEventListener('click', saveSummaryToScenario);
-
-    // Start initialization
-    init();
-  </script>
+  <script type="module" src="./src/summary-viewer.ts"></script>
 </body>
 </html>

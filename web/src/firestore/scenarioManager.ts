@@ -578,4 +578,64 @@ export class FirestoreScenarioManager {
 
     console.log(`Summary deleted from scenario ${scenarioId}`);
   }
+
+  /**
+   * Import scenarios from JSON data
+   * @param {string} jsonData - The JSON string containing the scenario data
+   * @param {boolean} overwrite - If true, overwrites the current scenario; if false, creates a new one
+   * @returns {boolean} - True if import was successful, false otherwise
+   */
+  async importScenarios(jsonData, overwrite = false) {
+    try {
+      // Parse the JSON data
+      const data = JSON.parse(jsonData);
+
+      // Validate the data structure
+      if (!data || typeof data !== 'object') {
+        console.error('Invalid data format: not an object');
+        return false;
+      }
+
+      // Check for required fields (locations, legs, costs)
+      const hasLocations = Array.isArray(data.locations);
+      const hasLegs = Array.isArray(data.legs);
+      const hasCosts = Array.isArray(data.costs);
+
+      if (!hasLocations || !hasLegs || !hasCosts) {
+        console.error('Invalid data format: missing required fields (locations, legs, costs)');
+        return false;
+      }
+
+      console.log(`📥 Importing scenario with ${data.locations.length} locations, ${data.legs.length} legs, ${data.costs.length} costs`);
+
+      if (overwrite && this.currentScenarioId) {
+        // Overwrite the current scenario by creating a new version
+        await this.saveVersion(
+          this.currentScenarioId,
+          data,
+          true,
+          `Imported on ${new Date().toLocaleDateString()}`
+        );
+        console.log(`✅ Scenario ${this.currentScenarioId} updated with imported data`);
+      } else {
+        // Create a new scenario
+        const scenarioName = data.scenarioName || `Imported Scenario ${new Date().toLocaleDateString()}`;
+        const scenarioDescription = data.scenarioDescription || 'Imported from JSON file';
+
+        const scenarioId = await this.saveScenario({
+          name: scenarioName,
+          description: scenarioDescription,
+          data: data
+        });
+
+        this.currentScenarioId = scenarioId;
+        console.log(`✅ New scenario created: ${scenarioId}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error importing scenarios:', error);
+      return false;
+    }
+  }
 }
