@@ -4648,6 +4648,7 @@ export async function initMapApp() {
         includeDetailed: document.getElementById('include-detailed').checked,
         includeFinancial: document.getElementById('include-financial').checked,
         includeTimeline: document.getElementById('include-timeline').checked,
+        includeDestinations: document.getElementById('include-destinations').checked,
         detailLevel: 'full',
         groupBy: 'country'
       };

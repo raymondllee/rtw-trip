@@ -141,6 +141,29 @@ function toggleCosts() {
   btn.textContent = isHidden ? '💰 Show Costs' : '💰 Hide Costs';
 }
 
+// Setup section toggle functionality
+function setupSectionToggles() {
+  const toggles = document.querySelectorAll('[data-section-toggle]');
+
+  toggles.forEach(toggle => {
+    const checkbox = toggle as HTMLInputElement;
+    const sectionName = checkbox.getAttribute('data-section-toggle');
+
+    checkbox.addEventListener('change', () => {
+      const section = document.querySelector(`[data-section="${sectionName}"]`) as HTMLElement;
+      if (section) {
+        section.style.display = checkbox.checked ? 'block' : 'none';
+      }
+    });
+
+    // Initialize visibility based on checkbox state
+    const section = document.querySelector(`[data-section="${sectionName}"]`) as HTMLElement;
+    if (section) {
+      section.style.display = checkbox.checked ? 'block' : 'none';
+    }
+  });
+}
+
 // Initialize
 async function init() {
   try {
@@ -175,6 +198,9 @@ async function init() {
 
     // Display the summary
     await displaySummary(html, itineraryData, options);
+
+    // Setup section toggles
+    setupSectionToggles();
 
     // Update cost toggle button text
     const btn = document.getElementById('toggle-costs-btn');

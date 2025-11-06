@@ -30,6 +30,10 @@ export function generateSummaryHTML(summaryData: SummaryData, options: SummaryOp
     sections.push(generateTimelineView(summaryData, options));
   }
 
+  if (options.includeDestinations) {
+    sections.push(generateDestinationDetails(summaryData, options));
+  }
+
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -87,7 +91,7 @@ function generateExecutiveSummary(summaryData: SummaryData, options: SummaryOpti
   const journeyTableHtml = generateCondensedJourneyTable(summaryData, options);
 
   return `
-    <section class="executive-summary">
+    <section class="executive-summary" data-section="executive">
       ${journeyTableHtml}
     </section>
   `;
@@ -231,7 +235,7 @@ function generateDetailedItinerary(summaryData: SummaryData, options: SummaryOpt
   }).join('');
 
   return `
-    <section class="detailed-itinerary page-break-before">
+    <section class="detailed-itinerary page-break-before" data-section="detailed">
       <h2 class="section-title">Detailed Itinerary</h2>
       ${continentsHtml}
     </section>
@@ -430,7 +434,7 @@ function generateFinancialSummary(summaryData: SummaryData, options: SummaryOpti
   `;
 
   return `
-    <section class="financial-summary page-break-before">
+    <section class="financial-summary page-break-before" data-section="financial">
       <h2 class="section-title">Financial Summary</h2>
       ${insightsHtml}
       ${categoryBreakdownHtml}
@@ -503,7 +507,7 @@ function generateTimelineView(summaryData: SummaryData, options: SummaryOptions)
   `;
 
   return `
-    <section class="timeline-view page-break-before">
+    <section class="timeline-view page-break-before" data-section="timeline">
       <h2 class="section-title">Timeline</h2>
       ${monthlyOverview}
       ${timelineHtml}
@@ -525,4 +529,67 @@ function calculateMonthCosts(summaryData: SummaryData, month: string): number {
   const totalCosts = summaryData.totalCost;
 
   return totalDays > 0 ? (monthDays / totalDays) * totalCosts : 0;
+}
+
+/**
+ * Generate destination-level details table
+ */
+function generateDestinationDetails(summaryData: SummaryData, options: SummaryOptions): string {
+  const locations = summaryData.locations.filter(loc => loc.arrival_date && loc.departure_date);
+
+  // Helper to format dates compactly
+  const formatCompactDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const day = date.getDate();
+    return `${month} ${day}`;
+  };
+
+  return `
+    <section class="destination-details" data-section="destinations">
+      <h2>Destination Details</h2>
+      <table class="journey-table destination-table">
+        <thead>
+          <tr>
+            <th style="width: 30px;">#</th>
+            <th style="min-width: 160px;">Destination</th>
+            <th style="min-width: 120px;">Country</th>
+            <th style="width: 50px; text-align: center;">Days</th>
+            <th style="min-width: 80px;">Arrival</th>
+            <th style="min-width: 80px;">Departure</th>
+            ${options.showCosts ? '<th style="width: 85px; text-align: right;">Cost</th>' : ''}
+          </tr>
+        </thead>
+        <tbody>
+          ${locations.map((loc, index) => {
+            const arrival = formatCompactDate(loc.arrival_date);
+            const departure = formatCompactDate(loc.departure_date);
+            const days = loc.duration_days || 0;
+            const cost = loc.total_cost || 0;
+
+            return `
+              <tr>
+                <td style="text-align: center; font-weight: 600; color: #3b82f6;">${index + 1}</td>
+                <td style="font-weight: 500;">${loc.name || loc.city || 'Unknown'}</td>
+                <td style="color: #6b7280; font-size: 12px;">${loc.country || ''}</td>
+                <td style="text-align: center;">${days}</td>
+                <td style="font-size: 12px; color: #6b7280;">${arrival}</td>
+                <td style="font-size: 12px; color: #6b7280;">${departure}</td>
+                ${options.showCosts ? `<td style="text-align: right; font-weight: 500; font-size: 13px;">${formatCurrency(cost)}</td>` : ''}
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="font-weight: 600; background: #f3f4f6;">
+            <td colspan="3" style="text-align: right; padding-right: 0.5rem; font-size: 13px;">TOTAL</td>
+            <td style="text-align: center;">${summaryData.stats.totalDays}</td>
+            <td colspan="2"></td>
+            ${options.showCosts ? `<td style="text-align: right;">${formatCurrency(summaryData.totalCost)}</td>` : ''}
+          </tr>
+        </tfoot>
+      </table>
+    </section>
+  `;
 }

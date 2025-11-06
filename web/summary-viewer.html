@@ -440,6 +440,33 @@
 <body>
   <aside class="sidebar">
     <h1>Itinerary Summary</h1>
+
+    <div class="section-toggles" style="margin-bottom: 1rem;">
+      <label style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #666; margin-bottom: 0.5rem; display: block;">Sections</label>
+      <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+          <input type="checkbox" data-section-toggle="executive" checked>
+          <span>Executive Summary</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+          <input type="checkbox" data-section-toggle="detailed" checked>
+          <span>Detailed Itinerary</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+          <input type="checkbox" data-section-toggle="financial" checked>
+          <span>Financial Summary</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+          <input type="checkbox" data-section-toggle="timeline" checked>
+          <span>Timeline View</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+          <input type="checkbox" data-section-toggle="destinations" checked>
+          <span>Destination Details</span>
+        </label>
+      </div>
+    </div>
+
     <div class="sidebar-actions">
       <button class="btn btn-secondary" id="toggle-costs-btn">💰 Hide Costs</button>
       <button class="btn btn-secondary" onclick="window.print()">🖨️ Print PDF</button>

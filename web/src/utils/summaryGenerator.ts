@@ -13,6 +13,7 @@ export interface SummaryOptions {
   includeDetailed: boolean;
   includeFinancial: boolean;
   includeTimeline: boolean;
+  includeDestinations: boolean;
   detailLevel: 'summary' | 'full';
   groupBy: 'country' | 'region' | 'leg';
 }
@@ -304,6 +305,7 @@ export const DEFAULT_SUMMARY_OPTIONS: SummaryOptions = {
   includeDetailed: true,
   includeFinancial: true,
   includeTimeline: true,
+  includeDestinations: true,
   detailLevel: 'full',
   groupBy: 'country'
 };
