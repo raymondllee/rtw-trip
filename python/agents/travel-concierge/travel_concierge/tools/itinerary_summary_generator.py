@@ -38,7 +38,7 @@ def _get_repo_root() -> Path:
 def _load_example_itinerary() -> str:
     """Load the example itinerary markdown for style reference."""
     repo_root = _get_repo_root()
-    example_path = repo_root / "itineary.md"
+    example_path = repo_root / "itinerary.md"
 
     if example_path.exists():
         with example_path.open("r", encoding="utf-8") as fp:

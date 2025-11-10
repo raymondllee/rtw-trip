@@ -41,6 +41,8 @@ Expand on the "Key Components" from above.
     * `pre_trip_agent` - Intended to be invoked regularly before the trip starts; This agent fetches relevant trip information given its origin, destination, and the user's nationality.
     * `in_trip_agent`- Intended to be invoked frequently during the trip. This agent provide three services: monitor any changes in bookings (mocked), acts as an informative guide, and provides transit assistance.
     * `post_trip_agent` - In this example, the post trip agent asks the traveler about their experience and attempts to extract and store their various preferences based on the trip, so that the information could be useful in future interactions.
+    * `cost_research_agent` - Researches and estimates costs for destinations including accommodation, activities, food, and local transportation.
+    * `transport_research_agent` - Researches transportation options (flights, trains, buses, ferries) between destinations.
 *   **Tools:**
     * `map_tool` - retrieves lat/long; geocoding an address with the Google Map API.
     * `memorize` - a function to memorize information from the dialog that are important to trip planning and to provide in-trip support.
@@ -80,7 +82,9 @@ Expand on the "Key Components" from above.
 │       ├── booking/
 │       ├── pre_trip/
 │       ├── in_trip/
-│       └── post_trip/
+│       ├── post_trip/
+│       ├── cost_research/
+│       └── transport_research/
 ├── tests/
 │   └── unit/
 ├── eval/

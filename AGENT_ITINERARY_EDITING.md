@@ -6,19 +6,21 @@ This feature allows the AI Travel Concierge to modify your itinerary in real-tim
 
 The system consists of several components working together:
 
-1. **Itinerary Editor Agent** - A sub-agent with tools to modify the itinerary
-2. **Custom Tools** - Python functions that the agent can call to add/remove/update destinations
+1. **Itinerary Editing Tools** - Python functions attached directly to the root agent to modify the itinerary
+2. **Root Agent** - Uses these tools directly (not delegated to a sub-agent) to add/remove/update destinations
 3. **Flask API Endpoints** - Receives tool calls and stores changes
 4. **Frontend Polling** - Checks for changes every 2 seconds and applies them to the UI
+
+**Note**: Itinerary editing tools are attached directly to the root agent to avoid tool calling conflicts that occurred with sub-agent delegation.
 
 ## Architecture Flow
 
 ```
 User: "Add 3 days in Bali"
   ↓
-Chat → ADK Root Agent → Itinerary Editor Sub-Agent
+Chat → ADK Root Agent
   ↓
-Agent calls tool: add_destination(...)
+Root Agent calls tool: add_destination(...)
   ↓
 Tool → Flask API (/api/itinerary/add)
   ↓
@@ -33,7 +35,7 @@ Frontend applies change → Map updates
 
 ### 1. Install Dependencies
 
-The itinerary editor agent is already integrated. Just ensure you have the travel-concierge environment set up:
+The itinerary editing tools are already integrated with the root agent. Just ensure you have the travel-concierge environment set up:
 
 ```bash
 cd python/agents/travel-concierge
@@ -118,7 +120,7 @@ The agent will:
 
 ## Available Tools
 
-The Itinerary Editor Agent has access to these tools:
+The Root Agent has direct access to these itinerary editing tools:
 
 ### `get_current_itinerary()`
 Returns the full current itinerary from the session state.
@@ -233,7 +235,7 @@ Watch the ADK server terminal to see which sub-agents are being called and which
 
 **Agent doesn't modify itinerary:**
 - Check that all 3 servers are running (ADK, Flask, Web)
-- Verify the agent selected the itinerary_editor_agent (check ADK logs)
+- Verify the root agent is calling itinerary editing tools (check ADK logs)
 - Ensure session ID is being passed correctly
 
 **Changes not appearing in UI:**

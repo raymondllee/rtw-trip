@@ -21,6 +21,8 @@ The Travel Concierge is a multi-agent AI system built on Google's Agent Developm
 ### Key Features
 - **Multi-phase journey support**: Inspiration → Planning → Booking → Pre-trip → In-trip → Post-trip
 - **Real-time itinerary editing**: Live updates synchronized between AI and web UI
+- **Cost research capabilities**: Research and estimate costs for destinations and activities
+- **Transport research**: Research flights, trains, and other transport options between destinations
 - **Hierarchical delegation**: Root agent delegates to specialized sub-agents
 - **Stateful conversations**: Maintains context across multiple interactions
 - **Tool-based integrations**: Geocoding, search, memory persistence
@@ -62,17 +64,19 @@ The Travel Concierge is a multi-agent AI system built on Google's Agent Developm
 │  - Itinerary editing tools                                   │
 └─────────────┬───┬───┬───┬───┬──────────────────────────────┘
               │   │   │   │   │
-      ┌───────┘   │   │   │   └───────┐
-      ▼           ▼   ▼   ▼           ▼
-┌──────────┐ ┌────────────┐ ┌──────────────┐
-│Inspiration│ │  Planning  │ │   Booking    │
-│  Agent    │ │   Agent    │ │    Agent     │
-└──────────┘ └────────────┘ └──────────────┘
-      ▼           ▼                  ▼
-┌──────────┐ ┌────────────┐ ┌──────────────┐
-│ Pre-trip │ │  In-trip   │ │  Post-trip   │
-│  Agent   │ │   Agent    │ │    Agent     │
-└──────────┘ └────────────┘ └──────────────┘
+      ┌───────┘   │   │   │   │   │   └───────┐
+      ▼           ▼   ▼   ▼   ▼   ▼           ▼
+┌──────────┐ ┌────────────┐ ┌──────────────┐ ┌──────────┐
+│Inspiration│ │  Planning  │ │   Booking    │ │   Cost   │
+│  Agent    │ │   Agent    │ │    Agent     │ │ Research │
+│           │ │            │ │              │ │  Agent   │
+└──────────┘ └────────────┘ └──────────────┘ └──────────┘
+      ▼           ▼                  ▼              ▼
+┌──────────┐ ┌────────────┐ ┌──────────────┐ ┌──────────┐
+│ Pre-trip │ │  In-trip   │ │  Post-trip   │ │Transport │
+│  Agent   │ │   Agent    │ │    Agent     │ │ Research │
+│          │ │            │ │              │ │  Agent   │
+└──────────┘ └────────────┘ └──────────────┘ └──────────┘
 ```
 
 ---
@@ -96,6 +100,10 @@ The Travel Concierge is a multi-agent AI system built on Google's Agent Developm
 - `update_destination_duration` - Change stay duration
 - `update_destination` - Modify destination attributes
 - `get_current_itinerary` - Retrieve current trip data
+- `generate_itinerary_summary` - Generate formatted HTML summary of the itinerary
+- `save_researched_costs` - Save cost research data for destinations
+- `update_destination_cost` - Update cost estimates for specific destinations
+- `save_transport_research` - Save transport research between destinations
 
 ### Sub-Agent Tree
 
@@ -123,9 +131,17 @@ Root Agent
 ├── In-Trip Agent (Active Travel)
 │   └── (Future: Real-time updates, changes)
 │
-└── Post-Trip Agent (Review & Follow-up)
-    └── (Future: Sharing, reviews, memories)
+├── Post-Trip Agent (Review & Follow-up)
+│   └── (Future: Sharing, reviews, memories)
+│
+├── Cost Research Agent (Cost Estimation)
+│   └── Researches accommodation, activities, and other costs for destinations
+│
+└── Transport Research Agent (Transportation Options)
+    └── Researches flights, trains, and other transport between destinations
 ```
+
+**Note**: Itinerary editing is handled by tools directly attached to the root agent (not a delegated sub-agent) to avoid tool calling conflicts.
 
 ---
 
@@ -419,6 +435,73 @@ Planning Agent receives: "Book a 3-day trip to Seattle"
 - Review collection
 - Trip memories summary
 - Next trip suggestions
+
+---
+
+### 7. Cost Research Agent
+
+**Purpose**: Research and estimate costs for destinations
+
+**Model**: `gemini-2.5-flash`
+
+**Key Responsibilities**:
+- Research accommodation costs (hotels, Airbnb, hostels)
+- Estimate activity and attraction costs
+- Food and dining cost estimates
+- Local transportation costs
+- General destination cost analysis
+
+**Tools**:
+- `search_web` - Web search for cost information
+- `save_researched_costs` - Save cost data to destination
+
+**Example Interaction**:
+```
+User: "How much will it cost to visit Bali for a week?"
+  ↓
+Root Agent → Cost Research Agent
+  ↓
+Agent researches:
+- Hotel costs: $50-150/night
+- Activities: $20-50/day
+- Food: $15-30/day
+- Transport: $10-20/day
+  ↓
+Saves to itinerary via save_researched_costs tool
+```
+
+---
+
+### 8. Transport Research Agent
+
+**Purpose**: Research transportation options between destinations
+
+**Model**: `gemini-2.5-flash`
+
+**Key Responsibilities**:
+- Research flight options and costs
+- Train and rail options
+- Ferry and boat connections
+- Bus and ground transport
+- Multi-modal journey planning
+
+**Tools**:
+- `search_web` - Web search for transport information
+- `save_transport_research` - Save transport data to itinerary
+
+**Example Interaction**:
+```
+User: "What are my options to get from Bangkok to Singapore?"
+  ↓
+Root Agent → Transport Research Agent
+  ↓
+Agent researches:
+- Flights: $80-200 (2h direct)
+- Train: $40-60 (24h journey)
+- Bus: $30-50 (18h journey)
+  ↓
+Saves to itinerary via save_transport_research tool
+```
 
 ---
 
@@ -932,8 +1015,8 @@ The Travel Concierge demonstrates a sophisticated multi-agent architecture that 
 - ✅ Comprehensive error handling and logging
 
 **Architecture Highlights**:
-- 6 specialized sub-agents
-- 5 itinerary editing tools
+- 8 specialized sub-agents (Inspiration, Planning, Booking, Pre-Trip, In-Trip, Post-Trip, Cost Research, Transport Research)
+- 9 root agent tools (5 itinerary editing + 4 research/summary tools)
 - 2-tier API architecture (Flask → ADK)
 - Sub-2-second polling for UI updates
 - Multi-source geocoding for global coverage

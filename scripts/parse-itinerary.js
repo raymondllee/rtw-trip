@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const ITINERARY_PATH = path.resolve(PROJECT_ROOT, 'itineary.md');
+const ITINERARY_PATH = path.resolve(PROJECT_ROOT, 'itinerary.md');
 
 function readItineraryMarkdown(filePath) {
   if (!fs.existsSync(filePath)) {

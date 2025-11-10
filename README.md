@@ -193,7 +193,7 @@ rtw-trip/
 │   ├── overrides.json             # Location overrides
 │   └── geocache.json              # Geocoding cache
 ├── logs/                          # Application logs
-├── itineary.md                    # Source itinerary
+├── itinerary.md                   # Source itinerary
 ├── start-travel-concierge.sh      # Startup script
 ├── stop-travel-concierge.sh       # Stop script
 └── package.json                   # Dependencies and scripts
@@ -288,7 +288,7 @@ To publish updates, run `npm run build` and deploy the contents of `web/dist/` a
 ## 🗺️ Data Sources
 
 - **Primary**: Firebase Firestore - All itinerary and cost data
-- **Source**: `itineary.md` - Original markdown itinerary (for reference)
+- **Source**: `itinerary.md` - Original markdown itinerary (for reference)
 - **Cache**: `data/geocache.json` - Geocoding cache for destinations
 
 ## 🎨 Customization
