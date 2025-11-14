@@ -140,7 +140,7 @@ function generateCondensedJourneyTable(summaryData: SummaryData, options: Summar
   return `
     <div class="condensed-journey">
       <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f9fafb; border-radius: 6px; font-size: 14px; color: #6b7280;">
-        <strong style="color: #374151;">Trip Dates:</strong> ${tripStartDate} - ${tripEndDate}
+        <strong style="color: #374151;">Trip Dates:</strong> ${formatDateRange(summaryData.startDate, summaryData.endDate)}
       </div>
       <table class="journey-table">
         <thead>
