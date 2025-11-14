@@ -1,0 +1,75 @@
+{
+  "eval_set_id": "planning-test-set-001",
+  "name": "Planning Agent Test Set",
+  "description": "Test scenarios for planning agent functionality",
+  "eval_cases": [
+    {
+      "eval_id": "planning-001",
+      "conversation": [
+        {
+          "invocation_id": "planning-001-001",
+          "user_content": {
+            "parts": [{"text": "Find flights from San Francisco to Tokyo for 4 days starting March 15"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": "I'll help you find flights from San Francisco to Tokyo."}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window",
+            "food_preference": "none",
+            "allergies": []
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "planning-002",
+      "conversation": [
+        {
+          "invocation_id": "planning-002-001",
+          "user_content": {
+            "parts": [{"text": "I need hotels in Bangkok for 5 nights"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": "I'll help you find hotels in Bangkok."}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window",
+            "food_preference": "none",
+            "allergies": []
+          }
+        }
+      }
+    }
+  ],
+  "creation_timestamp": 1735689600
+}
+

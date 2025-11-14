@@ -392,6 +392,31 @@ h5 {
   margin: 0.25rem 0 1rem 0;
 }
 
+.country-notes {
+  margin: 0.5rem 0 1rem 0;
+  padding: 0.75rem;
+  background: #f0f9ff;
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+}
+
+.country-notes-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e40af;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.country-notes-content {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 /* Destination */
 .destination {
   margin: 1rem 0;
@@ -655,10 +680,14 @@ body.hide-costs .country-cost,
 body.hide-costs .country-costs,
 body.hide-costs .financial-summary,
 body.hide-costs .cost-amount,
+body.hide-costs .cost-total,
+body.hide-costs .cost-table,
 body.hide-costs .insight-detail,
 body.hide-costs .cost-stat,
-body.hide-costs .journey-table th:last-child,
-body.hide-costs .journey-table td:last-child {
+body.hide-costs .country-costs-breakdown,
+body.hide-costs .category-breakdown,
+body.hide-costs .financial-insights,
+body.hide-costs .cost-column {
   display: none !important;
 }
 

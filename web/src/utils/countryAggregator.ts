@@ -26,6 +26,7 @@ export interface CountryStay {
   visits: VisitPeriod[];  // Track multiple separate visits
   totalCosts: number;
   costsByCategory: Record<string, number>;
+  notes?: string;
 }
 
 /**
@@ -240,6 +241,15 @@ export function aggregateByCountry(tripData: TripData): CountryStay[] {
     if (!b.startDate) return -1;
     return a.startDate.localeCompare(b.startDate);
   });
+
+  // Add notes from tripData.countryNotes if available
+  if (tripData.countryNotes) {
+    countryStays.forEach(stay => {
+      if (tripData.countryNotes![stay.country]) {
+        stay.notes = tripData.countryNotes![stay.country];
+      }
+    });
+  }
 
   return countryStays;
 }

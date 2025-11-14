@@ -1,0 +1,136 @@
+{
+  "eval_set_id": "inspiration-comprehensive-test-set",
+  "name": "Comprehensive Inspiration Agent Test Set",
+  "description": "Test scenarios for inspiration agent across different regions and travel styles",
+  "eval_cases": [
+    {
+      "eval_id": "inspire-asia",
+      "conversation": [
+        {
+          "invocation_id": "inspire-asia-001",
+          "user_content": {
+            "parts": [{"text": "What are some must-see destinations in Asia?"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window",
+            "food_preference": "vegan"
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-europe",
+      "conversation": [
+        {
+          "invocation_id": "inspire-europe-001",
+          "user_content": {
+            "parts": [{"text": "Recommend cultural destinations in Europe"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window",
+            "food_preference": "none"
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-beach",
+      "conversation": [
+        {
+          "invocation_id": "inspire-beach-001",
+          "user_content": {
+            "parts": [{"text": "Suggest beach destinations for a relaxing vacation"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window"
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-budget",
+      "conversation": [
+        {
+          "invocation_id": "inspire-budget-001",
+          "user_content": {
+            "parts": [{"text": "What are affordable destinations in Southeast Asia?"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window"
+          }
+        }
+      }
+    }
+  ],
+  "creation_timestamp": 1735689600
+}
+
+

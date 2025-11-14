@@ -76,7 +76,7 @@ function generateHeader(summaryData: SummaryData, options: SummaryOptions): stri
           <span class="header-stat">${summaryData.stats.totalCountries} countries</span>
           <span class="header-stat">${summaryData.stats.totalLocations} destinations</span>
           <span class="header-stat">${formatDuration(summaryData.totalDays, false)}</span>
-          ${options.showCosts ? `<span class="header-stat cost-stat">${formatCurrency(summaryData.totalCost)}</span>` : ''}
+          <span class="header-stat cost-stat">${formatCurrency(summaryData.totalCost)}</span>
         </div>
       </div>
     </header>
@@ -139,6 +139,9 @@ function generateCondensedJourneyTable(summaryData: SummaryData, options: Summar
 
   return `
     <div class="condensed-journey">
+      <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f9fafb; border-radius: 6px; font-size: 14px; color: #6b7280;">
+        <strong style="color: #374151;">Trip Dates:</strong> ${tripStartDate} - ${tripEndDate}
+      </div>
       <table class="journey-table">
         <thead>
           <tr>
@@ -148,7 +151,8 @@ function generateCondensedJourneyTable(summaryData: SummaryData, options: Summar
             <th style="width: 50px; text-align: center;">Days</th>
             <th style="width: 45px; text-align: center;">Dest</th>
             <th style="min-width: 130px; white-space: nowrap;">Dates</th>
-            ${options.showCosts ? '<th style="width: 85px; text-align: right;">Budget</th>' : ''}
+            <th class="cost-column" style="width: 85px; text-align: right;">Budget</th>
+            <th style="min-width: 200px;">Notes</th>
           </tr>
         </thead>
         <tbody>
@@ -166,7 +170,8 @@ function generateCondensedJourneyTable(summaryData: SummaryData, options: Summar
                 <td style="text-align: center;">${countryData.totalDays}</td>
                 <td style="text-align: center; color: #6b7280;">${countryData.destinations.length}</td>
                 <td style="font-size: 12px; color: #6b7280; white-space: nowrap;">${formatMultipleVisits(countryData)}</td>
-                ${options.showCosts ? `<td style="text-align: right; font-weight: 500; font-size: 13px;">${formatCurrency(countryData.totalCosts)}</td>` : ''}
+                <td class="cost-column" style="text-align: right; font-weight: 500; font-size: 13px;">${formatCurrency(countryData.totalCosts)}</td>
+                <td style="font-size: 11px; color: #92400e; font-style: italic;">${countryData.notes || ''}</td>
               </tr>
             `;
           }).join('')}
@@ -177,7 +182,8 @@ function generateCondensedJourneyTable(summaryData: SummaryData, options: Summar
             <td style="text-align: center;">${summaryData.stats.totalDays}</td>
             <td style="text-align: center;">${summaryData.stats.totalLocations}</td>
             <td></td>
-            ${options.showCosts ? `<td style="text-align: right;">${formatCurrency(summaryData.stats.totalCosts)}</td>` : ''}
+            <td class="cost-column" style="text-align: right;">${formatCurrency(summaryData.stats.totalCosts)}</td>
+            <td></td>
           </tr>
         </tfoot>
       </table>
@@ -338,6 +344,12 @@ function generateCountryDetail(country: CountryStay, options: SummaryOptions): s
         </span>
       </h4>
       <div class="country-dates">${dateRangeHtml}</div>
+      ${country.notes ? `
+        <div class="country-notes">
+          <h5 class="country-notes-header">Notes</h5>
+          <p class="country-notes-content">${country.notes}</p>
+        </div>
+      ` : ''}
       ${destinationsHtml}
       ${costBreakdownHtml}
     </div>
@@ -588,7 +600,7 @@ function generateDestinationDetails(summaryData: SummaryData, options: SummaryOp
             <th style="width: 50px; text-align: center;">Days</th>
             <th style="min-width: 80px;">Arrival</th>
             <th style="min-width: 80px;">Departure</th>
-            ${options.showCosts ? '<th style="width: 85px; text-align: right;">Cost</th>' : ''}
+            <th class="cost-column" style="width: 85px; text-align: right;">Cost</th>
           </tr>
         </thead>
         <tbody>
@@ -606,7 +618,7 @@ function generateDestinationDetails(summaryData: SummaryData, options: SummaryOp
                 <td style="text-align: center;">${days}</td>
                 <td style="font-size: 12px; color: #6b7280;">${arrival}</td>
                 <td style="font-size: 12px; color: #6b7280;">${departure}</td>
-                ${options.showCosts ? `<td style="text-align: right; font-weight: 500; font-size: 13px;">${formatCurrency(cost)}</td>` : ''}
+                <td class="cost-column" style="text-align: right; font-weight: 500; font-size: 13px;">${formatCurrency(cost)}</td>
               </tr>
             `;
           }).join('')}
@@ -616,7 +628,7 @@ function generateDestinationDetails(summaryData: SummaryData, options: SummaryOp
             <td colspan="3" style="text-align: right; padding-right: 0.5rem; font-size: 13px;">TOTAL</td>
             <td style="text-align: center;">${summaryData.stats.totalDays}</td>
             <td colspan="2"></td>
-            ${options.showCosts ? `<td style="text-align: right;">${formatCurrency(summaryData.totalCost)}</td>` : ''}
+            <td class="cost-column" style="text-align: right;">${formatCurrency(summaryData.totalCost)}</td>
           </tr>
         </tfoot>
       </table>

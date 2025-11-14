@@ -300,7 +300,7 @@ export function calculateCostPercentages(costsByCategory: Record<string, number>
  * Default summary options
  */
 export const DEFAULT_SUMMARY_OPTIONS: SummaryOptions = {
-  showCosts: true,
+  showCosts: false,
   includeExecutive: true,
   includeDetailed: true,
   includeFinancial: true,

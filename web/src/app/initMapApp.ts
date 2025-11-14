@@ -1952,6 +1952,10 @@ export async function initMapApp() {
                   </span>
                 </div>
               </div>
+
+              <div style="margin-top: 8px;">
+                <textarea class="editable-country-notes" placeholder="Add notes for ${countryStay.country}..." data-country="${countryStay.country}">${countryStay.notes || ''}</textarea>
+              </div>
             </div>
           `);
         });
@@ -2072,6 +2076,9 @@ export async function initMapApp() {
         }
       });
     });
+
+    // Setup country notes editing
+    setupCountryNotesEditing(destinationList);
   }
 
   function updateSidebar(locations) {
@@ -2582,7 +2589,52 @@ export async function initMapApp() {
       });
     });
   }
-  
+
+  function setupCountryNotesEditing(container) {
+    container.querySelectorAll('.editable-country-notes').forEach(textarea => {
+      // Auto-resize function
+      const autoResize = () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+      };
+
+      // Initial resize
+      autoResize();
+
+      // Auto-save notes on change with debouncing
+      let notesTimer = null;
+
+      textarea.addEventListener('input', (e) => {
+        autoResize();
+
+        const country = e.target.dataset.country;
+        const newNotes = e.target.value;
+
+        // Clear previous timer
+        if (notesTimer) clearTimeout(notesTimer);
+
+        // Set new timer to save after 1 second of no typing
+        notesTimer = setTimeout(() => {
+          // Initialize countryNotes if not exists
+          if (!workingData.countryNotes) {
+            workingData.countryNotes = {};
+          }
+
+          workingData.countryNotes[country] = newNotes;
+          triggerAutosave();
+        }, 1000);
+      });
+
+      textarea.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+
+      textarea.addEventListener('focus', (e) => {
+        e.stopPropagation();
+      });
+    });
+  }
+
   function setupDateLocking(container) {
     // Lock toggle buttons
     container.querySelectorAll('.date-lock-toggle').forEach(button => {
@@ -4622,46 +4674,33 @@ export async function initMapApp() {
   document.getElementById('import-scenarios-btn').addEventListener('click', openImportScenariosModal);
 
   // Summary generation button - shows options modal
-  document.getElementById('generate-summary-btn').addEventListener('click', () => {
+  document.getElementById('generate-summary-btn').addEventListener('click', async () => {
     // Check if we have locations
     if (!workingData.locations || workingData.locations.length === 0) {
       alert('No locations in itinerary to generate summary');
       return;
     }
 
-    // Show summary options modal
-    document.getElementById('summary-options-modal').style.display = 'flex';
-  });
-
-  // Cancel summary generation
-  document.getElementById('cancel-summary-btn').addEventListener('click', () => {
-    document.getElementById('summary-options-modal').style.display = 'none';
-  });
-
-  // Confirm summary generation with options
-  document.getElementById('generate-summary-confirm-btn').addEventListener('click', async () => {
     try {
-      // Get options from modal
+      // Use default options (all sections enabled, costs hidden by default)
       const options = {
-        showCosts: document.getElementById('show-costs').checked,
-        includeExecutive: document.getElementById('include-executive').checked,
-        includeDetailed: document.getElementById('include-detailed').checked,
-        includeFinancial: document.getElementById('include-financial').checked,
-        includeTimeline: document.getElementById('include-timeline').checked,
-        includeDestinations: document.getElementById('include-destinations').checked,
+        showCosts: false,
+        includeExecutive: true,
+        includeDetailed: true,
+        includeFinancial: true,
+        includeTimeline: true,
+        includeDestinations: true,
         detailLevel: 'full',
         groupBy: 'country'
       };
-
-      // Close modal
-      document.getElementById('summary-options-modal').style.display = 'none';
 
       // Build itinerary data from current state
       const itineraryData = {
         trip: workingData.trip || {},
         locations: workingData.locations || [],
         legs: workingData.legs || [],
-        costs: workingData.costs || []
+        costs: workingData.costs || [],
+        countryNotes: workingData.countryNotes || {}
       };
 
       // Build scenario metadata

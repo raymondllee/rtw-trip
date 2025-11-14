@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Monitoring Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #333;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric-card h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .metric-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .health-status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .health-status.healthy {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .health-status.degraded {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .health-status.unhealthy {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #333;
+            color: white;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .refresh-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .refresh-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>Agent Monitoring Dashboard</h1>
+            <button class="refresh-btn" onclick="refreshMetrics()">Refresh</button>
+        </div>
+
+        <div id="health-status" class="health-status">
+            Loading...
+        </div>
+
+        <div class="metrics-grid" id="metrics-grid">
+            <!-- Metrics will be populated here -->
+        </div>
+
+        <div class="metric-card">
+            <h3>Agent Performance</h3>
+            <table id="agent-table">
+                <thead>
+                    <tr>
+                        <th>Agent</th>
+                        <th>Total Responses</th>
+                        <th>Success Rate</th>
+                        <th>Avg Response Time (ms)</th>
+                        <th>P95 Response Time (ms)</th>
+                        <th>Total Tokens</th>
+                        <th>Error Count</th>
+                    </tr>
+                </thead>
+                <tbody id="agent-table-body">
+                    <!-- Data will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function fetchMetrics() {
+            try {
+                const response = await fetch('/api/monitoring/metrics');
+                const data = await response.json();
+                return data.metrics || {};
+            } catch (error) {
+                console.error('Error fetching metrics:', error);
+                return {};
+            }
+        }
+
+        async function fetchHealth() {
+            try {
+                const response = await fetch('/api/monitoring/health');
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching health:', error);
+                return { health: 'unknown' };
+            }
+        }
+
+        function updateHealthStatus(healthData) {
+            const statusDiv = document.getElementById('health-status');
+            statusDiv.className = `health-status ${healthData.health || 'unknown'}`;
+            statusDiv.textContent = `System Health: ${healthData.health || 'unknown'} (Error Rate: ${(healthData.error_rate * 100).toFixed(2)}%)`;
+        }
+
+        function updateMetrics(metrics) {
+            const grid = document.getElementById('metrics-grid');
+            grid.innerHTML = '';
+
+            // Calculate totals
+            let totalResponses = 0;
+            let totalErrors = 0;
+            let totalTokens = 0;
+            let avgResponseTime = 0;
+            let responseTimeCount = 0;
+
+            for (const [agentName, agentMetrics] of Object.entries(metrics)) {
+                totalResponses += agentMetrics.total_responses || 0;
+                totalErrors += agentMetrics.error_count || 0;
+                totalTokens += agentMetrics.total_tokens || 0;
+                if (agentMetrics.avg_response_time_ms) {
+                    avgResponseTime += agentMetrics.avg_response_time_ms;
+                    responseTimeCount++;
+                }
+            }
+
+            if (responseTimeCount > 0) {
+                avgResponseTime = avgResponseTime / responseTimeCount;
+            }
+
+            // Create summary cards
+            const summaryCards = [
+                { label: 'Total Responses', value: totalResponses },
+                { label: 'Total Errors', value: totalErrors },
+                { label: 'Error Rate', value: totalResponses > 0 ? ((totalErrors / totalResponses) * 100).toFixed(2) + '%' : '0%' },
+                { label: 'Total Tokens', value: totalTokens.toLocaleString() },
+                { label: 'Avg Response Time', value: avgResponseTime.toFixed(0) + ' ms' },
+            ];
+
+            summaryCards.forEach(card => {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'metric-card';
+                cardDiv.innerHTML = `
+                    <h3>${card.label}</h3>
+                    <div class="metric-value">${card.value}</div>
+                `;
+                grid.appendChild(cardDiv);
+            });
+
+            // Update agent table
+            const tableBody = document.getElementById('agent-table-body');
+            tableBody.innerHTML = '';
+
+            for (const [agentName, agentMetrics] of Object.entries(metrics)) {
+                const row = document.createElement('tr');
+                const successRate = agentMetrics.total_responses > 0
+                    ? ((agentMetrics.success_count / agentMetrics.total_responses) * 100).toFixed(2) + '%'
+                    : 'N/A';
+                
+                row.innerHTML = `
+                    <td>${agentName}</td>
+                    <td>${agentMetrics.total_responses || 0}</td>
+                    <td>${successRate}</td>
+                    <td>${agentMetrics.avg_response_time_ms ? agentMetrics.avg_response_time_ms.toFixed(0) : 'N/A'}</td>
+                    <td>${agentMetrics.p95_response_time_ms ? agentMetrics.p95_response_time_ms.toFixed(0) : 'N/A'}</td>
+                    <td>${(agentMetrics.total_tokens || 0).toLocaleString()}</td>
+                    <td>${agentMetrics.error_count || 0}</td>
+                `;
+                tableBody.appendChild(row);
+            }
+        }
+
+        async function refreshMetrics() {
+            const [metrics, health] = await Promise.all([
+                fetchMetrics(),
+                fetchHealth()
+            ]);
+            updateMetrics(metrics);
+            updateHealthStatus(health);
+        }
+
+        // Initial load
+        refreshMetrics();
+
+        // Auto-refresh every 30 seconds
+        setInterval(refreshMetrics, 30000);
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,106 @@
+{
+  "eval_set_id": "cost-research-comprehensive-test-set",
+  "name": "Comprehensive Cost Research Test Set",
+  "description": "Test scenarios for cost research across different destinations, travel styles, and group sizes",
+  "eval_cases": [
+    {
+      "eval_id": "cost-research-bangkok-budget",
+      "conversation": [
+        {
+          "invocation_id": "cost-bangkok-001",
+          "user_content": {
+            "parts": [{"text": "Research costs for Bangkok, Thailand for 5 days, budget travel, 1 person"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "cost_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "destination_id": "bangkok-002",
+          "destination_name": "Bangkok, Thailand",
+          "duration_days": 5,
+          "num_travelers": 1,
+          "travel_style": "budget"
+        }
+      }
+    },
+    {
+      "eval_id": "cost-research-tokyo-luxury",
+      "conversation": [
+        {
+          "invocation_id": "cost-tokyo-001",
+          "user_content": {
+            "parts": [{"text": "Research costs for Tokyo, Japan for 7 days, luxury travel, 2 people"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "cost_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "destination_id": "tokyo-001",
+          "destination_name": "Tokyo, Japan",
+          "duration_days": 7,
+          "num_travelers": 2,
+          "travel_style": "luxury"
+        }
+      }
+    },
+    {
+      "eval_id": "cost-research-family-trip",
+      "conversation": [
+        {
+          "invocation_id": "cost-family-001",
+          "user_content": {
+            "parts": [{"text": "Research costs for a family trip to Bali, Indonesia for 10 days, mid-range, 4 people"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "cost_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "destination_id": "bali-003",
+          "destination_name": "Bali, Indonesia",
+          "duration_days": 10,
+          "num_travelers": 4,
+          "travel_style": "mid-range"
+        }
+      }
+    }
+  ],
+  "creation_timestamp": 1735689600
+}
+
+

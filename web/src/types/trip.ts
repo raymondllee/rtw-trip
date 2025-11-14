@@ -92,6 +92,7 @@ export interface TripData {
   locations: TripLocation[];
   legs: TripLeg[];
   costs: TripCost[];
+  countryNotes?: Record<string, string>;
 }
 
 export interface TripScenarioVersion {

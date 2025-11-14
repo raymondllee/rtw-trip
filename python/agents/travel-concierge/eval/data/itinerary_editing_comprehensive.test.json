@@ -1,0 +1,144 @@
+{
+  "eval_set_id": "itinerary-editing-comprehensive-test-set",
+  "name": "Comprehensive Itinerary Editing Test Set",
+  "description": "Test scenarios for itinerary editing including add, remove, update operations",
+  "eval_cases": [
+    {
+      "eval_id": "itinerary-add-kyoto",
+      "conversation": [
+        {
+          "invocation_id": "edit-add-001",
+          "user_content": {
+            "parts": [{"text": "Add Kyoto to my itinerary for 3 days"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "add_destination", "args": {"name": "Kyoto", "city": "Kyoto", "country": "Japan", "duration_days": 3}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "web_session_id": "test_session_123",
+          "itinerary": {
+            "locations": [
+              {"id": "tokyo-001", "name": "Tokyo", "city": "Tokyo", "country": "Japan", "duration_days": 7}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "itinerary-remove-bangkok",
+      "conversation": [
+        {
+          "invocation_id": "edit-remove-001",
+          "user_content": {
+            "parts": [{"text": "Remove Bangkok from my trip"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "remove_destination", "args": {"destination_name": "Bangkok"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "web_session_id": "test_session_123",
+          "itinerary": {
+            "locations": [
+              {"id": "tokyo-001", "name": "Tokyo", "city": "Tokyo", "country": "Japan", "duration_days": 7},
+              {"id": "bangkok-002", "name": "Bangkok", "city": "Bangkok", "country": "Thailand", "duration_days": 5}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "itinerary-extend-tokyo",
+      "conversation": [
+        {
+          "invocation_id": "edit-extend-001",
+          "user_content": {
+            "parts": [{"text": "Extend Tokyo to 10 days"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "update_destination_duration", "args": {"destination_name": "Tokyo", "new_duration_days": 10}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "web_session_id": "test_session_123",
+          "itinerary": {
+            "locations": [
+              {"id": "tokyo-001", "name": "Tokyo", "city": "Tokyo", "country": "Japan", "duration_days": 7}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "itinerary-multi-edit",
+      "conversation": [
+        {
+          "invocation_id": "edit-multi-001",
+          "user_content": {
+            "parts": [{"text": "Add Osaka for 2 days, then extend Tokyo to 5 days"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "add_destination", "args": {"name": "Osaka", "city": "Osaka", "country": "Japan", "duration_days": 2}},
+              {"name": "update_destination_duration", "args": {"destination_name": "Tokyo", "new_duration_days": 5}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "web_session_id": "test_session_123",
+          "itinerary": {
+            "locations": [
+              {"id": "tokyo-001", "name": "Tokyo", "city": "Tokyo", "country": "Japan", "duration_days": 7}
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "creation_timestamp": 1735689600
+}
+
+

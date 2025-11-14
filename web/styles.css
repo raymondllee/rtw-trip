@@ -243,7 +243,8 @@ html, body {
   margin-top: 6px;
 }
 
-.editable-notes {
+.editable-notes,
+.editable-country-notes {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 3px;
@@ -261,18 +262,21 @@ html, body {
   box-sizing: border-box;
 }
 
-.editable-notes:hover {
+.editable-notes:hover,
+.editable-country-notes:hover {
   border-color: #ddd;
   background: white;
 }
 
-.editable-notes:focus {
+.editable-notes:focus,
+.editable-country-notes:focus {
   outline: none;
   border-color: #1e88e5;
   background: white;
 }
 
-.editable-notes::placeholder {
+.editable-notes::placeholder,
+.editable-country-notes::placeholder {
   color: #999;
   font-style: italic;
 }

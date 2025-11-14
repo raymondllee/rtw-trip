@@ -1,0 +1,110 @@
+{
+  "eval_set_id": "planning-comprehensive-test-set",
+  "name": "Comprehensive Planning Agent Test Set",
+  "description": "Test scenarios for planning agent covering flights, hotels, and full itineraries",
+  "eval_cases": [
+    {
+      "eval_id": "planning-hotel-search",
+      "conversation": [
+        {
+          "invocation_id": "planning-hotel-001",
+          "user_content": {
+            "parts": [{"text": "Find hotels in Bangkok for 5 nights, mid-range"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window"
+          },
+          "destination": "Bangkok, Thailand",
+          "duration_days": 5
+        }
+      }
+    },
+    {
+      "eval_id": "planning-flight-search",
+      "conversation": [
+        {
+          "invocation_id": "planning-flight-001",
+          "user_content": {
+            "parts": [{"text": "Find flights from San Francisco to Tokyo departing March 15, returning March 22"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window"
+          },
+          "origin": "San Francisco, CA",
+          "destination": "Tokyo, Japan"
+        }
+      }
+    },
+    {
+      "eval_id": "planning-full-itinerary",
+      "conversation": [
+        {
+          "invocation_id": "planning-full-001",
+          "user_content": {
+            "parts": [{"text": "Plan a 10-day trip to Japan starting April 1st"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window"
+          },
+          "destination": "Japan",
+          "start_date": "2026-04-01",
+          "duration_days": 10
+        }
+      }
+    }
+  ],
+  "creation_timestamp": 1735689600
+}
+
+

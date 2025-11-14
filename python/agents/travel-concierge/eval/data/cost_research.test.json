@@ -1,0 +1,73 @@
+{
+  "eval_set_id": "cost-research-test-set-001",
+  "name": "Cost Research Agent Test Set",
+  "description": "Test scenarios for cost research agent functionality",
+  "eval_cases": [
+    {
+      "eval_id": "cost-research-001",
+      "conversation": [
+        {
+          "invocation_id": "cost-001-001",
+          "user_content": {
+            "parts": [{"text": "Research costs for Tokyo, Japan for 7 days, mid-range, 2 people"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": "I'll research costs for Tokyo."}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "cost_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "destination_id": "tokyo-001",
+          "destination_name": "Tokyo, Japan",
+          "duration_days": 7,
+          "num_travelers": 2,
+          "travel_style": "mid-range"
+        }
+      }
+    },
+    {
+      "eval_id": "cost-research-002",
+      "conversation": [
+        {
+          "invocation_id": "cost-002-001",
+          "user_content": {
+            "parts": [{"text": "Research costs for Bangkok, Thailand for 5 days, budget, 1 person"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": "I'll research costs for Bangkok."}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "cost_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "destination_id": "bangkok-002",
+          "destination_name": "Bangkok, Thailand",
+          "duration_days": 5,
+          "num_travelers": 1,
+          "travel_style": "budget"
+        }
+      }
+    }
+  ],
+  "creation_timestamp": 1735689600
+}
+
