@@ -2,6 +2,16 @@ import { TripData, TripLocation, TripCost } from '../types/trip';
 import { COUNTRY_TO_REGION } from '../data/regionMappings';
 
 /**
+ * Represents a single visit period to a country
+ */
+export interface VisitPeriod {
+  startDate: string;
+  endDate: string;
+  destinations: TripLocation[];
+  days: number;
+}
+
+/**
  * Represents aggregated stay information for a country
  */
 export interface CountryStay {
@@ -13,6 +23,7 @@ export interface CountryStay {
   destinations: TripLocation[];
   startDate?: string;
   endDate?: string;
+  visits: VisitPeriod[];  // Track multiple separate visits
   totalCosts: number;
   costsByCategory: Record<string, number>;
 }
@@ -30,6 +41,68 @@ export interface RegionStay {
   startDate?: string;
   endDate?: string;
   totalCosts: number;
+}
+
+/**
+ * Calculate the number of days between two dates
+ */
+function daysBetween(date1: string, date2: string): number {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  const diffTime = Math.abs(d2.getTime() - d1.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Group destinations into separate visit periods
+ * Visits are considered separate if there's a gap of more than 1 day between them
+ */
+function groupIntoVisits(destinations: TripLocation[]): VisitPeriod[] {
+  if (destinations.length === 0) return [];
+
+  // Sort destinations by arrival date
+  const sorted = [...destinations]
+    .filter(d => d.arrival_date && d.departure_date)
+    .sort((a, b) => a.arrival_date!.localeCompare(b.arrival_date!));
+
+  if (sorted.length === 0) return [];
+
+  const visits: VisitPeriod[] = [];
+  let currentVisit: VisitPeriod = {
+    startDate: sorted[0].arrival_date!,
+    endDate: sorted[0].departure_date!,
+    destinations: [sorted[0]],
+    days: sorted[0].duration_days || 0
+  };
+
+  for (let i = 1; i < sorted.length; i++) {
+    const dest = sorted[i];
+    const prevDest = sorted[i - 1];
+
+    // Calculate gap between previous departure and current arrival
+    const gap = daysBetween(prevDest.departure_date!, dest.arrival_date!);
+
+    // If gap is more than 1 day, it's a new visit
+    if (gap > 1) {
+      visits.push(currentVisit);
+      currentVisit = {
+        startDate: dest.arrival_date!,
+        endDate: dest.departure_date!,
+        destinations: [dest],
+        days: dest.duration_days || 0
+      };
+    } else {
+      // Continue current visit
+      currentVisit.endDate = dest.departure_date!;
+      currentVisit.destinations.push(dest);
+      currentVisit.days += dest.duration_days || 0;
+    }
+  }
+
+  // Don't forget the last visit
+  visits.push(currentVisit);
+
+  return visits;
 }
 
 /**
@@ -56,6 +129,7 @@ export function aggregateByCountry(tripData: TripData): CountryStay[] {
         region: location.region || regionMapping?.region,
         totalDays: 0,
         destinations: [],
+        visits: [],
         totalCosts: 0,
         costsByCategory: {}
       });
@@ -71,7 +145,7 @@ export function aggregateByCountry(tripData: TripData): CountryStay[] {
       countryStay.totalDays += location.duration_days;
     }
 
-    // Track date range
+    // Track date range (overall)
     if (location.arrival_date) {
       if (!countryStay.startDate || location.arrival_date < countryStay.startDate) {
         countryStay.startDate = location.arrival_date;
@@ -84,6 +158,11 @@ export function aggregateByCountry(tripData: TripData): CountryStay[] {
       }
     }
   });
+
+  // Calculate separate visits for each country
+  for (const countryStay of countryMap.values()) {
+    countryStay.visits = groupIntoVisits(countryStay.destinations);
+  }
 
   // Aggregate costs by country
   console.log(`🔍 [countryAggregator] Starting cost aggregation with ${tripData.costs.length} total costs`);

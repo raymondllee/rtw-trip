@@ -121,6 +121,22 @@ function generateCondensedJourneyTable(summaryData: SummaryData, options: Summar
     return `${startMonth} ${startDay} - ${endMonth} ${endDay}`;
   };
 
+  // Helper to format multiple visits
+  const formatMultipleVisits = (countryData: CountryStay) => {
+    if (!countryData.visits || countryData.visits.length === 0) {
+      return formatCompactDates(countryData.startDate, countryData.endDate);
+    }
+
+    if (countryData.visits.length === 1) {
+      return formatCompactDates(countryData.visits[0].startDate, countryData.visits[0].endDate);
+    }
+
+    // Multiple visits - show each separately
+    return countryData.visits
+      .map(visit => formatCompactDates(visit.startDate, visit.endDate))
+      .join('; ');
+  };
+
   return `
     <div class="condensed-journey">
       <table class="journey-table">
@@ -140,14 +156,16 @@ function generateCondensedJourneyTable(summaryData: SummaryData, options: Summar
             const countryData = countryStaysMap.get(country);
             if (!countryData) return '';
 
+            const multipleVisits = countryData.visits && countryData.visits.length > 1;
+
             return `
               <tr>
                 <td style="text-align: center; font-weight: 600; color: #3b82f6;">${index + 1}</td>
-                <td style="font-weight: 500;">${country}</td>
+                <td style="font-weight: 500;">${country}${multipleVisits ? ' <span style="color: #f59e0b; font-size: 11px;">(' + countryData.visits.length + ' visits)</span>' : ''}</td>
                 <td style="color: #6b7280; font-size: 12px;">${countryData.region || countryData.continent || ''}</td>
                 <td style="text-align: center;">${countryData.totalDays}</td>
                 <td style="text-align: center; color: #6b7280;">${countryData.destinations.length}</td>
-                <td style="font-size: 12px; color: #6b7280; white-space: nowrap;">${formatCompactDates(countryData.startDate, countryData.endDate)}</td>
+                <td style="font-size: 12px; color: #6b7280; white-space: nowrap;">${formatMultipleVisits(countryData)}</td>
                 ${options.showCosts ? `<td style="text-align: right; font-weight: 500; font-size: 13px;">${formatCurrency(countryData.totalCosts)}</td>` : ''}
               </tr>
             `;
@@ -246,7 +264,19 @@ function generateDetailedItinerary(summaryData: SummaryData, options: SummaryOpt
  * Generate country detail block
  */
 function generateCountryDetail(country: CountryStay, options: SummaryOptions): string {
-  const dateRange = formatDateRange(country.startDate, country.endDate);
+  const multipleVisits = country.visits && country.visits.length > 1;
+
+  // Generate date range display
+  let dateRangeHtml = '';
+  if (multipleVisits) {
+    // Show separate visits
+    dateRangeHtml = country.visits.map((visit, idx) => {
+      const visitNum = idx + 1;
+      return `<div><strong>Visit ${visitNum}:</strong> ${formatDateRange(visit.startDate, visit.endDate)} (${formatDuration(visit.days)})</div>`;
+    }).join('');
+  } else {
+    dateRangeHtml = formatDateRange(country.startDate, country.endDate);
+  }
 
   // Sort destinations by arrival date
   const sortedDestinations = [...country.destinations].sort((a, b) => {
@@ -307,7 +337,7 @@ function generateCountryDetail(country: CountryStay, options: SummaryOptions): s
           ${options.showCosts ? ` • ${formatCurrency(country.totalCosts)}` : ''}
         </span>
       </h4>
-      <p class="country-dates">${dateRange}</p>
+      <div class="country-dates">${dateRangeHtml}</div>
       ${destinationsHtml}
       ${costBreakdownHtml}
     </div>
