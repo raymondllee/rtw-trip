@@ -7,6 +7,16 @@ set -e
 
 echo "🚀 Starting RTW Trip Application..."
 
+# Handle Google Cloud credentials for Firestore
+if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]; then
+    echo "📝 Writing Google Cloud service account credentials..."
+    echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > /tmp/gcloud-credentials.json
+    export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcloud-credentials.json
+    echo "✅ Credentials configured for Firestore"
+else
+    echo "⚠️  GOOGLE_APPLICATION_CREDENTIALS_JSON not set - Firestore will use in-memory fallback"
+fi
+
 # Build web configuration from environment variables
 echo "🔧 Building web configuration..."
 echo "📋 Environment check:"

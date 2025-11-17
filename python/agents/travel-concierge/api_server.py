@@ -268,9 +268,11 @@ session_store = SessionStore()
 logger = logging.getLogger('travel_concierge.api')
 
 # Determine web directory path
-# In production (Railway), files are at /app/web
-# In development, go up from api_server.py to repo root, then to web
-if os.path.exists('/app/web'):
+# In production (Railway), Vite builds to /app/web/dist
+# In development, use the web directory root for Vite dev server compatibility
+if os.path.exists('/app/web/dist'):
+    WEB_DIR = '/app/web/dist'
+elif os.path.exists('/app/web'):
     WEB_DIR = '/app/web'
 else:
     WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web'))
