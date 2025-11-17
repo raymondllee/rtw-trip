@@ -7,6 +7,14 @@ import { CountryStay } from './countryAggregator';
 import { formatDateRange, formatDuration, formatCurrency, formatPercentage, formatList, getContinentEmoji, getCategoryEmoji, getCategoryColor, formatNumber } from './summaryFormatters';
 
 /**
+ * Parse a date string (YYYY-MM-DD) as a local date to avoid timezone shifts
+ */
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
  * Generate complete summary HTML
  */
 export function generateSummaryHTML(summaryData: SummaryData, options: SummaryOptions): string {
@@ -108,8 +116,8 @@ function generateCondensedJourneyTable(summaryData: SummaryData, options: Summar
   // Helper to format dates compactly
   const formatCompactDates = (start?: string, end?: string) => {
     if (!start || !end) return '';
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const startDate = parseLocalDate(start);
+    const endDate = parseLocalDate(end);
     const startMonth = startDate.toLocaleDateString('en-US', { month: 'short' });
     const endMonth = endDate.toLocaleDateString('en-US', { month: 'short' });
     const startDay = startDate.getDate();
@@ -582,7 +590,7 @@ function generateDestinationDetails(summaryData: SummaryData, options: SummaryOp
   // Helper to format dates compactly
   const formatCompactDate = (dateStr?: string) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
+    const date = parseLocalDate(dateStr);
     const month = date.toLocaleDateString('en-US', { month: 'short' });
     const day = date.getDate();
     return `${month} ${day}`;
