@@ -3,14 +3,22 @@
  */
 
 /**
+ * Parse a date string (YYYY-MM-DD) as a local date to avoid timezone shifts
+ */
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
  * Format a date range string
  */
 export function formatDateRange(startDate?: string, endDate?: string): string {
   if (!startDate && !endDate) return 'Dates TBD';
   if (!endDate) return formatDate(startDate!);
 
-  const start = new Date(startDate!);
-  const end = new Date(endDate!);
+  const start = parseLocalDate(startDate!);
+  const end = parseLocalDate(endDate!);
 
   // Same day
   if (startDate === endDate) {
@@ -18,23 +26,22 @@ export function formatDateRange(startDate?: string, endDate?: string): string {
   }
 
   // Same month and year
-  if (start.getUTCMonth() === end.getUTCMonth() && start.getUTCFullYear() === end.getUTCFullYear()) {
-    const options: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' };
-    const endDay = end.getUTCDate();
-    const monthYear = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-    return `${start.getUTCDate()} - ${endDay}, ${monthYear}`;
+  if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
+    const endDay = end.getDate();
+    const monthYear = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    return `${start.getDate()} - ${endDay}, ${monthYear}`;
   }
 
   // Same year
-  if (start.getUTCFullYear() === end.getUTCFullYear()) {
-    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-    const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  if (start.getFullYear() === end.getFullYear()) {
+    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     return `${startStr} - ${endStr}`;
   }
 
   // Different years
-  const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-  const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   return `${startStr} - ${endStr}`;
 }
 
@@ -43,16 +50,16 @@ export function formatDateRange(startDate?: string, endDate?: string): string {
  */
 export function formatDate(dateStr?: string): string {
   if (!dateStr) return 'TBD';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  const date = parseLocalDate(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 /**
  * Format a month and year
  */
 export function formatMonthYear(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const date = parseLocalDate(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
 /**
@@ -211,8 +218,8 @@ export function sortByField<T>(items: T[], field: keyof T, descending: boolean =
  * Calculate days between two dates
  */
 export function daysBetween(startDate: string, endDate: string): number {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
   const diffTime = Math.abs(end.getTime() - start.getTime());
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
@@ -254,14 +261,14 @@ export function getCategoryColor(category: string): string {
  * Get month name from date string
  */
 export function getMonthName(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
+  const date = parseLocalDate(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'long' });
 }
 
 /**
  * Get year from date string
  */
 export function getYear(dateStr: string): number {
-  const date = new Date(dateStr);
-  return date.getUTCFullYear();
+  const date = parseLocalDate(dateStr);
+  return date.getFullYear();
 }
