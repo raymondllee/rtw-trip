@@ -128,6 +128,320 @@
           }
         }
       }
+    },
+    {
+      "eval_id": "inspire-adventure",
+      "conversation": [
+        {
+          "invocation_id": "inspire-adventure-001",
+          "user_content": {
+            "parts": [{"text": "I'm looking for adventure destinations with hiking, rock climbing, and outdoor activities"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "interests": ["adventure", "hiking", "outdoor_activities"]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-family-friendly",
+      "conversation": [
+        {
+          "invocation_id": "inspire-family-001",
+          "user_content": {
+            "parts": [{"text": "Suggest family-friendly destinations suitable for kids ages 5 and 8"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "traveling_with_children": true,
+            "children_ages": [5, 8]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-off-beaten-path",
+      "conversation": [
+        {
+          "invocation_id": "inspire-offbeat-001",
+          "user_content": {
+            "parts": [{"text": "I want to visit somewhere unique and off the beaten path, not typical tourist destinations"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "preferences": ["off_beaten_path", "authentic_experiences"]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-food-culture",
+      "conversation": [
+        {
+          "invocation_id": "inspire-food-001",
+          "user_content": {
+            "parts": [{"text": "I'm a foodie looking for destinations with amazing culinary scenes and street food"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "interests": ["food", "culinary_tours", "street_food"]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-historical",
+      "conversation": [
+        {
+          "invocation_id": "inspire-history-001",
+          "user_content": {
+            "parts": [{"text": "Recommend destinations rich in ancient history and archaeological sites"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "interests": ["history", "archaeology", "museums"]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-photography",
+      "conversation": [
+        {
+          "invocation_id": "inspire-photo-001",
+          "user_content": {
+            "parts": [{"text": "I'm a photographer looking for visually stunning destinations with great landscapes"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "interests": ["photography", "landscapes", "nature"]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-wellness-spa",
+      "conversation": [
+        {
+          "invocation_id": "inspire-wellness-001",
+          "user_content": {
+            "parts": [{"text": "Looking for wellness retreats and spa destinations for relaxation and rejuvenation"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "interests": ["wellness", "spa", "yoga", "meditation"]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-winter-sports",
+      "conversation": [
+        {
+          "invocation_id": "inspire-winter-001",
+          "user_content": {
+            "parts": [{"text": "Suggest destinations for skiing and winter sports in December"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "interests": ["skiing", "snowboarding", "winter_sports"]
+          },
+          "preferred_month": "December"
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-wildlife-safari",
+      "conversation": [
+        {
+          "invocation_id": "inspire-safari-001",
+          "user_content": {
+            "parts": [{"text": "I want to go on a wildlife safari to see animals in their natural habitat"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "interests": ["wildlife", "safari", "nature", "conservation"]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "inspire-solo-travel",
+      "conversation": [
+        {
+          "invocation_id": "inspire-solo-001",
+          "user_content": {
+            "parts": [{"text": "Safe and interesting destinations for solo female traveler"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "inspiration_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "gender": "female",
+            "traveling_solo": true,
+            "safety_priority": "high"
+          }
+        }
+      }
     }
   ],
   "creation_timestamp": 1735689600

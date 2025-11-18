@@ -1,0 +1,358 @@
+{
+  "eval_set_id": "post-trip-comprehensive-test-set",
+  "name": "Comprehensive Post-Trip Agent Test Set",
+  "description": "Test scenarios for post-trip agent covering feedback collection, experience learning, and preference updates",
+  "eval_cases": [
+    {
+      "eval_id": "post-trip-positive-feedback",
+      "conversation": [
+        {
+          "invocation_id": "post-trip-positive-001",
+          "user_content": {
+            "parts": [{"text": "I just returned from Tokyo and had an amazing experience! The hotel was perfect and the itinerary you planned was spot on."}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "post_trip_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "completed_trip": {
+            "destination": "Tokyo, Japan",
+            "duration_days": 7,
+            "start_date": "2026-03-15",
+            "end_date": "2026-03-22",
+            "hotel": "Grand Hyatt Tokyo",
+            "activities": ["Senso-ji Temple", "Shibuya Crossing", "Tokyo Tower"]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "post-trip-constructive-feedback",
+      "conversation": [
+        {
+          "invocation_id": "post-trip-feedback-001",
+          "user_content": {
+            "parts": [{"text": "The trip to Bangkok was good overall, but the hotel was too far from the city center. I'd prefer more central locations in the future."}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "post_trip_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "completed_trip": {
+            "destination": "Bangkok, Thailand",
+            "duration_days": 5,
+            "start_date": "2026-02-01",
+            "end_date": "2026-02-06",
+            "hotel": "Bangkok Riverside Hotel",
+            "hotel_location": "riverside",
+            "distance_to_center_km": 8
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "post-trip-preference-update",
+      "conversation": [
+        {
+          "invocation_id": "post-trip-pref-001",
+          "user_content": {
+            "parts": [{"text": "I discovered I really love local street food tours. Please add that to my preferences for future trips."}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "post_trip_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "completed_trip": {
+            "destination": "Hanoi, Vietnam",
+            "activities": ["Old Quarter Food Tour", "Street Food Walking Tour"]
+          },
+          "user_profile": {
+            "interests": ["culture", "history"]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "post-trip-multiple-issues",
+      "conversation": [
+        {
+          "invocation_id": "post-trip-issues-001",
+          "user_content": {
+            "parts": [{"text": "The Paris trip had several issues: the flight was delayed, hotel room wasn't ready, and we missed our first activity. How can we prevent this in the future?"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "post_trip_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "completed_trip": {
+            "destination": "Paris, France",
+            "issues": [
+              {"type": "flight_delay", "severity": "moderate"},
+              {"type": "hotel_check_in_delay", "severity": "minor"},
+              {"type": "missed_activity", "severity": "moderate"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "post-trip-recommendations-for-future",
+      "conversation": [
+        {
+          "invocation_id": "post-trip-recommend-001",
+          "user_content": {
+            "parts": [{"text": "Based on how much I enjoyed Bali, where else would you recommend for my next trip?"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "post_trip_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "completed_trip": {
+            "destination": "Bali, Indonesia",
+            "rating": 5,
+            "favorite_aspects": ["beaches", "temples", "nature", "local_culture"],
+            "duration_days": 10
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "post-trip-cost-feedback",
+      "conversation": [
+        {
+          "invocation_id": "post-trip-cost-001",
+          "user_content": {
+            "parts": [{"text": "The trip was great but I overspent by about $500. The daily cost estimates were lower than reality."}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "post_trip_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "completed_trip": {
+            "destination": "London, UK",
+            "estimated_total_cost": 2500,
+            "actual_total_cost": 3000,
+            "overspend_amount": 500,
+            "duration_days": 7
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "post-trip-hidden-gems",
+      "conversation": [
+        {
+          "invocation_id": "post-trip-gems-001",
+          "user_content": {
+            "parts": [{"text": "I found this amazing hidden restaurant in Rome that wasn't on our itinerary. It would be great to discover more places like that."}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "post_trip_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "completed_trip": {
+            "destination": "Rome, Italy",
+            "user_discovered_places": [
+              {"name": "Trattoria da Enzo", "type": "restaurant", "rating": 5}
+            ]
+          },
+          "user_profile": {
+            "preferences": ["authentic_local_experiences"]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "post-trip-travel-style-shift",
+      "conversation": [
+        {
+          "invocation_id": "post-trip-style-001",
+          "user_content": {
+            "parts": [{"text": "I've been doing budget travel for years but this mid-range trip to Kyoto made me realize I prefer a bit more comfort. Let's aim for mid-range on future trips."}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "post_trip_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "completed_trip": {
+            "destination": "Kyoto, Japan",
+            "travel_style": "mid-range",
+            "rating": 5
+          },
+          "user_profile": {
+            "travel_style": "budget",
+            "past_trips_count": 12
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "post-trip-seasonal-timing",
+      "conversation": [
+        {
+          "invocation_id": "post-trip-season-001",
+          "user_content": {
+            "parts": [{"text": "We went to Iceland in winter and it was too cold. I'd prefer spring or summer for northern destinations from now on."}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "post_trip_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "completed_trip": {
+            "destination": "Reykjavik, Iceland",
+            "season": "winter",
+            "month": "January",
+            "rating": 3,
+            "temperature_celsius": -2
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "post-trip-group-dynamics",
+      "conversation": [
+        {
+          "invocation_id": "post-trip-group-001",
+          "user_content": {
+            "parts": [{"text": "Traveling with kids to Barcelona was challenging. We needed more kid-friendly activities and shorter walking distances between attractions."}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "post_trip_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "completed_trip": {
+            "destination": "Barcelona, Spain",
+            "travelers": [
+              {"age": 35, "type": "adult"},
+              {"age": 32, "type": "adult"},
+              {"age": 6, "type": "child"},
+              {"age": 4, "type": "child"}
+            ],
+            "feedback": "too_much_walking_for_kids"
+          }
+        }
+      }
+    }
+  ],
+  "creation_timestamp": 1731888000
+}
