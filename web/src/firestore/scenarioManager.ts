@@ -18,11 +18,15 @@ import {
 import type { TripData, TripScenarioVersion } from '../types/trip';
 import { db } from '../firebase/config';
 
+// Maximum number of auto-saved versions to retain per scenario
+// Older versions beyond this limit will be automatically cleaned up
+const DEFAULT_AUTO_VERSION_RETENTION = 50;
+
 export class FirestoreScenarioManager {
   constructor() {
     this.userId = 'default-user'; // TODO: Replace with actual user ID from auth
     this.currentScenarioId = null;
-    this.autoVersionRetention = 50; // Keep last 50 auto-versions
+    this.autoVersionRetention = DEFAULT_AUTO_VERSION_RETENTION;
 
     // Debug: Verify Firebase is initialized
     console.log('🔥 FirestoreScenarioManager initialized, db available:', !!db);

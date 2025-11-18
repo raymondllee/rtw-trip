@@ -151,7 +151,7 @@ def _format_duration_days(start_date: Optional[str], end_date: Optional[str]) ->
         end = datetime.strptime(end_date, "%Y-%m-%d")
         days = (end - start).days + 1  # Inclusive
         return f"{days} Days"
-    except:
+    except (ValueError, TypeError):
         return ""
 
 

@@ -184,7 +184,7 @@ class SimpleTraceCapture:
         
         try:
             return dict(args) if hasattr(args, 'items') else {}
-        except:
+        except (TypeError, ValueError, AttributeError):
             return str(args)
     
     def _extract_response(self, response: Any) -> Any:
@@ -200,7 +200,7 @@ class SimpleTraceCapture:
         
         try:
             return dict(response) if hasattr(response, 'items') else {}
-        except:
+        except (TypeError, ValueError, AttributeError):
             return str(response)
     
     def save_trace(self, trace: Dict[str, Any]) -> pathlib.Path:

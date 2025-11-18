@@ -22,7 +22,7 @@ import requests
 
 
 class PlacesService:
-    """Wrapper to Placees API."""
+    """Wrapper to Places API."""
 
     def _check_key(self):
         if (

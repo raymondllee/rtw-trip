@@ -18,11 +18,12 @@ from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
 import json
 import logging
-import re
-import time
-import uuid
-import requests
 import os
+import re
+import requests
+import time
+import traceback
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -75,7 +76,6 @@ class SessionStore:
                 # Try to get credentials from environment variable
                 credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
                 if credentials_json:
-                    import json
                     credentials_info = json.loads(credentials_json)
                     credentials = service_account.Credentials.from_service_account_info(credentials_info)
                     project_id = credentials_info.get('project_id') or os.getenv('GOOGLE_CLOUD_PROJECT')
@@ -287,7 +287,6 @@ def get_firestore_client():
         # Try to get credentials from environment variable
         credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
         if credentials_json:
-            import json
             credentials_info = json.loads(credentials_json)
             credentials = service_account.Credentials.from_service_account_info(credentials_info)
             project_id = credentials_info.get('project_id') or os.getenv('GOOGLE_CLOUD_PROJECT')
@@ -321,6 +320,7 @@ app = Flask(__name__, static_folder=WEB_DIR, static_url_path='')
 CORS(app)  # Enable CORS for frontend requests
 
 # ADK API Server endpoint (you need to run: adk api_server travel_concierge)
+# TODO: Move to environment variable (e.g., ADK_API_URL env var)
 ADK_API_URL = "http://127.0.0.1:8000"
 APP_NAME = "travel_concierge"
 USER_ID = "web_user"
@@ -603,7 +603,6 @@ CRITICAL REMINDERS:
                                     r'updated your itinerary'
                                 ]
 
-                                import re
                                 for pattern in hallucinated_patterns:
                                     if re.search(pattern, text_content, re.IGNORECASE):
                                         print(f"\n🚨 DETECTED HALLUCINATED ITINERARY CHANGE: '{text_content}'")
@@ -829,6 +828,7 @@ CRITICAL REMINDERS:
                         continue
 
                     # Call bulk save API (using the same Flask server on port 5001)
+                    # TODO: Move to environment variable (e.g., FLASK_API_URL env var)
                     save_url = "http://127.0.0.1:5001/api/costs/bulk-save"
                     save_resp = requests.post(
                         save_url,
@@ -851,7 +851,6 @@ CRITICAL REMINDERS:
                         print(f"⚠️ Failed to save cost data: {save_resp.status_code}", flush=True)
                         print(f"   Response: {save_resp.text[:200]}", flush=True)
                 except Exception as save_error:
-                    import traceback
                     print(f"⚠️ Error saving cost research to Firestore: {save_error}")
                     print(f"   Traceback: {traceback.format_exc()}")
 
@@ -859,7 +858,6 @@ CRITICAL REMINDERS:
                 final_response_text = "\n\n".join(summaries)
 
         except Exception as e:
-            import traceback
             print(f"⚠️ Could not extract research_summary from response: {e}")
             print(f"   Traceback: {traceback.format_exc()}")
             final_response_text = response_text
@@ -872,7 +870,6 @@ CRITICAL REMINDERS:
         })
 
     except requests.exceptions.ConnectionError:
-        import traceback
         error_details = traceback.format_exc()
         logger.error("ADK API connection error", exc_info=True)
         print(f"Connection error: {error_details}")
@@ -881,7 +878,6 @@ CRITICAL REMINDERS:
             'status': 'error'
         }), 500
     except Exception as e:
-        import traceback
         error_details = traceback.format_exc()
         logger.exception("Chat endpoint failure: %s", e)
         print(f"Error in chat endpoint: {error_details}")
@@ -1889,10 +1885,8 @@ def bulk_save_costs():
             version_filtered_costs.extend(cost_items)
 
             try:
-                import json as _json
-
                 def _stable(obj):
-                    return _json.dumps(obj, sort_keys=True, separators=(",", ":"))
+                    return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
                 if _stable(version_costs) == _stable(version_filtered_costs):
                     scenario_ref.update({
@@ -2212,7 +2206,6 @@ def bulk_update_costs():
         })
 
     except Exception as e:
-        import traceback
         error_details = traceback.format_exc()
         print(f"Error in bulk-update endpoint: {error_details}")
         return jsonify({
@@ -2343,7 +2336,6 @@ def generate_summary():
             return jsonify(response), status_code
 
     except Exception as e:
-        import traceback
         error_details = traceback.format_exc()
         print(f"Error in summary generation endpoint: {error_details}")
         return jsonify({
@@ -2620,15 +2612,13 @@ For each category, provide low/mid/high estimates with sources.
         if not research_result and response_text:
             print(f"[DEBUG] Attempting to extract JSON from response_text (length={len(response_text)})")
             # Look for JSON in the response text
-            import re
             json_match = re.search(r'\{[\s\S]*"destination_name"[\s\S]*\}', response_text)
             if json_match:
                 try:
                     research_result = json.loads(json_match.group())
                     print(f"✅ Extracted JSON from response text")
-                except:
-                    print(f"[DEBUG] Failed to parse JSON from response_text")
-                    pass
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"[DEBUG] Failed to parse JSON from response_text: {e}")
             else:
                 print(f"[DEBUG] No JSON pattern found in response_text")
 
@@ -2781,7 +2771,6 @@ For each category, provide low/mid/high estimates with sources.
             'error': 'Cost research timed out. This process can take 2-3 minutes due to extensive web searches.'
         }), 504
     except Exception as e:
-        import traceback
         error_details = traceback.format_exc()
         print(f"Error in cost research endpoint: {error_details}")
         return jsonify({
