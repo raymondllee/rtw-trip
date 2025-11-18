@@ -2810,24 +2810,35 @@ export async function initMapApp() {
 
     if (!toggle || !destinationList) return;
 
-    // Load saved compact mode state from localStorage
-    const isCompactMode = localStorage.getItem('rtw-compact-mode') === 'true';
+    // Load saved compact mode state from localStorage (default to true)
+    const savedCompactMode = localStorage.getItem('rtw-compact-mode');
+    const isCompactMode = savedCompactMode !== null ? savedCompactMode === 'true' : true;
 
     // Apply initial state (always sync state with localStorage)
     if (isCompactMode) {
       destinationList.classList.add('compact-mode');
-      toggle.classList.add('active');
+      toggle.checked = true;
     } else {
       destinationList.classList.remove('compact-mode');
-      toggle.classList.remove('active');
+      toggle.checked = false;
+    }
+
+    // Save default if not set
+    if (savedCompactMode === null) {
+      localStorage.setItem('rtw-compact-mode', 'true');
     }
 
     // Only add event listener once
     if (!compactModeInitialized) {
       compactModeInitialized = true;
-      toggle.addEventListener('click', () => {
-        const isCurrentlyCompact = destinationList.classList.toggle('compact-mode');
-        toggle.classList.toggle('active');
+      toggle.addEventListener('change', (e) => {
+        const isCurrentlyCompact = e.target.checked;
+
+        if (isCurrentlyCompact) {
+          destinationList.classList.add('compact-mode');
+        } else {
+          destinationList.classList.remove('compact-mode');
+        }
 
         // Save to localStorage
         localStorage.setItem('rtw-compact-mode', isCurrentlyCompact.toString());
@@ -4268,7 +4279,16 @@ export async function initMapApp() {
   window.updateSidebarHighlight = updateSidebarHighlight;
 
   const routingToggle = document.getElementById('routing-toggle');
-  
+
+  // Initialize routing toggle state (default: false/unchecked)
+  const savedRoutingToggle = localStorage.getItem('rtw-routing-toggle');
+  if (savedRoutingToggle !== null) {
+    routingToggle.checked = savedRoutingToggle === 'true';
+  } else {
+    routingToggle.checked = false;
+    localStorage.setItem('rtw-routing-toggle', 'false');
+  }
+
   function updateMap() {
     const legName = legFilter.value;
     const subLegName = subLegFilter.value || null;
@@ -4290,7 +4310,11 @@ export async function initMapApp() {
     // Save sub-leg selection to state
     statePersistence.saveLegSelection(legFilter.value, e.target.value || null);
   });
-  routingToggle.addEventListener('change', updateMap);
+  routingToggle.addEventListener('change', (e) => {
+    // Save routing toggle state
+    localStorage.setItem('rtw-routing-toggle', e.target.checked.toString());
+    updateMap();
+  });
 
   // Country view toggle
   const countryViewToggle = document.getElementById('country-view-toggle');
@@ -5405,7 +5429,10 @@ export async function initMapApp() {
   const mapVisible = localStorage.getItem('rtw-map-visible');
   const educationVisible = localStorage.getItem('rtw-education-visible');
 
-  if (mapVisible === 'false') {
+  // Map visibility (default: true/shown)
+  if (mapVisible === null) {
+    localStorage.setItem('rtw-map-visible', 'true');
+  } else if (mapVisible === 'false') {
     const mainContent = document.querySelector('.main-content');
     const sidebar = document.querySelector('.sidebar');
     const toggle = document.getElementById('map-visibility-toggle');
@@ -5415,7 +5442,14 @@ export async function initMapApp() {
     if (toggle) toggle.checked = false;
   }
 
-  if (educationVisible === 'false') {
+  // Education visibility (default: false/hidden)
+  if (educationVisible === null) {
+    localStorage.setItem('rtw-education-visible', 'false');
+    const body = document.body;
+    const toggle = document.getElementById('education-visibility-toggle');
+    body.classList.add('education-hidden');
+    if (toggle) toggle.checked = false;
+  } else if (educationVisible === 'false') {
     const body = document.body;
     const toggle = document.getElementById('education-visibility-toggle');
     body.classList.add('education-hidden');
