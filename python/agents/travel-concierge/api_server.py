@@ -3712,6 +3712,187 @@ def update_transport_research():
 # EDUCATION SYSTEM - TEST ENDPOINTS
 # ============================================
 
+def _save_curriculum_to_firestore(student_profile: Dict, location: Dict, curriculum_data: Dict, metadata: Dict) -> Dict[str, str]:
+    """
+    Save generated curriculum to Firestore collections.
+
+    Args:
+        student_profile: Student profile data
+        location: Location data
+        curriculum_data: Generated curriculum JSON
+        metadata: Generation metadata (model, timestamp, etc.)
+
+    Returns:
+        Dict with saved document IDs: {
+            'student_profile_id': str,
+            'curriculum_plan_id': str,
+            'activity_ids': List[str]
+        }
+    """
+    if not firestore:
+        raise Exception("Firestore not available")
+
+    db = firestore.Client()
+    now = datetime.now()
+
+    # 1. Save or retrieve student profile
+    student_id = student_profile.get('id') or f"student_{uuid.uuid4().hex[:12]}"
+    student_ref = db.collection('student_profiles').document(student_id)
+
+    # Check if student already exists
+    student_doc = student_ref.get()
+    if not student_doc.exists:
+        # Create new student profile
+        student_data = {
+            'id': student_id,
+            'name': student_profile.get('name', 'Student'),
+            'age': student_profile.get('age', 14),
+            'grade': student_profile.get('grade', 8),
+            'state': student_profile.get('state', 'California'),
+            'country': student_profile.get('country', 'USA'),
+            'subjects_parent_covers': student_profile.get('subjects_parent_covers', []),
+            'subjects_to_cover': metadata.get('subjects', []),
+            'learning_style': student_profile.get('learning_style', 'experiential'),
+            'reading_level': student_profile.get('reading_level', 10),
+            'time_budget_minutes_per_day': student_profile.get('time_budget_minutes_per_day', 60),
+            'interests': student_profile.get('interests', []),
+            'educational_standards': [f"{student_profile.get('state', 'California')}-{student_profile.get('grade', 8)}"],
+            'required_subjects': metadata.get('subjects', []),
+            'created_at': now,
+            'updated_at': now
+        }
+        student_ref.set(student_data)
+        print(f"✓ Created student profile: {student_id}")
+    else:
+        # Update timestamp
+        student_ref.update({'updated_at': now})
+        print(f"✓ Using existing student profile: {student_id}")
+
+    # 2. Save curriculum plan
+    plan_id = f"plan_{uuid.uuid4().hex[:12]}"
+    location_id = location.get('id', 'unknown')
+
+    # Build location_lessons structure
+    location_lessons = {
+        str(location_id): {
+            'location_id': str(location_id),
+            'location_name': location.get('name', 'Unknown'),
+            'arrival_date': location.get('arrival_date', ''),
+            'departure_date': location.get('departure_date', ''),
+            'duration_days': location.get('duration_days', 7),
+            'pre_trip': curriculum_data.get('pre_trip', {}),
+            'on_location': {
+                'experiential_activities': curriculum_data.get('on_location', {}).get('experiential_activities', []),
+                'structured_lessons': curriculum_data.get('on_location', {}).get('structured_lessons', []),
+                'daily_menus': [],
+                'field_trip_guides': []
+            },
+            'post_trip': curriculum_data.get('post_trip', {}),
+            'subject_coverage': {}
+        }
+    }
+
+    curriculum_plan = {
+        'id': plan_id,
+        'student_profile_id': student_id,
+        'trip_scenario_id': location.get('trip_scenario_id', 'test_scenario'),
+        'trip_version_id': location.get('trip_version_id'),
+        'status': 'draft',
+        'created_at': now,
+        'updated_at': now,
+        'generated_at': now,
+        'ai_model_used': metadata.get('model_used', 'gemini-2.0-flash-exp'),
+        'generation_metadata': metadata,
+        'semester': {
+            'title': f"Learning Journey: {location.get('name', 'Unknown')}",
+            'start_date': location.get('arrival_date', ''),
+            'end_date': location.get('departure_date', ''),
+            'total_weeks': (location.get('duration_days', 7) // 7) or 1,
+            'total_destinations': 1,
+            'subjects': {}
+        },
+        'location_lessons': location_lessons,
+        'thematic_threads': [],
+        'standards_coverage': {}
+    }
+
+    plan_ref = db.collection('curriculum_plans').document(plan_id)
+    plan_ref.set(curriculum_plan)
+    print(f"✓ Created curriculum plan: {plan_id}")
+
+    # 3. Save individual learning activities
+    activity_ids = []
+
+    # Extract experiential activities
+    exp_activities = curriculum_data.get('on_location', {}).get('experiential_activities', [])
+    for idx, activity in enumerate(exp_activities):
+        activity_id = f"activity_{uuid.uuid4().hex[:12]}"
+        activity_data = {
+            'id': activity_id,
+            'curriculum_plan_id': plan_id,
+            'location_id': str(location_id),
+            'type': 'experiential',
+            'subject': activity.get('subject', 'general'),
+            'timing': 'on_location',
+            'title': activity.get('title', f'Activity {idx + 1}'),
+            'description': activity.get('description', ''),
+            'learning_objectives': activity.get('learning_objectives', []),
+            'estimated_duration_minutes': activity.get('estimated_duration_minutes', 60),
+            'difficulty': 'medium',
+            'instructions': activity.get('instructions', {}),
+            'resources': [],
+            'created_at': now,
+            'ai_generated': True,
+            'customized': False,
+            'source': 'curriculum_generator'
+        }
+
+        # Add site details if available
+        if 'site_details' in activity:
+            activity_data['site_details'] = activity['site_details']
+
+        activity_ref = db.collection('learning_activities').document(activity_id)
+        activity_ref.set(activity_data)
+        activity_ids.append(activity_id)
+
+    # Extract structured lessons
+    structured_lessons = curriculum_data.get('on_location', {}).get('structured_lessons', [])
+    for idx, lesson in enumerate(structured_lessons):
+        activity_id = f"activity_{uuid.uuid4().hex[:12]}"
+        activity_data = {
+            'id': activity_id,
+            'curriculum_plan_id': plan_id,
+            'location_id': str(location_id),
+            'type': 'structured',
+            'subject': lesson.get('subject', 'general'),
+            'timing': 'on_location',
+            'title': lesson.get('title', f'Lesson {idx + 1}'),
+            'description': lesson.get('description', ''),
+            'learning_objectives': lesson.get('learning_objectives', []),
+            'estimated_duration_minutes': lesson.get('estimated_duration_minutes', 45),
+            'difficulty': 'medium',
+            'instructions': {},
+            'resources': [],
+            'created_at': now,
+            'ai_generated': True,
+            'customized': False,
+            'source': 'curriculum_generator'
+        }
+
+        activity_ref = db.collection('learning_activities').document(activity_id)
+        activity_ref.set(activity_data)
+        activity_ids.append(activity_id)
+
+    print(f"✓ Created {len(activity_ids)} learning activities")
+
+    return {
+        'student_profile_id': student_id,
+        'curriculum_plan_id': plan_id,
+        'activity_ids': activity_ids,
+        'total_activities': len(activity_ids)
+    }
+
+
 @app.route('/api/education/test/generate-curriculum', methods=['POST'])
 def test_generate_curriculum():
     """
@@ -3965,6 +4146,26 @@ IMPORTANT: Every field shown above is REQUIRED. Use exact field names. Make it s
 
             print(f"✓ Successfully generated curriculum for {location.get('name')}")
 
+            # Save to Firestore if available
+            saved_ids = {}
+            if firestore:
+                try:
+                    saved_ids = _save_curriculum_to_firestore(
+                        student_profile=student,
+                        location=location,
+                        curriculum_data=result_json,
+                        metadata={
+                            'model_used': model_id,
+                            'generation_time': datetime.now().isoformat(),
+                            'subjects': subjects
+                        }
+                    )
+                    print(f"✓ Saved to Firestore: {saved_ids}")
+                except Exception as e:
+                    print(f"⚠ Failed to save to Firestore: {e}")
+                    import traceback
+                    traceback.print_exc()
+
             return jsonify({
                 'status': 'success',
                 'curriculum': result_json,
@@ -3972,7 +4173,8 @@ IMPORTANT: Every field shown above is REQUIRED. Use exact field names. Make it s
                     'model_used': model_id,
                     'prompt_length': len(prompt),
                     'generation_time': datetime.now().isoformat()
-                }
+                },
+                'saved_ids': saved_ids  # Include Firestore document IDs
             })
 
         except json.JSONDecodeError as e:

@@ -476,7 +476,7 @@ Historical sites (WWII, Meiji era)</textarea>
                 const data = await response.json();
 
                 if (response.ok && data.status === 'success') {
-                    displayCurriculum(data.curriculum, data.metadata);
+                    displayCurriculum(data.curriculum, data.metadata, data.saved_ids);
                 } else {
                     resultArea.innerHTML = `
                         <div class="error">
@@ -500,7 +500,7 @@ Historical sites (WWII, Meiji era)</textarea>
             }
         });
 
-        function displayCurriculum(curriculum, metadata) {
+        function displayCurriculum(curriculum, metadata, savedIds) {
             const resultArea = document.getElementById('resultArea');
 
             let html = `
@@ -509,6 +509,16 @@ Historical sites (WWII, Meiji era)</textarea>
                     <div style="margin-top: 8px; font-size: 13px;">
                         Model: ${metadata.model_used} | Generated: ${new Date(metadata.generation_time).toLocaleString()}
                     </div>
+                    ${savedIds && savedIds.curriculum_plan_id ? `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(72, 187, 120, 0.3);">
+                            <strong>💾 Saved to Firestore:</strong>
+                            <div style="margin-top: 6px; font-size: 12px; font-family: monospace; color: #2d3748;">
+                                <div>Student: ${savedIds.student_profile_id}</div>
+                                <div>Plan: ${savedIds.curriculum_plan_id}</div>
+                                <div>Activities: ${savedIds.total_activities || savedIds.activity_ids?.length || 0}</div>
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
 
                 <h2>${curriculum.location_name}</h2>
