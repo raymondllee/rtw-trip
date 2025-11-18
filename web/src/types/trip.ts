@@ -40,6 +40,7 @@ export interface TripLocation {
   activity_type?: string;
   highlights?: string[];
   learning_moments?: LearningMoment[];  // Educational opportunities at this location
+  curriculum_plan_ids?: string[];  // IDs of curriculum plans generated for this location
   airport_code?: string;
   transport_from_previous?: string;
   transport_segments?: TransportSegment[];

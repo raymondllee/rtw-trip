@@ -3803,6 +3803,13 @@ def _save_curriculum_to_firestore(student_profile: Dict, location: Dict, curricu
         'generated_at': now,
         'ai_model_used': metadata.get('model_used', 'gemini-2.0-flash-exp'),
         'generation_metadata': metadata,
+
+        # Top-level fields for querying and relationships
+        'location_id': str(location_id),  # Primary location ID for easy querying
+        'location_name': location.get('name', 'Unknown'),
+        'country': location.get('country', ''),  # For country-level queries
+        'region': location.get('region', ''),  # For region-level queries
+
         'semester': {
             'title': f"Learning Journey: {location.get('name', 'Unknown')}",
             'start_date': location.get('arrival_date', ''),
@@ -3885,11 +3892,52 @@ def _save_curriculum_to_firestore(student_profile: Dict, location: Dict, curricu
 
     print(f"✓ Created {len(activity_ids)} learning activities")
 
+    # 4. Optionally update trip location with curriculum reference
+    # This creates a two-way relationship between locations and curricula
+    if location.get('trip_scenario_id') and location.get('trip_version_id'):
+        try:
+            scenario_id = location['trip_scenario_id']
+            version_id = location['trip_version_id']
+
+            # Get the version document
+            version_ref = db.collection('scenarios').document(scenario_id).collection('versions').document(version_id)
+            version_doc = version_ref.get()
+
+            if version_doc.exists:
+                version_data = version_doc.to_dict()
+                itinerary_data = version_data.get('itineraryData', {})
+                locations = itinerary_data.get('locations', [])
+
+                # Find the location and add curriculum reference
+                updated = False
+                for loc in locations:
+                    if str(loc.get('id')) == str(location_id):
+                        # Add curriculum_plan_ids array if doesn't exist
+                        if 'curriculum_plan_ids' not in loc:
+                            loc['curriculum_plan_ids'] = []
+                        # Add this plan if not already there
+                        if plan_id not in loc['curriculum_plan_ids']:
+                            loc['curriculum_plan_ids'].append(plan_id)
+                        updated = True
+                        break
+
+                if updated:
+                    # Save updated itinerary back
+                    version_ref.update({
+                        'itineraryData': itinerary_data,
+                        'updatedAt': now
+                    })
+                    print(f"✓ Added curriculum reference to location {location_id}")
+        except Exception as e:
+            print(f"⚠ Could not update location with curriculum reference: {e}")
+            # Don't fail the whole operation if this step fails
+
     return {
         'student_profile_id': student_id,
         'curriculum_plan_id': plan_id,
         'activity_ids': activity_ids,
-        'total_activities': len(activity_ids)
+        'total_activities': len(activity_ids),
+        'location_id': str(location_id)
     }
 
 
@@ -4203,6 +4251,193 @@ IMPORTANT: Every field shown above is REQUIRED. Use exact field names. Make it s
             'error': str(e),
             'traceback': traceback.format_exc()
         }), 500
+
+
+@app.route('/api/education/curricula', methods=['GET'])
+def list_curricula():
+    """
+    List all curriculum plans with optional filters.
+
+    Query params:
+    - student_id: Filter by student profile
+    - location_id: Filter by location
+    - country: Filter by country
+    - status: Filter by status (draft, active, completed, archived)
+    - limit: Max results (default 50)
+    """
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = firestore.Client()
+        query = db.collection('curriculum_plans')
+
+        # Apply filters
+        student_id = request.args.get('student_id')
+        location_id = request.args.get('location_id')
+        country = request.args.get('country')
+        status = request.args.get('status')
+        limit = int(request.args.get('limit', 50))
+
+        if student_id:
+            query = query.where('student_profile_id', '==', student_id)
+        if status:
+            query = query.where('status', '==', status)
+        if country:
+            query = query.where('country', '==', country)
+
+        # Order by creation date (newest first)
+        query = query.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
+
+        docs = query.stream()
+        curricula = []
+
+        for doc in docs:
+            data = doc.to_dict()
+
+            # Filter by location_id if specified (need to check location_lessons keys)
+            if location_id and str(location_id) not in data.get('location_lessons', {}):
+                continue
+
+            # Convert timestamps to ISO strings
+            if 'created_at' in data:
+                data['created_at'] = data['created_at'].isoformat() if hasattr(data['created_at'], 'isoformat') else str(data['created_at'])
+            if 'updated_at' in data:
+                data['updated_at'] = data['updated_at'].isoformat() if hasattr(data['updated_at'], 'isoformat') else str(data['updated_at'])
+            if 'generated_at' in data:
+                data['generated_at'] = data['generated_at'].isoformat() if hasattr(data['generated_at'], 'isoformat') else str(data['generated_at'])
+
+            curricula.append(data)
+
+        return jsonify({
+            'status': 'success',
+            'count': len(curricula),
+            'curricula': curricula
+        })
+
+    except Exception as e:
+        print(f"Error listing curricula: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/curricula/<plan_id>', methods=['GET'])
+def get_curriculum(plan_id):
+    """Get a specific curriculum plan by ID."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = firestore.Client()
+        doc = db.collection('curriculum_plans').document(plan_id).get()
+
+        if not doc.exists:
+            return jsonify({'error': 'Curriculum plan not found'}), 404
+
+        data = doc.to_dict()
+
+        # Convert timestamps
+        if 'created_at' in data:
+            data['created_at'] = data['created_at'].isoformat() if hasattr(data['created_at'], 'isoformat') else str(data['created_at'])
+        if 'updated_at' in data:
+            data['updated_at'] = data['updated_at'].isoformat() if hasattr(data['updated_at'], 'isoformat') else str(data['updated_at'])
+        if 'generated_at' in data:
+            data['generated_at'] = data['generated_at'].isoformat() if hasattr(data['generated_at'], 'isoformat') else str(data['generated_at'])
+
+        return jsonify({
+            'status': 'success',
+            'curriculum': data
+        })
+
+    except Exception as e:
+        print(f"Error getting curriculum: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/curricula/by-location/<location_id>', methods=['GET'])
+def get_curricula_by_location(location_id):
+    """Get all curricula for a specific location."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = firestore.Client()
+
+        # Get all curricula and filter by location_id in location_lessons
+        docs = db.collection('curriculum_plans').stream()
+        curricula = []
+
+        for doc in docs:
+            data = doc.to_dict()
+
+            # Check if this curriculum includes the requested location
+            if str(location_id) in data.get('location_lessons', {}):
+                # Convert timestamps
+                if 'created_at' in data:
+                    data['created_at'] = data['created_at'].isoformat() if hasattr(data['created_at'], 'isoformat') else str(data['created_at'])
+                if 'updated_at' in data:
+                    data['updated_at'] = data['updated_at'].isoformat() if hasattr(data['updated_at'], 'isoformat') else str(data['updated_at'])
+                if 'generated_at' in data:
+                    data['generated_at'] = data['generated_at'].isoformat() if hasattr(data['generated_at'], 'isoformat') else str(data['generated_at'])
+
+                curricula.append(data)
+
+        return jsonify({
+            'status': 'success',
+            'location_id': location_id,
+            'count': len(curricula),
+            'curricula': curricula
+        })
+
+    except Exception as e:
+        print(f"Error getting curricula by location: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/students/<student_id>/curricula', methods=['GET'])
+def get_student_curricula(student_id):
+    """Get all curricula for a specific student."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = firestore.Client()
+        query = db.collection('curriculum_plans').where('student_profile_id', '==', student_id)
+        query = query.order_by('created_at', direction=firestore.Query.DESCENDING)
+
+        docs = query.stream()
+        curricula = []
+
+        for doc in docs:
+            data = doc.to_dict()
+
+            # Convert timestamps
+            if 'created_at' in data:
+                data['created_at'] = data['created_at'].isoformat() if hasattr(data['created_at'], 'isoformat') else str(data['created_at'])
+            if 'updated_at' in data:
+                data['updated_at'] = data['updated_at'].isoformat() if hasattr(data['updated_at'], 'isoformat') else str(data['updated_at'])
+            if 'generated_at' in data:
+                data['generated_at'] = data['generated_at'].isoformat() if hasattr(data['generated_at'], 'isoformat') else str(data['generated_at'])
+
+            curricula.append(data)
+
+        return jsonify({
+            'status': 'success',
+            'student_id': student_id,
+            'count': len(curricula),
+            'curricula': curricula
+        })
+
+    except Exception as e:
+        print(f"Error getting student curricula: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
