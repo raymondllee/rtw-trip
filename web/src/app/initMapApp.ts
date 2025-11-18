@@ -14,6 +14,7 @@ import {
 import { getRuntimeConfig } from '../config';
 import { getLegsForData, generateDynamicLegs, getLegSummary } from '../utils/dynamicLegManager';
 import { aggregateByCountry, groupByContinent, groupByRegion, calculateCountryStats, CountryStay, RegionStay } from '../utils/countryAggregator';
+import { loadEducationSection, initializeEducationUI } from '../education/educationUI';
 
 const { apiBaseUrl } = getRuntimeConfig();
 
@@ -2281,6 +2282,9 @@ export async function initMapApp() {
             <div class="destination-notes">
               <textarea class="editable-notes" placeholder="Add notes..." data-location-id="${loc.id}">${notes}</textarea>
             </div>
+            <div class="education-section-placeholder" data-location-id="${loc.id}">
+              <div class="education-loading">Loading education...</div>
+            </div>
           </div>
           <button class="delete-destination-btn" data-location-id="${loc.id}" title="Delete destination">×</button>
         </div>
@@ -2449,6 +2453,29 @@ export async function initMapApp() {
     setupDurationEditing(destinationList, locations);
     setupNotesEditing(destinationList, locations);
     setupDateLocking(destinationList);
+
+    // Load education sections asynchronously
+    loadEducationSections(locations);
+  }
+
+  async function loadEducationSections(locations) {
+    // Load education data for each location
+    for (const location of locations) {
+      try {
+        const placeholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
+        if (placeholder) {
+          const educationHTML = await loadEducationSection(location);
+          placeholder.outerHTML = educationHTML;
+        }
+      } catch (error) {
+        console.error(`Failed to load education for ${location.name}:`, error);
+        // Keep the placeholder with error message
+        const placeholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
+        if (placeholder) {
+          placeholder.innerHTML = '<div class="education-error">Unable to load education</div>';
+        }
+      }
+    }
   }
   
   function setupDragAndDrop(container, filteredLocations) {
@@ -5323,6 +5350,9 @@ export async function initMapApp() {
       }
     }
   };
+
+  // Initialize education UI
+  initializeEducationUI(currentScenarioId, currentScenarioName);
 
   console.log('✅ App initialized with state:', {
     scenarioId: currentScenarioId,
