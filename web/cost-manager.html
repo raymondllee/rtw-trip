@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cost & Budget Manager - RTW Trip Planner</title>
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./cost-styles.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #f5f5f5;
+    }
+
+    .cost-manager-page {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: white;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .page-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .page-title h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .back-button:hover {
+      background: #f8f9fa;
+      border-color: #bbb;
+    }
+
+    .tab-navigation {
+      display: flex;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 0 24px;
+    }
+
+    .tab-button {
+      padding: 14px 24px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: #666;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-button:hover {
+      color: #333;
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    .tab-button.active {
+      color: #1a73e8;
+      border-bottom-color: #1a73e8;
+      background: white;
+    }
+
+    .tab-content {
+      display: none;
+      flex: 1;
+      overflow: auto;
+    }
+
+    .tab-content.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab-panel {
+      flex: 1;
+      padding: 24px;
+      overflow: auto;
+    }
+
+    /* Tab-specific styles */
+    #tab-edit-costs .tab-panel {
+      padding: 0;
+    }
+
+    #tab-budget .tab-panel {
+      padding: 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    #tab-analysis .tab-panel {
+      padding: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .stub-message {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #666;
+      text-align: center;
+      padding: 48px;
+    }
+
+    .stub-message h2 {
+      margin: 0 0 12px 0;
+      font-size: 24px;
+      color: #999;
+    }
+
+    .stub-message p {
+      margin: 0;
+      font-size: 14px;
+      max-width: 500px;
+    }
+
+    /* Loading state */
+    .loading-spinner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 48px;
+      font-size: 16px;
+      color: #666;
+    }
+
+    .error-message {
+      padding: 24px;
+      margin: 24px;
+      background: #fee;
+      border: 1px solid #fcc;
+      border-radius: 6px;
+      color: #c33;
+    }
+  </style>
+</head>
+<body>
+  <div class="cost-manager-page">
+    <div class="page-header">
+      <div class="page-title">
+        <a href="./index.html" class="back-button">
+          ← Back to Trip
+        </a>
+        <h1>💰 Cost & Budget Manager</h1>
+      </div>
+      <div id="scenario-info" style="font-size: 14px; color: #666;">
+        <span id="scenario-name-display">Loading...</span>
+      </div>
+    </div>
+
+    <div class="tab-navigation">
+      <button class="tab-button active" data-tab="edit-costs">
+        📊 Review & Edit Costs
+      </button>
+      <button class="tab-button" data-tab="generate-costs">
+        🤖 Generate Costs (AI)
+      </button>
+      <button class="tab-button" data-tab="budget">
+        💵 Budget Management
+      </button>
+      <button class="tab-button" data-tab="analysis">
+        📈 Cost Analysis
+      </button>
+    </div>
+
+    <!-- Tab 1: Review & Edit Costs -->
+    <div id="tab-edit-costs" class="tab-content active">
+      <div class="tab-panel">
+        <div class="loading-spinner">
+          Loading costs...
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Generate Costs (AI) -->
+    <div id="tab-generate-costs" class="tab-content">
+      <div class="tab-panel">
+        <div id="generate-costs-container">
+          <div class="loading-spinner">
+            Loading destinations...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Budget Management -->
+    <div id="tab-budget" class="tab-content">
+      <div class="tab-panel">
+        <div id="budget-container">
+          <div class="loading-spinner">
+            Loading budget...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Cost Analysis (Stub) -->
+    <div id="tab-analysis" class="tab-content">
+      <div class="tab-panel">
+        <div class="stub-message">
+          <h2>📈 Cost Analysis</h2>
+          <p>
+            Advanced cost analytics and visualizations coming soon. This feature will include:
+            cost trends over time, destination comparisons, category breakdowns, and budget variance analysis.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load configuration -->
+  <script src="./config.js"></script>
+
+  <!-- Load modules -->
+  <script type="module" src="/src/cost-manager.ts"></script>
+</body>
+</html>
