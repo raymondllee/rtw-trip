@@ -102,6 +102,256 @@
           "duration_days": 10
         }
       }
+    },
+    {
+      "eval_id": "planning-multi-city-itinerary",
+      "conversation": [
+        {
+          "invocation_id": "planning-multi-001",
+          "user_content": {
+            "parts": [{"text": "Plan a 14-day trip visiting Tokyo, Kyoto, and Osaka"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window"
+          },
+          "destinations": ["Tokyo, Japan", "Kyoto, Japan", "Osaka, Japan"],
+          "start_date": "2026-05-01",
+          "duration_days": 14
+        }
+      }
+    },
+    {
+      "eval_id": "planning-last-minute-booking",
+      "conversation": [
+        {
+          "invocation_id": "planning-lastmin-001",
+          "user_content": {
+            "parts": [{"text": "I need to plan a trip to New York departing in 3 days"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen"
+          },
+          "destination": "New York, NY",
+          "departure_in_days": 3,
+          "duration_days": 4,
+          "urgency": "high"
+        }
+      }
+    },
+    {
+      "eval_id": "planning-business-class-flight",
+      "conversation": [
+        {
+          "invocation_id": "planning-business-001",
+          "user_content": {
+            "parts": [{"text": "Find business class flights to Dubai for 2 people departing June 15"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen"
+          },
+          "origin": "Los Angeles, CA",
+          "destination": "Dubai, UAE",
+          "departure_date": "2026-06-15",
+          "return_date": "2026-06-25",
+          "num_travelers": 2,
+          "cabin_class": "business"
+        }
+      }
+    },
+    {
+      "eval_id": "planning-accessible-hotel",
+      "conversation": [
+        {
+          "invocation_id": "planning-accessible-001",
+          "user_content": {
+            "parts": [{"text": "Find wheelchair accessible hotels in Paris near major attractions"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "accessibility_requirements": ["wheelchair_accessible"]
+          },
+          "destination": "Paris, France",
+          "duration_days": 7,
+          "preferences": ["near_attractions"]
+        }
+      }
+    },
+    {
+      "eval_id": "planning-family-suite",
+      "conversation": [
+        {
+          "invocation_id": "planning-family-002",
+          "user_content": {
+            "parts": [{"text": "Find family suites or connecting rooms in Orlando for 2 adults and 3 kids"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen"
+          },
+          "destination": "Orlando, FL",
+          "duration_days": 5,
+          "num_travelers": 5,
+          "travelers": [
+            {"type": "adult", "age": 35},
+            {"type": "adult", "age": 33},
+            {"type": "child", "age": 8},
+            {"type": "child", "age": 6},
+            {"type": "child", "age": 4}
+          ],
+          "room_requirements": ["family_suite", "connecting_rooms"]
+        }
+      }
+    },
+    {
+      "eval_id": "planning-long-layover",
+      "conversation": [
+        {
+          "invocation_id": "planning-layover-002",
+          "user_content": {
+            "parts": [{"text": "Find flights with a long layover in Singapore so I can explore the city"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen"
+          },
+          "origin": "San Francisco, CA",
+          "destination": "Bali, Indonesia",
+          "departure_date": "2026-07-01",
+          "return_date": "2026-07-15",
+          "preferences": ["long_layover_singapore"],
+          "min_layover_hours": 10
+        }
+      }
+    },
+    {
+      "eval_id": "planning-pet-friendly-hotel",
+      "conversation": [
+        {
+          "invocation_id": "planning-pet-001",
+          "user_content": {
+            "parts": [{"text": "Find pet-friendly hotels in San Diego that allow dogs"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "planning_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "traveling_with_pets": true,
+            "pet_type": "dog"
+          },
+          "destination": "San Diego, CA",
+          "duration_days": 3,
+          "requirements": ["pet_friendly"]
+        }
+      }
     }
   ],
   "creation_timestamp": 1735689600

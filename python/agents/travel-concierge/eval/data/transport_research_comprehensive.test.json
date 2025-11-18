@@ -1,0 +1,345 @@
+{
+  "eval_set_id": "transport-research-comprehensive-test-set",
+  "name": "Comprehensive Transport Research Test Set",
+  "description": "Test scenarios for transport research covering flight pricing, alternative routes, and multi-city options",
+  "eval_cases": [
+    {
+      "eval_id": "transport-research-direct-flight",
+      "conversation": [
+        {
+          "invocation_id": "transport-direct-001",
+          "user_content": {
+            "parts": [{"text": "Research flight costs from New York to London for March 15-22"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "transport_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "origin": "New York, NY",
+          "destination": "London, UK",
+          "departure_date": "2026-03-15",
+          "return_date": "2026-03-22",
+          "num_travelers": 3,
+          "travel_style": "mid-range"
+        }
+      }
+    },
+    {
+      "eval_id": "transport-research-multi-city",
+      "conversation": [
+        {
+          "invocation_id": "transport-multi-001",
+          "user_content": {
+            "parts": [{"text": "Research flight costs for a multi-city trip: San Francisco to Tokyo to Bangkok to San Francisco"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "transport_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "multi_city_route": [
+            {"origin": "San Francisco, CA", "destination": "Tokyo, Japan", "date": "2026-04-01"},
+            {"origin": "Tokyo, Japan", "destination": "Bangkok, Thailand", "date": "2026-04-08"},
+            {"origin": "Bangkok, Thailand", "destination": "San Francisco, CA", "date": "2026-04-15"}
+          ],
+          "num_travelers": 3,
+          "travel_style": "mid-range"
+        }
+      }
+    },
+    {
+      "eval_id": "transport-research-budget-airlines",
+      "conversation": [
+        {
+          "invocation_id": "transport-budget-001",
+          "user_content": {
+            "parts": [{"text": "Find the cheapest flights from Los Angeles to Mexico City, including budget airlines"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "transport_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "origin": "Los Angeles, CA",
+          "destination": "Mexico City, Mexico",
+          "departure_date": "2026-05-10",
+          "return_date": "2026-05-17",
+          "num_travelers": 3,
+          "travel_style": "budget"
+        }
+      }
+    },
+    {
+      "eval_id": "transport-research-alternative-airports",
+      "conversation": [
+        {
+          "invocation_id": "transport-alt-001",
+          "user_content": {
+            "parts": [{"text": "Research flight costs to Paris including alternative airports"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "transport_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "origin": "Boston, MA",
+          "destination": "Paris, France",
+          "departure_date": "2026-06-01",
+          "return_date": "2026-06-10",
+          "num_travelers": 3,
+          "travel_style": "mid-range",
+          "include_alternative_airports": true
+        }
+      }
+    },
+    {
+      "eval_id": "transport-research-layover-options",
+      "conversation": [
+        {
+          "invocation_id": "transport-layover-001",
+          "user_content": {
+            "parts": [{"text": "Find flights to Singapore with layover options and compare direct vs connecting flights"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "transport_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "origin": "Chicago, IL",
+          "destination": "Singapore",
+          "departure_date": "2026-07-15",
+          "return_date": "2026-07-25",
+          "num_travelers": 3,
+          "travel_style": "mid-range"
+        }
+      }
+    },
+    {
+      "eval_id": "transport-research-premium-economy",
+      "conversation": [
+        {
+          "invocation_id": "transport-premium-001",
+          "user_content": {
+            "parts": [{"text": "Research premium economy and business class flights to Sydney"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "transport_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "origin": "Los Angeles, CA",
+          "destination": "Sydney, Australia",
+          "departure_date": "2026-08-01",
+          "return_date": "2026-08-15",
+          "num_travelers": 3,
+          "travel_style": "luxury",
+          "cabin_class": ["premium_economy", "business"]
+        }
+      }
+    },
+    {
+      "eval_id": "transport-research-nearby-cities",
+      "conversation": [
+        {
+          "invocation_id": "transport-nearby-001",
+          "user_content": {
+            "parts": [{"text": "Research flights to Barcelona but also check nearby cities like Madrid and Valencia for better deals"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "transport_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "origin": "New York, NY",
+          "destination": "Barcelona, Spain",
+          "alternative_destinations": ["Madrid, Spain", "Valencia, Spain"],
+          "departure_date": "2026-09-05",
+          "return_date": "2026-09-15",
+          "num_travelers": 3,
+          "travel_style": "mid-range"
+        }
+      }
+    },
+    {
+      "eval_id": "transport-research-flexible-dates",
+      "conversation": [
+        {
+          "invocation_id": "transport-flexible-001",
+          "user_content": {
+            "parts": [{"text": "Research flight costs to Dubai with flexible dates (±3 days) to find the best prices"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "transport_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "origin": "Miami, FL",
+          "destination": "Dubai, UAE",
+          "departure_date": "2026-10-10",
+          "return_date": "2026-10-20",
+          "num_travelers": 3,
+          "travel_style": "luxury",
+          "flexible_dates": true,
+          "date_flexibility_days": 3
+        }
+      }
+    },
+    {
+      "eval_id": "transport-research-one-way",
+      "conversation": [
+        {
+          "invocation_id": "transport-oneway-001",
+          "user_content": {
+            "parts": [{"text": "Research one-way flight costs from Seattle to Rome"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "transport_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "origin": "Seattle, WA",
+          "destination": "Rome, Italy",
+          "departure_date": "2026-11-01",
+          "trip_type": "one-way",
+          "num_travelers": 3,
+          "travel_style": "mid-range"
+        }
+      }
+    },
+    {
+      "eval_id": "transport-research-regional-trains",
+      "conversation": [
+        {
+          "invocation_id": "transport-train-001",
+          "user_content": {
+            "parts": [{"text": "Research transport options from Paris to Amsterdam including trains and flights"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "transport_research_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "origin": "Paris, France",
+          "destination": "Amsterdam, Netherlands",
+          "departure_date": "2026-12-05",
+          "return_date": "2026-12-08",
+          "num_travelers": 3,
+          "travel_style": "mid-range",
+          "include_train_options": true
+        }
+      }
+    }
+  ],
+  "creation_timestamp": 1731888000
+}
