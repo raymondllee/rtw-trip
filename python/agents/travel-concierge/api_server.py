@@ -4472,6 +4472,91 @@ def get_curricula_by_location(location_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/education/students', methods=['GET'])
+def list_students():
+    """List all student profiles."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = get_firestore_client()
+        students_ref = db.collection('student_profiles')
+        docs = students_ref.stream()
+
+        students = []
+        for doc in docs:
+            data = doc.to_dict()
+            data['id'] = doc.id
+
+            # Convert timestamps
+            if 'created_at' in data:
+                data['created_at'] = data['created_at'].isoformat() if hasattr(data['created_at'], 'isoformat') else str(data['created_at'])
+            if 'updated_at' in data:
+                data['updated_at'] = data['updated_at'].isoformat() if hasattr(data['updated_at'], 'isoformat') else str(data['updated_at'])
+
+            students.append(data)
+
+        return jsonify(students)
+
+    except Exception as e:
+        print(f"Error listing students: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/students', methods=['POST'])
+def create_student():
+    """Create a new student profile."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        data = request.json
+
+        # Validate required fields
+        required_fields = ['name', 'age', 'grade', 'state', 'learning_style']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        db = get_firestore_client()
+
+        # Create student profile
+        student_data = {
+            'name': data['name'],
+            'age': data['age'],
+            'grade': data['grade'],
+            'state': data['state'],
+            'learning_style': data['learning_style'],
+            'interests': data.get('interests', []),
+            'time_budget_minutes_per_day': data.get('time_budget_minutes_per_day', 60),
+            'reading_level': data.get('reading_level', data['grade']),
+            'subjects_to_cover': data.get('subjects_to_cover', []),
+            'created_at': datetime.now(),
+            'updated_at': datetime.now(),
+        }
+
+        # Add to Firestore
+        doc_ref = db.collection('student_profiles').document()
+        doc_ref.set(student_data)
+
+        student_data['id'] = doc_ref.id
+        student_data['created_at'] = student_data['created_at'].isoformat()
+        student_data['updated_at'] = student_data['updated_at'].isoformat()
+
+        return jsonify({
+            'status': 'success',
+            'student': student_data
+        }), 201
+
+    except Exception as e:
+        print(f"Error creating student: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/education/students/<student_id>/curricula', methods=['GET'])
 def get_student_curricula(student_id):
     """Get all curricula for a specific student."""
@@ -4499,12 +4584,7 @@ def get_student_curricula(student_id):
 
             curricula.append(data)
 
-        return jsonify({
-            'status': 'success',
-            'student_id': student_id,
-            'count': len(curricula),
-            'curricula': curricula
-        })
+        return jsonify(curricula)
 
     except Exception as e:
         print(f"Error getting student curricula: {str(e)}")

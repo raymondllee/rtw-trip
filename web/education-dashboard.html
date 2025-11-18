@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Education Hub - RTW Trip Planner</title>
+    <link rel="stylesheet" href="education-dashboard.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="dashboard-header">
+        <div class="header-content">
+            <h1>📚 Education Hub</h1>
+            <div class="header-actions">
+                <button id="new-student-btn" class="btn btn-primary">+ New Student</button>
+                <a href="index.html" class="btn btn-secondary">← Back to Trip Planner</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="dashboard-nav">
+        <button class="nav-tab active" data-view="students">Students</button>
+        <button class="nav-tab" data-view="curricula">Curriculum Manager</button>
+        <button class="nav-tab" data-view="testing">Testing Lab</button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="dashboard-main">
+
+        <!-- Students View -->
+        <section id="students-view" class="view-section active">
+            <div class="view-header">
+                <h2>Students</h2>
+                <div class="view-actions">
+                    <input type="text" id="student-search" placeholder="Search students..." class="search-input">
+                </div>
+            </div>
+
+            <div id="students-container" class="students-grid">
+                <!-- Student cards will be inserted here -->
+                <div class="empty-state">
+                    <div class="empty-icon">👤</div>
+                    <h3>No students yet</h3>
+                    <p>Create a student profile to start generating curricula</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('new-student-btn').click()">+ Create First Student</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Curriculum Manager View -->
+        <section id="curricula-view" class="view-section">
+            <div class="view-header">
+                <h2>Curriculum Manager</h2>
+                <div class="view-actions">
+                    <button id="generate-curriculum-btn" class="btn btn-primary">+ Generate New</button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-bar">
+                <select id="filter-student" class="filter-select">
+                    <option value="">All Students</option>
+                </select>
+                <select id="filter-location" class="filter-select">
+                    <option value="">All Locations</option>
+                </select>
+                <select id="filter-status" class="filter-select">
+                    <option value="">All Status</option>
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                    <option value="archived">Archived</option>
+                </select>
+                <select id="sort-curricula" class="filter-select">
+                    <option value="recent">Sort: Most Recent</option>
+                    <option value="oldest">Sort: Oldest First</option>
+                    <option value="location">Sort: By Location</option>
+                </select>
+                <input type="text" id="curricula-search" placeholder="Search curricula..." class="search-input">
+            </div>
+
+            <div id="curricula-container" class="curricula-list">
+                <!-- Curriculum cards will be inserted here -->
+                <div class="empty-state">
+                    <div class="empty-icon">📚</div>
+                    <h3>No curricula yet</h3>
+                    <p>Generate a curriculum to get started</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('generate-curriculum-btn').click()">+ Generate First Curriculum</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Testing Lab View -->
+        <section id="testing-view" class="view-section">
+            <div class="view-header">
+                <h2>🧪 Curriculum Testing Lab</h2>
+                <p class="view-description">Test curriculum generation with different parameters without saving to a student profile</p>
+            </div>
+
+            <div class="testing-container">
+                <div class="testing-form">
+                    <!-- Student Profile Section -->
+                    <div class="form-section">
+                        <h3>Student Profile</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="test-student-name">Name</label>
+                                <input type="text" id="test-student-name" placeholder="e.g., Maya" value="Maya">
+                            </div>
+                            <div class="form-group">
+                                <label for="test-student-age">Age</label>
+                                <input type="number" id="test-student-age" min="5" max="18" value="14">
+                            </div>
+                            <div class="form-group">
+                                <label for="test-student-grade">Grade</label>
+                                <input type="number" id="test-student-grade" min="1" max="12" value="8">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="test-student-state">State</label>
+                                <select id="test-student-state">
+                                    <option value="California">California</option>
+                                    <option value="New York">New York</option>
+                                    <option value="Texas">Texas</option>
+                                    <option value="Florida">Florida</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Learning Style</label>
+                                <div class="radio-group">
+                                    <label><input type="radio" name="learning-style" value="experiential" checked> Experiential</label>
+                                    <label><input type="radio" name="learning-style" value="structured"> Structured</label>
+                                    <label><input type="radio" name="learning-style" value="mixed"> Mixed</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="test-student-interests">Interests (comma-separated)</label>
+                            <input type="text" id="test-student-interests" placeholder="e.g., marine biology, photography, architecture" value="marine biology, photography, architecture">
+                        </div>
+                    </div>
+
+                    <!-- Location Section -->
+                    <div class="form-section">
+                        <h3>Location</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="test-location-name">Location Name</label>
+                                <input type="text" id="test-location-name" placeholder="e.g., Tokyo" value="Tokyo">
+                            </div>
+                            <div class="form-group">
+                                <label for="test-location-country">Country</label>
+                                <input type="text" id="test-location-country" placeholder="e.g., Japan" value="Japan">
+                            </div>
+                            <div class="form-group">
+                                <label for="test-location-duration">Duration (days)</label>
+                                <input type="number" id="test-location-duration" min="1" max="365" value="23">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="test-location-highlights">Highlights (comma-separated)</label>
+                            <textarea id="test-location-highlights" rows="2" placeholder="e.g., Modern technology, ancient temples, sushi culture">Modern technology, ancient temples, sushi culture, museums, architecture</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Generation Options -->
+                    <div class="form-section">
+                        <h3>Generation Options</h3>
+                        <div class="form-group">
+                            <label>Subjects</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" name="subjects" value="science" checked> Science</label>
+                                <label><input type="checkbox" name="subjects" value="social_studies" checked> Social Studies</label>
+                                <label><input type="checkbox" name="subjects" value="language_arts" checked> Language Arts</label>
+                                <label><input type="checkbox" name="subjects" value="math"> Math</label>
+                                <label><input type="checkbox" name="subjects" value="art"> Art</label>
+                                <label><input type="checkbox" name="subjects" value="music"> Music</label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="test-time-budget">Time Budget (min/day)</label>
+                                <input type="number" id="test-time-budget" min="15" max="480" step="15" value="60">
+                            </div>
+                            <div class="form-group">
+                                <label for="test-reading-level">Reading Level (grade)</label>
+                                <input type="number" id="test-reading-level" min="1" max="12" value="10">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="form-actions">
+                        <button id="test-generate-btn" class="btn btn-primary btn-lg">🚀 Generate Test Curriculum</button>
+                        <button id="test-reset-btn" class="btn btn-secondary">Reset Form</button>
+                    </div>
+                </div>
+
+                <!-- Results Preview -->
+                <div id="test-results" class="testing-results" style="display: none;">
+                    <h3>Generation Results</h3>
+                    <div id="test-results-content">
+                        <!-- Results will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modals -->
+
+    <!-- New Student Modal -->
+    <div id="new-student-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Student Profile</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="new-student-form">
+                    <div class="form-group">
+                        <label for="student-name">Name *</label>
+                        <input type="text" id="student-name" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="student-age">Age *</label>
+                            <input type="number" id="student-age" min="5" max="18" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="student-grade">Grade *</label>
+                            <input type="number" id="student-grade" min="1" max="12" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="student-state">State *</label>
+                        <select id="student-state" required>
+                            <option value="">Select State</option>
+                            <option value="California">California</option>
+                            <option value="New York">New York</option>
+                            <option value="Texas">Texas</option>
+                            <option value="Florida">Florida</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Learning Style *</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="student-learning-style" value="experiential" checked> Experiential</label>
+                            <label><input type="radio" name="student-learning-style" value="structured"> Structured</label>
+                            <label><input type="radio" name="student-learning-style" value="mixed"> Mixed</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="student-interests">Interests (comma-separated)</label>
+                        <input type="text" id="student-interests" placeholder="e.g., marine biology, photography, architecture">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="student-time-budget">Time Budget (min/day)</label>
+                            <input type="number" id="student-time-budget" min="15" max="480" step="15" value="60">
+                        </div>
+                        <div class="form-group">
+                            <label for="student-reading-level">Reading Level (grade)</label>
+                            <input type="number" id="student-reading-level" min="1" max="12">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('new-student-modal')">Cancel</button>
+                <button class="btn btn-primary" id="save-student-btn">Create Student</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Curriculum Detail Modal -->
+    <div id="curriculum-detail-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="curriculum-detail-title">Curriculum Details</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="curriculum-detail-content">
+                    <!-- Curriculum details will be inserted here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('curriculum-detail-modal')">Close</button>
+                <button class="btn btn-primary" id="export-curriculum-btn">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p id="loading-message">Loading...</p>
+    </div>
+
+    <script type="module" src="src/education/educationDashboard.ts"></script>
+</body>
+</html>
