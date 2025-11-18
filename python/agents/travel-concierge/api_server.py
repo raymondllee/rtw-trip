@@ -4200,8 +4200,16 @@ CRITICAL: Provide response as valid JSON matching this EXACT structure:
 IMPORTANT: Every field shown above is REQUIRED. Use exact field names. Make it specific, engaging, and educationally sound!
 """
 
-        # Initialize Gemini client using Application Default Credentials
-        client = genai.Client()
+        # Initialize Gemini client with credentials
+        credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+        if credentials_json:
+            credentials_info = json.loads(credentials_json)
+            credentials = service_account.Credentials.from_service_account_info(credentials_info)
+            client = genai.Client(credentials=credentials)
+        else:
+            # Fall back to default credentials (ADC)
+            client = genai.Client()
+
         model_id = 'gemini-2.0-flash-exp'
 
         print(f"Generating curriculum for {location.get('name')}...")
