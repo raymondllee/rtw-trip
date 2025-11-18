@@ -4702,6 +4702,12 @@ export async function initMapApp() {
 
   // Summary generation button - shows options modal
   document.getElementById('generate-summary-btn').addEventListener('click', async () => {
+    // Close dropdown
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    if (scenarioActionsDropdown) scenarioActionsDropdown.style.display = 'none';
+    if (scenarioActionsBtn) scenarioActionsBtn.classList.remove('active');
+
     // Check if we have locations
     if (!workingData.locations || workingData.locations.length === 0) {
       alert('No locations in itinerary to generate summary');

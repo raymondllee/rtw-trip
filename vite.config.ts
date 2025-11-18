@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 
@@ -9,7 +10,13 @@ export default defineConfig({
   },
   build: {
     outDir: resolve(__dirname, 'web', 'dist'),
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'web', 'index.html'),
+        summary: resolve(__dirname, 'web', 'summary-viewer.html'),
+      }
+    }
   },
   resolve: {
     alias: {
