@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 export default defineConfig({
   root: resolve(__dirname, 'web'),
-  base: '/web/',
+  base: '/',
   server: {
     port: 5173
   },

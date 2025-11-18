@@ -268,12 +268,17 @@ session_store = SessionStore()
 logger = logging.getLogger('travel_concierge.api')
 
 # Determine web directory path
-# In production (Railway), files are at /app/web
-# In development, go up from api_server.py to repo root, then to web
-if os.path.exists('/app/web'):
+# In production (Railway), serve from built dist directory
+# In development, serve from web directory
+if os.path.exists('/app/web/dist'):
+    WEB_DIR = '/app/web/dist'
+elif os.path.exists('/app/web'):
     WEB_DIR = '/app/web'
 else:
-    WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web'))
+    # Development: check for dist first, fallback to web
+    dev_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web/dist'))
+    dev_web = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web'))
+    WEB_DIR = dev_dist if os.path.exists(dev_dist) else dev_web
 
 app = Flask(__name__, static_folder=WEB_DIR, static_url_path='')
 CORS(app)  # Enable CORS for frontend requests
