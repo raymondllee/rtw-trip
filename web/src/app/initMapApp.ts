@@ -4604,6 +4604,50 @@ export async function initMapApp() {
     }
   });
 
+  // Toggle map visibility
+  document.getElementById('toggle-map-btn').addEventListener('click', () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    scenarioActionsDropdown.style.display = 'none';
+    scenarioActionsBtn.classList.remove('active');
+
+    const mainContent = document.querySelector('.main-content');
+    const toggleText = document.getElementById('map-toggle-text');
+    const isMapHidden = mainContent.classList.contains('map-hidden');
+
+    if (isMapHidden) {
+      mainContent.classList.remove('map-hidden');
+      toggleText.textContent = 'Hide Map';
+      localStorage.setItem('rtw-map-visible', 'true');
+    } else {
+      mainContent.classList.add('map-hidden');
+      toggleText.textContent = 'Show Map';
+      localStorage.setItem('rtw-map-visible', 'false');
+    }
+  });
+
+  // Toggle education features visibility
+  document.getElementById('toggle-education-btn').addEventListener('click', () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    scenarioActionsDropdown.style.display = 'none';
+    scenarioActionsBtn.classList.remove('active');
+
+    const body = document.body;
+    const toggleText = document.getElementById('education-toggle-text');
+    const isEducationHidden = body.classList.contains('education-hidden');
+
+    if (isEducationHidden) {
+      body.classList.remove('education-hidden');
+      toggleText.textContent = 'Hide Education';
+      localStorage.setItem('rtw-education-visible', 'true');
+    } else {
+      body.classList.add('education-hidden');
+      toggleText.textContent = 'Show Education';
+      localStorage.setItem('rtw-education-visible', 'false');
+    }
+  });
+
   // Update itinerary data and cost summary when costs change
   window.addEventListener('costs-updated', async () => {
     console.log('🔄 costs-updated event received, refreshing costs...');
@@ -5353,6 +5397,24 @@ export async function initMapApp() {
 
   // Initialize education UI
   initializeEducationUI(currentScenarioId, currentScenarioName);
+
+  // Restore view preferences from localStorage
+  const mapVisible = localStorage.getItem('rtw-map-visible');
+  const educationVisible = localStorage.getItem('rtw-education-visible');
+
+  if (mapVisible === 'false') {
+    const mainContent = document.querySelector('.main-content');
+    const toggleText = document.getElementById('map-toggle-text');
+    mainContent.classList.add('map-hidden');
+    toggleText.textContent = 'Show Map';
+  }
+
+  if (educationVisible === 'false') {
+    const body = document.body;
+    const toggleText = document.getElementById('education-toggle-text');
+    body.classList.add('education-hidden');
+    toggleText.textContent = 'Show Education';
+  }
 
   console.log('✅ App initialized with state:', {
     scenarioId: currentScenarioId,
