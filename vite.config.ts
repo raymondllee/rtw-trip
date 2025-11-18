@@ -9,7 +9,13 @@ export default defineConfig({
   },
   build: {
     outDir: resolve(__dirname, 'web', 'dist'),
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'web', 'index.html'),
+        education: resolve(__dirname, 'web', 'education-dashboard.html')
+      }
+    }
   },
   resolve: {
     alias: {
