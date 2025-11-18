@@ -4197,7 +4197,11 @@ CRITICAL: Provide response as valid JSON matching this EXACT structure:
   }}
 }}
 
-IMPORTANT: Every field shown above is REQUIRED. Use exact field names. Make it specific, engaging, and educationally sound!
+IMPORTANT:
+1. Every field shown above is REQUIRED. Use exact field names.
+2. Return ONLY valid JSON - no markdown, no explanation text before or after.
+3. Ensure all JSON is properly formatted with correct commas, brackets, and quotes.
+4. Make it specific, engaging, and educationally sound!
 """
 
         # Initialize Gemini client with credentials
@@ -4236,15 +4240,30 @@ IMPORTANT: Every field shown above is REQUIRED. Use exact field names. Make it s
         # Try to parse as JSON
         try:
             # Remove markdown code blocks if present
-            if result_text.strip().startswith('```'):
-                result_text = result_text.strip()
-                parts = result_text.split('```')
+            cleaned_text = result_text.strip()
+            if cleaned_text.startswith('```'):
+                parts = cleaned_text.split('```')
                 if len(parts) >= 2:
-                    result_text = parts[1]
-                    if result_text.startswith('json'):
-                        result_text = result_text[4:]
+                    cleaned_text = parts[1]
+                    # Remove language identifier if present
+                    if cleaned_text.strip().startswith('json'):
+                        cleaned_text = cleaned_text.strip()[4:]
 
-            result_json = json.loads(result_text)
+            # Clean up common JSON formatting issues
+            cleaned_text = cleaned_text.strip()
+
+            # Try to find JSON object boundaries if there's extra text
+            if not cleaned_text.startswith('{'):
+                start_idx = cleaned_text.find('{')
+                if start_idx >= 0:
+                    cleaned_text = cleaned_text[start_idx:]
+
+            if not cleaned_text.endswith('}'):
+                end_idx = cleaned_text.rfind('}')
+                if end_idx >= 0:
+                    cleaned_text = cleaned_text[:end_idx + 1]
+
+            result_json = json.loads(cleaned_text)
 
             print(f"✓ Successfully generated curriculum for {location.get('name')}")
 

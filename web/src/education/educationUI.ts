@@ -257,6 +257,13 @@ export function showCurriculumGenerationModal(location: any, scenarioId?: string
           });
           window.dispatchEvent(event);
         }, 1500);
+      } else if (response.status === 'partial_success') {
+        messageEl.textContent = '⚠️ Curriculum generated with formatting issues. Please try again.';
+        messageEl.style.color = '#f6ad55';
+        console.warn('Partial success - JSON parsing failed:', response.error);
+        console.log('Raw curriculum text:', response.raw_text);
+        submitBtn.disabled = false;
+        cancelBtn.disabled = false;
       } else {
         throw new Error(response.error || 'Failed to generate curriculum');
       }
