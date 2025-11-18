@@ -87,12 +87,16 @@ async function displaySummary(summaryHtml, itineraryData, options) {
     return;
   }
 
-  // Replace container content with the generated HTML body
+  // Insert summary content into the summary-content div (preserving budget-container)
   const parser = new DOMParser();
   const doc = parser.parseFromString(summaryHtml, 'text/html');
   const bodyContent = doc.body.innerHTML;
 
-  containerEl.innerHTML = bodyContent;
+  const summaryContentEl = document.getElementById('summary-content');
+  if (summaryContentEl) {
+    summaryContentEl.innerHTML = bodyContent;
+    summaryContentEl.style.display = 'block';
+  }
 
   // Apply cost visibility
   if (!options.showCosts) {
@@ -177,7 +181,12 @@ function initializeBudgetManager(itineraryData, budget) {
   }
 
   const container = document.getElementById('budget-container');
-  if (!container) return;
+  if (!container) {
+    console.error('Budget container not found!');
+    return;
+  }
+
+  console.log('Initializing budget manager with data:', { itineraryData, budget });
 
   // Show the container
   container.style.display = 'block';

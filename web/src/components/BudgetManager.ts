@@ -248,6 +248,7 @@ export class BudgetManager {
   render() {
     const html = this.renderBudgetStatus();
     this.container.innerHTML = html;
+    this.container.style.display = 'block';
     this.attachEventListeners();
   }
 }
