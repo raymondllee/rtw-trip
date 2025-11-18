@@ -4605,61 +4605,51 @@ export async function initMapApp() {
   });
 
   // Toggle map visibility
-  document.getElementById('toggle-map-btn').addEventListener('click', () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    scenarioActionsDropdown.style.display = 'none';
-    scenarioActionsBtn.classList.remove('active');
+  const mapVisibilityToggle = document.getElementById('map-visibility-toggle');
+  if (mapVisibilityToggle) {
+    mapVisibilityToggle.addEventListener('change', (e) => {
+      const mainContent = document.querySelector('.main-content');
+      const sidebar = document.querySelector('.sidebar');
+      const isChecked = e.target.checked;
 
-    const mainContent = document.querySelector('.main-content');
-    const sidebar = document.querySelector('.sidebar');
-    const toggleText = document.getElementById('map-toggle-text');
-    const isMapHidden = mainContent.classList.contains('map-hidden');
+      if (isChecked) {
+        // Show map - restore saved sidebar width
+        mainContent.classList.remove('map-hidden');
+        localStorage.setItem('rtw-map-visible', 'true');
 
-    if (isMapHidden) {
-      // Show map - restore saved sidebar width
-      mainContent.classList.remove('map-hidden');
-      toggleText.textContent = 'Hide Map';
-      localStorage.setItem('rtw-map-visible', 'true');
-
-      const savedWidth = localStorage.getItem('sidebarWidth');
-      if (savedWidth) {
-        sidebar.style.width = savedWidth;
+        const savedWidth = localStorage.getItem('sidebarWidth');
+        if (savedWidth) {
+          sidebar.style.width = savedWidth;
+        } else {
+          sidebar.style.width = '';
+        }
       } else {
+        // Hide map - remove inline width to allow CSS to take over
+        mainContent.classList.add('map-hidden');
+        localStorage.setItem('rtw-map-visible', 'false');
+
+        // Clear inline width style so CSS width: 100% takes effect
         sidebar.style.width = '';
       }
-    } else {
-      // Hide map - remove inline width to allow CSS to take over
-      mainContent.classList.add('map-hidden');
-      toggleText.textContent = 'Show Map';
-      localStorage.setItem('rtw-map-visible', 'false');
-
-      // Clear inline width style so CSS width: 100% takes effect
-      sidebar.style.width = '';
-    }
-  });
+    });
+  }
 
   // Toggle education features visibility
-  document.getElementById('toggle-education-btn').addEventListener('click', () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    scenarioActionsDropdown.style.display = 'none';
-    scenarioActionsBtn.classList.remove('active');
+  const educationVisibilityToggle = document.getElementById('education-visibility-toggle');
+  if (educationVisibilityToggle) {
+    educationVisibilityToggle.addEventListener('change', (e) => {
+      const body = document.body;
+      const isChecked = e.target.checked;
 
-    const body = document.body;
-    const toggleText = document.getElementById('education-toggle-text');
-    const isEducationHidden = body.classList.contains('education-hidden');
-
-    if (isEducationHidden) {
-      body.classList.remove('education-hidden');
-      toggleText.textContent = 'Hide Education';
-      localStorage.setItem('rtw-education-visible', 'true');
-    } else {
-      body.classList.add('education-hidden');
-      toggleText.textContent = 'Show Education';
-      localStorage.setItem('rtw-education-visible', 'false');
-    }
-  });
+      if (isChecked) {
+        body.classList.remove('education-hidden');
+        localStorage.setItem('rtw-education-visible', 'true');
+      } else {
+        body.classList.add('education-hidden');
+        localStorage.setItem('rtw-education-visible', 'false');
+      }
+    });
+  }
 
   // Update itinerary data and cost summary when costs change
   window.addEventListener('costs-updated', async () => {
@@ -5418,18 +5408,18 @@ export async function initMapApp() {
   if (mapVisible === 'false') {
     const mainContent = document.querySelector('.main-content');
     const sidebar = document.querySelector('.sidebar');
-    const toggleText = document.getElementById('map-toggle-text');
+    const toggle = document.getElementById('map-visibility-toggle');
     mainContent.classList.add('map-hidden');
-    toggleText.textContent = 'Show Map';
     // Clear inline width so CSS can take over
     sidebar.style.width = '';
+    if (toggle) toggle.checked = false;
   }
 
   if (educationVisible === 'false') {
     const body = document.body;
-    const toggleText = document.getElementById('education-toggle-text');
+    const toggle = document.getElementById('education-visibility-toggle');
     body.classList.add('education-hidden');
-    toggleText.textContent = 'Show Education';
+    if (toggle) toggle.checked = false;
   }
 
   console.log('✅ App initialized with state:', {

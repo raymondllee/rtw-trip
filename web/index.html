@@ -28,6 +28,14 @@
           <input type="checkbox" id="routing-toggle" checked>
           <span>Show Inter-Destination Transport Costs</span>
         </label>
+        <label class="transport-toggle" for="map-visibility-toggle">
+          <input type="checkbox" id="map-visibility-toggle" checked>
+          <span>Show Map</span>
+        </label>
+        <label class="transport-toggle" for="education-visibility-toggle">
+          <input type="checkbox" id="education-visibility-toggle" checked>
+          <span>Show Education</span>
+        </label>
         <button id="scenario-actions-btn" class="scenario-actions-btn-compact" title="Scenario actions">⋯</button>
         <div class="save-indicator" id="save-indicator">✓</div>
       </div>
@@ -88,15 +96,6 @@
           <span class="icon">🌍</span>
           <span>Geographic Data</span>
           <span id="geo-validation-badge" style="margin-left: auto;"></span>
-        </button>
-        <div class="dropdown-divider"></div>
-        <button id="toggle-map-btn" class="dropdown-item">
-          <span class="icon">🗺️</span>
-          <span id="map-toggle-text">Hide Map</span>
-        </button>
-        <button id="toggle-education-btn" class="dropdown-item">
-          <span class="icon">📚</span>
-          <span id="education-toggle-text">Hide Education</span>
         </button>
         <div class="dropdown-divider"></div>
         <button id="import-scenarios-btn" class="dropdown-item">
