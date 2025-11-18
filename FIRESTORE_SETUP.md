@@ -173,9 +173,171 @@ Your localStorage data will remain untouched.
 ✅ **Cross-device sync**: Access your trip from any device
 ✅ **No manual export/import**: Everything saved automatically to cloud
 
+## Education System Collections
+
+The education system adds new collections for homeschool curriculum management:
+
+### student_profiles/{profileId}
+Stores student information and learning preferences.
+
+```javascript
+{
+  id: "profile_123",
+  name: "Maya",
+  age: 14,
+  grade: 8,
+  state: "California",
+  subjects_parent_covers: ["math", "chinese"],
+  subjects_to_cover: ["language_arts", "science", "social_studies"],
+  learning_style: "experiential",
+  reading_level: 10,
+  time_budget_minutes_per_day: 60,
+  interests: ["marine_biology", "photography"],
+  created_at: Timestamp,
+  updated_at: Timestamp
+}
+```
+
+### curriculum_plans/{planId}
+Stores generated curriculum plans linked to trips.
+
+```javascript
+{
+  id: "plan_123",
+  student_profile_id: "profile_123",
+  trip_scenario_id: "scenario_123",
+  status: "active",
+  semester: {
+    title: "8th Grade Semester 1: World Travel",
+    start_date: "2025-09-01",
+    end_date: "2025-12-20",
+    subjects: { /* SubjectPlan objects */ }
+  },
+  location_lessons: { /* LocationLearning objects by location_id */ },
+  thematic_threads: [ /* Thread objects */ ],
+  created_at: Timestamp,
+  updated_at: Timestamp
+}
+```
+
+### learning_activities/{activityId}
+Stores individual learning activities and lessons.
+
+```javascript
+{
+  id: "activity_123",
+  curriculum_plan_id: "plan_123",
+  location_id: "location_456",
+  type: "experiential",
+  subject: "science",
+  timing: "on_location",
+  title: "Tsukiji Fish Market Economics",
+  description: "Visit the market to study supply chain...",
+  learning_objectives: ["Understand economics", "Identify species"],
+  estimated_duration_minutes: 120,
+  instructions: { before: "...", during: "...", after: "..." },
+  resources: [ /* Resource objects */ ],
+  created_at: Timestamp
+}
+```
+
+### progress_tracking/{trackingId}
+Tracks student progress through curriculum (one per curriculum plan).
+
+```javascript
+{
+  id: "tracking_123",
+  student_profile_id: "profile_123",
+  curriculum_plan_id: "plan_123",
+  activity_progress: {
+    "activity_123": {
+      status: "completed",
+      completed_at: Timestamp,
+      time_spent_minutes: 120,
+      completion_checked: true
+    }
+  },
+  daily_logs: {
+    "2025-11-05": {
+      location_id: "tokyo_123",
+      activities_completed: ["activity_123", "activity_124"],
+      time_spent_minutes: 180,
+      highlights: "Great market visit!"
+    }
+  },
+  summary: {
+    total_hours: 48.5,
+    activities_completed: 79,
+    completion_percentage: 62
+  },
+  updated_at: Timestamp
+}
+```
+
+### portfolios/{portfolioId}
+Stores student work and artifacts.
+
+```javascript
+{
+  id: "portfolio_123",
+  student_profile_id: "profile_123",
+  curriculum_plan_id: "plan_123",
+  status: "building",
+  artifacts: {
+    journals: [ /* journal entries */ ],
+    essays: [ /* essay objects */ ],
+    photos: [ /* photo objects with captions */ ],
+    projects: [ /* project objects */ ]
+  },
+  created_at: Timestamp,
+  updated_at: Timestamp
+}
+```
+
+### Updated Security Rules
+
+Add these rules to your Firestore security rules:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Existing scenarios rules
+    match /scenarios/{scenarioId} {
+      allow read, write: if true;
+      match /versions/{versionId} {
+        allow read, write: if true;
+      }
+    }
+
+    // New education system rules
+    match /student_profiles/{profileId} {
+      allow read, write: if true; // TODO: add authentication
+    }
+
+    match /curriculum_plans/{planId} {
+      allow read, write: if true;
+    }
+
+    match /learning_activities/{activityId} {
+      allow read, write: if true;
+    }
+
+    match /progress_tracking/{trackingId} {
+      allow read, write: if true;
+    }
+
+    match /portfolios/{portfolioId} {
+      allow read, write: if true;
+    }
+  }
+}
+```
+
 ## Next Steps
 
 - Set up authentication for multi-user support
 - Add Python backend Firestore integration
 - Add version comparison/diff view
 - Add collaborative editing features
+- Implement education curriculum generation and tracking

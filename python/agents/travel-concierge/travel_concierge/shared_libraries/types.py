@@ -138,6 +138,55 @@ class POISuggestions(BaseModel):
     places: list[POI]
 
 
+class LearningMoment(BaseModel):
+    """
+    Educational opportunity at a destination.
+
+    Represents a specific learning experience, activity, or site visit
+    that provides educational value for students during travel.
+    """
+    id: Optional[str] = Field(
+        default=None,
+        description="Unique identifier for the learning moment"
+    )
+    subject: str = Field(
+        description="Academic subject: 'science', 'social_studies', 'language_arts', 'art', 'music', 'history', 'geography', 'culture', 'general'"
+    )
+    title: str = Field(description="Title of the learning moment")
+    description: str = Field(description="Detailed description of the educational experience")
+    type: str = Field(
+        description="Type of learning: 'site_visit', 'activity', 'experience', 'observation', 'interaction', 'research'"
+    )
+    location: Optional[str] = Field(
+        default=None,
+        description="Specific site/museum/place within the destination"
+    )
+    estimated_duration_minutes: Optional[int] = Field(
+        default=None,
+        description="Expected duration in minutes"
+    )
+    estimated_cost_usd: Optional[float] = Field(
+        default=None,
+        description="Estimated cost in USD (admission, materials, etc.)"
+    )
+    age_appropriate_min: Optional[int] = Field(
+        default=None,
+        description="Minimum age for appropriateness"
+    )
+    age_appropriate_max: Optional[int] = Field(
+        default=None,
+        description="Maximum age for appropriateness"
+    )
+    standards_addressed: Optional[list[str]] = Field(
+        default=None,
+        description="Educational standards addressed (e.g., CA-NGSS-MS-LS2-1)"
+    )
+    tags: Optional[list[str]] = Field(
+        default=None,
+        description="Tags for categorization (e.g., hands-on, outdoor, museum, guided)"
+    )
+
+
 class AttractionEvent(BaseModel):
     """An Attraction."""
     event_type: str = Field(default="visit")
@@ -295,7 +344,7 @@ class CostItem(BaseModel):
     """A single cost item for trip budgeting and tracking."""
     id: str = Field(description="Unique identifier for the cost item")
     category: str = Field(
-        description="Cost category: 'flight', 'accommodation', 'activity', 'food', 'transport', 'other'"
+        description="Cost category: 'flight', 'accommodation', 'activity', 'food', 'transport', 'education', 'educational_materials', 'educational_activities', 'other'"
     )
     description: str = Field(description="Description of the cost item")
     amount: float = Field(description="Cost amount in the original currency")

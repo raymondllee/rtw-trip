@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curriculum Generation Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #1a202c;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #718096;
+            margin-bottom: 30px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2d3748;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .button:hover {
+            background: #3182ce;
+        }
+
+        .button:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+        }
+
+        .sample-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .sample-button {
+            background: #edf2f7;
+            color: #2d3748;
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sample-button:hover {
+            background: #e2e8f0;
+            border-color: #cbd5e0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #718096;
+        }
+
+        .spinner {
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #4299e1;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fff5f5;
+            border: 1px solid #fc8181;
+            color: #c53030;
+            padding: 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #f0fff4;
+            border: 1px solid #68d391;
+            color: #22543d;
+            padding: 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .result-section {
+            margin-top: 30px;
+        }
+
+        .result-section h3 {
+            color: #2d3748;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .activity-card {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .activity-card h4 {
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .activity-meta {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: #718096;
+        }
+
+        .activity-meta span {
+            background: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: #718096;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: #4299e1;
+            border-bottom-color: #4299e1;
+        }
+
+        .tab:hover {
+            color: #2d3748;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .download-button {
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+
+        .download-button:hover {
+            background: #38a169;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 Curriculum Generation Test</h1>
+        <p class="subtitle">Test AI-powered curriculum generation using Vertex AI</p>
+
+        <div class="layout">
+            <!-- Left Panel: Form -->
+            <div class="card">
+                <h2>Input Parameters</h2>
+
+                <div class="sample-buttons">
+                    <button class="sample-button" onclick="loadSample('tokyo')">📍 Load Tokyo</button>
+                    <button class="sample-button" onclick="loadSample('bali')">🏝️ Load Bali</button>
+                </div>
+
+                <form id="curriculumForm">
+                    <div class="form-group">
+                        <label>Student Name</label>
+                        <input type="text" id="studentName" value="Maya" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Age</label>
+                        <input type="number" id="studentAge" value="14" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Grade</label>
+                        <input type="number" id="studentGrade" value="8" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>State</label>
+                        <input type="text" id="studentState" value="California" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Learning Style</label>
+                        <select id="learningStyle">
+                            <option value="experiential" selected>Experiential (70% hands-on)</option>
+                            <option value="structured">Structured (70% lessons)</option>
+                            <option value="mixed">Mixed (50/50)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Time Budget (minutes/day)</label>
+                        <input type="number" id="timeBudget" value="60" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Interests (comma-separated)</label>
+                        <input type="text" id="interests" value="marine_biology, photography, architecture, food_culture">
+                    </div>
+
+                    <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
+
+                    <div class="form-group">
+                        <label>Location Name</label>
+                        <input type="text" id="locationName" value="Tokyo" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Country</label>
+                        <input type="text" id="locationCountry" value="Japan" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Duration (days)</label>
+                        <input type="number" id="duration" value="23" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Highlights (one per line)</label>
+                        <textarea id="highlights" rows="6">Modern technology and robotics
+Traditional temples and shrines
+World-class museums
+Unique food culture
+Earthquake-resistant architecture
+Public transportation systems
+Pop culture and anime
+Historical sites (WWII, Meiji era)</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Subjects (comma-separated)</label>
+                        <input type="text" id="subjects" value="science, social_studies, language_arts">
+                    </div>
+
+                    <button type="submit" class="button" id="generateButton">
+                        Generate Curriculum
+                    </button>
+                </form>
+            </div>
+
+            <!-- Right Panel: Results -->
+            <div class="card">
+                <div id="resultArea">
+                    <div style="text-align: center; padding: 60px 20px; color: #a0aec0;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">📚</div>
+                        <h3 style="color: #718096; margin-bottom: 8px;">Ready to generate curriculum</h3>
+                        <p style="color: #a0aec0;">Fill in the form and click "Generate Curriculum"</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5001';
+
+        const SAMPLES = {
+            tokyo: {
+                location: {
+                    id: 'tokyo_japan',
+                    name: 'Tokyo',
+                    country: 'Japan',
+                    duration_days: 23,
+                    arrival_date: '2025-11-01',
+                    departure_date: '2025-11-23',
+                    activity_type: 'cultural_exploration',
+                    highlights: [
+                        'Modern technology and robotics',
+                        'Traditional temples and shrines',
+                        'World-class museums',
+                        'Unique food culture',
+                        'Earthquake-resistant architecture',
+                        'Public transportation systems',
+                        'Pop culture and anime',
+                        'Historical sites (WWII, Meiji era)'
+                    ]
+                }
+            },
+            bali: {
+                location: {
+                    id: 'bali_indonesia',
+                    name: 'Bali',
+                    country: 'Indonesia',
+                    duration_days: 7,
+                    arrival_date: '2025-09-01',
+                    departure_date: '2025-09-07',
+                    activity_type: 'diving_and_culture',
+                    highlights: [
+                        'Coral reef ecosystems',
+                        'Marine biodiversity',
+                        'Volcanic geology',
+                        'Hindu temples and culture',
+                        'Traditional arts (batik, dance)',
+                        'Rice terraces and agriculture',
+                        'Local markets and economy'
+                    ]
+                }
+            }
+        };
+
+        function loadSample(name) {
+            const sample = SAMPLES[name];
+            if (!sample) return;
+
+            const loc = sample.location;
+            document.getElementById('locationName').value = loc.name;
+            document.getElementById('locationCountry').value = loc.country;
+            document.getElementById('duration').value = loc.duration_days;
+            document.getElementById('highlights').value = loc.highlights.join('\n');
+        }
+
+        document.getElementById('curriculumForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const button = document.getElementById('generateButton');
+            button.disabled = true;
+            button.textContent = 'Generating...';
+
+            const resultArea = document.getElementById('resultArea');
+            resultArea.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Generating curriculum with Gemini...</p>
+                    <p style="font-size: 13px; margin-top: 8px;">This may take 15-30 seconds</p>
+                </div>
+            `;
+
+            const payload = {
+                student: {
+                    name: document.getElementById('studentName').value,
+                    age: parseInt(document.getElementById('studentAge').value),
+                    grade: parseInt(document.getElementById('studentGrade').value),
+                    state: document.getElementById('studentState').value,
+                    learning_style: document.getElementById('learningStyle').value,
+                    time_budget_minutes_per_day: parseInt(document.getElementById('timeBudget').value),
+                    reading_level: parseInt(document.getElementById('studentGrade').value) + 2,
+                    interests: document.getElementById('interests').value.split(',').map(s => s.trim())
+                },
+                location: {
+                    id: document.getElementById('locationName').value.toLowerCase().replace(' ', '_'),
+                    name: document.getElementById('locationName').value,
+                    country: document.getElementById('locationCountry').value,
+                    duration_days: parseInt(document.getElementById('duration').value),
+                    activity_type: 'exploration',
+                    highlights: document.getElementById('highlights').value.split('\n').filter(h => h.trim())
+                },
+                subjects: document.getElementById('subjects').value.split(',').map(s => s.trim())
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/api/education/test/generate-curriculum`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    displayCurriculum(data.curriculum, data.metadata, data.saved_ids);
+                } else {
+                    resultArea.innerHTML = `
+                        <div class="error">
+                            <h3>Error</h3>
+                            <p>${data.error || 'Failed to generate curriculum'}</p>
+                            ${data.traceback ? `<pre style="margin-top: 12px; font-size: 11px;">${data.traceback}</pre>` : ''}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultArea.innerHTML = `
+                    <div class="error">
+                        <h3>Network Error</h3>
+                        <p>${error.message}</p>
+                        <p style="margin-top: 8px; font-size: 13px;">Make sure Flask API is running on port 5001</p>
+                    </div>
+                `;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Generate Curriculum';
+            }
+        });
+
+        function displayCurriculum(curriculum, metadata, savedIds) {
+            const resultArea = document.getElementById('resultArea');
+
+            let html = `
+                <div class="success">
+                    ✓ Curriculum generated successfully!
+                    <div style="margin-top: 8px; font-size: 13px;">
+                        Model: ${metadata.model_used} | Generated: ${new Date(metadata.generation_time).toLocaleString()}
+                    </div>
+                    ${savedIds && savedIds.curriculum_plan_id ? `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(72, 187, 120, 0.3);">
+                            <strong>💾 Saved to Firestore:</strong>
+                            <div style="margin-top: 6px; font-size: 12px; font-family: monospace; color: #2d3748;">
+                                <div>Student: ${savedIds.student_profile_id}</div>
+                                <div>Plan: ${savedIds.curriculum_plan_id}</div>
+                                <div>Activities: ${savedIds.total_activities || savedIds.activity_ids?.length || 0}</div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <h2>${curriculum.location_name}</h2>
+                <p style="color: #718096; margin-bottom: 20px;">
+                    ${curriculum.duration_days} days of learning activities
+                </p>
+
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('overview')">Overview</button>
+                    <button class="tab" onclick="switchTab('pretrip')">Pre-Trip</button>
+                    <button class="tab" onclick="switchTab('onlocation')">On-Location</button>
+                    <button class="tab" onclick="switchTab('posttrip')">Post-Trip</button>
+                    <button class="tab" onclick="switchTab('json')">JSON</button>
+                </div>
+
+                <div id="tab-overview" class="tab-content active">
+                    ${renderOverview(curriculum)}
+                </div>
+
+                <div id="tab-pretrip" class="tab-content">
+                    ${renderPreTrip(curriculum.pre_trip)}
+                </div>
+
+                <div id="tab-onlocation" class="tab-content">
+                    ${renderOnLocation(curriculum.on_location)}
+                </div>
+
+                <div id="tab-posttrip" class="tab-content">
+                    ${renderPostTrip(curriculum.post_trip)}
+                </div>
+
+                <div id="tab-json" class="tab-content">
+                    <button class="download-button" onclick="downloadJSON()">📥 Download JSON</button>
+                    <pre>${JSON.stringify(curriculum, null, 2)}</pre>
+                </div>
+            `;
+
+            resultArea.innerHTML = html;
+
+            // Store curriculum for download
+            window.currentCurriculum = curriculum;
+        }
+
+        function renderOverview(curriculum) {
+            const coverage = curriculum.subject_coverage || {};
+            let html = '<h3>Subject Coverage</h3>';
+
+            for (const [subject, details] of Object.entries(coverage)) {
+                html += `
+                    <div class="activity-card">
+                        <h4>${subject.replace('_', ' ').toUpperCase()}</h4>
+                        <p><strong>Topics:</strong> ${details.topics?.join(', ') || 'N/A'}</p>
+                        <p><strong>Estimated Hours:</strong> ${details.estimated_hours || 0}</p>
+                        <p><strong>Standards:</strong> ${details.standards?.join(', ') || 'N/A'}</p>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function renderPreTrip(preTrip) {
+            if (!preTrip) return '<p>No pre-trip content generated</p>';
+
+            let html = '<h3>Readings</h3>';
+            (preTrip.readings || []).forEach(reading => {
+                html += `
+                    <div class="activity-card">
+                        <h4>${reading.title}</h4>
+                        <p><strong>Source:</strong> ${reading.source}</p>
+                        <p><strong>Time:</strong> ${reading.reading_time_minutes || reading.estimated_reading_time} minutes</p>
+                        <p>${reading.description}</p>
+                        ${reading.url ? `<p><a href="${reading.url}" target="_blank">Read Article →</a></p>` : ''}
+                    </div>
+                `;
+            });
+
+            html += '<h3 style="margin-top: 24px;">Videos</h3>';
+            (preTrip.videos || []).forEach(video => {
+                html += `
+                    <div class="activity-card">
+                        <h4>${video.title}</h4>
+                        <p><strong>Source:</strong> ${video.source}</p>
+                        <p><strong>Duration:</strong> ${video.duration_minutes || video.duration} minutes</p>
+                        <p>${video.description}</p>
+                    </div>
+                `;
+            });
+
+            return html;
+        }
+
+        function renderOnLocation(onLocation) {
+            if (!onLocation) return '<p>No on-location content generated</p>';
+
+            let html = '<h3>Experiential Activities</h3>';
+            const expActivities = onLocation.experiential_activities || [];
+
+            if (expActivities.length === 0) {
+                html += '<p style="color: #a0aec0;">No experiential activities generated</p>';
+            }
+
+            expActivities.forEach(activity => {
+                // Handle both possible field names and undefined values
+                const subject = activity.subject || activity.Subject || 'General';
+                const duration = activity.estimated_duration_minutes || activity.duration || activity.time || 'N/A';
+                const description = activity.description || activity.Description || activity.details || 'No description available';
+                const learningObjectives = activity.learning_objectives || activity.objectives || [];
+                const instructions = activity.instructions || {};
+
+                html += `
+                    <div class="activity-card">
+                        <h4>${activity.title || 'Untitled Activity'}</h4>
+                        <div class="activity-meta">
+                            <span>📚 ${subject}</span>
+                            <span>⏱️ ${duration}${typeof duration === 'number' ? ' min' : ''}</span>
+                        </div>
+                        <p>${description}</p>
+                        ${learningObjectives.length > 0 ? `
+                            <p style="margin-top: 8px;"><strong>Learning Objectives:</strong></p>
+                            <ul style="margin-left: 20px; margin-top: 4px;">
+                                ${learningObjectives.map(obj => `<li>${obj}</li>`).join('')}
+                            </ul>
+                        ` : ''}
+                        ${instructions.during ? `
+                            <p style="margin-top: 8px;"><strong>Instructions:</strong></p>
+                            <p style="font-size: 13px; color: #4a5568;">${instructions.during}</p>
+                        ` : ''}
+                        ${activity.site_details ? `
+                            <p style="margin-top: 12px;"><strong>📍 ${activity.site_details.name || 'Location'}</strong></p>
+                            ${activity.site_details.address ? `<p style="font-size: 13px; color: #718096;">${activity.site_details.address}</p>` : ''}
+                            ${activity.site_details.best_time ? `<p style="font-size: 13px; color: #718096;">Best time: ${activity.site_details.best_time}</p>` : ''}
+                            ${activity.site_details.cost_usd ? `<p style="font-size: 13px; color: #718096;">Cost: $${activity.site_details.cost_usd}</p>` : ''}
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            html += '<h3 style="margin-top: 24px;">Structured Lessons</h3>';
+            const structuredLessons = onLocation.structured_lessons || [];
+
+            if (structuredLessons.length === 0) {
+                html += '<p style="color: #a0aec0;">No structured lessons generated</p>';
+            }
+
+            structuredLessons.forEach(lesson => {
+                const subject = lesson.subject || lesson.Subject || 'General';
+                const duration = lesson.estimated_duration_minutes || lesson.duration || 'N/A';
+                const description = lesson.description || lesson.Description || 'No description available';
+                const activities = lesson.activities || [];
+
+                html += `
+                    <div class="activity-card">
+                        <h4>${lesson.title || 'Untitled Lesson'}</h4>
+                        <div class="activity-meta">
+                            <span>📚 ${subject}</span>
+                            <span>⏱️ ${duration}${typeof duration === 'number' ? ' min' : ''}</span>
+                        </div>
+                        <p>${description}</p>
+                        ${activities.length > 0 ? `
+                            <p style="margin-top: 8px;"><strong>Activities:</strong></p>
+                            <ul style="margin-left: 20px; margin-top: 4px;">
+                                ${activities.map(act => `<li>${act}</li>`).join('')}
+                            </ul>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            return html;
+        }
+
+        function renderPostTrip(postTrip) {
+            if (!postTrip) return '<p>No post-trip content generated</p>';
+
+            let html = '<h3>Reflection Prompts</h3>';
+            const reflectionPrompts = postTrip.reflection_prompts || [];
+
+            if (reflectionPrompts.length === 0) {
+                html += '<p style="color: #a0aec0;">No reflection prompts generated</p>';
+            }
+
+            reflectionPrompts.forEach(prompt => {
+                const promptType = prompt.type || prompt.Type || 'journal';
+                const promptText = prompt.text || prompt.prompt || prompt.question || 'No prompt text available';
+                const wordTarget = prompt.word_count_target || prompt.word_count || prompt.target_words;
+
+                html += `
+                    <div class="activity-card">
+                        <p><strong>Type:</strong> ${promptType}</p>
+                        <p style="font-style: italic; color: #2d3748; margin-top: 8px;">"${promptText}"</p>
+                        ${wordTarget ? `<p style="font-size: 13px; color: #718096; margin-top: 8px;">Target: ${wordTarget} words</p>` : ''}
+                    </div>
+                `;
+            });
+
+            html += '<h3 style="margin-top: 24px;">Synthesis Activities</h3>';
+            const synthesisActivities = postTrip.synthesis_activities || [];
+
+            if (synthesisActivities.length === 0) {
+                html += '<p style="color: #a0aec0;">No synthesis activities generated</p>';
+            }
+
+            synthesisActivities.forEach(activity => {
+                const title = activity.title || activity.name || 'Untitled Activity';
+                const activityType = activity.type || activity.Type || 'assignment';
+                const description = activity.description || activity.details || 'No description available';
+                const duration = activity.estimated_duration_minutes || activity.duration || 'N/A';
+                const learningObjectives = activity.learning_objectives || activity.objectives || [];
+
+                html += `
+                    <div class="activity-card">
+                        <h4>${title}</h4>
+                        <p><strong>Type:</strong> ${activityType}</p>
+                        <p>${description}</p>
+                        <p><strong>Time:</strong> ${duration}${typeof duration === 'number' ? ' minutes' : ''}</p>
+                        ${learningObjectives.length > 0 ? `
+                            <p style="margin-top: 8px;"><strong>Learning Objectives:</strong></p>
+                            <ul style="margin-left: 20px; margin-top: 4px;">
+                                ${learningObjectives.map(obj => `<li>${obj}</li>`).join('')}
+                            </ul>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            return html;
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        function downloadJSON() {
+            const dataStr = JSON.stringify(window.currentCurriculum, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `curriculum_${window.currentCurriculum.location_id}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
