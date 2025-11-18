@@ -12,12 +12,12 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
 
   if (!hasCurricula) {
     return `
-      <div class="education-section" data-location-id="${location.id}">
+      <div class="education-section expanded" data-location-id="${location.id}">
         <div class="education-header">
           <span class="education-icon">📚</span>
           <span>Education</span>
         </div>
-        <div class="education-content">
+        <div class="education-content" style="display: block;">
           <button class="btn-generate-curriculum" data-location-id="${location.id}">
             <span>✨ Generate Curriculum</span>
           </button>
@@ -546,6 +546,7 @@ export function initializeEducationUI(scenarioId?: string, versionId?: string) {
     const target = e.target as HTMLElement;
 
     if (target.classList.contains('btn-generate-curriculum') || target.closest('.btn-generate-curriculum')) {
+      e.stopPropagation(); // Prevent destination card click
       const btn = target.closest('.btn-generate-curriculum') as HTMLElement;
       const locationId = btn?.dataset.locationId;
 
@@ -564,6 +565,7 @@ export function initializeEducationUI(scenarioId?: string, versionId?: string) {
     }
 
     if (target.classList.contains('btn-view-curriculum') || target.closest('.btn-view-curriculum')) {
+      e.stopPropagation(); // Prevent destination card click
       const btn = target.closest('.btn-view-curriculum') as HTMLElement;
       const curriculumId = btn?.dataset.curriculumId;
 
@@ -574,6 +576,7 @@ export function initializeEducationUI(scenarioId?: string, versionId?: string) {
 
     // Toggle education section
     if (target.closest('.education-header')) {
+      e.stopPropagation(); // Prevent destination card click
       const header = target.closest('.education-header') as HTMLElement;
       const toggleId = header.dataset.toggle;
 
