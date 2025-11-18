@@ -3771,10 +3771,10 @@ def _save_curriculum_to_firestore(student_profile: Dict, location: Dict, curricu
             'activity_ids': List[str]
         }
     """
-    if not firestore:
+    db = get_firestore_client()
+    if not db:
         raise Exception("Firestore not available")
 
-    db = get_firestore_client()
     now = datetime.now()
 
     # 1. Save or retrieve student profile
