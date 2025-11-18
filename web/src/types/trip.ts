@@ -3,6 +3,22 @@ export interface Coordinates {
   lng: number;
 }
 
+// Learning moment - educational opportunities at a location
+export interface LearningMoment {
+  id?: string;
+  subject: 'science' | 'social_studies' | 'language_arts' | 'art' | 'music' | 'history' | 'geography' | 'culture' | 'general';
+  title: string;
+  description: string;
+  type: 'site_visit' | 'activity' | 'experience' | 'observation' | 'interaction' | 'research';
+  location?: string;  // Specific site/museum/place within the destination
+  estimated_duration_minutes?: number;
+  estimated_cost_usd?: number;
+  age_appropriate_min?: number;  // Minimum age
+  age_appropriate_max?: number;  // Maximum age
+  standards_addressed?: string[];  // e.g., ["CA-NGSS-MS-LS2-1"]
+  tags?: string[];  // e.g., ["hands-on", "outdoor", "museum", "guided"]
+}
+
 export interface TripLocation {
   // Primary identifiers
   id: string | number | null;
@@ -23,6 +39,7 @@ export interface TripLocation {
   duration_days?: number;
   activity_type?: string;
   highlights?: string[];
+  learning_moments?: LearningMoment[];  // Educational opportunities at this location
   airport_code?: string;
   transport_from_previous?: string;
   transport_segments?: TransportSegment[];
@@ -70,13 +87,29 @@ export interface TripLeg {
   end_date?: string;
 }
 
+export type CostCategory =
+  | 'flight'
+  | 'accommodation'
+  | 'activity'
+  | 'food'
+  | 'transport'
+  | 'education'           // Educational materials and activities
+  | 'educational_materials'  // Books, subscriptions, apps, resources
+  | 'educational_activities' // Museum admissions, tours, classes, workshops
+  | 'other';
+
 export interface TripCost {
   id: string;
-  category: string;
+  category: CostCategory | string;  // Allow string for backwards compatibility
   amount: number;
   currency?: string;
   destinationId?: string | number;
   notes?: string;
+  description?: string;
+  booking_status?: 'estimated' | 'researched' | 'booked' | 'paid';
+  source?: 'manual' | 'ai_estimate' | 'web_research' | 'booking_api';
+  amount_usd?: number;  // Cost converted to USD
+  date?: string;  // YYYY-MM-DD
   [key: string]: unknown;
 }
 

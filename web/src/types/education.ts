@@ -1,5 +1,9 @@
 // Education System Type Definitions
 
+// Import from trip types
+import type { LearningMoment } from './trip';
+export type { LearningMoment };
+
 export type LearningStyle = 'experiential' | 'structured' | 'mixed';
 export type ActivityType = 'experiential' | 'structured' | 'reading' | 'video' | 'assignment' | 'reflection';
 export type ActivityTiming = 'pre_trip' | 'on_location' | 'post_trip' | 'flexible';
