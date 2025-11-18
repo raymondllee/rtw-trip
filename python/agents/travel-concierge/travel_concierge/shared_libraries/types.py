@@ -14,7 +14,7 @@
 
 """Common data schema and types for travel-concierge agents."""
 
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from google.genai import types
 from pydantic import BaseModel, Field
