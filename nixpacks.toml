@@ -4,8 +4,8 @@ aptPkgs = ["python3-pip", "python3-venv"]
 
 [phases.install]
 cmds = [
-    "npm install",
-    "pip3 install --break-system-packages -r requirements.txt"
+    "npm ci --prefer-offline --no-audit",
+    "pip3 install --break-system-packages --no-cache-dir -r requirements.txt"
 ]
 
 [phases.build]
