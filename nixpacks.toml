@@ -10,7 +10,6 @@ cmds = [
 
 [phases.build]
 cmds = [
-    "npm run build:config",
     "npm run build:web"
 ]
 

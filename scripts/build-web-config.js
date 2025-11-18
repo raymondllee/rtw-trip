@@ -85,7 +85,9 @@ window.RTW_CONFIG = {
 };
 `;
 
-  const configPath = path.join(__dirname, '..', 'web', 'config.js');
+  const webDir = path.join(__dirname, '..', 'web');
+  const configPath = path.join(webDir, 'config.js');
+  const distConfigPath = path.join(webDir, 'dist', 'config.js');
 
   // Create backup of existing config
   if (fs.existsSync(configPath)) {
@@ -94,10 +96,17 @@ window.RTW_CONFIG = {
     console.log('✓ Backup created:', backupPath);
   }
 
-  // Write new config
+  // Write config to web directory
   fs.writeFileSync(configPath, configTemplate);
   console.log('✓ Web config built successfully');
   console.log('✓ Config file written to:', configPath);
+
+  // Also write to dist directory if it exists (for production builds)
+  const distDir = path.join(webDir, 'dist');
+  if (fs.existsSync(distDir)) {
+    fs.writeFileSync(distConfigPath, configTemplate);
+    console.log('✓ Config also written to dist:', distConfigPath);
+  }
 
   // Also generate firebase-config.js as an ES module
   const firebaseConfigTemplate = `// Firebase Configuration generated during build from environment variables
@@ -125,7 +134,8 @@ const db = getFirestore(app);
 export { db };
 `;
 
-  const firebaseConfigPath = path.join(__dirname, '..', 'web', 'firebase-config.js');
+  const firebaseConfigPath = path.join(webDir, 'firebase-config.js');
+  const distFirebaseConfigPath = path.join(webDir, 'dist', 'firebase-config.js');
 
   // Create backup of existing firebase-config if it exists
   if (fs.existsSync(firebaseConfigPath)) {
@@ -134,10 +144,16 @@ export { db };
     console.log('✓ Firebase config backup created:', backupPath);
   }
 
-  // Write firebase config
+  // Write firebase config to web directory
   fs.writeFileSync(firebaseConfigPath, firebaseConfigTemplate);
   console.log('✓ Firebase config built successfully');
   console.log('✓ Firebase config file written to:', firebaseConfigPath);
+
+  // Also write to dist directory if it exists (for production builds)
+  if (fs.existsSync(distDir)) {
+    fs.writeFileSync(distFirebaseConfigPath, firebaseConfigTemplate);
+    console.log('✓ Firebase config also written to dist:', distFirebaseConfigPath);
+  }
 }
 
 // Run the build

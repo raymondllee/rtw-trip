@@ -6,7 +6,7 @@
   "scripts": {
     "build:data": "node scripts/build-data.js",
     "build:config": "node scripts/build-web-config.js",
-    "build:web": "npm run build:config && vite build",
+    "build:web": "npm run build:config && vite build && npm run build:config",
     "build": "npm run build:web",
     "parse": "node scripts/parse-itinerary.js",
     "geocode": "node scripts/geocode.js",
