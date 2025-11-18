@@ -5,6 +5,7 @@ import { db } from '../firebase-config.js';
 import { doc, updateDoc, getDoc, Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 import { prepareSummaryData, DEFAULT_SUMMARY_OPTIONS } from './utils/summaryGenerator';
 import { generateSummaryHTML } from './utils/summaryTemplates';
+import { BudgetManager, budgetManagerStyles } from './components/BudgetManager';
 
 const API_URL = 'http://localhost:5001';
 
@@ -15,6 +16,7 @@ const scenarioId = urlParams.get('scenario');
 
 let currentSummary = null;
 let currentScenarioId = scenarioId;
+let budgetManager = null;
 
 async function loadExistingSummary(id) {
   // Load a previously saved summary from sessionStorage or Firebase
@@ -164,6 +166,59 @@ function setupSectionToggles() {
   });
 }
 
+// Initialize budget manager
+function initializeBudgetManager(itineraryData, budget) {
+  // Inject budget manager styles
+  if (!document.getElementById('budget-manager-styles')) {
+    const styleElement = document.createElement('div');
+    styleElement.id = 'budget-manager-styles';
+    styleElement.innerHTML = budgetManagerStyles;
+    document.head.appendChild(styleElement);
+  }
+
+  const container = document.getElementById('budget-container');
+  if (!container) return;
+
+  // Show the container
+  container.style.display = 'block';
+
+  // Convert itineraryData to TripData format
+  const tripData = {
+    locations: itineraryData.locations || [],
+    legs: itineraryData.legs || [],
+    costs: itineraryData.costs || [],
+    countryNotes: itineraryData.countryNotes || {},
+    budget: budget || null
+  };
+
+  // Create or update budget manager
+  if (budgetManager) {
+    budgetManager.updateData(tripData, budget);
+  } else {
+    budgetManager = new BudgetManager(
+      container,
+      tripData,
+      budget,
+      async (updatedBudget) => {
+        // Save budget to Firestore when updated
+        if (currentScenarioId) {
+          try {
+            const scenarioRef = doc(db, 'scenarios', currentScenarioId);
+            await updateDoc(scenarioRef, {
+              'itineraryData.budget': updatedBudget,
+              updatedAt: Timestamp.now()
+            });
+            console.log('Budget saved to Firestore');
+          } catch (error) {
+            console.error('Error saving budget:', error);
+            alert('Failed to save budget: ' + error.message);
+          }
+        }
+      }
+    );
+  }
+}
+
 // Initialize
 async function init() {
   try {
@@ -201,6 +256,9 @@ async function init() {
 
     // Setup section toggles
     setupSectionToggles();
+
+    // Initialize budget manager
+    initializeBudgetManager(itineraryData, itineraryData.budget);
 
     // Update cost toggle button text
     const btn = document.getElementById('toggle-costs-btn');
