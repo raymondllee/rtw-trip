@@ -605,33 +605,75 @@ Historical sites (WWII, Meiji era)</textarea>
             if (!onLocation) return '<p>No on-location content generated</p>';
 
             let html = '<h3>Experiential Activities</h3>';
-            (onLocation.experiential_activities || []).forEach(activity => {
+            const expActivities = onLocation.experiential_activities || [];
+
+            if (expActivities.length === 0) {
+                html += '<p style="color: #a0aec0;">No experiential activities generated</p>';
+            }
+
+            expActivities.forEach(activity => {
+                // Handle both possible field names and undefined values
+                const subject = activity.subject || activity.Subject || 'General';
+                const duration = activity.estimated_duration_minutes || activity.duration || activity.time || 'N/A';
+                const description = activity.description || activity.Description || activity.details || 'No description available';
+                const learningObjectives = activity.learning_objectives || activity.objectives || [];
+                const instructions = activity.instructions || {};
+
                 html += `
                     <div class="activity-card">
-                        <h4>${activity.title}</h4>
+                        <h4>${activity.title || 'Untitled Activity'}</h4>
                         <div class="activity-meta">
-                            <span>📚 ${activity.subject}</span>
-                            <span>⏱️ ${activity.estimated_duration_minutes} min</span>
+                            <span>📚 ${subject}</span>
+                            <span>⏱️ ${duration}${typeof duration === 'number' ? ' min' : ''}</span>
                         </div>
-                        <p>${activity.description}</p>
+                        <p>${description}</p>
+                        ${learningObjectives.length > 0 ? `
+                            <p style="margin-top: 8px;"><strong>Learning Objectives:</strong></p>
+                            <ul style="margin-left: 20px; margin-top: 4px;">
+                                ${learningObjectives.map(obj => `<li>${obj}</li>`).join('')}
+                            </ul>
+                        ` : ''}
+                        ${instructions.during ? `
+                            <p style="margin-top: 8px;"><strong>Instructions:</strong></p>
+                            <p style="font-size: 13px; color: #4a5568;">${instructions.during}</p>
+                        ` : ''}
                         ${activity.site_details ? `
-                            <p style="margin-top: 12px;"><strong>📍 ${activity.site_details.name}</strong></p>
-                            <p style="font-size: 13px; color: #718096;">${activity.site_details.address || ''}</p>
+                            <p style="margin-top: 12px;"><strong>📍 ${activity.site_details.name || 'Location'}</strong></p>
+                            ${activity.site_details.address ? `<p style="font-size: 13px; color: #718096;">${activity.site_details.address}</p>` : ''}
+                            ${activity.site_details.best_time ? `<p style="font-size: 13px; color: #718096;">Best time: ${activity.site_details.best_time}</p>` : ''}
+                            ${activity.site_details.cost_usd ? `<p style="font-size: 13px; color: #718096;">Cost: $${activity.site_details.cost_usd}</p>` : ''}
                         ` : ''}
                     </div>
                 `;
             });
 
             html += '<h3 style="margin-top: 24px;">Structured Lessons</h3>';
-            (onLocation.structured_lessons || []).forEach(lesson => {
+            const structuredLessons = onLocation.structured_lessons || [];
+
+            if (structuredLessons.length === 0) {
+                html += '<p style="color: #a0aec0;">No structured lessons generated</p>';
+            }
+
+            structuredLessons.forEach(lesson => {
+                const subject = lesson.subject || lesson.Subject || 'General';
+                const duration = lesson.estimated_duration_minutes || lesson.duration || 'N/A';
+                const description = lesson.description || lesson.Description || 'No description available';
+                const activities = lesson.activities || [];
+
                 html += `
                     <div class="activity-card">
-                        <h4>${lesson.title}</h4>
+                        <h4>${lesson.title || 'Untitled Lesson'}</h4>
                         <div class="activity-meta">
-                            <span>📚 ${lesson.subject}</span>
-                            <span>⏱️ ${lesson.estimated_duration_minutes} min</span>
+                            <span>📚 ${subject}</span>
+                            <span>⏱️ ${duration}${typeof duration === 'number' ? ' min' : ''}</span>
                         </div>
-                        <p>${lesson.description}</p>
+                        <p>${description}</p>
+                        ${activities.length > 0 ? `
+                            <p style="margin-top: 8px;"><strong>Activities:</strong></p>
+                            <ul style="margin-left: 20px; margin-top: 4px;">
+                                ${activities.map(act => `<li>${act}</li>`).join('')}
+                            </ul>
+                        ` : ''}
                     </div>
                 `;
             });
@@ -643,24 +685,52 @@ Historical sites (WWII, Meiji era)</textarea>
             if (!postTrip) return '<p>No post-trip content generated</p>';
 
             let html = '<h3>Reflection Prompts</h3>';
-            (postTrip.reflection_prompts || []).forEach(prompt => {
+            const reflectionPrompts = postTrip.reflection_prompts || [];
+
+            if (reflectionPrompts.length === 0) {
+                html += '<p style="color: #a0aec0;">No reflection prompts generated</p>';
+            }
+
+            reflectionPrompts.forEach(prompt => {
+                const promptType = prompt.type || prompt.Type || 'journal';
+                const promptText = prompt.text || prompt.prompt || prompt.question || 'No prompt text available';
+                const wordTarget = prompt.word_count_target || prompt.word_count || prompt.target_words;
+
                 html += `
                     <div class="activity-card">
-                        <p><strong>Type:</strong> ${prompt.type}</p>
-                        <p>${prompt.text}</p>
-                        ${prompt.word_count_target ? `<p style="font-size: 13px; color: #718096;">Target: ${prompt.word_count_target} words</p>` : ''}
+                        <p><strong>Type:</strong> ${promptType}</p>
+                        <p style="font-style: italic; color: #2d3748; margin-top: 8px;">"${promptText}"</p>
+                        ${wordTarget ? `<p style="font-size: 13px; color: #718096; margin-top: 8px;">Target: ${wordTarget} words</p>` : ''}
                     </div>
                 `;
             });
 
             html += '<h3 style="margin-top: 24px;">Synthesis Activities</h3>';
-            (postTrip.synthesis_activities || []).forEach(activity => {
+            const synthesisActivities = postTrip.synthesis_activities || [];
+
+            if (synthesisActivities.length === 0) {
+                html += '<p style="color: #a0aec0;">No synthesis activities generated</p>';
+            }
+
+            synthesisActivities.forEach(activity => {
+                const title = activity.title || activity.name || 'Untitled Activity';
+                const activityType = activity.type || activity.Type || 'assignment';
+                const description = activity.description || activity.details || 'No description available';
+                const duration = activity.estimated_duration_minutes || activity.duration || 'N/A';
+                const learningObjectives = activity.learning_objectives || activity.objectives || [];
+
                 html += `
                     <div class="activity-card">
-                        <h4>${activity.title}</h4>
-                        <p><strong>Type:</strong> ${activity.type}</p>
-                        <p>${activity.description}</p>
-                        <p><strong>Time:</strong> ${activity.estimated_duration_minutes} minutes</p>
+                        <h4>${title}</h4>
+                        <p><strong>Type:</strong> ${activityType}</p>
+                        <p>${description}</p>
+                        <p><strong>Time:</strong> ${duration}${typeof duration === 'number' ? ' minutes' : ''}</p>
+                        ${learningObjectives.length > 0 ? `
+                            <p style="margin-top: 8px;"><strong>Learning Objectives:</strong></p>
+                            <ul style="margin-left: 20px; margin-top: 4px;">
+                                ${learningObjectives.map(obj => `<li>${obj}</li>`).join('')}
+                            </ul>
+                        ` : ''}
                     </div>
                 `;
             });

@@ -3813,34 +3813,120 @@ Longer-form assignments: essays, reports, creative projects.
 
 # Output Format
 
-Provide response as valid JSON with this structure:
+CRITICAL: Provide response as valid JSON matching this EXACT structure:
 
 {{
   "location_id": "{location.get('id', 'location')}",
   "location_name": "{location.get('name')}, {location.get('country')}",
   "duration_days": {location.get('duration_days', 7)},
+
   "pre_trip": {{
     "timeline": "2 weeks before arrival",
-    "readings": [...],
-    "videos": [...],
-    "preparation_tasks": [...]
+    "readings": [
+      {{
+        "title": "Exact article title",
+        "source": "Publication name or website",
+        "reading_time_minutes": 20,
+        "description": "What the student will learn",
+        "relevance": "Why this matters for the trip",
+        "url": "https://example.com/article" or null
+      }}
+    ],
+    "videos": [
+      {{
+        "title": "Exact video title",
+        "source": "YouTube channel or platform name",
+        "duration_minutes": 15,
+        "description": "What the video covers",
+        "key_concepts": ["concept1", "concept2"],
+        "url": "https://youtube.com/..." or null
+      }}
+    ],
+    "preparation_tasks": [
+      {{
+        "title": "Task name",
+        "description": "Detailed instructions",
+        "estimated_duration_minutes": 30
+      }}
+    ]
   }},
+
   "on_location": {{
-    "experiential_activities": [...],
-    "structured_lessons": [...]
+    "experiential_activities": [
+      {{
+        "title": "Activity name",
+        "type": "experiential",
+        "subject": "science" or "social_studies" or "language_arts",
+        "estimated_duration_minutes": 120,
+        "learning_objectives": ["objective1", "objective2"],
+        "description": "Detailed activity description",
+        "instructions": {{
+          "before": "What to prepare",
+          "during": "Step-by-step what to do",
+          "after": "Follow-up tasks"
+        }},
+        "site_details": {{
+          "name": "Exact museum/site name",
+          "address": "Full street address",
+          "best_time": "Morning on weekdays",
+          "cost_usd": 15,
+          "what_to_bring": ["camera", "notebook", "water"]
+        }}
+      }}
+    ],
+    "structured_lessons": [
+      {{
+        "title": "Lesson name",
+        "type": "structured",
+        "subject": "science",
+        "estimated_duration_minutes": 60,
+        "learning_objectives": ["objective1"],
+        "description": "What the lesson covers",
+        "activities": ["Read chapter 3", "Watch video", "Answer questions"]
+      }}
+    ]
   }},
+
   "post_trip": {{
-    "reflection_prompts": [...],
-    "synthesis_activities": [...]
+    "reflection_prompts": [
+      {{
+        "text": "The actual prompt question or writing prompt",
+        "type": "journal" or "essay" or "discussion",
+        "word_count_target": 300
+      }}
+    ],
+    "synthesis_activities": [
+      {{
+        "title": "Activity name",
+        "type": "essay" or "presentation" or "project",
+        "subject": "social_studies",
+        "description": "Detailed assignment description",
+        "estimated_duration_minutes": 120,
+        "learning_objectives": ["objective1", "objective2"]
+      }}
+    ]
   }},
+
   "subject_coverage": {{
-    "science": {{"topics": [...], "standards": [...], "estimated_hours": 0}},
-    "social_studies": {{"topics": [...], "standards": [...], "estimated_hours": 0}},
-    "language_arts": {{"topics": [...], "standards": [...], "estimated_hours": 0}}
+    "science": {{
+      "topics": ["Marine ecosystems", "Geology"],
+      "standards": ["CA-NGSS-MS-LS2-1"],
+      "estimated_hours": 8.0
+    }},
+    "social_studies": {{
+      "topics": ["Cultural studies", "Economics"],
+      "standards": ["CA-HSS-8.1"],
+      "estimated_hours": 5.0
+    }},
+    "language_arts": {{
+      "topics": ["Descriptive writing", "Research"],
+      "standards": ["CA-CCSS-ELA-W.8.1"],
+      "estimated_hours": 3.0
+    }}
   }}
 }}
 
-Make it specific, engaging, and educationally sound!
+IMPORTANT: Every field shown above is REQUIRED. Use exact field names. Make it specific, engaging, and educationally sound!
 """
 
         # Initialize Gemini client using Application Default Credentials
