@@ -70,13 +70,61 @@ export interface TripLeg {
   end_date?: string;
 }
 
+export interface PricingModel {
+  type: 'fixed' | 'per_day' | 'per_night' | 'per_person_day' | 'per_person_night' | 'custom';
+  base_unit?: 'day' | 'night' | 'week' | 'month';
+  scales_with_duration?: boolean;
+  scales_with_travelers?: boolean;
+  minimum_charge?: number;
+  custom_formula?: string;
+}
+
+export interface CostChangeEvent {
+  timestamp: string;
+  changed_by: string;  // user_id or 'ai_research' or 'system'
+  previous_value: Partial<TripCost>;
+  new_value: Partial<TripCost>;
+  change_reason?: string;  // 'price_update', 'research', 'booking_confirmed', 'user_edit'
+  fields_changed: string[];
+}
+
+export interface CostHistory {
+  cost_id: string;
+  changes: CostChangeEvent[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TripCost {
   id: string;
   category: string;
   amount: number;
   currency?: string;
   destinationId?: string | number;
+  destination_id?: string | number;  // Support both naming conventions
   notes?: string;
+  description?: string;
+
+  // Pricing model configuration (Recommendation G)
+  pricing_model?: PricingModel;
+
+  // Cost history (Recommendation F)
+  history?: CostChangeEvent[];
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  last_modified_by?: string;
+
+  // Legacy/fallback fields for duration scaling
+  scale_with_duration?: boolean;
+  duration_invariant?: boolean;
+  duration_sensitive?: boolean;
+  amount_per_day?: number;
+  daily_rate?: number;
+  unit?: string;
+  time_unit?: string;
+  period?: string;
+
   [key: string]: unknown;
 }
 
@@ -88,11 +136,33 @@ export interface TripTransportCost {
   distanceMeters?: number;
 }
 
+export interface BudgetAlert {
+  type: 'info' | 'warning' | 'exceeded';
+  category?: string;
+  destination?: string;
+  current_spend: number;
+  budget_amount: number;
+  over_by?: number;
+  percentage: number;
+  message: string;
+}
+
+export interface TripBudget {
+  total_budget_usd: number;
+  budgets_by_category: Record<string, number>;
+  budgets_by_destination: Record<string, number>;
+  contingency_pct: number;  // e.g., 10% buffer
+  alerts: BudgetAlert[];
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface TripData {
   locations: TripLocation[];
   legs: TripLeg[];
   costs: TripCost[];
   countryNotes?: Record<string, string>;
+  budget?: TripBudget;
 }
 
 export interface TripScenarioVersion {

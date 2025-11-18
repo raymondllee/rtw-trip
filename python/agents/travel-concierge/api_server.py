@@ -34,6 +34,11 @@ except Exception:  # pragma: no cover - Firestore optional
 from travel_concierge.tools.cost_tracker import CostTrackerService
 from travel_concierge.tools.cost_manager import _to_float
 from travel_concierge.shared_libraries.types import CostItem
+from travel_concierge.tools.destination_id_validator import (
+    validate_cost_items,
+    is_valid_destination_id,
+    build_destination_lookup
+)
 
 
 def get_transport_icon(transport_mode: str) -> str:
@@ -1378,10 +1383,51 @@ def update_cost(cost_id):
         updated_costs = []
         for cost in version_costs:
             if cost.get('id') == cost_id:
-                # Merge updates into existing cost
-                updated_cost = {**cost, **updates}
+                # Record change history (Recommendation F)
+                from datetime import datetime
+
+                # Find fields that changed
+                fields_changed = []
+                previous_value = {}
+                new_value = {}
+
+                for key, new_val in updates.items():
+                    old_val = cost.get(key)
+                    if old_val != new_val:
+                        fields_changed.append(key)
+                        previous_value[key] = old_val
+                        new_value[key] = new_val
+
+                # Create change event
+                if fields_changed:
+                    change_event = {
+                        'timestamp': datetime.utcnow().isoformat() + 'Z',
+                        'changed_by': data.get('user_id', 'system'),
+                        'previous_value': previous_value,
+                        'new_value': new_value,
+                        'change_reason': data.get('change_reason', 'user_edit'),
+                        'fields_changed': fields_changed
+                    }
+
+                    # Add to history
+                    history = cost.get('history', [])
+                    if not isinstance(history, list):
+                        history = []
+                    history.append(change_event)
+
+                    # Merge updates with history tracking
+                    updated_cost = {**cost, **updates}
+                    updated_cost['history'] = history
+                    updated_cost['updated_at'] = change_event['timestamp']
+                    updated_cost['last_modified_by'] = change_event['changed_by']
+                else:
+                    # No changes, just return existing cost
+                    updated_cost = cost
+
                 updated_costs.append(updated_cost)
                 print(f"✓ Updated cost: {cost_id} - {updated_cost.get('category')} ${updated_cost.get('amount_usd', 0)}")
+                if fields_changed:
+                    print(f"  Changed fields: {', '.join(fields_changed)}")
             else:
                 updated_costs.append(cost)
 
@@ -1750,24 +1796,6 @@ def bulk_save_costs():
 
     print(f"🔍 Looking for costs to remove with aliases: {sorted(destination_aliases)}")
 
-    # Validate destination IDs on incoming cost items
-    import re
-    uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', re.IGNORECASE)
-
-    for item in cost_items:
-        item_dest_id = item.get('destination_id')
-
-        if item_dest_id is None and destination_id is not None:
-            item['destination_id'] = destination_id
-            print(f"  📝 Set destination_id to {destination_id} for {item.get('category')}")
-        elif item_dest_id is not None:
-            item['destination_id'] = str(item_dest_id).strip() or destination_id
-
-        final_dest_id = item.get('destination_id')
-        if final_dest_id and not uuid_pattern.match(str(final_dest_id)):
-            print(f"  ⚠️ WARNING: Cost has non-UUID destination_id: {final_dest_id} for {item.get('category')}")
-            print(f"     This cost may become orphaned! Please use UUIDs only.")
-
     try:
         from google.cloud import firestore
 
@@ -1800,6 +1828,40 @@ def bulk_save_costs():
 
             itinerary_data = latest_version_data.get('itineraryData', {}) or {}
             version_costs = itinerary_data.get('costs', []) or []
+            locations = itinerary_data.get('locations', []) or []
+
+            # Validate and resolve destination IDs for incoming cost items
+            print(f"\n🔍 Validating destination IDs for {len(cost_items)} cost items...")
+
+            # Set destination_id if missing
+            for item in cost_items:
+                if not item.get('destination_id') and destination_id:
+                    item['destination_id'] = destination_id
+                    print(f"  📝 Set destination_id to {destination_id} for {item.get('category')}")
+
+            # Validate and auto-resolve destination IDs
+            try:
+                validated_costs, validation_warnings = validate_cost_items(
+                    cost_items,
+                    locations,
+                    auto_resolve=True,
+                    strict=False  # Don't fail hard, but log warnings
+                )
+
+                # Replace cost_items with validated version
+                cost_items = validated_costs
+
+                # Log validation results
+                if validation_warnings:
+                    print(f"  ⚠️ Validation warnings:")
+                    for warning in validation_warnings:
+                        print(f"    - {warning}")
+                else:
+                    print(f"  ✓ All cost items have valid destination IDs")
+
+            except Exception as e:
+                print(f"  ❌ Validation error: {e}")
+                # Continue anyway, but log the error
 
             print(f"📊 Total costs in database before removal: {len(version_costs)}")
             print(f"📊 Costs with descriptions containing '{destination_name.split(',')[0] if destination_name else ''}': {len([c for c in version_costs if destination_name and destination_name.split(',')[0].lower() in (c.get('description') or '').lower()])}")
