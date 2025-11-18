@@ -4604,6 +4604,53 @@ export async function initMapApp() {
     }
   });
 
+  // Toggle map visibility
+  const mapVisibilityToggle = document.getElementById('map-visibility-toggle');
+  if (mapVisibilityToggle) {
+    mapVisibilityToggle.addEventListener('change', (e) => {
+      const mainContent = document.querySelector('.main-content');
+      const sidebar = document.querySelector('.sidebar');
+      const isChecked = e.target.checked;
+
+      if (isChecked) {
+        // Show map - restore saved sidebar width
+        mainContent.classList.remove('map-hidden');
+        localStorage.setItem('rtw-map-visible', 'true');
+
+        const savedWidth = localStorage.getItem('sidebarWidth');
+        if (savedWidth) {
+          sidebar.style.width = savedWidth;
+        } else {
+          sidebar.style.width = '';
+        }
+      } else {
+        // Hide map - remove inline width to allow CSS to take over
+        mainContent.classList.add('map-hidden');
+        localStorage.setItem('rtw-map-visible', 'false');
+
+        // Clear inline width style so CSS width: 100% takes effect
+        sidebar.style.width = '';
+      }
+    });
+  }
+
+  // Toggle education features visibility
+  const educationVisibilityToggle = document.getElementById('education-visibility-toggle');
+  if (educationVisibilityToggle) {
+    educationVisibilityToggle.addEventListener('change', (e) => {
+      const body = document.body;
+      const isChecked = e.target.checked;
+
+      if (isChecked) {
+        body.classList.remove('education-hidden');
+        localStorage.setItem('rtw-education-visible', 'true');
+      } else {
+        body.classList.add('education-hidden');
+        localStorage.setItem('rtw-education-visible', 'false');
+      }
+    });
+  }
+
   // Update itinerary data and cost summary when costs change
   window.addEventListener('costs-updated', async () => {
     console.log('🔄 costs-updated event received, refreshing costs...');
@@ -5353,6 +5400,27 @@ export async function initMapApp() {
 
   // Initialize education UI
   initializeEducationUI(currentScenarioId, currentScenarioName);
+
+  // Restore view preferences from localStorage
+  const mapVisible = localStorage.getItem('rtw-map-visible');
+  const educationVisible = localStorage.getItem('rtw-education-visible');
+
+  if (mapVisible === 'false') {
+    const mainContent = document.querySelector('.main-content');
+    const sidebar = document.querySelector('.sidebar');
+    const toggle = document.getElementById('map-visibility-toggle');
+    mainContent.classList.add('map-hidden');
+    // Clear inline width so CSS can take over
+    sidebar.style.width = '';
+    if (toggle) toggle.checked = false;
+  }
+
+  if (educationVisible === 'false') {
+    const body = document.body;
+    const toggle = document.getElementById('education-visibility-toggle');
+    body.classList.add('education-hidden');
+    if (toggle) toggle.checked = false;
+  }
 
   console.log('✅ App initialized with state:', {
     scenarioId: currentScenarioId,

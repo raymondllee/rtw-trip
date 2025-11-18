@@ -2510,3 +2510,52 @@ textarea.form-input {
     padding-left: 16px;
   }
 }
+
+/* View preferences: Map visibility */
+.main-content.map-hidden #map {
+  display: none;
+}
+
+.main-content.map-hidden .sidebar-resizer {
+  display: none;
+}
+
+.main-content.map-hidden .sidebar {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  border-left: none;
+}
+
+/* View preferences: Education visibility */
+.education-hidden .education-section,
+.education-hidden .education-section-placeholder,
+.education-hidden #curriculum-generation-modal,
+.education-hidden #curriculum-viewer-modal {
+  display: none !important;
+}
+
+/* Responsive adjustments when map is hidden */
+@media (min-width: 769px) {
+  .main-content.map-hidden .sidebar {
+    padding: 0 20px;
+  }
+
+  .main-content.map-hidden .destination-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 16px;
+    padding: 16px 0;
+  }
+
+  .main-content.map-hidden .destination-card {
+    margin: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  .main-content.map-hidden .destination-list {
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+  }
+}
