@@ -3708,6 +3708,215 @@ def update_transport_research():
 
 
 
+# ============================================
+# EDUCATION SYSTEM - TEST ENDPOINTS
+# ============================================
+
+@app.route('/api/education/test/generate-curriculum', methods=['POST'])
+def test_generate_curriculum():
+    """
+    Test endpoint for curriculum generation using Vertex AI.
+    Uses existing Google Cloud credentials (ADC).
+    """
+    try:
+        from google import genai
+
+        data = request.json
+        location = data.get('location', {})
+        student = data.get('student', {})
+        subjects = data.get('subjects', [])
+
+        if not location or not student or not subjects:
+            return jsonify({'error': 'Missing required fields: location, student, subjects'}), 400
+
+        # Build the curriculum generation prompt
+        prompt = f"""You are an expert curriculum designer specializing in location-based, experiential learning for middle school students.
+
+# Student Context
+- Name: {student.get('name', 'Student')}
+- Age: {student.get('age', 14)}
+- Grade: {student.get('grade', 8)}
+- Learning Style: {student.get('learning_style', 'experiential')}
+- Time Budget: {student.get('time_budget_minutes_per_day', 60)} minutes per day
+- Reading Level: Grade {student.get('reading_level', 10)}
+- Interests: {', '.join(student.get('interests', []))}
+- State Standards: {student.get('state', 'California')} Grade {student.get('grade', 8)}
+
+# Location Details
+- Name: {location.get('name')}, {location.get('country')}
+- Duration: {location.get('duration_days')} days
+- Dates: {location.get('arrival_date', 'TBD')} to {location.get('departure_date', 'TBD')}
+- Activity Type: {location.get('activity_type', 'exploration')}
+- Highlights: {', '.join(location.get('highlights', []))}
+
+# Subjects to Cover
+{', '.join(subjects)}
+
+# Task
+Generate comprehensive educational content for this location that aligns with California 8th grade standards.
+
+Create a detailed learning plan with the following structure:
+
+## 1. Pre-Trip Preparation (2 weeks before arrival)
+
+### Readings
+Provide 3-5 readings (articles, book chapters). For each:
+- Title
+- Source (specific publication or website)
+- Estimated reading time
+- Brief description
+- Why it's relevant
+
+### Videos
+Provide 2-3 educational videos. For each:
+- Title
+- Source (YouTube channel, PBS, National Geographic, etc.)
+- Duration
+- Description
+- Key concepts covered
+
+### Preparation Tasks
+List 3-4 specific tasks to complete before the trip.
+
+## 2. On-Location Activities
+
+Create {min(location.get('duration_days', 7), 7)} days worth of learning activities.
+
+### Experiential Activities (prioritize these - 70%)
+Provide specific, location-based activities with:
+- Exact sites to visit (with addresses)
+- What to observe and document
+- Questions to investigate
+- Photo/video assignments
+- Local interviews
+- Hands-on challenges
+
+### Structured Lessons (30%)
+Provide 2-3 shorter activities for rest days, bad weather, evening time.
+
+## 3. Post-Trip Reflections
+
+### Reflection Prompts (5-7 prompts)
+Journal prompts that encourage comparative thinking and synthesis.
+
+### Synthesis Activities (2-3 activities)
+Longer-form assignments: essays, reports, creative projects.
+
+# Important Guidelines
+
+1. **Be SPECIFIC**: Don't say "visit a museum" - say "Visit the Miraikan Science Museum, 3rd floor robotics exhibit"
+2. **Include PRACTICAL DETAILS**: Best times to visit, estimated costs, what to bring
+3. **AGE-APPROPRIATE**: Content for 8th grade, reading level appropriate
+4. **EXPERIENTIAL FOCUS**: 70% experiential, 30% structured
+5. **SUBJECT INTEGRATION**: Naturally weave together all subjects
+6. **STANDARDS ALIGNMENT**: Reference California 8th grade standards
+
+# Output Format
+
+Provide response as valid JSON with this structure:
+
+{{
+  "location_id": "{location.get('id', 'location')}",
+  "location_name": "{location.get('name')}, {location.get('country')}",
+  "duration_days": {location.get('duration_days', 7)},
+  "pre_trip": {{
+    "timeline": "2 weeks before arrival",
+    "readings": [...],
+    "videos": [...],
+    "preparation_tasks": [...]
+  }},
+  "on_location": {{
+    "experiential_activities": [...],
+    "structured_lessons": [...]
+  }},
+  "post_trip": {{
+    "reflection_prompts": [...],
+    "synthesis_activities": [...]
+  }},
+  "subject_coverage": {{
+    "science": {{"topics": [...], "standards": [...], "estimated_hours": 0}},
+    "social_studies": {{"topics": [...], "standards": [...], "estimated_hours": 0}},
+    "language_arts": {{"topics": [...], "standards": [...], "estimated_hours": 0}}
+  }}
+}}
+
+Make it specific, engaging, and educationally sound!
+"""
+
+        # Initialize Gemini client using Application Default Credentials
+        client = genai.Client()
+        model_id = 'gemini-2.0-flash-exp'
+
+        print(f"Generating curriculum for {location.get('name')}...")
+        print(f"Using model: {model_id}")
+        print(f"Prompt length: {len(prompt)} characters")
+
+        # Generate content
+        response = client.models.generate_content(
+            model=model_id,
+            contents=prompt,
+            config={
+                'temperature': 0.7,
+                'max_output_tokens': 8000,
+            }
+        )
+
+        # Extract text from response
+        result_text = response.text
+
+        # Try to parse as JSON
+        try:
+            # Remove markdown code blocks if present
+            if result_text.strip().startswith('```'):
+                result_text = result_text.strip()
+                parts = result_text.split('```')
+                if len(parts) >= 2:
+                    result_text = parts[1]
+                    if result_text.startswith('json'):
+                        result_text = result_text[4:]
+
+            result_json = json.loads(result_text)
+
+            print(f"✓ Successfully generated curriculum for {location.get('name')}")
+
+            return jsonify({
+                'status': 'success',
+                'curriculum': result_json,
+                'metadata': {
+                    'model_used': model_id,
+                    'prompt_length': len(prompt),
+                    'generation_time': datetime.now().isoformat()
+                }
+            })
+
+        except json.JSONDecodeError as e:
+            print(f"⚠ JSON parsing error: {e}")
+            # Return raw text if JSON parsing fails
+            return jsonify({
+                'status': 'partial_success',
+                'raw_text': result_text,
+                'error': f'JSON parsing failed: {str(e)}',
+                'metadata': {
+                    'model_used': model_id,
+                    'prompt_length': len(prompt)
+                }
+            }), 206  # 206 Partial Content
+
+    except ImportError as e:
+        return jsonify({
+            'error': 'google-genai package not installed',
+            'details': str(e)
+        }), 500
+    except Exception as e:
+        print(f"Error generating curriculum: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
 def _to_float(value) -> float:
