@@ -2531,8 +2531,9 @@ textarea.form-input {
 }
 
 .main-content.map-hidden .sidebar {
-  width: 100%;
-  max-width: none;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
   border-left: none;
 }
 

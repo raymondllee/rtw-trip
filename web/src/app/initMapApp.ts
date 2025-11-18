@@ -4612,17 +4612,30 @@ export async function initMapApp() {
     scenarioActionsBtn.classList.remove('active');
 
     const mainContent = document.querySelector('.main-content');
+    const sidebar = document.querySelector('.sidebar');
     const toggleText = document.getElementById('map-toggle-text');
     const isMapHidden = mainContent.classList.contains('map-hidden');
 
     if (isMapHidden) {
+      // Show map - restore saved sidebar width
       mainContent.classList.remove('map-hidden');
       toggleText.textContent = 'Hide Map';
       localStorage.setItem('rtw-map-visible', 'true');
+
+      const savedWidth = localStorage.getItem('sidebarWidth');
+      if (savedWidth) {
+        sidebar.style.width = savedWidth;
+      } else {
+        sidebar.style.width = '';
+      }
     } else {
+      // Hide map - remove inline width to allow CSS to take over
       mainContent.classList.add('map-hidden');
       toggleText.textContent = 'Show Map';
       localStorage.setItem('rtw-map-visible', 'false');
+
+      // Clear inline width style so CSS width: 100% takes effect
+      sidebar.style.width = '';
     }
   });
 
@@ -5404,9 +5417,12 @@ export async function initMapApp() {
 
   if (mapVisible === 'false') {
     const mainContent = document.querySelector('.main-content');
+    const sidebar = document.querySelector('.sidebar');
     const toggleText = document.getElementById('map-toggle-text');
     mainContent.classList.add('map-hidden');
     toggleText.textContent = 'Show Map';
+    // Clear inline width so CSS can take over
+    sidebar.style.width = '';
   }
 
   if (educationVisible === 'false') {
