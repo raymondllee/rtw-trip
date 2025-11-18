@@ -15,6 +15,8 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'web', 'index.html'),
         summary: resolve(__dirname, 'web', 'summary-viewer.html'),
+        costManager: resolve(__dirname, 'web', 'cost-manager.html'),
+        bulkEdit: resolve(__dirname, 'web', 'bulk-edit.html'),
       }
     }
   },
