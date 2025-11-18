@@ -4204,7 +4204,11 @@ IMPORTANT: Every field shown above is REQUIRED. Use exact field names. Make it s
         credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
         if credentials_json:
             credentials_info = json.loads(credentials_json)
-            credentials = service_account.Credentials.from_service_account_info(credentials_info)
+            credentials = service_account.Credentials.from_service_account_info(
+                credentials_info,
+                scopes=['https://www.googleapis.com/auth/cloud-platform',
+                       'https://www.googleapis.com/auth/generative-language']
+            )
             client = genai.Client(credentials=credentials)
         else:
             # Fall back to default credentials (ADC)
