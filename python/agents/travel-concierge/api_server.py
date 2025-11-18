@@ -28,8 +28,10 @@ from typing import Any, Dict, List
 
 try:
     from google.cloud import firestore
+    from google.oauth2 import service_account
 except Exception:  # pragma: no cover - Firestore optional
     firestore = None
+    service_account = None
 
 from travel_concierge.tools.cost_tracker import CostTrackerService
 from travel_concierge.tools.cost_manager import _to_float
@@ -70,9 +72,21 @@ class SessionStore:
 
         if self._use_firestore:
             try:
-                self._client = firestore.Client()
+                # Try to get credentials from environment variable
+                credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+                if credentials_json:
+                    import json
+                    credentials_info = json.loads(credentials_json)
+                    credentials = service_account.Credentials.from_service_account_info(credentials_info)
+                    project_id = credentials_info.get('project_id') or os.getenv('GOOGLE_CLOUD_PROJECT')
+                    self._client = firestore.Client(credentials=credentials, project=project_id)
+                    self._logger.info('SessionStore using Firestore backend with JSON credentials')
+                else:
+                    # Fall back to default credentials (ADC)
+                    self._client = firestore.Client()
+                    self._logger.info('SessionStore using Firestore backend with default credentials')
+
                 self._collection = self._client.collection(self._collection_name)
-                self._logger.info('SessionStore using Firestore backend')
             except Exception as exc:  # pragma: no cover
                 self._logger.warning('Firestore client unavailable (%s); using in-memory store', exc)
                 self._use_firestore = False
@@ -262,6 +276,29 @@ class SessionStore:
         ]
         sessions.sort(key=lambda sid: metadata[sid].get('last_activity_epoch', 0.0))
         return sessions
+
+
+def get_firestore_client():
+    """Get a configured Firestore client with proper credentials."""
+    if not firestore:
+        return None
+
+    try:
+        # Try to get credentials from environment variable
+        credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+        if credentials_json:
+            import json
+            credentials_info = json.loads(credentials_json)
+            credentials = service_account.Credentials.from_service_account_info(credentials_info)
+            project_id = credentials_info.get('project_id') or os.getenv('GOOGLE_CLOUD_PROJECT')
+            return firestore.Client(credentials=credentials, project=project_id)
+        else:
+            # Fall back to default credentials (ADC)
+            return firestore.Client()
+    except Exception as exc:
+        logger = logging.getLogger(__name__)
+        logger.warning('Failed to create Firestore client: %s', exc)
+        return None
 
 
 session_store = SessionStore()
@@ -1339,7 +1376,7 @@ def update_cost(cost_id):
         updates = {k: v for k, v in data.items() if k not in ['session_id', 'cost_id']}
 
         # Initialize Firestore
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
         # Get current scenario
@@ -1448,7 +1485,7 @@ def delete_cost(cost_id):
 
         # Try Firestore first
         try:
-            db = firestore.Client()
+            db = get_firestore_client()
             scenario_ref = db.collection('scenarios').document(scenario_id)
             scenario_doc = scenario_ref.get()
 
@@ -1558,7 +1595,7 @@ def get_costs():
             from google.cloud import firestore
 
             # Try to fetch from Firestore first (session_id is actually scenario_id)
-            db = firestore.Client()
+            db = get_firestore_client()
             scenario_ref = db.collection('scenarios').document(session_id)
             scenario_doc = scenario_ref.get()
 
@@ -1776,7 +1813,7 @@ def bulk_save_costs():
     try:
         from google.cloud import firestore
 
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
         scenario_doc = scenario_ref.get()
@@ -2043,7 +2080,7 @@ def bulk_update_costs():
             }), 400
 
         # Initialize Firestore
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
         # Get current scenario
@@ -2201,7 +2238,7 @@ def get_working_data():
 
         print(f"📊 GET /api/working-data - session_id: {session_id}")
 
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(session_id)
 
         # Get latest version
@@ -2925,7 +2962,7 @@ def cleanup_ai_estimates():
         print(f"   Scenario ID: {scenario_id}")
 
         # Initialize Firestore
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
         # Get latest version
@@ -3009,7 +3046,7 @@ def get_transport_segments():
             return jsonify({'error': 'scenario_id required'}), 400
 
         print("🔧 Creating Firestore client...")
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
         print(f"📡 Querying Firestore for scenario: {scenario_id}")
@@ -3089,7 +3126,7 @@ def create_transport_segment():
         }
 
         # Save to Firestore
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
         # Get latest version
@@ -3143,7 +3180,7 @@ def update_transport_segment(segment_id):
         if not scenario_id:
             return jsonify({'error': 'scenario_id required'}), 400
 
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
         # Get latest version
@@ -3226,7 +3263,7 @@ def delete_transport_segment(segment_id):
         if not scenario_id:
             return jsonify({'error': 'scenario_id required'}), 400
 
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
         # Get latest version
@@ -3284,7 +3321,7 @@ def sync_transport_segments():
         if not scenario_id:
             return jsonify({'error': 'scenario_id required'}), 400
 
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
         # Get latest version
@@ -3621,7 +3658,7 @@ def update_transport_research():
         if not scenario_id:
             return jsonify({'error': 'No active scenario found. Please provide scenario_id or valid session_id.'}), 400
 
-        db = firestore.Client()
+        db = get_firestore_client()
         scenario_ref = db.collection('scenarios').document(scenario_id)
 
         # Get latest version
@@ -3737,7 +3774,7 @@ def _save_curriculum_to_firestore(student_profile: Dict, location: Dict, curricu
     if not firestore:
         raise Exception("Firestore not available")
 
-    db = firestore.Client()
+    db = get_firestore_client()
     now = datetime.now()
 
     # 1. Save or retrieve student profile
@@ -4270,11 +4307,11 @@ def list_curricula():
     - status: Filter by status (draft, active, completed, archived)
     - limit: Max results (default 50)
     """
-    if not firestore:
-        return jsonify({'error': 'Firestore not available'}), 500
+    db = get_firestore_client()
+    if not db:
+        return jsonify({'status': 'success', 'curricula': [], 'count': 0}), 200
 
     try:
-        db = firestore.Client()
         query = db.collection('curriculum_plans')
 
         # Apply filters
@@ -4330,11 +4367,11 @@ def list_curricula():
 @app.route('/api/education/curricula/<plan_id>', methods=['GET'])
 def get_curriculum(plan_id):
     """Get a specific curriculum plan by ID."""
-    if not firestore:
-        return jsonify({'error': 'Firestore not available'}), 500
+    db = get_firestore_client()
+    if not db:
+        return jsonify({'error': 'Firestore not available'}), 404
 
     try:
-        db = firestore.Client()
         doc = db.collection('curriculum_plans').document(plan_id).get()
 
         if not doc.exists:
@@ -4365,11 +4402,11 @@ def get_curriculum(plan_id):
 @app.route('/api/education/curricula/by-location/<location_id>', methods=['GET'])
 def get_curricula_by_location(location_id):
     """Get all curricula for a specific location."""
-    if not firestore:
-        return jsonify({'error': 'Firestore not available'}), 500
+    db = get_firestore_client()
+    if not db:
+        return jsonify({'status': 'success', 'curricula': [], 'count': 0}), 200
 
     try:
-        db = firestore.Client()
 
         # Get all curricula and filter by location_id in location_lessons
         docs = db.collection('curriculum_plans').stream()
@@ -4411,7 +4448,7 @@ def get_student_curricula(student_id):
         return jsonify({'error': 'Firestore not available'}), 500
 
     try:
-        db = firestore.Client()
+        db = get_firestore_client()
         query = db.collection('curriculum_plans').where('student_profile_id', '==', student_id)
         query = query.order_by('created_at', direction=firestore.Query.DESCENDING)
 
