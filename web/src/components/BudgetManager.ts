@@ -185,6 +185,15 @@ export class BudgetManager {
             </div>
           </div>
 
+          <!-- Group note for categories -->
+          <div class="group-note-section">
+            <label class="note-label">📝 Category Budget Notes:</label>
+            <textarea class="group-note-input"
+                      id="category-group-note"
+                      placeholder="Add notes about category budgeting strategy..."
+                      rows="2">${this.budget?.category_group_note || ''}</textarea>
+          </div>
+
           <!-- Always-visible budget summary -->
           <div class="budget-summary-box">
             <div class="summary-row">
@@ -226,9 +235,15 @@ export class BudgetManager {
               const pct = status.by_category[cat]?.percentage || 0;
               const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
 
+              const catNote = this.budget?.category_notes?.[cat] || '';
               return `
                 <div class="budget-item-edit">
-                  <div class="item-label">${cat.replace(/_/g, ' ')}</div>
+                  <div class="item-label">
+                    ${cat.replace(/_/g, ' ')}
+                    <button class="note-toggle-btn" data-category="${cat}" title="Add/Edit Note">
+                      ${catNote ? '📝' : '📄'}
+                    </button>
+                  </div>
                   <div class="item-input-row">
                     <div class="input-with-unit">
                       <input type="number"
@@ -251,6 +266,12 @@ export class BudgetManager {
                       </div>
                     </div>
                   </div>
+                  <div class="item-note-section" data-category="${cat}" style="display: ${catNote ? 'block' : 'none'}">
+                    <textarea class="item-note-input"
+                              data-category="${cat}"
+                              placeholder="Add notes about this category budget..."
+                              rows="2">${catNote}</textarea>
+                  </div>
                 </div>
               `;
             }).join('')}
@@ -264,12 +285,21 @@ export class BudgetManager {
               <h4>🌍 Budget by Country</h4>
               <div class="mode-controls">
                 <span class="mode-indicator" id="country-mode-indicator">Mode: Dollar Amounts</span>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="country-mode-toggle">
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-label">Use %</span>
-                </label>
+                <div class="country-mode-selector">
+                  <button class="mode-btn active" data-mode="dollars" id="country-mode-dollars">$</button>
+                  <button class="mode-btn" data-mode="percent" id="country-mode-percent">%</button>
+                  <button class="mode-btn" data-mode="perday" id="country-mode-perday">$/day</button>
+                </div>
               </div>
+            </div>
+
+            <!-- Group note for countries -->
+            <div class="group-note-section">
+              <label class="note-label">📝 Country Budget Notes:</label>
+              <textarea class="group-note-input"
+                        id="country-group-note"
+                        placeholder="Add notes about country budgeting strategy..."
+                        rows="2">${this.budget?.country_group_note || ''}</textarea>
             </div>
 
             <!-- Always-visible budget summary for countries -->
@@ -321,10 +351,16 @@ export class BudgetManager {
                 const countryPct = currentBudget > 0 ? (countryBudget / currentBudget * 100) : 0;
                 const pct = status.by_country[country]?.percentage || 0;
                 const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
+                const countryNote = this.budget?.country_notes?.[country] || '';
 
                 return `
                   <div class="budget-item-edit">
-                    <div class="item-label">${country} <span class="days-label">(${countryDays} day${countryDays !== 1 ? 's' : ''})</span></div>
+                    <div class="item-label">
+                      ${country} <span class="days-label">(${countryDays} day${countryDays !== 1 ? 's' : ''})</span>
+                      <button class="note-toggle-btn" data-country="${country}" title="Add/Edit Note">
+                        ${countryNote ? '📝' : '📄'}
+                      </button>
+                    </div>
                     <div class="item-input-row">
                       <div class="input-with-unit">
                         <input type="number"
@@ -348,6 +384,12 @@ export class BudgetManager {
                           <div class="mini-progress-fill" style="width: ${Math.min(pct, 100)}%"></div>
                         </div>
                       </div>
+                    </div>
+                    <div class="item-note-section" data-country="${country}" style="display: ${countryNote ? 'block' : 'none'}">
+                      <textarea class="item-note-input"
+                                data-country="${country}"
+                                placeholder="Add notes about this country budget..."
+                                rows="2">${countryNote}</textarea>
                     </div>
                   </div>
                 `;
@@ -547,14 +589,13 @@ export class BudgetManager {
       updateCountryCalculatedDisplays();
     });
 
-    // Country mode toggle logic
-    const countryModeToggle = this.container.querySelector('#country-mode-toggle') as HTMLInputElement;
+    // Country mode selector logic
     const countryModeIndicator = this.container.querySelector('#country-mode-indicator') as HTMLElement;
     const countryAllocationStatus = this.container.querySelector('#country-allocation-status') as HTMLElement;
     const countryTotalAllocatedSpan = this.container.querySelector('#country-total-allocated-pct') as HTMLElement;
     const countryAllocationRemainder = this.container.querySelector('#country-allocation-remainder') as HTMLElement;
 
-    let isCountryPercentageMode = false;
+    let countryMode: 'dollars' | 'percent' | 'perday' = 'dollars';
 
     // Update budget summary for countries
     const updateCountrySummary = () => {
@@ -613,12 +654,19 @@ export class BudgetManager {
         const calcValueSpan = this.container.querySelector(`.calc-value[data-country="${country}"]`) as HTMLElement;
         const perDayDisplay = this.container.querySelector(`.country-per-day-display[data-country="${country}"]`) as HTMLElement;
 
-        if (isCountryPercentageMode) {
+        if (countryMode === 'percent') {
           const pct = parseFloat(el.value) || 0;
           const dollars = Math.round(totalBudget * pct / 100);
           const perDay = days > 0 ? Math.round(dollars / days) : 0;
           calcValueSpan.textContent = `$${dollars.toLocaleString()}`;
           perDayDisplay.textContent = `$${perDay}/day`;
+          el.dataset.dollarValue = dollars.toString();
+        } else if (countryMode === 'perday') {
+          const perDay = parseFloat(el.value) || 0;
+          const dollars = Math.round(perDay * days);
+          const pct = totalBudget > 0 ? (dollars / totalBudget * 100) : 0;
+          calcValueSpan.textContent = `$${dollars.toLocaleString()}`;
+          perDayDisplay.textContent = `${pct.toFixed(1)}%`;
           el.dataset.dollarValue = dollars.toString();
         } else {
           const dollars = parseFloat(el.value) || 0;
@@ -630,7 +678,7 @@ export class BudgetManager {
         }
       });
 
-      if (isCountryPercentageMode) {
+      if (countryMode === 'percent') {
         updateCountryAllocationStatus();
       }
 
@@ -662,41 +710,83 @@ export class BudgetManager {
       }
     };
 
-    // Country toggle between % and $
-    countryModeToggle?.addEventListener('change', () => {
-      isCountryPercentageMode = countryModeToggle.checked;
-      const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+    // Country mode selector buttons
+    const countryModeBtns = this.container.querySelectorAll('.country-mode-selector .mode-btn');
+    countryModeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newMode = (btn as HTMLElement).dataset.mode as 'dollars' | 'percent' | 'perday';
+        countryMode = newMode;
+        const totalBudget = parseFloat(totalBudgetInput.value) || 0;
 
-      countryModeIndicator.textContent = isCountryPercentageMode ? 'Mode: Percentages' : 'Mode: Dollar Amounts';
-      countryAllocationStatus.style.display = isCountryPercentageMode ? 'block' : 'none';
+        // Update button states
+        countryModeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
 
-      this.container.querySelectorAll('.country-input').forEach(input => {
-        const el = input as HTMLInputElement;
-        const country = el.dataset.country!;
-        const unitSpan = this.container.querySelector(`.input-unit[data-country="${country}"]`) as HTMLElement;
-        const currentDollarValue = parseFloat(el.dataset.dollarValue!) || parseFloat(el.value) || 0;
+        // Update indicator
+        const modeText = newMode === 'dollars' ? 'Dollar Amounts' : newMode === 'percent' ? 'Percentages' : 'Per Day';
+        countryModeIndicator.textContent = `Mode: ${modeText}`;
+        countryAllocationStatus.style.display = newMode === 'percent' ? 'block' : 'none';
 
-        if (isCountryPercentageMode) {
-          const pct = totalBudget > 0 ? (currentDollarValue / totalBudget * 100) : 0;
-          el.value = pct.toFixed(1);
-          el.step = '0.1';
-          el.max = '100';
-          unitSpan.textContent = '%';
-        } else {
-          el.value = Math.round(currentDollarValue).toString();
-          el.step = '10';
-          el.removeAttribute('max');
-          unitSpan.textContent = 'USD';
-        }
+        // Convert all inputs to new mode
+        this.container.querySelectorAll('.country-input').forEach(input => {
+          const el = input as HTMLInputElement;
+          const country = el.dataset.country!;
+          const days = parseFloat(el.dataset.days!) || 1;
+          const unitSpan = this.container.querySelector(`.input-unit[data-country="${country}"]`) as HTMLElement;
+          const currentDollarValue = parseFloat(el.dataset.dollarValue!) || parseFloat(el.value) || 0;
+
+          if (newMode === 'percent') {
+            const pct = totalBudget > 0 ? (currentDollarValue / totalBudget * 100) : 0;
+            el.value = pct.toFixed(1);
+            el.step = '0.1';
+            el.max = '100';
+            unitSpan.textContent = '%';
+          } else if (newMode === 'perday') {
+            const perDay = days > 0 ? Math.round(currentDollarValue / days) : 0;
+            el.value = perDay.toString();
+            el.step = '1';
+            el.removeAttribute('max');
+            unitSpan.textContent = '$/day';
+          } else {
+            el.value = Math.round(currentDollarValue).toString();
+            el.step = '10';
+            el.removeAttribute('max');
+            unitSpan.textContent = 'USD';
+          }
+        });
+
+        updateCountryCalculatedDisplays();
       });
-
-      updateCountryCalculatedDisplays();
     });
 
     // Update country displays when inputs change
     this.container.querySelectorAll('.country-input').forEach(input => {
       input.addEventListener('input', () => {
         updateCountryCalculatedDisplays();
+      });
+    });
+
+    // Note toggle functionality for categories
+    this.container.querySelectorAll('.note-toggle-btn[data-category]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const category = (btn as HTMLElement).dataset.category!;
+        const noteSection = this.container.querySelector(`.item-note-section[data-category="${category}"]`) as HTMLElement;
+        if (noteSection) {
+          const isVisible = noteSection.style.display !== 'none';
+          noteSection.style.display = isVisible ? 'none' : 'block';
+        }
+      });
+    });
+
+    // Note toggle functionality for countries
+    this.container.querySelectorAll('.note-toggle-btn[data-country]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const country = (btn as HTMLElement).dataset.country!;
+        const noteSection = this.container.querySelector(`.item-note-section[data-country="${country}"]`) as HTMLElement;
+        if (noteSection) {
+          const isVisible = noteSection.style.display !== 'none';
+          noteSection.style.display = isVisible ? 'none' : 'block';
+        }
       });
     });
 
@@ -723,12 +813,42 @@ export class BudgetManager {
         budgets_by_country[country] = dollarValue;
       });
 
+      // Collect category notes
+      const category_notes: Record<string, string> = {};
+      this.container.querySelectorAll('.item-note-input[data-category]').forEach(textarea => {
+        const el = textarea as HTMLTextAreaElement;
+        const category = el.dataset.category!;
+        const note = el.value.trim();
+        if (note) {
+          category_notes[category] = note;
+        }
+      });
+
+      // Collect country notes
+      const country_notes: Record<string, string> = {};
+      this.container.querySelectorAll('.item-note-input[data-country]').forEach(textarea => {
+        const el = textarea as HTMLTextAreaElement;
+        const country = el.dataset.country!;
+        const note = el.value.trim();
+        if (note) {
+          country_notes[country] = note;
+        }
+      });
+
+      // Get group notes
+      const categoryGroupNote = (this.container.querySelector('#category-group-note') as HTMLTextAreaElement)?.value.trim();
+      const countryGroupNote = (this.container.querySelector('#country-group-note') as HTMLTextAreaElement)?.value.trim();
+
       const newBudget: TripBudget = {
         total_budget_usd: totalBudget,
         budgets_by_category,
         budgets_by_country,
         contingency_pct: contingency,
-        alerts: []
+        alerts: [],
+        category_notes: Object.keys(category_notes).length > 0 ? category_notes : undefined,
+        country_notes: Object.keys(country_notes).length > 0 ? country_notes : undefined,
+        category_group_note: categoryGroupNote || undefined,
+        country_group_note: countryGroupNote || undefined
       };
 
       this.budget = newBudget;
@@ -1375,6 +1495,108 @@ export const budgetManagerStyles = `
 #allocation-status,
 #country-allocation-status {
   border-left: 4px solid #007bff;
+}
+
+/* Country mode selector buttons */
+.country-mode-selector {
+  display: flex;
+  gap: 4px;
+  background: #f0f0f0;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.mode-btn {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: #666;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover {
+  background: #e0e0e0;
+}
+
+.mode-btn.active {
+  background: #007bff;
+  color: white;
+}
+
+/* Notes sections */
+.group-note-section {
+  margin: 15px 0;
+  padding: 12px;
+  background: #fffbf0;
+  border-radius: 6px;
+  border: 1px solid #ffe4a3;
+}
+
+.note-label {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.group-note-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.group-note-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.note-toggle-btn {
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  margin-left: 8px;
+}
+
+.note-toggle-btn:hover {
+  opacity: 1;
+}
+
+.item-note-section {
+  margin-top: 10px;
+  padding: 10px;
+  background: #fffbf0;
+  border-radius: 4px;
+  border: 1px solid #ffe4a3;
+}
+
+.item-note-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.item-note-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
 }
 </style>
 `;
