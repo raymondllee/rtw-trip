@@ -117,7 +117,8 @@ async function loadStudents() {
         // For each student, count their curricula
         const studentsWithStats = await Promise.all(
             students.map(async (student) => {
-                const studentCurricula = await educationService.getStudentCurricula(student.id);
+                const response = await educationService.getStudentCurricula(student.id);
+                const studentCurricula = response.curricula;
                 const completedCount = studentCurricula.filter(c => c.status === 'completed').length;
                 const totalActivities = studentCurricula.reduce((sum, c) => {
                     const locations = c.location_lessons || {};
@@ -306,7 +307,8 @@ async function loadCurricula() {
     try {
         showLoading('Loading curricula...');
 
-        curricula = await educationService.listCurricula();
+        const response = await educationService.listCurricula();
+        curricula = response.curricula;
         filteredCurricula = curricula;
 
         renderCurricula(filteredCurricula);
@@ -461,8 +463,8 @@ function renderCurricula(curriculaData: CurriculumPlan[]) {
 (window as any).viewCurriculum = async (curriculumId: string) => {
     try {
         showLoading('Loading curriculum details...');
-        const curriculum = await educationService.getCurriculum(curriculumId);
-        displayCurriculumDetails(curriculum);
+        const response = await educationService.getCurriculum(curriculumId);
+        displayCurriculumDetails(response.curriculum);
     } catch (error) {
         console.error('Error loading curriculum:', error);
         showError('Failed to load curriculum details');
@@ -473,8 +475,8 @@ function renderCurricula(curriculaData: CurriculumPlan[]) {
 
 (window as any).exportCurriculum = async (curriculumId: string) => {
     try {
-        const curriculum = await educationService.getCurriculum(curriculumId);
-        const dataStr = JSON.stringify(curriculum, null, 2);
+        const response = await educationService.getCurriculum(curriculumId);
+        const dataStr = JSON.stringify(response.curriculum, null, 2);
         const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
 
         const exportFileDefaultName = `curriculum_${curriculumId}.json`;

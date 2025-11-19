@@ -4584,7 +4584,11 @@ def get_student_curricula(student_id):
 
             curricula.append(data)
 
-        return jsonify(curricula)
+        return jsonify({
+            'status': 'success',
+            'count': len(curricula),
+            'curricula': curricula
+        })
 
     except Exception as e:
         print(f"Error getting student curricula: {str(e)}")
