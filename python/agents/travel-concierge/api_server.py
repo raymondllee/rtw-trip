@@ -4325,6 +4325,16 @@ IMPORTANT:
                 if end_idx >= 0:
                     cleaned_text = cleaned_text[:end_idx + 1]
 
+            # Fix common JSON errors from AI output
+            # Fix numbers followed by unquoted text in parentheses (e.g., "10 (village entrance fee)" -> "10")
+            import re
+            cleaned_text = re.sub(r'(\d+)\s*\([^)]*\)', r'\1', cleaned_text)
+
+            # Fix missing commas before closing braces/brackets in some edge cases
+            # This is a more conservative fix that only targets obvious issues
+            cleaned_text = re.sub(r'"\s*\n\s*}', '"\n}', cleaned_text)
+            cleaned_text = re.sub(r'"\s*\n\s*]', '"\n]', cleaned_text)
+
             result_json = json.loads(cleaned_text)
 
             print(f"✓ Successfully generated curriculum for {location.get('name')}")
@@ -4414,6 +4424,8 @@ def list_curricula():
         status = request.args.get('status')
         limit = int(request.args.get('limit', 50))
 
+        has_filters = bool(student_id or status or country)
+
         if student_id:
             query = query.where('student_profile_id', '==', student_id)
         if status:
@@ -4421,8 +4433,10 @@ def list_curricula():
         if country:
             query = query.where('country', '==', country)
 
-        # Order by creation date (newest first)
-        query = query.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
+        # Only use ORDER BY if no filters (to avoid needing composite indexes)
+        # Otherwise, sort in Python after fetching
+        if not has_filters:
+            query = query.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
 
         docs = query.stream()
         curricula = []
@@ -4443,6 +4457,11 @@ def list_curricula():
                 data['generated_at'] = data['generated_at'].isoformat() if hasattr(data['generated_at'], 'isoformat') else str(data['generated_at'])
 
             curricula.append(data)
+
+        # Sort by created_at in Python if we had filters
+        if has_filters:
+            curricula.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            curricula = curricula[:limit]  # Apply limit after sorting
 
         return jsonify({
             'status': 'success',
@@ -4534,6 +4553,187 @@ def get_curricula_by_location(location_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/education/students', methods=['GET'])
+def list_students():
+    """List all student profiles."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = get_firestore_client()
+        students_ref = db.collection('student_profiles')
+        docs = students_ref.stream()
+
+        students = []
+        for doc in docs:
+            data = doc.to_dict()
+            data['id'] = doc.id
+
+            # Convert timestamps
+            if 'created_at' in data:
+                data['created_at'] = data['created_at'].isoformat() if hasattr(data['created_at'], 'isoformat') else str(data['created_at'])
+            if 'updated_at' in data:
+                data['updated_at'] = data['updated_at'].isoformat() if hasattr(data['updated_at'], 'isoformat') else str(data['updated_at'])
+
+            students.append(data)
+
+        return jsonify(students)
+
+    except Exception as e:
+        print(f"Error listing students: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/students', methods=['POST'])
+def create_student():
+    """Create a new student profile."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        data = request.json
+
+        # Validate required fields
+        required_fields = ['name', 'age', 'grade', 'state', 'learning_style']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        db = get_firestore_client()
+
+        # Create student profile
+        student_data = {
+            'name': data['name'],
+            'age': data['age'],
+            'grade': data['grade'],
+            'state': data['state'],
+            'learning_style': data['learning_style'],
+            'interests': data.get('interests', []),
+            'time_budget_minutes_per_day': data.get('time_budget_minutes_per_day', 60),
+            'reading_level': data.get('reading_level', data['grade']),
+            'subjects_to_cover': data.get('subjects_to_cover', []),
+            'created_at': datetime.now(),
+            'updated_at': datetime.now(),
+        }
+
+        # Add to Firestore
+        doc_ref = db.collection('student_profiles').document()
+        doc_ref.set(student_data)
+
+        student_data['id'] = doc_ref.id
+        student_data['created_at'] = student_data['created_at'].isoformat()
+        student_data['updated_at'] = student_data['updated_at'].isoformat()
+
+        return jsonify({
+            'status': 'success',
+            'student': student_data
+        }), 201
+
+    except Exception as e:
+        print(f"Error creating student: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/students/<student_id>', methods=['PUT'])
+def update_student(student_id):
+    """Update an existing student profile."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        data = request.json
+        db = get_firestore_client()
+
+        # Check if student exists
+        doc_ref = db.collection('student_profiles').document(student_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Student not found'}), 404
+
+        # Update student profile
+        student_data = {
+            'name': data['name'],
+            'age': data['age'],
+            'grade': data['grade'],
+            'state': data['state'],
+            'learning_style': data['learning_style'],
+            'interests': data.get('interests', []),
+            'time_budget_minutes_per_day': data.get('time_budget_minutes_per_day', 60),
+            'reading_level': data.get('reading_level', data['grade']),
+            'subjects_to_cover': data.get('subjects_to_cover', []),
+            'updated_at': datetime.now(),
+        }
+
+        # Update in Firestore
+        doc_ref.update(student_data)
+
+        # Get updated student
+        updated_doc = doc_ref.get()
+        updated_data = updated_doc.to_dict()
+        updated_data['id'] = student_id
+
+        # Convert timestamps
+        if 'created_at' in updated_data:
+            updated_data['created_at'] = updated_data['created_at'].isoformat() if hasattr(updated_data['created_at'], 'isoformat') else str(updated_data['created_at'])
+        if 'updated_at' in updated_data:
+            updated_data['updated_at'] = updated_data['updated_at'].isoformat() if hasattr(updated_data['updated_at'], 'isoformat') else str(updated_data['updated_at'])
+
+        return jsonify({
+            'status': 'success',
+            'student': updated_data
+        })
+
+    except Exception as e:
+        print(f"Error updating student: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/students/<student_id>', methods=['DELETE'])
+def delete_student(student_id):
+    """Delete a student profile and all associated curricula."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = get_firestore_client()
+
+        # Check if student exists
+        doc_ref = db.collection('student_profiles').document(student_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Student not found'}), 404
+
+        # Delete all curricula for this student
+        curricula_query = db.collection('curriculum_plans').where('student_profile_id', '==', student_id)
+        curricula_docs = curricula_query.stream()
+
+        deleted_curricula = 0
+        for curriculum_doc in curricula_docs:
+            curriculum_doc.reference.delete()
+            deleted_curricula += 1
+
+        # Delete the student profile
+        doc_ref.delete()
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Student deleted successfully. {deleted_curricula} curricula also deleted.',
+            'deleted_curricula_count': deleted_curricula
+        })
+
+    except Exception as e:
+        print(f"Error deleting student: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/education/students/<student_id>/curricula', methods=['GET'])
 def get_student_curricula(student_id):
     """Get all curricula for a specific student."""
@@ -4542,8 +4742,9 @@ def get_student_curricula(student_id):
 
     try:
         db = get_firestore_client()
+        # Query without ORDER BY to avoid needing composite index
+        # We'll sort in Python instead
         query = db.collection('curriculum_plans').where('student_profile_id', '==', student_id)
-        query = query.order_by('created_at', direction=firestore.Query.DESCENDING)
 
         docs = query.stream()
         curricula = []
@@ -4561,15 +4762,91 @@ def get_student_curricula(student_id):
 
             curricula.append(data)
 
+        # Sort by created_at in Python (most recent first)
+        curricula.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+
         return jsonify({
             'status': 'success',
-            'student_id': student_id,
             'count': len(curricula),
             'curricula': curricula
         })
 
     except Exception as e:
         print(f"Error getting student curricula: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/destinations', methods=['GET'])
+def get_destinations():
+    """Get destinations from the current (most recent) scenario."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = get_firestore_client()
+
+        # Get the most recent scenario for the default user
+        user_id = 'default-user'  # TODO: Replace with actual user ID from auth
+        scenarios_query = (
+            db.collection('scenarios')
+            .where('userId', '==', user_id)
+            .order_by('updatedAt', direction=firestore.Query.DESCENDING)
+            .limit(1)
+        )
+
+        scenarios = list(scenarios_query.stream())
+
+        if not scenarios:
+            return jsonify({
+                'status': 'success',
+                'destinations': []
+            })
+
+        scenario_ref = scenarios[0].reference
+
+        # Get the latest version
+        versions = list(
+            scenario_ref
+            .collection('versions')
+            .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+            .limit(1)
+            .stream()
+        )
+
+        if not versions:
+            return jsonify({
+                'status': 'success',
+                'destinations': []
+            })
+
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        locations = itinerary_data.get('locations', []) or []
+
+        # Transform locations to a simpler format
+        destinations = []
+        for loc in locations:
+            if isinstance(loc, dict):
+                # Try duration_days first, fall back to days
+                duration = loc.get('duration_days', loc.get('days', 0))
+                destinations.append({
+                    'id': loc.get('id', ''),
+                    'name': loc.get('name', ''),
+                    'country': loc.get('country', ''),
+                    'days': duration,
+                    'arrival_date': loc.get('arrival_date', ''),
+                    'departure_date': loc.get('departure_date', '')
+                })
+
+        return jsonify({
+            'status': 'success',
+            'destinations': destinations
+        })
+
+    except Exception as e:
+        print(f"Error getting destinations: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500

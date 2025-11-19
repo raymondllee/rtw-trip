@@ -25,8 +25,16 @@
         </select>
         <button id="add-destination-bar-btn" class="add-destination-bar-btn" title="Add destination">+</button>
         <label class="transport-toggle" for="routing-toggle">
-          <input type="checkbox" id="routing-toggle" checked>
+          <input type="checkbox" id="routing-toggle">
           <span>Show Inter-Destination Transport Costs</span>
+        </label>
+        <label class="transport-toggle" for="map-visibility-toggle">
+          <input type="checkbox" id="map-visibility-toggle" checked>
+          <span>Show Map</span>
+        </label>
+        <label class="transport-toggle" for="education-visibility-toggle">
+          <input type="checkbox" id="education-visibility-toggle">
+          <span>Show Education</span>
         </label>
         <button id="scenario-actions-btn" class="scenario-actions-btn-compact" title="Scenario actions">⋯</button>
         <div class="save-indicator" id="save-indicator">✓</div>
@@ -44,9 +52,10 @@
             <input type="checkbox" id="country-view-toggle" style="cursor: pointer;">
             <span>Country View</span>
           </label>
-          <button id="compact-mode-toggle" class="compact-mode-toggle" title="Toggle compact mode">
-            <span class="compact-icon">⊟</span>
-          </button>
+          <label class="country-view-toggle-label" for="compact-mode-toggle" style="margin-left: 12px; font-size: 13px; font-weight: normal; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            <input type="checkbox" id="compact-mode-toggle" style="cursor: pointer;" checked>
+            <span>Compact View</span>
+          </label>
         </div>
         <div id="sidebar-summary" class="header-secondary"></div>
       </div>
@@ -60,6 +69,12 @@
         </button>
         <div class="dropdown-divider"></div>
         <button id="view-trip-summary-btn" class="dropdown-item">
+        <a href="education-dashboard.html" class="dropdown-item education-hub-dropdown-link">
+          <span class="icon">📚</span>
+          <span>Education Hub</span>
+        </a>
+        <div class="dropdown-divider"></div>
+        <button id="generate-summary-btn" class="dropdown-item">
           <span class="icon">📄</span>
           <span>View Trip Summary</span>
         </button>

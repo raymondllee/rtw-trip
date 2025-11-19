@@ -2,9 +2,16 @@
  * Education Service - API client for curriculum and education features
  */
 
-import { getRuntimeConfig } from '../config';
-
-const { apiBaseUrl } = getRuntimeConfig();
+// Get API base URL from config without requiring Google Maps API key
+function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const apiConfig = (window as any).API_CONFIG;
+    if (apiConfig?.BASE_URL) {
+      return apiConfig.BASE_URL;
+    }
+  }
+  return 'http://localhost:5001';
+}
 
 export interface CurriculumPlan {
   id: string;
@@ -89,7 +96,7 @@ export class EducationService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = apiBaseUrl || 'http://localhost:5001';
+    this.baseUrl = getApiBaseUrl();
   }
 
   /**

@@ -1,0 +1,309 @@
+{
+  "eval_set_id": "booking-comprehensive-test-set",
+  "name": "Comprehensive Booking Agent Test Set",
+  "description": "Test scenarios for booking agent covering reservation creation, payment choices, and payment processing",
+  "eval_cases": [
+    {
+      "eval_id": "booking-hotel-reservation",
+      "conversation": [
+        {
+          "invocation_id": "booking-hotel-001",
+          "user_content": {
+            "parts": [{"text": "I'd like to book the Grand Hyatt Tokyo for 3 nights starting March 15"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "booking_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "payment_methods": ["credit_card", "debit_card"]
+          },
+          "selected_hotel": {
+            "name": "Grand Hyatt Tokyo",
+            "price_per_night": 350,
+            "location": "Tokyo, Japan",
+            "check_in": "2026-03-15",
+            "check_out": "2026-03-18"
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "booking-flight-reservation",
+      "conversation": [
+        {
+          "invocation_id": "booking-flight-001",
+          "user_content": {
+            "parts": [{"text": "Book the United Airlines flight UA875 departing March 15 at 1:30 PM"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "booking_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "seat_preference": "window",
+            "payment_methods": ["credit_card"]
+          },
+          "selected_flight": {
+            "airline": "United Airlines",
+            "flight_number": "UA875",
+            "departure": "2026-03-15T13:30:00",
+            "arrival": "2026-03-16T16:45:00",
+            "origin": "San Francisco, CA",
+            "destination": "Tokyo, Japan",
+            "price": 1250,
+            "class": "economy"
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "booking-payment-options",
+      "conversation": [
+        {
+          "invocation_id": "booking-payment-001",
+          "user_content": {
+            "parts": [{"text": "What payment options do I have for this booking?"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "booking_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "payment_methods": ["credit_card", "debit_card", "paypal"],
+            "passport_nationality": "US Citizen"
+          },
+          "pending_booking": {
+            "type": "hotel",
+            "total_cost": 1050
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "booking-process-credit-card-payment",
+      "conversation": [
+        {
+          "invocation_id": "booking-payment-002",
+          "user_content": {
+            "parts": [{"text": "Process payment with my Visa credit card ending in 4242"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "booking_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "payment_methods": ["credit_card"],
+            "saved_cards": [{"type": "visa", "last_four": "4242"}]
+          },
+          "pending_booking": {
+            "type": "flight",
+            "total_cost": 1250,
+            "reservation_id": "RES-12345"
+          },
+          "selected_payment": "credit_card"
+        }
+      }
+    },
+    {
+      "eval_id": "booking-multi-item-package",
+      "conversation": [
+        {
+          "invocation_id": "booking-package-001",
+          "user_content": {
+            "parts": [{"text": "Book the entire package - flights, hotel, and activities"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "booking_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "payment_methods": ["credit_card", "paypal"]
+          },
+          "package_booking": {
+            "flight_cost": 1250,
+            "hotel_cost": 1050,
+            "activities_cost": 300,
+            "total_cost": 2600,
+            "items": [
+              {"type": "flight", "name": "UA875 SFO-NRT"},
+              {"type": "hotel", "name": "Grand Hyatt Tokyo - 3 nights"},
+              {"type": "activity", "name": "Tokyo City Tour"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "booking-payment-with-installments",
+      "conversation": [
+        {
+          "invocation_id": "booking-installment-001",
+          "user_content": {
+            "parts": [{"text": "Can I pay in installments? I'd like to split this over 3 months"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "booking_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "payment_methods": ["credit_card", "installment_plan"]
+          },
+          "pending_booking": {
+            "type": "package",
+            "total_cost": 2600
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "booking-cancellation-policy",
+      "conversation": [
+        {
+          "invocation_id": "booking-cancel-001",
+          "user_content": {
+            "parts": [{"text": "What's the cancellation policy for this reservation?"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "booking_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen"
+          },
+          "pending_booking": {
+            "type": "hotel",
+            "name": "Grand Hyatt Tokyo",
+            "cancellation_policy": "free_cancellation_48h"
+          }
+        }
+      }
+    },
+    {
+      "eval_id": "booking-group-reservation",
+      "conversation": [
+        {
+          "invocation_id": "booking-group-001",
+          "user_content": {
+            "parts": [{"text": "Book 4 rooms at the same hotel for our group traveling together"}],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [{"text": ""}],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {"name": "transfer_to_agent", "args": {"agent_name": "booking_agent"}}
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "travel_concierge",
+        "user_id": "test_user",
+        "state": {
+          "user_profile": {
+            "passport_nationality": "US Citizen",
+            "payment_methods": ["credit_card"]
+          },
+          "group_booking": {
+            "num_rooms": 4,
+            "hotel": "Grand Hyatt Tokyo",
+            "price_per_room": 350,
+            "nights": 3,
+            "total_cost": 4200
+          }
+        }
+      }
+    }
+  ],
+  "creation_timestamp": 1731888000
+}
