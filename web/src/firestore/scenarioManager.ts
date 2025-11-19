@@ -120,6 +120,12 @@ export class FirestoreScenarioManager {
     const currentVersion = scenarioDoc.data().currentVersion || 0;
     const latest = await this.getLatestVersion(scenarioId);
 
+    // Preserve budget from the latest version if not present in new data
+    if (latest && latest.itineraryData && latest.itineraryData.budget && !itineraryData.budget) {
+      console.log('📊 Preserving budget from previous version');
+      itineraryData.budget = latest.itineraryData.budget;
+    }
+
     // For autosave, compute a hash to detect changes
     let currentHash = null;
     if (!isNamed) {
