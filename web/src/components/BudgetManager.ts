@@ -225,24 +225,145 @@ export class BudgetManager {
       .reduce((sum, cost) => sum + (cost.amount_usd || cost.amount || 0), 0);
 
     const currentBudget = this.budget?.total_budget_usd || totalCosts * 1.1;
+    const currentContingency = this.budget?.contingency_pct || 10;
 
-    const budgetValue = prompt(
-      'Enter total budget (USD):',
-      Math.round(currentBudget).toString()
-    );
+    // Get all unique categories and destinations
+    const categories = new Set<string>();
+    const destinations = new Map<string, string>();
 
-    if (budgetValue) {
-      const amount = parseFloat(budgetValue);
-      if (!isNaN(amount) && amount > 0) {
-        const contingencyPct = ((amount - totalCosts) / totalCosts) * 100;
-        const newBudget = createDefaultBudget(this.tripData, Math.max(0, contingencyPct));
-        newBudget.total_budget_usd = amount;
-
-        this.budget = newBudget;
-        this.onBudgetUpdate?.(newBudget);
-        this.render();
+    (this.tripData.costs || []).forEach(cost => {
+      if (cost.category) categories.add(cost.category);
+      if (cost.destination_id) {
+        const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
+        if (location) {
+          destinations.set(cost.destination_id, location.name || location.city || cost.destination_id);
+        }
       }
-    }
+    });
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.className = 'budget-edit-modal';
+    modal.innerHTML = `
+      <div class="budget-edit-dialog">
+        <div class="dialog-header">
+          <h3>Edit Budget</h3>
+          <button class="close-btn" id="close-edit-dialog">×</button>
+        </div>
+
+        <div class="dialog-body">
+          <div class="form-section">
+            <h4>Overall Budget</h4>
+            <div class="form-group">
+              <label for="total-budget">Total Budget (USD)</label>
+              <input type="number" id="total-budget" value="${Math.round(currentBudget)}" min="0" step="100">
+            </div>
+            <div class="form-group">
+              <label for="contingency-pct">Contingency (%)</label>
+              <input type="number" id="contingency-pct" value="${currentContingency}" min="0" max="100" step="1">
+              <small>Percentage above current costs for buffer</small>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4>Budget by Category</h4>
+            <div id="category-budgets">
+              ${Array.from(categories).map(cat => {
+                const catCosts = (this.tripData.costs || [])
+                  .filter(c => c.category === cat)
+                  .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+                const catBudget = this.budget?.budgets_by_category?.[cat] || catCosts * 1.1;
+                return `
+                  <div class="form-group">
+                    <label for="cat-${cat}">${cat.replace(/_/g, ' ')}</label>
+                    <div class="budget-input-group">
+                      <input type="number" id="cat-${cat}" data-category="${cat}" value="${Math.round(catBudget)}" min="0" step="10">
+                      <span class="current-spend">Current: $${Math.round(catCosts).toLocaleString()}</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4>Budget by Destination</h4>
+            <div id="destination-budgets">
+              ${Array.from(destinations).map(([id, name]) => {
+                const destCosts = (this.tripData.costs || [])
+                  .filter(c => c.destination_id === id)
+                  .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+                const destBudget = this.budget?.budgets_by_destination?.[id] || destCosts * 1.1;
+                return `
+                  <div class="form-group">
+                    <label for="dest-${id}">${name}</label>
+                    <div class="budget-input-group">
+                      <input type="number" id="dest-${id}" data-destination="${id}" value="${Math.round(destBudget)}" min="0" step="10">
+                      <span class="current-spend">Current: $${Math.round(destCosts).toLocaleString()}</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <button class="btn-secondary" id="cancel-edit-btn">Cancel</button>
+          <button class="btn-primary" id="save-budget-btn">Save Budget</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Event listeners
+    const closeDialog = () => {
+      modal.remove();
+    };
+
+    modal.querySelector('#close-edit-dialog')?.addEventListener('click', closeDialog);
+    modal.querySelector('#cancel-edit-btn')?.addEventListener('click', closeDialog);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeDialog();
+    });
+
+    modal.querySelector('#save-budget-btn')?.addEventListener('click', () => {
+      const totalBudgetInput = modal.querySelector('#total-budget') as HTMLInputElement;
+      const contingencyInput = modal.querySelector('#contingency-pct') as HTMLInputElement;
+
+      const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+      const contingency = parseFloat(contingencyInput.value) || 0;
+
+      // Collect category budgets
+      const budgets_by_category: Record<string, number> = {};
+      modal.querySelectorAll('[data-category]').forEach(input => {
+        const el = input as HTMLInputElement;
+        const category = el.dataset.category!;
+        budgets_by_category[category] = parseFloat(el.value) || 0;
+      });
+
+      // Collect destination budgets
+      const budgets_by_destination: Record<string, number> = {};
+      modal.querySelectorAll('[data-destination]').forEach(input => {
+        const el = input as HTMLInputElement;
+        const destId = el.dataset.destination!;
+        budgets_by_destination[destId] = parseFloat(el.value) || 0;
+      });
+
+      const newBudget: TripBudget = {
+        total_budget_usd: totalBudget,
+        budgets_by_category,
+        budgets_by_destination,
+        contingency_pct: contingency,
+        alerts: []
+      };
+
+      this.budget = newBudget;
+      this.onBudgetUpdate?.(newBudget);
+      this.render();
+      closeDialog();
+    });
   }
 
   render() {
@@ -542,6 +663,154 @@ export const budgetManagerStyles = `
   font-size: 32px;
   font-weight: bold;
   color: #007bff;
+}
+
+/* Budget Edit Modal */
+.budget-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.budget-edit-dialog {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.dialog-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.close-btn:hover {
+  background: #f0f0f0;
+}
+
+.dialog-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.form-section {
+  margin-bottom: 24px;
+}
+
+.form-section h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #007bff;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #333;
+  text-transform: capitalize;
+}
+
+.form-group input[type="number"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.form-group input[type="number"]:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.form-group small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #666;
+}
+
+.budget-input-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.budget-input-group input {
+  flex: 1;
+}
+
+.budget-input-group .current-spend {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.dialog-footer .btn-primary,
+.dialog-footer .btn-secondary {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 </style>
 `;
