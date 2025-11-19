@@ -266,18 +266,56 @@ export class BudgetManager {
           </div>
 
           <div class="form-section">
-            <h4>Budget by Category</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h4 style="margin: 0;">Budget by Category</h4>
+              <label class="toggle-switch">
+                <input type="checkbox" id="category-mode-toggle">
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">Use %</span>
+              </label>
+            </div>
+
+            <div id="allocation-status" style="display: none; padding: 12px; background: #f8f9fa; border-radius: 6px; margin-bottom: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <strong>Total Allocated:</strong> <span id="total-allocated-pct">0</span>%
+                </div>
+                <div id="allocation-remainder" style="font-weight: 600;"></div>
+              </div>
+            </div>
+
             <div id="category-budgets">
               ${Array.from(categories).map(cat => {
                 const catCosts = (this.tripData.costs || [])
                   .filter(c => c.category === cat)
                   .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
                 const catBudget = this.budget?.budgets_by_category?.[cat] || catCosts * 1.1;
+                const catPct = currentBudget > 0 ? (catBudget / currentBudget * 100) : 0;
                 return `
                   <div class="form-group">
                     <label for="cat-${cat}">${cat.replace(/_/g, ' ')}</label>
                     <div class="budget-input-group">
-                      <input type="number" id="cat-${cat}" data-category="${cat}" value="${Math.round(catBudget)}" min="0" step="10">
+                      <div class="dual-input-container">
+                        <input type="number"
+                               class="cat-dollar-input"
+                               id="cat-${cat}"
+                               data-category="${cat}"
+                               value="${Math.round(catBudget)}"
+                               min="0"
+                               step="10">
+                        <input type="number"
+                               class="cat-pct-input"
+                               id="cat-pct-${cat}"
+                               data-category="${cat}"
+                               value="${catPct.toFixed(1)}"
+                               min="0"
+                               max="100"
+                               step="0.1"
+                               style="display: none;">
+                        <span class="input-suffix dollar-suffix">USD</span>
+                        <span class="input-suffix pct-suffix" style="display: none;">%</span>
+                      </div>
+                      <span class="calculated-amount" style="display: none;"></span>
                       <span class="current-spend">Current: $${Math.round(catCosts).toLocaleString()}</span>
                     </div>
                   </div>
@@ -326,6 +364,120 @@ export class BudgetManager {
     modal.querySelector('#cancel-edit-btn')?.addEventListener('click', closeDialog);
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeDialog();
+    });
+
+    // Category percentage/dollar toggle logic
+    const categoryModeToggle = modal.querySelector('#category-mode-toggle') as HTMLInputElement;
+    const allocationStatus = modal.querySelector('#allocation-status') as HTMLElement;
+    const totalAllocatedSpan = modal.querySelector('#total-allocated-pct') as HTMLElement;
+    const allocationRemainder = modal.querySelector('#allocation-remainder') as HTMLElement;
+    const totalBudgetInput = modal.querySelector('#total-budget') as HTMLInputElement;
+
+    let isPercentageMode = false;
+
+    const updateAllocationStatus = () => {
+      if (!isPercentageMode) return;
+
+      let totalPct = 0;
+      modal.querySelectorAll('.cat-pct-input').forEach(input => {
+        const el = input as HTMLInputElement;
+        totalPct += parseFloat(el.value) || 0;
+      });
+
+      totalAllocatedSpan.textContent = totalPct.toFixed(1);
+
+      const remainder = 100 - totalPct;
+      const absRemainder = Math.abs(remainder);
+
+      if (Math.abs(remainder) < 0.1) {
+        allocationRemainder.textContent = '✓ Fully Allocated';
+        allocationRemainder.style.color = '#28a745';
+      } else if (remainder > 0) {
+        allocationRemainder.textContent = `${absRemainder.toFixed(1)}% Unallocated`;
+        allocationRemainder.style.color = '#ffc107';
+      } else {
+        allocationRemainder.textContent = `${absRemainder.toFixed(1)}% Over-allocated`;
+        allocationRemainder.style.color = '#dc3545';
+      }
+    };
+
+    const updateCalculatedAmounts = () => {
+      const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+
+      modal.querySelectorAll('.cat-pct-input').forEach(input => {
+        const el = input as HTMLInputElement;
+        const pct = parseFloat(el.value) || 0;
+        const amount = (totalBudget * pct / 100);
+
+        const category = el.dataset.category!;
+        const dollarInput = modal.querySelector(`#cat-${category}`) as HTMLInputElement;
+        const calculatedSpan = el.closest('.budget-input-group')?.querySelector('.calculated-amount') as HTMLElement;
+
+        // Update dollar input (hidden in % mode)
+        dollarInput.value = Math.round(amount).toString();
+
+        // Update calculated amount display
+        if (calculatedSpan) {
+          calculatedSpan.textContent = `= $${Math.round(amount).toLocaleString()}`;
+        }
+      });
+    };
+
+    categoryModeToggle.addEventListener('change', () => {
+      isPercentageMode = categoryModeToggle.checked;
+
+      // Toggle visibility
+      modal.querySelectorAll('.cat-dollar-input').forEach(el => {
+        (el as HTMLElement).style.display = isPercentageMode ? 'none' : 'block';
+      });
+      modal.querySelectorAll('.cat-pct-input').forEach(el => {
+        (el as HTMLElement).style.display = isPercentageMode ? 'block' : 'none';
+      });
+      modal.querySelectorAll('.dollar-suffix').forEach(el => {
+        (el as HTMLElement).style.display = isPercentageMode ? 'none' : 'inline';
+      });
+      modal.querySelectorAll('.pct-suffix').forEach(el => {
+        (el as HTMLElement).style.display = isPercentageMode ? 'inline' : 'none';
+      });
+      modal.querySelectorAll('.calculated-amount').forEach(el => {
+        (el as HTMLElement).style.display = isPercentageMode ? 'inline' : 'none';
+      });
+
+      allocationStatus.style.display = isPercentageMode ? 'block' : 'none';
+
+      if (isPercentageMode) {
+        // Convert current dollar values to percentages
+        const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+        if (totalBudget > 0) {
+          modal.querySelectorAll('.cat-dollar-input').forEach(dollarInput => {
+            const el = dollarInput as HTMLInputElement;
+            const category = el.dataset.category!;
+            const amount = parseFloat(el.value) || 0;
+            const pct = (amount / totalBudget * 100);
+            const pctInput = modal.querySelector(`#cat-pct-${category}`) as HTMLInputElement;
+            if (pctInput) {
+              pctInput.value = pct.toFixed(1);
+            }
+          });
+        }
+        updateAllocationStatus();
+        updateCalculatedAmounts();
+      }
+    });
+
+    // Update calculated amounts when percentage changes
+    modal.querySelectorAll('.cat-pct-input').forEach(input => {
+      input.addEventListener('input', () => {
+        updateAllocationStatus();
+        updateCalculatedAmounts();
+      });
+    });
+
+    // Update percentages when total budget changes (in % mode)
+    totalBudgetInput.addEventListener('input', () => {
+      if (isPercentageMode) {
+        updateCalculatedAmounts();
+      }
     });
 
     modal.querySelector('#save-budget-btn')?.addEventListener('click', () => {
@@ -811,6 +963,93 @@ export const budgetManagerStyles = `
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-switch input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  background-color: #ccc;
+  border-radius: 24px;
+  transition: background-color 0.3s;
+}
+
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #007bff;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+}
+
+/* Dual Input Container */
+.dual-input-container {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.dual-input-container input {
+  width: 100%;
+  padding-right: 45px;
+}
+
+.input-suffix {
+  position: absolute;
+  right: 12px;
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.calculated-amount {
+  font-size: 13px;
+  color: #007bff;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+/* Allocation status colors */
+#allocation-status {
+  border-left: 4px solid #007bff;
 }
 </style>
 `;
