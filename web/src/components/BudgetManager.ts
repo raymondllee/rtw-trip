@@ -1,6 +1,6 @@
 /**
  * Budget Manager UI Component (Recommendation J)
- * Provides budget tracking, alerts, and management interface
+ * Provides integrated budget tracking, editing, and management interface
  */
 
 import type { TripBudget, TripData } from '../types/trip';
@@ -85,44 +85,77 @@ export class BudgetManager {
     if (!this.budget) return this.renderNoBudget();
 
     const status = calculateBudgetStatus(this.budget, this.tripData);
-
     const progressBarClass = status.percentage_used > 100 ? 'over-budget' :
                             status.percentage_used > 90 ? 'warning' :
                             status.percentage_used > 80 ? 'caution' : '';
-
     const progressWidth = Math.min(status.percentage_used, 100);
 
+    // Get all categories and countries from trip data
+    const categories = new Set<string>();
+    const countries = new Set<string>();
+
+    (this.tripData.costs || []).forEach(cost => {
+      if (cost.category) categories.add(cost.category);
+    });
+
+    (this.tripData.locations || []).forEach(loc => {
+      if (loc.country) countries.add(loc.country);
+    });
+
+    const currentBudget = this.budget.total_budget_usd || 0;
+
     return `
-      <div class="budget-manager">
+      <div class="budget-manager integrated">
         <div class="budget-header">
           <h3>💰 Budget Management</h3>
-          <button class="btn-icon" id="edit-budget-btn" title="Edit Budget">✏️</button>
+          <div class="header-actions">
+            <button class="btn-primary" id="save-budget-btn">💾 Save Budget</button>
+          </div>
         </div>
 
-        <!-- Total Budget Overview -->
-        <div class="budget-overview">
-          <div class="budget-total">
-            <div class="budget-label">Total Budget</div>
-            <div class="budget-amount">${this.formatCurrency(status.total_budget)}</div>
-          </div>
-          <div class="budget-spent ${progressBarClass}">
-            <div class="budget-label">Total Spent</div>
-            <div class="budget-amount">${this.formatCurrency(status.total_spent)}</div>
-          </div>
-          <div class="budget-remaining">
-            <div class="budget-label">Remaining</div>
-            <div class="budget-amount ${status.total_remaining < 0 ? 'negative' : ''}">
-              ${this.formatCurrency(status.total_remaining)}
+        <!-- Overall Budget Section -->
+        <div class="budget-edit-section">
+          <h4>Overall Budget</h4>
+          <div class="budget-overview-edit">
+            <div class="form-group-inline">
+              <label for="total-budget">Total Budget</label>
+              <div class="input-with-unit">
+                <input type="number" id="total-budget" value="${currentBudget}" min="0" step="100">
+                <span class="input-unit">USD</span>
+              </div>
+            </div>
+            <div class="form-group-inline">
+              <label for="contingency-pct">Contingency</label>
+              <div class="input-with-unit">
+                <input type="number" id="contingency-pct" value="${this.budget.contingency_pct || 0}" min="0" max="100" step="1">
+                <span class="input-unit">%</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Progress Bar -->
-        <div class="budget-progress">
-          <div class="progress-bar ${progressBarClass}">
-            <div class="progress-fill" style="width: ${progressWidth}%"></div>
+          <!-- Budget Status Display -->
+          <div class="budget-status-display">
+            <div class="status-item">
+              <span class="status-label">Total Spent:</span>
+              <span class="status-value ${progressBarClass}">${this.formatCurrency(status.total_spent)}</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Remaining:</span>
+              <span class="status-value ${status.total_remaining < 0 ? 'negative' : 'positive'}">
+                ${this.formatCurrency(status.total_remaining)}
+              </span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Used:</span>
+              <span class="status-value">${status.percentage_used.toFixed(1)}%</span>
+            </div>
           </div>
-          <div class="progress-label">${status.percentage_used.toFixed(1)}% used</div>
+
+          <div class="budget-progress">
+            <div class="progress-bar ${progressBarClass}">
+              <div class="progress-fill" style="width: ${progressWidth}%"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Alerts -->
@@ -138,26 +171,61 @@ export class BudgetManager {
           </div>
         ` : ''}
 
-        <!-- Category Breakdown -->
-        <div class="budget-breakdown">
-          <h4>📊 By Category</h4>
-          <div class="budget-items">
-            ${Object.entries(status.by_category).map(([category, data]) => {
-              const pct = data.percentage;
+        <!-- Budget by Category -->
+        <div class="budget-edit-section">
+          <div class="section-header">
+            <h4>📊 Budget by Category</h4>
+            <div class="mode-controls">
+              <span class="mode-indicator" id="category-mode-indicator">Mode: Dollar Amounts</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="category-mode-toggle">
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">Use %</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="allocation-status" style="display: none;" class="allocation-status">
+            <div class="allocation-info">
+              <strong>Total Allocated:</strong> <span id="total-allocated-pct">0</span>%
+            </div>
+            <div id="allocation-remainder" class="allocation-remainder"></div>
+          </div>
+
+          <div class="budget-items-edit">
+            ${Array.from(categories).map(cat => {
+              const catCosts = (this.tripData.costs || [])
+                .filter(c => c.category === cat)
+                .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+              const catBudget = this.budget?.budgets_by_category?.[cat] || catCosts * 1.1;
+              const catPct = currentBudget > 0 ? (catBudget / currentBudget * 100) : 0;
+              const pct = status.by_category[cat]?.percentage || 0;
               const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
+
               return `
-                <div class="budget-item">
-                  <div class="item-header">
-                    <span class="item-name">${category}</span>
-                    <span class="item-amounts">
-                      ${this.formatCurrency(data.spent)} / ${this.formatCurrency(data.budget)}
-                    </span>
-                  </div>
-                  <div class="item-progress">
-                    <div class="mini-progress-bar ${barClass}">
-                      <div class="mini-progress-fill" style="width: ${Math.min(pct, 100)}%"></div>
+                <div class="budget-item-edit">
+                  <div class="item-label">${cat.replace(/_/g, ' ')}</div>
+                  <div class="item-input-row">
+                    <div class="input-with-unit">
+                      <input type="number"
+                             class="cat-input"
+                             data-category="${cat}"
+                             data-dollar-value="${Math.round(catBudget)}"
+                             value="${Math.round(catBudget)}"
+                             min="0"
+                             step="10">
+                      <span class="input-unit" data-category="${cat}">USD</span>
                     </div>
-                    <span class="item-percentage">${pct.toFixed(0)}%</span>
+                    <span class="calc-arrow">→</span>
+                    <div class="calculated-display">
+                      <span class="calc-value" data-category="${cat}">${catPct.toFixed(1)}%</span>
+                    </div>
+                    <div class="item-status">
+                      <span class="current-spend">Spent: ${this.formatCurrency(catCosts)}</span>
+                      <div class="mini-progress-bar ${barClass}">
+                        <div class="mini-progress-fill" style="width: ${Math.min(pct, 100)}%"></div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               `;
@@ -165,27 +233,73 @@ export class BudgetManager {
           </div>
         </div>
 
-        <!-- Country Breakdown -->
-        ${Object.keys(status.by_country).length > 0 ? `
-          <div class="budget-breakdown">
-            <h4>🌍 By Country</h4>
-            <div class="budget-items">
-              ${Object.entries(status.by_country).map(([country, data]) => {
-                const pct = data.percentage;
+        <!-- Budget by Country -->
+        ${countries.size > 0 ? `
+          <div class="budget-edit-section">
+            <div class="section-header">
+              <h4>🌍 Budget by Country</h4>
+              <div class="mode-controls">
+                <span class="mode-indicator" id="country-mode-indicator">Mode: Dollar Amounts</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="country-mode-toggle">
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-label">Use %</span>
+                </label>
+              </div>
+            </div>
+
+            <div id="country-allocation-status" style="display: none;" class="allocation-status">
+              <div class="allocation-info">
+                <strong>Total Allocated:</strong> <span id="country-total-allocated-pct">0</span>%
+              </div>
+              <div id="country-allocation-remainder" class="allocation-remainder"></div>
+            </div>
+
+            <div class="budget-items-edit">
+              ${Array.from(countries).map(country => {
+                const countryDays = (this.tripData.locations || [])
+                  .filter(loc => loc.country === country)
+                  .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
+
+                const countryCosts = (this.tripData.costs || [])
+                  .filter(c => {
+                    const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+                    return location?.country === country;
+                  })
+                  .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+
+                const countryBudget = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
+                const budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
+                const countryPct = currentBudget > 0 ? (countryBudget / currentBudget * 100) : 0;
+                const pct = status.by_country[country]?.percentage || 0;
                 const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
+
                 return `
-                  <div class="budget-item">
-                    <div class="item-header">
-                      <span class="item-name">${country}</span>
-                      <span class="item-amounts">
-                        ${this.formatCurrency(data.spent)} / ${this.formatCurrency(data.budget)}
-                      </span>
-                    </div>
-                    <div class="item-progress">
-                      <div class="mini-progress-bar ${barClass}">
-                        <div class="mini-progress-fill" style="width: ${Math.min(pct, 100)}%"></div>
+                  <div class="budget-item-edit">
+                    <div class="item-label">${country} <span class="days-label">(${countryDays} day${countryDays !== 1 ? 's' : ''})</span></div>
+                    <div class="item-input-row">
+                      <div class="input-with-unit">
+                        <input type="number"
+                               class="country-input"
+                               data-country="${country}"
+                               data-days="${countryDays}"
+                               data-dollar-value="${Math.round(countryBudget)}"
+                               value="${Math.round(countryBudget)}"
+                               min="0"
+                               step="10">
+                        <span class="input-unit" data-country="${country}">USD</span>
                       </div>
-                      <span class="item-percentage">${pct.toFixed(0)}%</span>
+                      <span class="calc-arrow">→</span>
+                      <div class="calculated-display">
+                        <span class="calc-value" data-country="${country}">${countryPct.toFixed(1)}%</span>
+                      </div>
+                      <div class="item-status">
+                        <span class="country-per-day-display" data-country="${country}">$${Math.round(budgetPerDay)}/day</span>
+                        <span class="current-spend">Spent: ${this.formatCurrency(countryCosts)}</span>
+                        <div class="mini-progress-bar ${barClass}">
+                          <div class="mini-progress-fill" style="width: ${Math.min(pct, 100)}%"></div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 `;
@@ -193,6 +307,10 @@ export class BudgetManager {
             </div>
           </div>
         ` : ''}
+
+        <div class="budget-footer">
+          <button class="btn-primary" id="save-budget-btn-footer">💾 Save Budget</button>
+        </div>
       </div>
     `;
   }
@@ -210,240 +328,51 @@ export class BudgetManager {
     // Custom budget button
     const customBtn = this.container.querySelector('#custom-budget-btn');
     customBtn?.addEventListener('click', () => {
-      this.showCustomBudgetDialog();
+      const newBudget = createDefaultBudget(this.tripData, 10);
+      this.budget = newBudget;
+      this.onBudgetUpdate?.(newBudget);
+      this.render();
     });
 
-    // Edit budget button
-    const editBtn = this.container.querySelector('#edit-budget-btn');
-    editBtn?.addEventListener('click', () => {
-      this.showCustomBudgetDialog();
-    });
+    // If budget exists, attach integrated edit listeners
+    if (this.budget) {
+      this.attachBudgetEditListeners();
+    }
   }
 
-  private showCustomBudgetDialog() {
-    const totalCosts = (this.tripData.costs || [])
-      .reduce((sum, cost) => sum + (cost.amount_usd || cost.amount || 0), 0);
+  private attachBudgetEditListeners() {
+    const totalBudgetInput = this.container.querySelector('#total-budget') as HTMLInputElement;
+    const contingencyInput = this.container.querySelector('#contingency-pct') as HTMLInputElement;
 
-    const currentBudget = this.budget?.total_budget_usd || totalCosts * 1.1;
-    const currentContingency = this.budget?.contingency_pct || 10;
+    if (!totalBudgetInput) return;
 
-    // Get all unique categories and countries
-    const categories = new Set<string>();
-    const countries = new Set<string>();
-
-    (this.tripData.costs || []).forEach(cost => {
-      if (cost.category) categories.add(cost.category);
-      if (cost.destination_id) {
-        const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
-        if (location?.country) {
-          countries.add(location.country);
-        }
-      }
-    });
-
-    // Create modal
-    const modal = document.createElement('div');
-    modal.className = 'budget-edit-modal';
-    modal.innerHTML = `
-      <div class="budget-edit-dialog">
-        <div class="dialog-header">
-          <h3>Edit Budget</h3>
-          <button class="close-btn" id="close-edit-dialog">×</button>
-        </div>
-
-        <div class="dialog-body">
-          <div class="form-section">
-            <h4>Overall Budget</h4>
-            <div class="form-group">
-              <label for="total-budget">Total Budget (USD)</label>
-              <input type="number" id="total-budget" value="${Math.round(currentBudget)}" min="0" step="100">
-            </div>
-            <div class="form-group">
-              <label for="contingency-pct">Contingency (%)</label>
-              <input type="number" id="contingency-pct" value="${currentContingency}" min="0" max="100" step="1">
-              <small>Percentage above current costs for buffer</small>
-            </div>
-          </div>
-
-          <div class="form-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <h4 style="margin: 0;">Budget by Category</h4>
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="mode-indicator" id="category-mode-indicator" style="font-size: 13px; color: #666; font-weight: 500;">Mode: Dollar Amounts</span>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="category-mode-toggle">
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-label">Use %</span>
-                </label>
-              </div>
-            </div>
-
-            <div id="allocation-status" style="display: none; padding: 12px; background: #f8f9fa; border-radius: 6px; margin-bottom: 16px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <strong>Total Allocated:</strong> <span id="total-allocated-pct">0</span>%
-                </div>
-                <div id="allocation-remainder" style="font-weight: 600;"></div>
-              </div>
-            </div>
-
-            <div id="category-budgets">
-              ${Array.from(categories).map(cat => {
-                const catCosts = (this.tripData.costs || [])
-                  .filter(c => c.category === cat)
-                  .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
-                const catBudget = this.budget?.budgets_by_category?.[cat] || catCosts * 1.1;
-                const catPct = currentBudget > 0 ? (catBudget / currentBudget * 100) : 0;
-                return `
-                  <div class="form-group">
-                    <label for="cat-${cat}">${cat.replace(/_/g, ' ')}</label>
-                    <div class="budget-input-group budget-input-row">
-                      <div class="input-with-unit">
-                        <input type="number"
-                               class="cat-input"
-                               id="cat-${cat}"
-                               data-category="${cat}"
-                               data-dollar-value="${Math.round(catBudget)}"
-                               value="${Math.round(catBudget)}"
-                               min="0"
-                               step="10">
-                        <span class="input-unit" data-category="${cat}">USD</span>
-                      </div>
-                      <span class="calc-arrow">→</span>
-                      <div class="calculated-display">
-                        <span class="calc-value" data-category="${cat}">${catPct.toFixed(1)}%</span>
-                      </div>
-                      <span class="current-spend">Spent: $${Math.round(catCosts).toLocaleString()}</span>
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-
-          <div class="form-section">
-            <h4>Budget by Country</h4>
-            <div id="country-budgets">
-              ${Array.from(countries).map(country => {
-                // Calculate total days in this country
-                const countryDays = (this.tripData.locations || [])
-                  .filter(loc => loc.country === country)
-                  .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
-
-                // Calculate current costs in this country
-                const countryCosts = (this.tripData.costs || [])
-                  .filter(c => {
-                    const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
-                    return location?.country === country;
-                  })
-                  .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
-
-                const countryBudget = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
-                const currentPerDay = countryDays > 0 ? countryCosts / countryDays : 0;
-                const budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
-
-                return `
-                  <div class="form-group">
-                    <label for="country-${country}">${country} <span style="color: #666; font-weight: normal;">(${countryDays} day${countryDays !== 1 ? 's' : ''})</span></label>
-
-                    <div style="display: flex; gap: 12px; margin-bottom: 8px;">
-                      <div style="flex: 1;">
-                        <label style="font-size: 12px; color: #666; margin-bottom: 4px;">Total Budget</label>
-                        <div class="budget-input-group">
-                          <input type="number"
-                                 class="country-total-input"
-                                 id="country-${country}"
-                                 data-country="${country}"
-                                 data-days="${countryDays}"
-                                 value="${Math.round(countryBudget)}"
-                                 min="0"
-                                 step="10">
-                          <span style="font-size: 12px; color: #666;">USD</span>
-                        </div>
-                      </div>
-
-                      <div style="flex: 1;">
-                        <label style="font-size: 12px; color: #666; margin-bottom: 4px;">Per Day</label>
-                        <div class="budget-input-group">
-                          <input type="number"
-                                 class="country-perday-input"
-                                 data-country="${country}"
-                                 data-days="${countryDays}"
-                                 value="${Math.round(budgetPerDay)}"
-                                 min="0"
-                                 step="1">
-                          <span style="font-size: 12px; color: #666;">USD/day</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style="display: flex; gap: 16px; font-size: 12px; color: #666;">
-                      <span>Current Spend: $${Math.round(countryCosts).toLocaleString()} ($${Math.round(currentPerDay)}/day)</span>
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        </div>
-
-        <div class="dialog-footer">
-          <button class="btn-secondary" id="cancel-edit-btn">Cancel</button>
-          <button class="btn-primary" id="save-budget-btn">Save Budget</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    // Track if changes have been made
-    let isDirty = false;
-
-    // Event listeners
-    const closeDialog = (force: boolean = false) => {
-      if (!force && isDirty) {
-        const confirmClose = confirm('You have unsaved changes. Are you sure you want to close without saving?');
-        if (!confirmClose) return;
-      }
-      modal.remove();
-    };
-
-    modal.querySelector('#close-edit-dialog')?.addEventListener('click', () => closeDialog());
-    modal.querySelector('#cancel-edit-btn')?.addEventListener('click', () => closeDialog());
-    // Removed backdrop click-to-close to prevent accidental closure
-
-    // Category percentage/dollar toggle logic
-    const categoryModeToggle = modal.querySelector('#category-mode-toggle') as HTMLInputElement;
-    const modeIndicator = modal.querySelector('#category-mode-indicator') as HTMLElement;
-    const allocationStatus = modal.querySelector('#allocation-status') as HTMLElement;
-    const totalAllocatedSpan = modal.querySelector('#total-allocated-pct') as HTMLElement;
-    const allocationRemainder = modal.querySelector('#allocation-remainder') as HTMLElement;
-    const totalBudgetInput = modal.querySelector('#total-budget') as HTMLInputElement;
+    // Category mode toggle logic
+    const categoryModeToggle = this.container.querySelector('#category-mode-toggle') as HTMLInputElement;
+    const categoryModeIndicator = this.container.querySelector('#category-mode-indicator') as HTMLElement;
+    const allocationStatus = this.container.querySelector('#allocation-status') as HTMLElement;
+    const totalAllocatedSpan = this.container.querySelector('#total-allocated-pct') as HTMLElement;
+    const allocationRemainder = this.container.querySelector('#allocation-remainder') as HTMLElement;
 
     let isPercentageMode = false;
 
-    // Update calculated display (shows opposite of input mode)
+    // Update calculated displays for categories
     const updateCalculatedDisplays = () => {
       const totalBudget = parseFloat(totalBudgetInput.value) || 0;
 
-      modal.querySelectorAll('.cat-input').forEach(input => {
+      this.container.querySelectorAll('.cat-input').forEach(input => {
         const el = input as HTMLInputElement;
         const category = el.dataset.category!;
-        const calcValueSpan = modal.querySelector(`.calc-value[data-category="${category}"]`) as HTMLElement;
+        const calcValueSpan = this.container.querySelector(`.calc-value[data-category="${category}"]`) as HTMLElement;
 
         if (isPercentageMode) {
-          // Input is %, show calculated $
           const pct = parseFloat(el.value) || 0;
           const dollars = Math.round(totalBudget * pct / 100);
           calcValueSpan.textContent = `$${dollars.toLocaleString()}`;
-          // Store dollar value for saving
           el.dataset.dollarValue = dollars.toString();
         } else {
-          // Input is $, show calculated %
           const dollars = parseFloat(el.value) || 0;
           const pct = totalBudget > 0 ? (dollars / totalBudget * 100) : 0;
           calcValueSpan.textContent = `${pct.toFixed(1)}%`;
-          // Store dollar value for saving
           el.dataset.dollarValue = dollars.toString();
         }
       });
@@ -453,10 +382,10 @@ export class BudgetManager {
       }
     };
 
-    // Update allocation status (only in % mode)
+    // Update allocation status for categories
     const updateAllocationStatus = () => {
       let totalPct = 0;
-      modal.querySelectorAll('.cat-input').forEach(input => {
+      this.container.querySelectorAll('.cat-input').forEach(input => {
         const el = input as HTMLInputElement;
         totalPct += parseFloat(el.value) || 0;
       });
@@ -478,35 +407,27 @@ export class BudgetManager {
       }
     };
 
-    // Toggle between % and $ mode
-    categoryModeToggle.addEventListener('change', () => {
+    // Category toggle between % and $
+    categoryModeToggle?.addEventListener('change', () => {
       isPercentageMode = categoryModeToggle.checked;
       const totalBudget = parseFloat(totalBudgetInput.value) || 0;
 
-      // Update mode indicator
-      modeIndicator.textContent = isPercentageMode ? 'Mode: Percentages' : 'Mode: Dollar Amounts';
-
-      // Show/hide allocation status
+      categoryModeIndicator.textContent = isPercentageMode ? 'Mode: Percentages' : 'Mode: Dollar Amounts';
       allocationStatus.style.display = isPercentageMode ? 'block' : 'none';
 
-      // Note: Don't mark as dirty just for switching modes, only for actual value changes
-
-      // Update all input fields and labels
-      modal.querySelectorAll('.cat-input').forEach(input => {
+      this.container.querySelectorAll('.cat-input').forEach(input => {
         const el = input as HTMLInputElement;
         const category = el.dataset.category!;
-        const unitSpan = modal.querySelector(`.input-unit[data-category="${category}"]`) as HTMLElement;
+        const unitSpan = this.container.querySelector(`.input-unit[data-category="${category}"]`) as HTMLElement;
         const currentDollarValue = parseFloat(el.dataset.dollarValue!) || parseFloat(el.value) || 0;
 
         if (isPercentageMode) {
-          // Switch to percentage input
           const pct = totalBudget > 0 ? (currentDollarValue / totalBudget * 100) : 0;
           el.value = pct.toFixed(1);
           el.step = '0.1';
           el.max = '100';
           unitSpan.textContent = '%';
         } else {
-          // Switch to dollar input
           el.value = Math.round(currentDollarValue).toString();
           el.step = '10';
           el.removeAttribute('max');
@@ -517,84 +438,145 @@ export class BudgetManager {
       updateCalculatedDisplays();
     });
 
-    // Mark as dirty and update calculated displays when input changes
-    const markDirty = () => {
-      isDirty = true;
-    };
-
-    modal.querySelectorAll('.cat-input').forEach(input => {
+    // Update category displays when inputs change
+    this.container.querySelectorAll('.cat-input').forEach(input => {
       input.addEventListener('input', () => {
-        markDirty();
         updateCalculatedDisplays();
       });
     });
 
-    // Track changes in total budget
+    // Update when total budget changes
     totalBudgetInput.addEventListener('input', () => {
-      markDirty();
       updateCalculatedDisplays();
+      updateCountryCalculatedDisplays();
     });
 
-    // Track changes in contingency
-    const contingencyInput = modal.querySelector('#contingency-pct') as HTMLInputElement;
-    contingencyInput?.addEventListener('input', markDirty);
+    // Country mode toggle logic
+    const countryModeToggle = this.container.querySelector('#country-mode-toggle') as HTMLInputElement;
+    const countryModeIndicator = this.container.querySelector('#country-mode-indicator') as HTMLElement;
+    const countryAllocationStatus = this.container.querySelector('#country-allocation-status') as HTMLElement;
+    const countryTotalAllocatedSpan = this.container.querySelector('#country-total-allocated-pct') as HTMLElement;
+    const countryAllocationRemainder = this.container.querySelector('#country-allocation-remainder') as HTMLElement;
 
-    // Sync country total and per-day inputs
-    modal.querySelectorAll('.country-total-input').forEach(input => {
-      input.addEventListener('input', (e) => {
-        markDirty();
-        const totalInput = e.target as HTMLInputElement;
-        const country = totalInput.dataset.country!;
-        const days = parseFloat(totalInput.dataset.days!) || 1;
-        const total = parseFloat(totalInput.value) || 0;
-        const perDay = total / days;
+    let isCountryPercentageMode = false;
 
-        const perDayInput = modal.querySelector(`.country-perday-input[data-country="${country}"]`) as HTMLInputElement;
-        if (perDayInput) {
-          perDayInput.value = Math.round(perDay).toString();
+    // Update calculated displays for countries
+    const updateCountryCalculatedDisplays = () => {
+      const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+
+      this.container.querySelectorAll('.country-input').forEach(input => {
+        const el = input as HTMLInputElement;
+        const country = el.dataset.country!;
+        const days = parseFloat(el.dataset.days!) || 1;
+        const calcValueSpan = this.container.querySelector(`.calc-value[data-country="${country}"]`) as HTMLElement;
+        const perDayDisplay = this.container.querySelector(`.country-per-day-display[data-country="${country}"]`) as HTMLElement;
+
+        if (isCountryPercentageMode) {
+          const pct = parseFloat(el.value) || 0;
+          const dollars = Math.round(totalBudget * pct / 100);
+          const perDay = days > 0 ? Math.round(dollars / days) : 0;
+          calcValueSpan.textContent = `$${dollars.toLocaleString()}`;
+          perDayDisplay.textContent = `$${perDay}/day`;
+          el.dataset.dollarValue = dollars.toString();
+        } else {
+          const dollars = parseFloat(el.value) || 0;
+          const pct = totalBudget > 0 ? (dollars / totalBudget * 100) : 0;
+          const perDay = days > 0 ? Math.round(dollars / days) : 0;
+          calcValueSpan.textContent = `${pct.toFixed(1)}%`;
+          perDayDisplay.textContent = `$${perDay}/day`;
+          el.dataset.dollarValue = dollars.toString();
         }
+      });
+
+      if (isCountryPercentageMode) {
+        updateCountryAllocationStatus();
+      }
+    };
+
+    // Update allocation status for countries
+    const updateCountryAllocationStatus = () => {
+      let totalPct = 0;
+      this.container.querySelectorAll('.country-input').forEach(input => {
+        const el = input as HTMLInputElement;
+        totalPct += parseFloat(el.value) || 0;
+      });
+
+      countryTotalAllocatedSpan.textContent = totalPct.toFixed(1);
+
+      const remainder = 100 - totalPct;
+      const absRemainder = Math.abs(remainder);
+
+      if (Math.abs(remainder) < 0.1) {
+        countryAllocationRemainder.textContent = '✓ Fully Allocated';
+        countryAllocationRemainder.style.color = '#28a745';
+      } else if (remainder > 0) {
+        countryAllocationRemainder.textContent = `${absRemainder.toFixed(1)}% Unallocated`;
+        countryAllocationRemainder.style.color = '#ffc107';
+      } else {
+        countryAllocationRemainder.textContent = `${absRemainder.toFixed(1)}% Over-allocated`;
+        countryAllocationRemainder.style.color = '#dc3545';
+      }
+    };
+
+    // Country toggle between % and $
+    countryModeToggle?.addEventListener('change', () => {
+      isCountryPercentageMode = countryModeToggle.checked;
+      const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+
+      countryModeIndicator.textContent = isCountryPercentageMode ? 'Mode: Percentages' : 'Mode: Dollar Amounts';
+      countryAllocationStatus.style.display = isCountryPercentageMode ? 'block' : 'none';
+
+      this.container.querySelectorAll('.country-input').forEach(input => {
+        const el = input as HTMLInputElement;
+        const country = el.dataset.country!;
+        const unitSpan = this.container.querySelector(`.input-unit[data-country="${country}"]`) as HTMLElement;
+        const currentDollarValue = parseFloat(el.dataset.dollarValue!) || parseFloat(el.value) || 0;
+
+        if (isCountryPercentageMode) {
+          const pct = totalBudget > 0 ? (currentDollarValue / totalBudget * 100) : 0;
+          el.value = pct.toFixed(1);
+          el.step = '0.1';
+          el.max = '100';
+          unitSpan.textContent = '%';
+        } else {
+          el.value = Math.round(currentDollarValue).toString();
+          el.step = '10';
+          el.removeAttribute('max');
+          unitSpan.textContent = 'USD';
+        }
+      });
+
+      updateCountryCalculatedDisplays();
+    });
+
+    // Update country displays when inputs change
+    this.container.querySelectorAll('.country-input').forEach(input => {
+      input.addEventListener('input', () => {
+        updateCountryCalculatedDisplays();
       });
     });
 
-    modal.querySelectorAll('.country-perday-input').forEach(input => {
-      input.addEventListener('input', (e) => {
-        markDirty();
-        const perDayInput = e.target as HTMLInputElement;
-        const country = perDayInput.dataset.country!;
-        const days = parseFloat(perDayInput.dataset.days!) || 1;
-        const perDay = parseFloat(perDayInput.value) || 0;
-        const total = perDay * days;
-
-        const totalInput = modal.querySelector(`.country-total-input[data-country="${country}"]`) as HTMLInputElement;
-        if (totalInput) {
-          totalInput.value = Math.round(total).toString();
-        }
-      });
-    });
-
-    modal.querySelector('#save-budget-btn')?.addEventListener('click', () => {
-      const totalBudgetInput = modal.querySelector('#total-budget') as HTMLInputElement;
-      const contingencyInput = modal.querySelector('#contingency-pct') as HTMLInputElement;
-
+    // Save budget functionality
+    const saveBudget = () => {
       const totalBudget = parseFloat(totalBudgetInput.value) || 0;
       const contingency = parseFloat(contingencyInput.value) || 0;
 
-      // Collect category budgets - ALWAYS save dollar amounts
+      // Collect category budgets - use stored dollar values
       const budgets_by_category: Record<string, number> = {};
-      modal.querySelectorAll('.cat-input').forEach(input => {
+      this.container.querySelectorAll('.cat-input').forEach(input => {
         const el = input as HTMLInputElement;
         const category = el.dataset.category!;
-        // Use stored dollar value (which is updated as user types)
         const dollarValue = parseFloat(el.dataset.dollarValue!) || 0;
         budgets_by_category[category] = dollarValue;
       });
 
-      // Collect country budgets (always in dollars) - use total inputs
+      // Collect country budgets - use stored dollar values
       const budgets_by_country: Record<string, number> = {};
-      modal.querySelectorAll('.country-total-input').forEach(input => {
+      this.container.querySelectorAll('.country-input').forEach(input => {
         const el = input as HTMLInputElement;
         const country = el.dataset.country!;
-        budgets_by_country[country] = parseFloat(el.value) || 0;
+        const dollarValue = parseFloat(el.dataset.dollarValue!) || 0;
+        budgets_by_country[country] = dollarValue;
       });
 
       const newBudget: TripBudget = {
@@ -608,8 +590,11 @@ export class BudgetManager {
       this.budget = newBudget;
       this.onBudgetUpdate?.(newBudget);
       this.render();
-      closeDialog(true); // Force close without confirmation since we just saved
-    });
+    };
+
+    // Attach save listeners to both buttons
+    this.container.querySelector('#save-budget-btn')?.addEventListener('click', saveBudget);
+    this.container.querySelector('#save-budget-btn-footer')?.addEventListener('click', saveBudget);
   }
 
   render() {
@@ -911,140 +896,185 @@ export const budgetManagerStyles = `
   color: #007bff;
 }
 
-/* Budget Edit Modal */
-.budget-edit-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+/* Integrated budget interface styles */
+.budget-manager.integrated {
+  max-width: 100%;
+}
+
+.header-actions {
   display: flex;
+  gap: 10px;
   align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  padding: 20px;
 }
 
-.budget-edit-dialog {
-  background: white;
+.budget-edit-section {
+  background: #f8f9fa;
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  max-width: 600px;
-  width: 100%;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
+  padding: 20px;
+  margin: 20px 0;
+  border: 1px solid #e0e0e0;
 }
 
-.dialog-header {
+.budget-edit-section h4 {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 15px;
 }
 
-.dialog-header h3 {
+.section-header h4 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
 }
 
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 28px;
-  color: #666;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
+.mode-controls {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 4px;
+  gap: 12px;
 }
 
-.close-btn:hover {
-  background: #f0f0f0;
-}
-
-.dialog-body {
-  padding: 24px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.form-section {
-  margin-bottom: 24px;
-}
-
-.form-section h4 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #007bff;
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group label {
-  display: block;
-  font-size: 14px;
+.mode-indicator {
+  font-size: 13px;
+  color: #666;
   font-weight: 500;
-  margin-bottom: 6px;
-  color: #333;
-  text-transform: capitalize;
 }
 
-.form-group input[type="number"] {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.form-group input[type="number"]:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-}
-
-.form-group small {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  color: #666;
-}
-
-.budget-input-group {
+.budget-overview-edit {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
 }
 
-.budget-input-group input {
+.form-group-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   flex: 1;
+  min-width: 200px;
 }
 
-.budget-input-group .current-spend {
+.form-group-inline label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.budget-status-display {
+  display: flex;
+  gap: 20px;
+  padding: 15px;
+  background: white;
+  border-radius: 6px;
+  margin: 15px 0;
+  flex-wrap: wrap;
+}
+
+.status-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.status-label {
   font-size: 12px;
   color: #666;
-  white-space: nowrap;
+  text-transform: uppercase;
 }
 
-/* Budget Input Row Layout (for percentage/dollar toggle) */
-.budget-input-row {
+.status-value {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.status-value.positive {
+  color: #28a745;
+}
+
+.status-value.negative {
+  color: #dc3545;
+}
+
+.status-value.over-budget,
+.status-value.warning {
+  color: #dc3545;
+}
+
+.allocation-status {
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  margin: 15px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.allocation-info {
+  font-size: 14px;
+}
+
+.allocation-remainder {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.budget-items-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.budget-item-edit {
+  background: white;
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.item-label {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.days-label {
+  font-weight: normal;
+  color: #666;
+  font-size: 13px;
+}
+
+.item-input-row {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.item-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 300px;
+}
+
+.item-status .mini-progress-bar {
+  flex: 1;
+  min-width: 100px;
+}
+
+.budget-footer {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 2px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .input-with-unit {
@@ -1097,23 +1127,10 @@ export const budgetManagerStyles = `
   white-space: nowrap;
 }
 
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 24px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.dialog-footer .btn-primary,
-.dialog-footer .btn-secondary {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
+.current-spend {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
 }
 
 /* Toggle Switch */
@@ -1168,38 +1185,9 @@ export const budgetManagerStyles = `
   color: #666;
 }
 
-/* Dual Input Container */
-.dual-input-container {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-}
-
-.dual-input-container input {
-  width: 100%;
-  padding-right: 45px;
-}
-
-.input-suffix {
-  position: absolute;
-  right: 12px;
-  font-size: 13px;
-  color: #666;
-  font-weight: 500;
-  pointer-events: none;
-}
-
-.calculated-amount {
-  font-size: 13px;
-  color: #007bff;
-  font-weight: 600;
-  white-space: nowrap;
-  margin-left: 8px;
-}
-
 /* Allocation status colors */
-#allocation-status {
+#allocation-status,
+#country-allocation-status {
   border-left: 4px solid #007bff;
 }
 </style>
