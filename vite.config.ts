@@ -6,7 +6,13 @@ export default defineConfig({
   root: resolve(__dirname, 'web'),
   base: '/',
   server: {
-    port: 5173
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5001',
+        changeOrigin: true
+      }
+    }
   },
   build: {
     outDir: resolve(__dirname, 'web', 'dist'),
