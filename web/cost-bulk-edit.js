@@ -1093,10 +1093,7 @@ if (typeof window !== 'undefined') {
   window.CostBulkEdit = CostBulkEdit;
 }
 
-// Export for use in other modules
+// Export for use in CommonJS modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { CostBulkEdit };
 }
-
-// ES6 export for modern modules
-export { CostBulkEdit };
