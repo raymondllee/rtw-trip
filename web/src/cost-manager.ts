@@ -4,6 +4,13 @@ import { BudgetManager, budgetManagerStyles } from './components/BudgetManager';
 import { updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase-config';
 
+// Extend window interface for CostBulkEdit
+declare global {
+  interface Window {
+    CostBulkEdit: any;
+  }
+}
+
 // Get scenario ID from URL params
 const urlParams = new URLSearchParams(window.location.search);
 const scenarioId = urlParams.get('scenario');
@@ -52,11 +59,13 @@ async function initEditCostsTab() {
   const tabPanel = document.querySelector('#tab-edit-costs .tab-panel');
 
   try {
-    // Dynamically import the bulk edit class
-    const { CostBulkEdit } = await import('../cost-bulk-edit.js');
+    // Use globally loaded CostBulkEdit class
+    if (!window.CostBulkEdit) {
+      throw new Error('CostBulkEdit class not loaded. Ensure cost-bulk-edit.js is loaded before cost-manager.ts');
+    }
 
     // Create instance
-    bulkEditor = new CostBulkEdit('http://localhost:5001');
+    bulkEditor = new window.CostBulkEdit('http://localhost:5001');
     bulkEditor.setSessionId(scenarioId);
     bulkEditor.setDestinations(currentVersionData.itineraryData.locations || []);
 
