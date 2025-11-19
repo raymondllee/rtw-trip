@@ -547,31 +547,6 @@ html, body {
   transform: scale(0.95);
 }
 
-.education-hub-link {
-  padding: 6px 12px;
-  border: 1px solid #4A90E2;
-  border-radius: 4px;
-  background: #4A90E2;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.education-hub-link:hover {
-  background: #357ABD;
-  border-color: #357ABD;
-}
-
-.education-hub-link:active {
-  transform: scale(0.95);
-}
-
 .scenario-actions-btn-compact {
   padding: 4px 8px;
   border: 1px solid #ddd;
@@ -752,6 +727,16 @@ html, body {
   height: 1px;
   background: #eee;
   margin: 4px 0;
+}
+
+/* Anchor dropdown items should look like buttons */
+.scenario-actions-dropdown a.dropdown-item {
+  text-decoration: none;
+  color: #333;
+}
+
+.scenario-actions-dropdown a.dropdown-item:hover {
+  text-decoration: none;
 }
 
 /* Position the dropdown relative to sidebar */
