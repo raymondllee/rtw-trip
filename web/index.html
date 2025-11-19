@@ -63,37 +63,40 @@
 
       <!-- Scenario Actions Dropdown -->
       <div class="scenario-actions-dropdown" id="scenario-actions-dropdown" style="display: none;">
+        <!-- Itinerary Group -->
+        <div class="dropdown-group-header">Itinerary</div>
         <button id="manage-scenarios-btn" class="dropdown-item">
           <span class="icon">⚙️</span>
           <span>Manage Scenarios</span>
         </button>
-        <div class="dropdown-divider"></div>
-        <a href="education-dashboard.html" class="dropdown-item education-hub-dropdown-link">
-          <span class="icon">📚</span>
-          <span>Education Hub</span>
-        </a>
-        <div class="dropdown-divider"></div>
         <button id="generate-summary-btn" class="dropdown-item">
-          <span class="icon">📄</span>
-          <span>View Trip Summary</span>
-        </button>
-        <button id="view-summary-btn" class="dropdown-item" disabled>
           <span class="icon">👁️</span>
           <span>View Summary</span>
         </button>
         <div class="dropdown-divider"></div>
-        <button id="student-dashboard-btn" class="dropdown-item">
+
+        <!-- School Group -->
+        <div class="dropdown-group-header">School</div>
+        <a href="education-dashboard.html" class="dropdown-item education-hub-dropdown-link">
           <span class="icon">📚</span>
+          <span>Education Hub</span>
+        </a>
+        <button id="student-dashboard-btn" class="dropdown-item">
+          <span class="icon">🎓</span>
           <span>Student Dashboard</span>
         </button>
+        <div class="dropdown-divider"></div>
+
+        <!-- Costs Group -->
+        <div class="dropdown-group-header">Costs</div>
         <button id="manage-costs-budget-btn" class="dropdown-item">
           <span class="icon">💰</span>
           <span>Manage Costs & Budget</span>
         </button>
-        <button id="compare-costs-btn" class="dropdown-item">
-          <span class="icon">📈</span>
-          <span>Compare Scenarios</span>
-        </button>
+        <div class="dropdown-divider"></div>
+
+        <!-- Utilities Group -->
+        <div class="dropdown-group-header">Utilities</div>
         <button id="data-integrity-btn" class="dropdown-item">
           <span class="icon">🔍</span>
           <span>Data Integrity</span>
@@ -104,7 +107,6 @@
           <span>Geographic Data</span>
           <span id="geo-validation-badge" style="margin-left: auto;"></span>
         </button>
-        <div class="dropdown-divider"></div>
         <button id="import-scenarios-btn" class="dropdown-item">
           <span class="icon">📥</span>
           <span>Import</span>

@@ -45,18 +45,20 @@ async function fetchDestinations() {
         const response = await fetch('/api/education/destinations');
         if (!response.ok) throw new Error('Failed to fetch destinations');
         const data = await response.json();
+        console.log('✅ Fetched destinations:', data.destinations?.length || 0, 'destinations');
         return data.destinations || [];
     } catch (error) {
-        console.error('Error fetching destinations:', error);
+        console.error('❌ Error fetching destinations:', error);
         return [];
     }
 }
 
 function renderModalContent(modal: HTMLElement, destinations: any[], studentId: string) {
+    console.log('📋 Rendering modal with', destinations.length, 'destinations');
     modal.innerHTML = `
         <div class="modal" style="background: #1e293b; padding: 2rem; border-radius: 1rem; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; color: #f8fafc;">
             <h2 style="margin-bottom: 1.5rem; font-size: 1.5rem;">Generate All Curricula</h2>
-            
+
             <div id="bulk-step-1">
                 <p style="margin-bottom: 1rem; color: #94a3b8;">Select locations to generate curriculum for:</p>
                 
@@ -66,12 +68,12 @@ function renderModalContent(modal: HTMLElement, destinations: any[], studentId: 
                 </div>
 
                 <div class="locations-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; margin-bottom: 2rem; max-height: 300px; overflow-y: auto; padding: 0.5rem; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem;">
-                    ${destinations.map(dest => `
+                    ${destinations.length > 0 ? destinations.map(dest => `
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.25rem;">
-                            <input type="checkbox" class="location-checkbox" value="${dest.id}" data-name="${dest.name}" checked>
+                            <input type="checkbox" class="location-checkbox" value="${dest.id}" data-name="${dest.name}" data-country="${dest.country || ''}" data-days="${dest.days || 7}" data-arrival="${dest.arrival_date || ''}" data-departure="${dest.departure_date || ''}" checked>
                             <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${dest.name}</span>
                         </label>
-                    `).join('')}
+                    `).join('') : '<div style="padding: 2rem; text-align: center; color: #ef4444; grid-column: 1 / -1;">⚠️ No destinations found. Please create a trip scenario first.</div>'}
                 </div>
 
                 <div class="form-group" style="margin-bottom: 1.5rem;">
@@ -129,7 +131,11 @@ function renderModalContent(modal: HTMLElement, destinations: any[], studentId: 
         const selectedCheckboxes = Array.from(modal.querySelectorAll<HTMLInputElement>('.location-checkbox:checked'));
         const selectedLocations = selectedCheckboxes.map(cb => ({
             id: cb.value,
-            name: cb.getAttribute('data-name')
+            name: cb.getAttribute('data-name') || '',
+            country: cb.getAttribute('data-country') || '',
+            duration_days: parseInt(cb.getAttribute('data-days') || '7'),
+            arrival_date: cb.getAttribute('data-arrival') || '',
+            departure_date: cb.getAttribute('data-departure') || ''
         }));
 
         const selectedSubjects = Array.from(modal.querySelectorAll<HTMLInputElement>('input[name="subject"]:checked')).map(cb => cb.value);
