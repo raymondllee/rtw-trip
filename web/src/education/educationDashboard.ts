@@ -109,7 +109,9 @@ async function loadStudents() {
         showLoading('Loading students...');
 
         // Load students from Firestore
-        const response = await fetch('http://localhost:5001/api/education/students');
+        const response = await fetch('http://localhost:5001/api/education/students', {
+            cache: 'no-store'
+        });
         if (!response.ok) {
             throw new Error('Failed to load students');
         }
