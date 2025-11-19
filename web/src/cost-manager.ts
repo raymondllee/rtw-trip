@@ -347,19 +347,17 @@ function initBudgetTab() {
     tripData,
     tripData.budget,
     async (updatedBudget) => {
-      // Save budget to both scenario AND version to ensure persistence
+      // Save budget to version document to ensure persistence
       try {
-        // Update the scenario document
-        const scenarioRef = doc(db, 'scenarios', scenarioId);
-
         // Also update currentVersionData so the budget persists in the version
         currentVersionData.itineraryData.budget = updatedBudget;
 
-        // Get the current version number
-        const currentVersion = currentScenario.currentVersion || 0;
+        // Update the version document with the budget using the actual document ID
+        if (!currentVersionData.id) {
+          throw new Error('Version document ID not found');
+        }
 
-        // Update the version document with the budget
-        const versionRef = doc(db, 'scenarios', scenarioId, 'versions', `v${currentVersion}`);
+        const versionRef = doc(db, 'scenarios', scenarioId, 'versions', currentVersionData.id);
         await updateDoc(versionRef, {
           'itineraryData.budget': updatedBudget,
           updatedAt: Timestamp.now()
