@@ -13,7 +13,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'web', 'index.html'),
-        education: resolve(__dirname, 'web', 'education-dashboard.html')
+        education: resolve(__dirname, 'web', 'education-dashboard.html'),
+        student_dashboard: resolve(__dirname, 'web', 'student-dashboard.html')
       }
     }
   },
