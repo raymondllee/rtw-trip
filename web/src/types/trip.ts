@@ -185,7 +185,7 @@ export interface BudgetAlert {
 export interface TripBudget {
   total_budget_usd: number;
   budgets_by_category: Record<string, number>;
-  budgets_by_destination: Record<string, number>;
+  budgets_by_country: Record<string, number>;
   contingency_pct: number;  // e.g., 10% buffer
   alerts: BudgetAlert[];
   created_at?: string;

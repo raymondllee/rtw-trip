@@ -165,18 +165,18 @@ export class BudgetManager {
           </div>
         </div>
 
-        <!-- Destination Breakdown -->
-        ${Object.keys(status.by_destination).length > 0 ? `
+        <!-- Country Breakdown -->
+        ${Object.keys(status.by_country).length > 0 ? `
           <div class="budget-breakdown">
-            <h4>🌍 By Destination</h4>
+            <h4>🌍 By Country</h4>
             <div class="budget-items">
-              ${Object.entries(status.by_destination).map(([destination, data]) => {
+              ${Object.entries(status.by_country).map(([country, data]) => {
                 const pct = data.percentage;
                 const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
                 return `
                   <div class="budget-item">
                     <div class="item-header">
-                      <span class="item-name">${destination}</span>
+                      <span class="item-name">${country}</span>
                       <span class="item-amounts">
                         ${this.formatCurrency(data.spent)} / ${this.formatCurrency(data.budget)}
                       </span>
@@ -227,16 +227,16 @@ export class BudgetManager {
     const currentBudget = this.budget?.total_budget_usd || totalCosts * 1.1;
     const currentContingency = this.budget?.contingency_pct || 10;
 
-    // Get all unique categories and destinations
+    // Get all unique categories and countries
     const categories = new Set<string>();
-    const destinations = new Map<string, string>();
+    const countries = new Set<string>();
 
     (this.tripData.costs || []).forEach(cost => {
       if (cost.category) categories.add(cost.category);
       if (cost.destination_id) {
         const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
-        if (location) {
-          destinations.set(cost.destination_id, location.name || location.city || cost.destination_id);
+        if (location?.country) {
+          countries.add(location.country);
         }
       }
     });
@@ -322,19 +322,22 @@ export class BudgetManager {
           </div>
 
           <div class="form-section">
-            <h4>Budget by Destination</h4>
-            <div id="destination-budgets">
-              ${Array.from(destinations).map(([id, name]) => {
-                const destCosts = (this.tripData.costs || [])
-                  .filter(c => c.destination_id === id)
+            <h4>Budget by Country</h4>
+            <div id="country-budgets">
+              ${Array.from(countries).map(country => {
+                const countryCosts = (this.tripData.costs || [])
+                  .filter(c => {
+                    const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+                    return location?.country === country;
+                  })
                   .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
-                const destBudget = this.budget?.budgets_by_destination?.[id] || destCosts * 1.1;
+                const countryBudget = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
                 return `
                   <div class="form-group">
-                    <label for="dest-${id}">${name}</label>
+                    <label for="country-${country}">${country}</label>
                     <div class="budget-input-group">
-                      <input type="number" id="dest-${id}" data-destination="${id}" value="${Math.round(destBudget)}" min="0" step="10">
-                      <span class="current-spend">Current: $${Math.round(destCosts).toLocaleString()}</span>
+                      <input type="number" id="country-${country}" data-country="${country}" value="${Math.round(countryBudget)}" min="0" step="10">
+                      <span class="current-spend">Current: $${Math.round(countryCosts).toLocaleString()}</span>
                     </div>
                   </div>
                 `;
@@ -491,18 +494,18 @@ export class BudgetManager {
         budgets_by_category[category] = dollarValue;
       });
 
-      // Collect destination budgets (always in dollars)
-      const budgets_by_destination: Record<string, number> = {};
-      modal.querySelectorAll('[data-destination]').forEach(input => {
+      // Collect country budgets (always in dollars)
+      const budgets_by_country: Record<string, number> = {};
+      modal.querySelectorAll('[data-country]').forEach(input => {
         const el = input as HTMLInputElement;
-        const destId = el.dataset.destination!;
-        budgets_by_destination[destId] = parseFloat(el.value) || 0;
+        const country = el.dataset.country!;
+        budgets_by_country[country] = parseFloat(el.value) || 0;
       });
 
       const newBudget: TripBudget = {
         total_budget_usd: totalBudget,
         budgets_by_category,
-        budgets_by_destination,
+        budgets_by_country,
         contingency_pct: contingency,
         alerts: []
       };
