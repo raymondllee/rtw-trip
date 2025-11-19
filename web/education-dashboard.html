@@ -10,7 +10,12 @@
     <!-- Header -->
     <header class="dashboard-header">
         <div class="header-content">
-            <h1>📚 Education Hub</h1>
+            <div class="header-left">
+                <h1>📚 Education Hub</h1>
+                <nav class="breadcrumb" id="breadcrumb">
+                    <span class="breadcrumb-item">Home</span>
+                </nav>
+            </div>
             <div class="header-actions">
                 <button id="new-student-btn" class="btn btn-primary">+ New Student</button>
                 <a href="index.html" class="btn btn-secondary">← Back to Trip Planner</a>
@@ -366,8 +371,18 @@
     <div id="curriculum-detail-modal" class="modal">
         <div class="modal-content modal-large">
             <div class="modal-header">
-                <h2 id="curriculum-detail-title">Curriculum Details</h2>
-                <button class="modal-close">&times;</button>
+                <div style="flex: 1;">
+                    <h2 id="curriculum-detail-title">Curriculum Details</h2>
+                    <div id="curriculum-breadcrumb" class="breadcrumb" style="margin-top: 4px;"></div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <label class="toggle-switch" title="Toggle Edit Mode">
+                        <input type="checkbox" id="edit-mode-toggle">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">Edit Mode</span>
+                    </label>
+                    <button class="modal-close">&times;</button>
+                </div>
             </div>
             <div class="modal-body">
                 <div id="curriculum-detail-content">
@@ -375,8 +390,12 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('curriculum-detail-modal')">Close</button>
-                <button class="btn btn-primary" id="export-curriculum-btn">Export</button>
+                <div class="modal-footer-left">
+                    <button class="btn btn-secondary" onclick="closeModal('curriculum-detail-modal')">Close</button>
+                </div>
+                <div class="modal-footer-right" id="curriculum-detail-actions">
+                    <button class="btn btn-secondary" id="export-curriculum-btn">📥 Export JSON</button>
+                </div>
             </div>
         </div>
     </div>

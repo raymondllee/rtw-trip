@@ -12,6 +12,9 @@ let students: StudentProfile[] = [];
 let curricula: CurriculumPlan[] = [];
 let filteredCurricula: CurriculumPlan[] = [];
 let destinations: any[] = [];
+let currentCurriculum: any = null;
+let isEditMode = false;
+let currentStudent: StudentProfile | null = null;
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
@@ -51,12 +54,48 @@ function switchView(view: 'students' | 'curricula' | 'testing') {
         section.classList.toggle('active', section.id === `${view}-view`);
     });
 
+    // Update breadcrumb
+    updateBreadcrumb();
+
     // Reload data when switching to a view
     if (view === 'students') {
         loadStudents();
     } else if (view === 'curricula') {
         loadCurricula();
     }
+}
+
+// Breadcrumb Management
+function updateBreadcrumb(additionalItems: string[] = []) {
+    const breadcrumb = document.getElementById('breadcrumb');
+    if (!breadcrumb) return;
+
+    const viewNames = {
+        'students': 'Students',
+        'curricula': 'Curricula',
+        'testing': 'Testing Lab'
+    };
+
+    let items = ['Home'];
+
+    if (currentView) {
+        items.push(viewNames[currentView]);
+    }
+
+    items = items.concat(additionalItems);
+
+    breadcrumb.innerHTML = items.map((item, index) => {
+        const isLast = index === items.length - 1;
+        const isHome = item === 'Home';
+
+        if (isHome && !isLast) {
+            return `<span class="breadcrumb-item link" onclick="switchView('students')">${item}</span>`;
+        } else if (isLast) {
+            return `<span class="breadcrumb-item">${item}</span>`;
+        } else {
+            return `<span class="breadcrumb-item">${item}</span>`;
+        }
+    }).join('');
 }
 
 // Modal Management
@@ -83,6 +122,15 @@ function initializeModals() {
     // New student button
     document.getElementById('new-student-btn')?.addEventListener('click', () => {
         openModal('new-student-modal');
+    });
+
+    // Edit mode toggle
+    document.getElementById('edit-mode-toggle')?.addEventListener('change', (e) => {
+        const checkbox = e.target as HTMLInputElement;
+        isEditMode = checkbox.checked;
+        if (currentCurriculum) {
+            displayCurriculumDetails(currentCurriculum);
+        }
     });
 }
 
@@ -603,7 +651,10 @@ function renderCurricula(curriculaData: CurriculumPlan[]) {
     try {
         showLoading('Loading curriculum details...');
         const response = await educationService.getCurriculum(curriculumId);
-        displayCurriculumDetails(response.curriculum);
+        currentCurriculum = response.curriculum;
+        currentStudent = students.find(s => s.id === currentCurriculum.student_profile_id) || null;
+        displayCurriculumDetails(currentCurriculum);
+        openModal('curriculum-detail-modal');
     } catch (error) {
         console.error('Error loading curriculum:', error);
         showError('Failed to load curriculum details');
@@ -631,6 +682,98 @@ function renderCurricula(curriculaData: CurriculumPlan[]) {
         showError('Failed to export curriculum');
     }
 };
+
+// Activity rendering helpers
+function renderActivityActions(activityId: string, activityType: string, locationId: string): string {
+    if (!isEditMode) return '';
+
+    return `
+        <div class="activity-actions">
+            <button class="activity-action-btn" onclick="editActivity('${activityId}', '${activityType}', '${locationId}')">
+                ✏️ Edit
+            </button>
+            <button class="activity-action-btn complete" onclick="toggleActivityComplete('${activityId}')">
+                ✅ Mark Complete
+            </button>
+            <button class="activity-action-btn" onclick="duplicateActivity('${activityId}', '${activityType}', '${locationId}')">
+                📋 Duplicate
+            </button>
+            <button class="activity-action-btn delete" onclick="deleteActivity('${activityId}', '${activityType}', '${locationId}')">
+                🗑️ Delete
+            </button>
+        </div>
+    `;
+}
+
+function renderSectionActions(sectionType: string, locationId: string): string {
+    if (!isEditMode) return '';
+
+    return `
+        <div style="margin-top: 12px; padding: 12px; background: var(--bg-primary); border-radius: 4px; border: 1px dashed var(--border-color);">
+            <button class="activity-action-btn primary" onclick="addActivity('${sectionType}', '${locationId}')">
+                ➕ Add ${sectionType === 'pre_trip' ? 'Pre-Trip' : sectionType === 'on_location' ? 'On-Location' : 'Post-Trip'} Activity
+            </button>
+            <button class="activity-action-btn primary" onclick="regenerateSection('${sectionType}', '${locationId}')">
+                🔄 Regenerate This Section
+            </button>
+        </div>
+    `;
+}
+
+function renderRegenerationPanel(curriculum: any): string {
+    if (!isEditMode) return '';
+
+    const student = students.find(s => s.id === curriculum.student_profile_id);
+    const studentName = student?.name || 'Student';
+
+    return `
+        <div class="regeneration-panel">
+            <h4>🔄 Ad-hoc Curriculum Regeneration</h4>
+            <p style="margin-bottom: 12px; font-size: 13px; color: var(--text-secondary);">
+                Regenerate the entire curriculum or specific parts with new parameters
+            </p>
+
+            <div class="regeneration-options">
+                <div class="form-group">
+                    <label style="font-weight: 500; margin-bottom: 4px; display: block;">Regeneration Scope</label>
+                    <select id="regen-scope" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+                        <option value="full">Full Curriculum</option>
+                        <option value="location">Specific Location</option>
+                        <option value="section">Specific Section (Pre-trip, On-location, Post-trip)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="regen-location-select" style="display: none;">
+                    <label style="font-weight: 500; margin-bottom: 4px; display: block;">Select Location</label>
+                    <select id="regen-location" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+                        ${Object.keys(curriculum.location_lessons || {}).map(locId => {
+                            const loc = curriculum.location_lessons[locId];
+                            return `<option value="${locId}">${loc.location_name || locId}</option>`;
+                        }).join('')}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight: 500; margin-bottom: 4px; display: block;">Modification Instructions (optional)</label>
+                    <textarea
+                        id="regen-instructions"
+                        class="inline-edit-textarea"
+                        placeholder="E.g., Add more hands-on activities, reduce time to 45 min/day, include more art activities..."
+                    ></textarea>
+                </div>
+
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" onclick="executeRegeneration('${curriculum.id}')">
+                        🚀 Regenerate
+                    </button>
+                    <button class="btn btn-secondary" onclick="compareBeforeRegenerate('${curriculum.id}')">
+                        👁️ Preview Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
 
 function displayCurriculumDetails(curriculum: any) {
     const modal = document.getElementById('curriculum-detail-modal');
