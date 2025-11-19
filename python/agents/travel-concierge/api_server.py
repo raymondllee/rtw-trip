@@ -126,6 +126,7 @@ class SessionStore:
             # but we can add a method to retrieve it or mock the API response.
             pass
 
+    @staticmethod
     def _now() -> float:
         return time.time()
 
