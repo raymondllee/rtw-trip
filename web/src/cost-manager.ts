@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { FirestoreScenarioManager } from './firestore/scenarioManager';
 import { BudgetManager, budgetManagerStyles } from './components/BudgetManager';
-import { updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase-config';
+import { updateDoc, doc, Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
 // Extend window interface for CostBulkEdit
 declare global {
