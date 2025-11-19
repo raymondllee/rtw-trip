@@ -4583,6 +4583,51 @@ def get_curricula_by_location(location_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/education/destinations', methods=['GET'])
+def get_destinations():
+    """Get all destinations from scenarios for the testing lab destination selector."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = get_firestore_client()
+        scenarios_ref = db.collection('scenarios')
+        docs = scenarios_ref.stream()
+
+        all_destinations = []
+        seen_ids = set()
+
+        for doc in docs:
+            scenario_data = doc.to_dict()
+            locations = scenario_data.get('locations', [])
+
+            for location in locations:
+                # Skip if we've already seen this destination
+                location_id = location.get('id')
+                if location_id in seen_ids:
+                    continue
+                seen_ids.add(location_id)
+
+                # Extract destination info
+                all_destinations.append({
+                    'id': location_id,
+                    'name': location.get('name', ''),
+                    'country': location.get('country', ''),
+                    'days': location.get('days', 0)
+                })
+
+        # Sort by name
+        all_destinations.sort(key=lambda d: d['name'])
+
+        return jsonify({'destinations': all_destinations})
+
+    except Exception as e:
+        print(f"Error getting destinations: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/education/students', methods=['GET'])
 def list_students():
     """List all student profiles."""
