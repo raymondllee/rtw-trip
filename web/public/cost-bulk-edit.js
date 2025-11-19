@@ -1088,7 +1088,12 @@ class CostBulkEdit {
   }
 }
 
-// Export for use in other modules
+// Make available globally for use in other pages
+if (typeof window !== 'undefined') {
+  window.CostBulkEdit = CostBulkEdit;
+}
+
+// Export for use in CommonJS modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { CostBulkEdit };
 }

@@ -22,6 +22,7 @@ from datetime import datetime
 from google.genai.types import Tool, FunctionDeclaration
 from google.adk.tools import ToolContext
 
+from travel_concierge.tools.currency_validator import validate_currency
 
 logger = logging.getLogger(__name__)
 FLASK_API_URL = os.getenv("FLASK_API_URL", "http://127.0.0.1:5001")
@@ -127,15 +128,10 @@ def save_researched_costs(
         base_local = _to_float(cat_data.get('amount_local', 0))
         currency_local = cat_data.get('currency_local', 'USD')
 
-        # Sanitize currency code - ensure it's a valid ISO 4217 code
-        # AI sometimes returns N/A, null, None, or empty strings
-        if not currency_local or currency_local in ('N/A', 'null', 'None', ''):
-            currency_local = 'USD'
-        currency_local = str(currency_local).strip().upper()
-        # Validate it's a 3-letter code (basic ISO 4217 check)
-        if len(currency_local) != 3 or not currency_local.isalpha():
-            print(f"⚠️  Invalid currency code '{currency_local}' for {destination_name}, defaulting to USD")
-            currency_local = 'USD'
+        # Validate and fix currency code using currency validator
+        # Extracts country from destination_name for inference (e.g., "Tokyo, Japan" -> "Japan")
+        country = destination_name.split(',')[-1].strip() if ',' in destination_name else None
+        currency_local = validate_currency(currency_local, country=country, default='USD')
 
         # Scale per category semantics:
         # - food_daily, transport_daily: per-day per-person → scale by duration_days * num_travelers
@@ -157,6 +153,9 @@ def save_researched_costs(
             .replace(':', '-')
         )
 
+        # Create timestamp for history tracking (Recommendation F)
+        now_iso = datetime.now().isoformat() + 'Z'
+
         cost_item = {
             "id": f"{destination_id}_{stable_dest}_{itinerary_cat}",
             "category": itinerary_cat,
@@ -171,7 +170,13 @@ def save_researched_costs(
             "notes": cat_data.get('notes', ''),
             "confidence": cat_data.get('confidence', 'medium'),
             "sources": cat_data.get('sources', []),
-            "researched_at": cat_data.get('researched_at', datetime.now().isoformat())
+            "researched_at": cat_data.get('researched_at', datetime.now().isoformat()),
+
+            # History tracking (Recommendation F)
+            "created_at": now_iso,
+            "created_by": "ai_research",
+            "updated_at": now_iso,
+            "last_modified_by": "ai_research"
         }
 
         cost_items.append(cost_item)

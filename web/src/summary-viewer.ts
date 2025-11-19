@@ -85,12 +85,16 @@ async function displaySummary(summaryHtml, itineraryData, options) {
     return;
   }
 
-  // Replace container content with the generated HTML body
+  // Insert summary content into the summary-content div (preserving budget-container)
   const parser = new DOMParser();
   const doc = parser.parseFromString(summaryHtml, 'text/html');
   const bodyContent = doc.body.innerHTML;
 
-  containerEl.innerHTML = bodyContent;
+  const summaryContentEl = document.getElementById('summary-content');
+  if (summaryContentEl) {
+    summaryContentEl.innerHTML = bodyContent;
+    summaryContentEl.style.display = 'block';
+  }
 
   // Apply cost visibility
   if (!options.showCosts) {
