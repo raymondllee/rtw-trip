@@ -4829,6 +4829,13 @@ export async function initMapApp() {
     }
   });
 
+  // Student Dashboard button (in scenario actions dropdown)
+  document.getElementById('student-dashboard-btn').addEventListener('click', () => {
+    const studentId = localStorage.getItem('current_student_id') || 'student_default';
+    localStorage.setItem('current_student_id', studentId);
+    window.open(`/student-dashboard.html?student_id=${studentId}`, '_blank');
+  });
+
   // View saved summary button (in scenario actions dropdown)
   document.getElementById('view-summary-btn').addEventListener('click', async () => {
     if (!currentScenarioId) {

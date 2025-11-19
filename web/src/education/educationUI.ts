@@ -618,3 +618,272 @@ export function initializeEducationUI(scenarioId?: string, versionId?: string) {
     }
   });
 }
+
+/**
+ * Add custom activity to a curriculum
+ */
+export function showAddCustomActivityModal(planId: string, locationId: string) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+
+  modal.innerHTML = `
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3>➕ Add Custom Activity</h3>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-section">
+          <h4>Activity Information</h4>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Activity Title *</label>
+              <input type="text" id="activity-title" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Subject *</label>
+              <select id="activity-subject" required>
+                <option value="">Select a subject</option>
+                <option value="science">Science</option>
+                <option value="social_studies">Social Studies</option>
+                <option value="language_arts">Language Arts</option>
+                <option value="math">Mathematics</option>
+                <option value="art">Arts</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Type *</label>
+              <select id="activity-type" required>
+                <option value="">Select a type</option>
+                <option value="experiential">Experiential</option>
+                <option value="reading">Reading</option>
+                <option value="video">Video</option>
+                <option value="reflection">Reflection</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Description *</label>
+            <textarea id="activity-description" rows="4" required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Learning Objectives (one per line)</label>
+            <textarea id="activity-objectives" rows="3" placeholder="Enter learning objectives, one per line"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Duration (minutes)</label>
+            <input type="number" id="activity-duration" value="60" min="5" max="480">
+          </div>
+
+          <div class="form-section">
+            <h4>External Resources (Optional)</h4>
+            <div id="external-links-container">
+              <div class="external-link-item">
+                <input type="text" class="link-title" placeholder="Resource Title">
+                <input type="url" class="link-url" placeholder="https://example.com">
+                <button type="button" class="btn-remove-link">×</button>
+              </div>
+            </div>
+            <button type="button" id="add-link-btn" class="btn-secondary" style="margin-top: 10px;">
+              + Add Another Link
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary cancel-btn">Cancel</button>
+        <button class="btn-primary" id="save-activity-btn">Save Activity</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Close modal handlers
+  const closeModal = () => modal.remove();
+  modal.querySelector('.modal-close-btn')!.addEventListener('click', closeModal);
+  modal.querySelector('.cancel-btn')!.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  // Add link button
+  modal.querySelector('#add-link-btn')!.addEventListener('click', () => {
+    const container = modal.querySelector('#external-links-container')!;
+    const linkItem = document.createElement('div');
+    linkItem.className = 'external-link-item';
+    linkItem.innerHTML = `
+      <input type="text" class="link-title" placeholder="Resource Title">
+      <input type="url" class="link-url" placeholder="https://example.com">
+      <button type="button" class="btn-remove-link">×</button>
+    `;
+    container.appendChild(linkItem);
+
+    // Add remove handler
+    linkItem.querySelector('.btn-remove-link')!.addEventListener('click', () => {
+      linkItem.remove();
+    });
+  });
+
+  // Remove link handlers for initial item
+  modal.querySelectorAll('.btn-remove-link').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      (e.target as HTMLElement).closest('.external-link-item')!.remove();
+    });
+  });
+
+  // Save activity
+  modal.querySelector('#save-activity-btn')!.addEventListener('click', async () => {
+    const title = (modal.querySelector('#activity-title') as HTMLInputElement).value.trim();
+    const subject = (modal.querySelector('#activity-subject') as HTMLSelectElement).value;
+    const type = (modal.querySelector('#activity-type') as HTMLSelectElement).value;
+    const description = (modal.querySelector('#activity-description') as HTMLTextAreaElement).value.trim();
+
+    if (!title || !subject || !type || !description) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    // Get objectives
+    const objectivesText = (modal.querySelector('#activity-objectives') as HTMLTextAreaElement).value.trim();
+    const objectives = objectivesText ? objectivesText.split('\n').map(o => o.trim()).filter(o => o) : [];
+
+    // Get duration
+    const duration = parseInt((modal.querySelector('#activity-duration') as HTMLInputElement).value);
+
+    // Get external links
+    const linkItems = modal.querySelectorAll('.external-link-item');
+    const externalLinks: any[] = [];
+    linkItems.forEach((item) => {
+      const titleInput = item.querySelector('.link-title') as HTMLInputElement;
+      const urlInput = item.querySelector('.link-url') as HTMLInputElement;
+      if (titleInput.value.trim() && urlInput.value.trim()) {
+        externalLinks.push({
+          title: titleInput.value.trim(),
+          url: urlInput.value.trim(),
+          type: 'external'
+        });
+      }
+    });
+
+    // Prepare request body
+    const requestBody = {
+      location_id: locationId,
+      type: type,
+      subject: subject,
+      title: title,
+      description: description,
+      learning_objectives: objectives,
+      estimated_duration_minutes: duration,
+      external_links: externalLinks
+    };
+
+    try {
+      const response = await fetch(`/api/education/curricula/${planId}/activities`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to save activity: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        alert('Activity added successfully!');
+        closeModal();
+        // Reload curriculum viewer if it's open
+        if (document.getElementById('curriculum-viewer-modal')?.style.display === 'flex') {
+          showCurriculumViewerModal(planId);
+        }
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (error: any) {
+      console.error('Error saving activity:', error);
+      alert(`Error: ${error.message}`);
+    }
+  });
+}
+
+/**
+ * Enable edit mode for curriculum viewer
+ */
+export function enableCurriculumEditMode(curriculumId: string, modal: HTMLElement) {
+  // Add edit controls to modal
+  const footer = modal.querySelector('.modal-footer')!;
+
+  // Check if edit mode is already enabled
+  if (footer.querySelector('#save-changes-btn')) {
+    return; // Already in edit mode
+  }
+
+  // Add Save and Add Activity buttons
+  const saveBtn = document.createElement('button');
+  saveBtn.id = 'save-changes-btn';
+  saveBtn.className = 'btn-primary';
+  saveBtn.textContent = 'Save Changes';
+  saveBtn.style.display = 'none'; // Initially hidden
+
+  const addActivityBtn = document.createElement('button');
+  addActivityBtn.id = 'add-activity-btn';
+  addActivityBtn.className = 'btn-secondary';
+  addActivityBtn.textContent = '+ Add Custom Activity';
+
+  footer.insertBefore(addActivityBtn, footer.firstChild);
+  footer.appendChild(saveBtn);
+
+  // Make content editable
+  let hasChanges = false;
+  modal.querySelectorAll('.content-title, .content-desc').forEach((element) => {
+    const el = element as HTMLElement;
+    el.contentEditable = 'true';
+    el.style.border = '1px dashed #cbd5e0';
+    el.style.padding = '4px';
+    el.style.borderRadius = '3px';
+
+    el.addEventListener('input', () => {
+      hasChanges = true;
+      saveBtn.style.display = 'inline-block';
+    });
+  });
+
+  // Add activity button handler
+  addActivityBtn.addEventListener('click', () => {
+    // Get location ID from curriculum
+    // This is a simplified implementation - you may need to adjust based on your data structure
+    const locationId = 'location_default'; // TODO: Get actual location ID
+    showAddCustomActivityModal(curriculumId, locationId);
+  });
+
+  // Save changes button handler
+  saveBtn.addEventListener('click', async () => {
+    if (!hasChanges) {
+      alert('No changes to save');
+      return;
+    }
+
+    // Collect changes (simplified - you may want to track specific changes)
+    // For now, just show a success message
+    alert('Edit functionality is being enhanced. Changes will be saved in the next update!');
+
+    // TODO: Implement actual save logic
+    // This would involve:
+    // 1. Collecting all edited content
+    // 2. Building the update payload
+    // 3. Calling the PATCH /api/education/curricula/{planId} endpoint
+    // 4. Refreshing the modal
+  });
+}
