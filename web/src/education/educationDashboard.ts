@@ -712,7 +712,7 @@ function displayCurriculumDetails(curriculum: any) {
                                     <strong>Reflection Prompts (${location.post_trip.reflection_prompts.length}):</strong>
                                     <ul>
                                         ${location.post_trip.reflection_prompts.map((p: any) => {
-                                            const text = typeof p === 'string' ? p : (p.prompt || p.question || p.title || p.description || JSON.stringify(p));
+                                            const text = typeof p === 'string' ? p : (p.text || p.prompt || p.question || p.title || p.description || '');
                                             return `<li>${text}</li>`;
                                         }).join('')}
                                     </ul>
@@ -723,7 +723,7 @@ function displayCurriculumDetails(curriculum: any) {
                                     <strong>Synthesis Activities (${location.post_trip.synthesis_activities.length}):</strong>
                                     <ul>
                                         ${location.post_trip.synthesis_activities.map((s: any) => {
-                                            const title = typeof s === 'string' ? s : (s.title || s.description || s.activity || JSON.stringify(s));
+                                            const title = typeof s === 'string' ? s : (s.title || s.description || s.activity || s.text || '');
                                             return `<li>${title}</li>`;
                                         }).join('')}
                                     </ul>
@@ -867,25 +867,32 @@ function displayTestResults(result: any) {
     const resultsContent = document.getElementById('test-results-content');
     if (!resultsContainer || !resultsContent) return;
 
+    console.log('displayTestResults received:', result);
+
     const curriculum = result.curriculum;
-    const locations = curriculum.location_lessons || {};
+    console.log('Curriculum:', curriculum);
+
+    // The test endpoint returns a single location directly, not in location_lessons
+    const location = curriculum;
 
     let totalActivities = 0;
     let preTripCount = 0;
     let onLocationCount = 0;
     let postTripCount = 0;
 
-    Object.values(locations).forEach((location: any) => {
-        preTripCount += (location.pre_trip?.readings?.length || 0) +
-                        (location.pre_trip?.videos?.length || 0) +
-                        (location.pre_trip?.prep_tasks?.length || 0);
-        onLocationCount += (location.on_location?.experiential_activities?.length || 0) +
-                           (location.on_location?.structured_lessons?.length || 0);
-        postTripCount += (location.post_trip?.reflection_prompts?.length || 0) +
-                         (location.post_trip?.synthesis_activities?.length || 0);
-    });
+    // Count activities from the single location
+    preTripCount = (location.pre_trip?.readings?.length || 0) +
+                   (location.pre_trip?.videos?.length || 0) +
+                   (location.pre_trip?.preparation_tasks?.length || 0);
+
+    onLocationCount = (location.on_location?.experiential_activities?.length || 0) +
+                      (location.on_location?.structured_lessons?.length || 0);
+
+    postTripCount = (location.post_trip?.reflection_prompts?.length || 0) +
+                    (location.post_trip?.synthesis_activities?.length || 0);
 
     totalActivities = preTripCount + onLocationCount + postTripCount;
+    console.log(`Total activities: ${totalActivities} (pre=${preTripCount}, on=${onLocationCount}, post=${postTripCount})`);
 
     resultsContent.innerHTML = `
         <div class="result-summary">
@@ -926,17 +933,15 @@ function displayTestResults(result: any) {
         </div>
 
         <h4 style="margin-top: 24px;">Activity Preview</h4>
-        ${Object.entries(locations).slice(0, 1).map(([locId, location]: [string, any]) => `
-            ${location.on_location?.experiential_activities?.slice(0, 3).map((activity: any) => `
-                <div class="activity-preview">
-                    <h4>${activity.title}</h4>
-                    <p>${activity.description || ''}</p>
-                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
-                        ${activity.subject} • ${activity.estimated_duration_minutes || 0} min
-                    </div>
+        ${location.on_location?.experiential_activities?.slice(0, 3).map((activity: any) => `
+            <div class="activity-preview">
+                <h4>${activity.title}</h4>
+                <p>${activity.description || ''}</p>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
+                    ${activity.subject} • ${activity.estimated_duration_minutes || 0} min
                 </div>
-            `).join('') || ''}
-        `).join('')}
+            </div>
+        `).join('') || '<p style="color: var(--text-secondary);">No activities generated</p>'}
     `;
 
     resultsContainer.style.display = 'block';
