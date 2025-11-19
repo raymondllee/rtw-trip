@@ -142,6 +142,7 @@ async function loadStudents() {
 
         renderStudents(studentsWithStats);
         updateStudentFilters(students);
+        updateStudentSelector();
     } catch (error) {
         console.error('Error loading students:', error);
         showError('Failed to load students');
@@ -710,7 +711,10 @@ function displayCurriculumDetails(curriculum: any) {
                                 <div class="activity-list">
                                     <strong>Reflection Prompts (${location.post_trip.reflection_prompts.length}):</strong>
                                     <ul>
-                                        ${location.post_trip.reflection_prompts.map((p: any) => `<li>${p.prompt || p.title || p}</li>`).join('')}
+                                        ${location.post_trip.reflection_prompts.map((p: any) => {
+                                            const text = typeof p === 'string' ? p : (p.prompt || p.question || p.title || p.description || JSON.stringify(p));
+                                            return `<li>${text}</li>`;
+                                        }).join('')}
                                     </ul>
                                 </div>
                             ` : ''}
@@ -718,7 +722,10 @@ function displayCurriculumDetails(curriculum: any) {
                                 <div class="activity-list">
                                     <strong>Synthesis Activities (${location.post_trip.synthesis_activities.length}):</strong>
                                     <ul>
-                                        ${location.post_trip.synthesis_activities.map((s: any) => `<li>${s.title || s.description || s}</li>`).join('')}
+                                        ${location.post_trip.synthesis_activities.map((s: any) => {
+                                            const title = typeof s === 'string' ? s : (s.title || s.description || s.activity || JSON.stringify(s));
+                                            return `<li>${title}</li>`;
+                                        }).join('')}
                                     </ul>
                                 </div>
                             ` : ''}
@@ -733,9 +740,61 @@ function displayCurriculumDetails(curriculum: any) {
 }
 
 // Testing Lab
+let selectedTestStudent: string | null = null;
+
 function initializeTestingLab() {
     document.getElementById('test-generate-btn')?.addEventListener('click', generateTestCurriculum);
     document.getElementById('test-reset-btn')?.addEventListener('click', resetTestingForm);
+
+    // Student selector change handler
+    document.getElementById('test-student-selector')?.addEventListener('change', (e) => {
+        const select = e.target as HTMLSelectElement;
+        const studentId = select.value;
+
+        if (studentId) {
+            const student = students.find(s => s.id === studentId);
+            if (student) {
+                selectedTestStudent = studentId;
+                populateTestingLabWithStudent(student);
+            }
+        } else {
+            selectedTestStudent = null;
+            resetTestingForm();
+        }
+    });
+}
+
+function populateTestingLabWithStudent(student: any) {
+    (document.getElementById('test-student-name') as HTMLInputElement).value = student.name;
+    (document.getElementById('test-student-age') as HTMLInputElement).value = student.age.toString();
+    (document.getElementById('test-student-grade') as HTMLInputElement).value = student.grade.toString();
+    (document.getElementById('test-student-state') as HTMLSelectElement).value = student.state;
+
+    const learningStyleRadios = document.getElementsByName('learning-style') as NodeListOf<HTMLInputElement>;
+    learningStyleRadios.forEach(radio => {
+        radio.checked = radio.value === student.learning_style;
+    });
+
+    if (student.interests && student.interests.length > 0) {
+        (document.getElementById('test-student-interests') as HTMLInputElement).value = student.interests.join(', ');
+    }
+
+    (document.getElementById('test-time-budget') as HTMLInputElement).value = (student.time_budget_minutes_per_day || 60).toString();
+    (document.getElementById('test-reading-level') as HTMLInputElement).value = (student.reading_level || student.grade).toString();
+}
+
+function updateStudentSelector() {
+    const selector = document.getElementById('test-student-selector') as HTMLSelectElement;
+    if (!selector) return;
+
+    const currentValue = selector.value;
+    selector.innerHTML = '<option value="">-- Create New / Enter Manually --</option>' +
+        students.map(s => `<option value="${s.id}">${s.name} (${s.age} years, Grade ${s.grade})</option>`).join('');
+
+    // Restore selection if possible
+    if (currentValue && students.find(s => s.id === currentValue)) {
+        selector.value = currentValue;
+    }
 }
 
 async function generateTestCurriculum() {
@@ -773,6 +832,7 @@ async function generateTestCurriculum() {
 
         const result = await educationService.generateCurriculum({
             student: {
+                id: selectedTestStudent || undefined,
                 name,
                 age,
                 grade,
@@ -905,7 +965,13 @@ function resetTestingForm() {
         return;
     }
 
-    showSuccess('Curriculum already saved to database!');
+    if (selectedTestStudent) {
+        const student = students.find(s => s.id === selectedTestStudent);
+        showSuccess(`Curriculum saved to ${student?.name || 'selected student'}'s profile!`);
+    } else {
+        showSuccess('Curriculum saved to database!');
+    }
+
     await loadCurricula();
     switchView('curricula');
 };
