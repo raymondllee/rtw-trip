@@ -4263,6 +4263,16 @@ IMPORTANT:
                 if end_idx >= 0:
                     cleaned_text = cleaned_text[:end_idx + 1]
 
+            # Fix common JSON errors from AI output
+            # Fix numbers followed by unquoted text in parentheses (e.g., "10 (village entrance fee)" -> "10")
+            import re
+            cleaned_text = re.sub(r'(\d+)\s*\([^)]*\)', r'\1', cleaned_text)
+
+            # Fix missing commas before closing braces/brackets in some edge cases
+            # This is a more conservative fix that only targets obvious issues
+            cleaned_text = re.sub(r'"\s*\n\s*}', '"\n}', cleaned_text)
+            cleaned_text = re.sub(r'"\s*\n\s*]', '"\n]', cleaned_text)
+
             result_json = json.loads(cleaned_text)
 
             print(f"✓ Successfully generated curriculum for {location.get('name')}")
@@ -4701,6 +4711,80 @@ def get_student_curricula(student_id):
 
     except Exception as e:
         print(f"Error getting student curricula: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/destinations', methods=['GET'])
+def get_destinations():
+    """Get destinations from the current (most recent) scenario."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = get_firestore_client()
+
+        # Get the most recent scenario for the default user
+        user_id = 'default-user'  # TODO: Replace with actual user ID from auth
+        scenarios_query = (
+            db.collection('scenarios')
+            .where('userId', '==', user_id)
+            .order_by('updatedAt', direction=firestore.Query.DESCENDING)
+            .limit(1)
+        )
+
+        scenarios = list(scenarios_query.stream())
+
+        if not scenarios:
+            return jsonify({
+                'status': 'success',
+                'destinations': []
+            })
+
+        scenario_ref = scenarios[0].reference
+
+        # Get the latest version
+        versions = list(
+            scenario_ref
+            .collection('versions')
+            .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+            .limit(1)
+            .stream()
+        )
+
+        if not versions:
+            return jsonify({
+                'status': 'success',
+                'destinations': []
+            })
+
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        locations = itinerary_data.get('locations', []) or []
+
+        # Transform locations to a simpler format
+        destinations = []
+        for loc in locations:
+            if isinstance(loc, dict):
+                # Try duration_days first, fall back to days
+                duration = loc.get('duration_days', loc.get('days', 0))
+                destinations.append({
+                    'id': loc.get('id', ''),
+                    'name': loc.get('name', ''),
+                    'country': loc.get('country', ''),
+                    'days': duration,
+                    'arrival_date': loc.get('arrival_date', ''),
+                    'departure_date': loc.get('departure_date', '')
+                })
+
+        return jsonify({
+            'status': 'success',
+            'destinations': destinations
+        })
+
+    except Exception as e:
+        print(f"Error getting destinations: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500

@@ -11,6 +11,7 @@ let currentView: 'students' | 'curricula' | 'testing' = 'students';
 let students: StudentProfile[] = [];
 let curricula: CurriculumPlan[] = [];
 let filteredCurricula: CurriculumPlan[] = [];
+let destinations: any[] = [];
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load initial data
     loadStudents();
     loadCurricula();
+    loadDestinations();
 });
 
 // Navigation
@@ -148,6 +150,21 @@ async function loadStudents() {
         showError('Failed to load students');
     } finally {
         hideLoading();
+    }
+}
+
+async function loadDestinations() {
+    try {
+        const response = await fetch('http://localhost:5001/api/education/destinations');
+        if (!response.ok) {
+            throw new Error('Failed to fetch destinations');
+        }
+        const data = await response.json();
+        destinations = data.destinations || [];
+        updateDestinationSelector();
+    } catch (error) {
+        console.error('Error loading destinations:', error);
+        // Don't show error to user - destinations are optional
     }
 }
 
@@ -647,7 +664,22 @@ function displayCurriculumDetails(curriculum: any) {
                                 <div class="activity-list">
                                     <strong>Readings (${location.pre_trip.readings.length}):</strong>
                                     <ul>
-                                        ${location.pre_trip.readings.map((r: any) => `<li>${r.title || r.description || r}</li>`).join('')}
+                                        ${location.pre_trip.readings.map((r: any) => `
+                                            <li>
+                                                <strong>${r.title || r.description || r}</strong>
+                                                ${r.description && r.title !== r.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${r.description}</span>` : ''}
+                                                ${r.url ? `<br><a href="${r.url}" target="_blank" style="font-size: 12px; color: var(--primary-color);">🔗 ${r.url}</a>` : ''}
+                                                ${r.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${r.estimated_duration_minutes} min</span>` : ''}
+                                                ${r.learning_objectives && r.learning_objectives.length > 0 ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📚 Learning Objectives</summary>
+                                                        <ul style="margin: 4px 0; padding-left: 20px; font-size: 12px;">
+                                                            ${r.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
+                                                        </ul>
+                                                    </details>
+                                                ` : ''}
+                                            </li>
+                                        `).join('')}
                                     </ul>
                                 </div>
                             ` : ''}
@@ -655,7 +687,23 @@ function displayCurriculumDetails(curriculum: any) {
                                 <div class="activity-list">
                                     <strong>Videos (${location.pre_trip.videos.length}):</strong>
                                     <ul>
-                                        ${location.pre_trip.videos.map((v: any) => `<li>${v.title || v.description || v}</li>`).join('')}
+                                        ${location.pre_trip.videos.map((v: any) => `
+                                            <li>
+                                                <strong>${v.title || v.description || v}</strong>
+                                                ${v.description && v.title !== v.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${v.description}</span>` : ''}
+                                                ${v.url ? `<br><a href="${v.url}" target="_blank" style="font-size: 12px; color: var(--primary-color);">🔗 ${v.url}</a>` : ''}
+                                                ${v.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${v.estimated_duration_minutes} min</span>` : ''}
+                                                ${v.key_concepts && v.key_concepts.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 12px;">📋 Key concepts: ${v.key_concepts.join(', ')}</span>` : ''}
+                                                ${v.learning_objectives && v.learning_objectives.length > 0 ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📚 Learning Objectives</summary>
+                                                        <ul style="margin: 4px 0; padding-left: 20px; font-size: 12px;">
+                                                            ${v.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
+                                                        </ul>
+                                                    </details>
+                                                ` : ''}
+                                            </li>
+                                        `).join('')}
                                     </ul>
                                 </div>
                             ` : ''}
@@ -663,7 +711,14 @@ function displayCurriculumDetails(curriculum: any) {
                                 <div class="activity-list">
                                     <strong>Prep Tasks (${location.pre_trip.prep_tasks.length}):</strong>
                                     <ul>
-                                        ${location.pre_trip.prep_tasks.map((t: any) => `<li>${t.title || t.description || t}</li>`).join('')}
+                                        ${location.pre_trip.prep_tasks.map((t: any) => `
+                                            <li>
+                                                <strong>${t.title || t.description || t}</strong>
+                                                ${t.description && t.title !== t.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${t.description}</span>` : ''}
+                                                ${t.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${t.estimated_duration_minutes} min</span>` : ''}
+                                                ${t.materials_needed && t.materials_needed.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 12px;">📦 Materials: ${t.materials_needed.join(', ')}</span>` : ''}
+                                            </li>
+                                        `).join('')}
                                     </ul>
                                 </div>
                             ` : ''}
@@ -678,10 +733,41 @@ function displayCurriculumDetails(curriculum: any) {
                                     <strong>Experiential Activities (${location.on_location.experiential_activities.length}):</strong>
                                     <ul>
                                         ${location.on_location.experiential_activities.map((a: any) => `
-                                            <li>
+                                            <li style="margin-bottom: 16px;">
                                                 <strong>${a.title}</strong>
+                                                ${a.subject ? `<span style="color: var(--primary-color); font-size: 12px; margin-left: 8px;">📚 ${a.subject}</span>` : ''}
                                                 ${a.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${a.description}</span>` : ''}
                                                 ${a.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${a.estimated_duration_minutes} min</span>` : ''}
+                                                ${a.site_details ? `
+                                                    <br><details style="margin-top: 8px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📍 Site Details</summary>
+                                                        <div style="margin: 6px 0; padding-left: 12px; font-size: 12px; color: var(--text-secondary);">
+                                                            ${a.site_details.address ? `<div>📍 ${a.site_details.address}</div>` : ''}
+                                                            ${a.site_details.best_time ? `<div>🕐 Best time: ${a.site_details.best_time}</div>` : ''}
+                                                            ${a.site_details.cost_usd !== undefined ? `<div>💰 Cost: $${a.site_details.cost_usd}</div>` : ''}
+                                                            ${a.site_details.what_to_bring && a.site_details.what_to_bring.length > 0 ? `<div>🎒 Bring: ${a.site_details.what_to_bring.join(', ')}</div>` : ''}
+                                                        </div>
+                                                    </details>
+                                                ` : ''}
+                                                ${a.learning_objectives && a.learning_objectives.length > 0 ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📚 Learning Objectives</summary>
+                                                        <ul style="margin: 4px 0; padding-left: 20px; font-size: 12px;">
+                                                            ${a.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
+                                                        </ul>
+                                                    </details>
+                                                ` : ''}
+                                                ${a.instructions ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📋 Instructions</summary>
+                                                        <div style="margin: 6px 0; padding-left: 12px; font-size: 12px;">
+                                                            ${a.instructions.before ? `<div style="margin-bottom: 8px;"><strong>Before:</strong><br>${a.instructions.before}</div>` : ''}
+                                                            ${a.instructions.during ? `<div style="margin-bottom: 8px;"><strong>During:</strong><br>${a.instructions.during}</div>` : ''}
+                                                            ${a.instructions.after ? `<div><strong>After:</strong><br>${a.instructions.after}</div>` : ''}
+                                                        </div>
+                                                    </details>
+                                                ` : ''}
+                                                ${a.standards && a.standards.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 11px;">🎯 Standards: ${a.standards.join(', ')}</span>` : ''}
                                             </li>
                                         `).join('')}
                                     </ul>
@@ -692,10 +778,32 @@ function displayCurriculumDetails(curriculum: any) {
                                     <strong>Structured Lessons (${location.on_location.structured_lessons.length}):</strong>
                                     <ul>
                                         ${location.on_location.structured_lessons.map((l: any) => `
-                                            <li>
+                                            <li style="margin-bottom: 16px;">
                                                 <strong>${l.title}</strong>
+                                                ${l.subject ? `<span style="color: var(--primary-color); font-size: 12px; margin-left: 8px;">📚 ${l.subject}</span>` : ''}
                                                 ${l.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${l.description}</span>` : ''}
                                                 ${l.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${l.estimated_duration_minutes} min</span>` : ''}
+                                                ${l.materials_needed && l.materials_needed.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 12px;">📦 Materials: ${l.materials_needed.join(', ')}</span>` : ''}
+                                                ${l.learning_objectives && l.learning_objectives.length > 0 ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📚 Learning Objectives</summary>
+                                                        <ul style="margin: 4px 0; padding-left: 20px; font-size: 12px;">
+                                                            ${l.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
+                                                        </ul>
+                                                    </details>
+                                                ` : ''}
+                                                ${l.instructions ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📋 Instructions</summary>
+                                                        <div style="margin: 6px 0; padding-left: 12px; font-size: 12px;">
+                                                            ${typeof l.instructions === 'string' ? l.instructions : ''}
+                                                            ${l.instructions.before ? `<div style="margin-bottom: 8px;"><strong>Before:</strong><br>${l.instructions.before}</div>` : ''}
+                                                            ${l.instructions.during ? `<div style="margin-bottom: 8px;"><strong>During:</strong><br>${l.instructions.during}</div>` : ''}
+                                                            ${l.instructions.after ? `<div><strong>After:</strong><br>${l.instructions.after}</div>` : ''}
+                                                        </div>
+                                                    </details>
+                                                ` : ''}
+                                                ${l.standards && l.standards.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 11px;">🎯 Standards: ${l.standards.join(', ')}</span>` : ''}
                                             </li>
                                         `).join('')}
                                     </ul>
@@ -713,7 +821,13 @@ function displayCurriculumDetails(curriculum: any) {
                                     <ul>
                                         ${location.post_trip.reflection_prompts.map((p: any) => {
                                             const text = typeof p === 'string' ? p : (p.text || p.prompt || p.question || p.title || p.description || '');
-                                            return `<li>${text}</li>`;
+                                            return `
+                                                <li style="margin-bottom: 12px;">
+                                                    ${text}
+                                                    ${typeof p === 'object' && p.word_count_target ? `<br><span style="color: var(--text-secondary); font-size: 12px;">📝 Target: ${p.word_count_target} words</span>` : ''}
+                                                    ${typeof p === 'object' && p.subject ? `<span style="color: var(--primary-color); font-size: 12px; margin-left: 8px;">📚 ${p.subject}</span>` : ''}
+                                                </li>
+                                            `;
                                         }).join('')}
                                     </ul>
                                 </div>
@@ -724,7 +838,23 @@ function displayCurriculumDetails(curriculum: any) {
                                     <ul>
                                         ${location.post_trip.synthesis_activities.map((s: any) => {
                                             const title = typeof s === 'string' ? s : (s.title || s.description || s.activity || s.text || '');
-                                            return `<li>${title}</li>`;
+                                            return `
+                                                <li style="margin-bottom: 12px;">
+                                                    <strong>${title}</strong>
+                                                    ${typeof s === 'object' && s.subject ? `<span style="color: var(--primary-color); font-size: 12px; margin-left: 8px;">📚 ${s.subject}</span>` : ''}
+                                                    ${typeof s === 'object' && s.description && s.title !== s.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${s.description}</span>` : ''}
+                                                    ${typeof s === 'object' && s.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${s.estimated_duration_minutes} min</span>` : ''}
+                                                    ${typeof s === 'object' && s.materials_needed && s.materials_needed.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 12px;">📦 Materials: ${s.materials_needed.join(', ')}</span>` : ''}
+                                                    ${typeof s === 'object' && s.learning_objectives && s.learning_objectives.length > 0 ? `
+                                                        <br><details style="margin-top: 6px;">
+                                                            <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📚 Learning Objectives</summary>
+                                                            <ul style="margin: 4px 0; padding-left: 20px; font-size: 12px;">
+                                                                ${s.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
+                                                            </ul>
+                                                        </details>
+                                                    ` : ''}
+                                                </li>
+                                            `;
                                         }).join('')}
                                     </ul>
                                 </div>
@@ -759,7 +889,22 @@ function initializeTestingLab() {
             }
         } else {
             selectedTestStudent = null;
-            resetTestingForm();
+            clearStudentFields();
+        }
+    });
+
+    // Location selector change handler
+    document.getElementById('test-location-selector')?.addEventListener('change', (e) => {
+        const select = e.target as HTMLSelectElement;
+        const destinationId = select.value;
+
+        if (destinationId) {
+            const destination = destinations.find(d => d.id === destinationId);
+            if (destination) {
+                populateTestingLabWithDestination(destination);
+            }
+        } else {
+            clearLocationFields();
         }
     });
 }
@@ -783,18 +928,49 @@ function populateTestingLabWithStudent(student: any) {
     (document.getElementById('test-reading-level') as HTMLInputElement).value = (student.reading_level || student.grade).toString();
 }
 
+function clearStudentFields() {
+    (document.getElementById('test-student-name') as HTMLInputElement).value = '';
+    (document.getElementById('test-student-age') as HTMLInputElement).value = '';
+    (document.getElementById('test-student-grade') as HTMLInputElement).value = '';
+}
+
+function populateTestingLabWithDestination(destination: any) {
+    (document.getElementById('test-location-name') as HTMLInputElement).value = destination.name;
+    (document.getElementById('test-location-country') as HTMLInputElement).value = destination.country;
+    (document.getElementById('test-location-duration') as HTMLInputElement).value = destination.days.toString();
+}
+
+function clearLocationFields() {
+    (document.getElementById('test-location-name') as HTMLInputElement).value = '';
+    (document.getElementById('test-location-country') as HTMLInputElement).value = '';
+    (document.getElementById('test-location-duration') as HTMLInputElement).value = '';
+}
+
 function updateStudentSelector() {
     const selector = document.getElementById('test-student-selector') as HTMLSelectElement;
     if (!selector) return;
 
     const currentValue = selector.value;
-    selector.innerHTML = '<option value="">-- Create New / Enter Manually --</option>' +
+    selector.innerHTML = '<option value="">-- Enter Manually --</option>' +
         students.map(s => `<option value="${s.id}">${s.name} (${s.age} years, Grade ${s.grade})</option>`).join('');
 
-    // Restore selection if possible
-    if (currentValue && students.find(s => s.id === currentValue)) {
+    // Auto-select first student if no current selection
+    if (!currentValue && students.length > 0) {
+        selector.value = students[0].id;
+        selectedTestStudent = students[0].id;
+        populateTestingLabWithStudent(students[0]);
+    } else if (currentValue && students.find(s => s.id === currentValue)) {
+        // Restore selection if possible
         selector.value = currentValue;
     }
+}
+
+function updateDestinationSelector() {
+    const selector = document.getElementById('test-location-selector') as HTMLSelectElement;
+    if (!selector) return;
+
+    selector.innerHTML = '<option value="">-- Enter Manually --</option>' +
+        destinations.map(d => `<option value="${d.id}">${d.name}, ${d.country} (${d.days} days)</option>`).join('');
 }
 
 async function generateTestCurriculum() {
@@ -852,8 +1028,14 @@ async function generateTestCurriculum() {
             subjects,
         });
 
+        console.log('Generation result:', result);
         displayTestResults(result);
-        showSuccess('Curriculum generated successfully!');
+
+        if (result.status === 'success' && result.curriculum) {
+            showSuccess('Curriculum generated successfully!');
+        } else {
+            showError('Curriculum generated but there may be issues. Check the results below.');
+        }
     } catch (error) {
         console.error('Error generating curriculum:', error);
         showError('Failed to generate curriculum. Please try again.');
@@ -868,6 +1050,25 @@ function displayTestResults(result: any) {
     if (!resultsContainer || !resultsContent) return;
 
     console.log('displayTestResults received:', result);
+
+    // Check if curriculum generation failed
+    if (result.status === 'partial_success' || !result.curriculum) {
+        resultsContent.innerHTML = `
+            <div class="result-summary">
+                <h4>⚠️ Generation Issue</h4>
+                <p>The curriculum was generated but there was an issue parsing the response.</p>
+                ${result.error ? `<p style="color: var(--text-secondary); font-size: 14px;">Error: ${result.error}</p>` : ''}
+                ${result.raw_text ? `
+                    <details style="margin-top: 16px;">
+                        <summary style="cursor: pointer; color: var(--primary-color);">View Raw Response</summary>
+                        <pre style="background: var(--bg-secondary); padding: 12px; border-radius: var(--border-radius); overflow-x: auto; font-size: 12px; margin-top: 8px;">${result.raw_text}</pre>
+                    </details>
+                ` : ''}
+            </div>
+        `;
+        resultsContainer.style.display = 'block';
+        return;
+    }
 
     const curriculum = result.curriculum;
     console.log('Curriculum:', curriculum);
@@ -951,12 +1152,22 @@ function displayTestResults(result: any) {
 }
 
 function resetTestingForm() {
-    (document.getElementById('test-student-name') as HTMLInputElement).value = 'Maya';
-    (document.getElementById('test-student-age') as HTMLInputElement).value = '14';
-    (document.getElementById('test-student-grade') as HTMLInputElement).value = '8';
-    (document.getElementById('test-location-name') as HTMLInputElement).value = 'Tokyo';
-    (document.getElementById('test-location-country') as HTMLInputElement).value = 'Japan';
-    (document.getElementById('test-location-duration') as HTMLInputElement).value = '23';
+    // Reset selectors
+    const studentSelector = document.getElementById('test-student-selector') as HTMLSelectElement;
+    const locationSelector = document.getElementById('test-location-selector') as HTMLSelectElement;
+
+    if (studentSelector) {
+        studentSelector.value = '';
+    }
+    if (locationSelector) {
+        locationSelector.value = '';
+    }
+
+    selectedTestStudent = null;
+
+    // Clear all fields
+    clearStudentFields();
+    clearLocationFields();
 
     const resultsContainer = document.getElementById('test-results');
     if (resultsContainer) {
