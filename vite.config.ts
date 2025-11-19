@@ -9,7 +9,21 @@ export default defineConfig({
   },
   build: {
     outDir: resolve(__dirname, 'web', 'dist'),
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'web', 'index.html'),
+        summaryViewer: resolve(__dirname, 'web', 'summary-viewer.html'),
+        bulkEdit: resolve(__dirname, 'web', 'bulk-edit.html'),
+        curriculumTest: resolve(__dirname, 'web', 'curriculum-test.html'),
+        migrationTool: resolve(__dirname, 'web', 'migration-tool.html'),
+        migrationPreview: resolve(__dirname, 'web', 'migration-preview-tool.html'),
+        placeIdMigration: resolve(__dirname, 'web', 'place-id-migration-tool.html'),
+        placeIdMigrationStandalone: resolve(__dirname, 'web', 'place-id-migration-standalone.html'),
+        runValidation: resolve(__dirname, 'web', 'run-validation.html'),
+        validationStandalone: resolve(__dirname, 'web', 'validation-standalone.html')
+      }
+    }
   },
   resolve: {
     alias: {
