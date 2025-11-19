@@ -418,9 +418,7 @@
 
             } catch (error) {
                 console.error('Error initializing:', error);
-                // Fallback to default if API fails
-                studentId = 'student_default';
-                fetchDashboardData(studentId);
+                showError('Failed to load students. Please create a student profile first.');
             }
         }
 

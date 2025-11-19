@@ -95,36 +95,6 @@ class SessionStore:
             except Exception as exc:  # pragma: no cover
                 self._logger.warning('Firestore client unavailable (%s); using in-memory store', exc)
                 self._use_firestore = False
-        
-        self._ensure_default_student()
-
-    def _ensure_default_student(self):
-        """Ensure the default student profile exists."""
-        student_id = 'student_default'
-        default_student = {
-            'name': 'Alex Explorer',
-            'age': 12,
-            'grade': '7th',
-            'interests': ['History', 'Geography', 'Photography'],
-            'learning_style': 'Visual',
-            'state': 'CA',
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
-        }
-
-        if self._use_firestore and self._client:
-            try:
-                doc_ref = self._client.collection('student_profiles').document(student_id)
-                if not doc_ref.get().exists:
-                    doc_ref.set(default_student)
-                    self._logger.info(f"Created default student profile: {student_id}")
-            except Exception as e:
-                self._logger.error(f"Error creating default student: {e}")
-        else:
-            # In-memory fallback (mocking the student profile for dashboard)
-            # We don't have a separate in-memory store for students in this class, 
-            # but we can add a method to retrieve it or mock the API response.
-            pass
 
     @staticmethod
     def _now() -> float:
@@ -4918,22 +4888,9 @@ def get_student_dashboard(student_id):
         student_ref = db.collection('student_profiles').document(student_id)
         student_doc = student_ref.get()
         if not student_doc.exists:
-            # Auto-create if missing (double safety)
-            student_data = {
-                'name': 'Alex Explorer',
-                'age': 12,
-                'grade': '7th',
-                'interests': ['History', 'Geography', 'Photography'],
-                'learning_style': 'Visual',
-                'state': 'CA',
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow()
-            }
-            student_ref.set(student_data)
-            student_profile = student_data
-        else:
-            student_profile = student_doc.to_dict()
-        
+            return jsonify({'error': 'Student not found'}), 404
+
+        student_profile = student_doc.to_dict()
         student_profile['id'] = student_id
 
         # 2. Get All Curricula

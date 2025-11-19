@@ -4822,9 +4822,13 @@ export async function initMapApp() {
 
   // View saved summary button (in scenario actions dropdown)
   document.getElementById('student-dashboard-btn').addEventListener('click', () => {
-    const studentId = localStorage.getItem('current_student_id') || 'student_default';
-    localStorage.setItem('current_student_id', studentId);
-    window.open(`/student-dashboard.html?student_id=${studentId}`, '_blank');
+    const studentId = localStorage.getItem('current_student_id');
+    if (studentId) {
+      window.open(`/student-dashboard.html?student_id=${studentId}`, '_blank');
+    } else {
+      // No student selected, let the dashboard pick the first one
+      window.open(`/student-dashboard.html`, '_blank');
+    }
   });
 
   document.getElementById('view-summary-btn').addEventListener('click', async () => {
