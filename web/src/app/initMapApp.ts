@@ -119,21 +119,15 @@ function filterByLeg(data, legName) {
     return data.locations || [];
   }
 
-  // Filter by regions (continent-based)
-  const legRegions = leg.regions || [];
-  if (legRegions.length === 0) {
-    console.warn(`⚠️ Leg "${legName}" has no regions defined`);
-    return data.locations || [];
-  }
-
+  // Filter by continent (leg name is the continent)
   return (data.locations || []).filter(location => {
-    // VALIDATION: Warn about missing region field
-    if (!location.region) {
-      console.warn(`⚠️ Location "${location.name}" (ID: ${location.id}) is missing region field - will not appear in leg view`);
+    // VALIDATION: Warn about missing continent field
+    if (!location.continent) {
+      console.warn(`⚠️ Location "${location.name}" (ID: ${location.id}) is missing continent field - will not appear in leg view`);
       return false;
     }
 
-    return legRegions.includes(location.region);
+    return location.continent === legName;
   });
 }
 
@@ -153,8 +147,10 @@ function filterBySubLeg(data, legName, subLegName) {
 
   const subLeg = leg.sub_legs?.find(sl => sl.name === subLegName);
   if (!subLeg) {
-    console.warn(`⚠️ Sub-leg "${subLegName}" not found in leg "${legName}"`);
-    return [];
+    console.warn(`⚠️ Sub-leg "${subLegName}" not found in leg "${legName}" - falling back to show all destinations for the leg`);
+    // Fallback to showing all destinations for this leg if sub-leg not found
+    // This handles migration from old region-based sub-legs to new country-based sub-legs
+    return filterByLeg(data, legName);
   }
 
   // Filter locations by country (geographic relationship)
@@ -176,13 +172,8 @@ function filterBySubLeg(data, legName, subLegName) {
       return false;
     }
 
-    // Filter by country match
+    // Filter by country match (sub-legs are now countries, not regions)
     const matches = subLegCountries.includes(location.country);
-
-    // DEBUG: Log why a location is filtered out
-    if (!matches && location.region && leg.regions?.includes(location.region)) {
-      console.warn(`❌ Location "${location.name}" has region "${location.region}" but country "${location.country}" NOT in sub-leg countries:`, subLegCountries);
-    }
 
     return matches;
   });
@@ -1458,6 +1449,11 @@ export async function initMapApp() {
 
   async function updateViewSummaryButtonState() {
     const viewSummaryBtn = document.getElementById('view-summary-btn');
+    if (!viewSummaryBtn) {
+      // Button doesn't exist in DOM, skip
+      return;
+    }
+
     if (!currentScenarioId) {
       // No scenario selected, disable button
       viewSummaryBtn.disabled = true;
@@ -4331,17 +4327,20 @@ export async function initMapApp() {
   }
   
   // Export scenario button
-  document.getElementById('export-scenario-btn').addEventListener('click', () => {
-    const dataStr = JSON.stringify(workingData, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    const scenarioName = currentScenarioName || 'itinerary';
-    link.download = `${scenarioName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  });
+  const exportScenarioBtn = document.getElementById('export-scenario-btn');
+  if (exportScenarioBtn) {
+    exportScenarioBtn.addEventListener('click', () => {
+      const dataStr = JSON.stringify(workingData, null, 2);
+      const dataBlob = new Blob([dataStr], {type: 'application/json'});
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      const scenarioName = currentScenarioName || 'itinerary';
+      link.download = `${scenarioName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+  }
   
   // Scenario actions dropdown toggle
   console.log('Setting up scenario actions button...');
@@ -4499,30 +4498,29 @@ export async function initMapApp() {
   };
 
   // Scenario controls
-  document.getElementById('manage-scenarios-btn').addEventListener('click', async (e) => {
-    try {
-      const dropdown = document.getElementById('scenario-actions-dropdown');
-      if (dropdown) dropdown.style.display = 'none';
-    } catch {}
-    await window.showManageScenarios();
-  });
+  const manageScenariosBtn = document.getElementById('manage-scenarios-btn');
+  if (manageScenariosBtn) {
+    manageScenariosBtn.addEventListener('click', async (e) => {
+      try {
+        const dropdown = document.getElementById('scenario-actions-dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+      } catch {}
+      await window.showManageScenarios();
+    });
+  }
 
   // Add destination quick button
-  document.getElementById('add-destination-bar-btn').addEventListener('click', () => {
-    openAddDestinationModal(null); // null means auto-calculate insertion point
-  });
+  const addDestinationBarBtn = document.getElementById('add-destination-bar-btn');
+  if (addDestinationBarBtn) {
+    addDestinationBarBtn.addEventListener('click', () => {
+      openAddDestinationModal(null); // null means auto-calculate insertion point
+    });
+  }
 
-  // Bulk cost update button
-  document.getElementById('bulk-update-costs-btn').addEventListener('click', () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    scenarioActionsDropdown.style.display = 'none';
-    scenarioActionsBtn.classList.remove('active');
-
-    openBulkCostUpdateModal();
-  });
-
-  document.getElementById('bulk-edit-costs-btn').addEventListener('click', () => {
+  // Manage Costs & Budget button - navigates to unified cost manager
+  const manageCostsBudgetBtn = document.getElementById('manage-costs-budget-btn');
+  if (manageCostsBudgetBtn) {
+    manageCostsBudgetBtn.addEventListener('click', () => {
     const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
     const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
     scenarioActionsDropdown.style.display = 'none';
@@ -4533,12 +4531,15 @@ export async function initMapApp() {
       return;
     }
 
-    // Navigate to full-screen bulk edit page
-    window.location.href = `./bulk-edit.html?scenario=${currentScenarioId}`;
-  });
+    // Navigate to unified cost & budget manager page
+    window.location.href = `./cost-manager.html?scenario=${currentScenarioId}`;
+    });
+  }
 
   // Bulk cost update modal event listeners
-  document.getElementById('select-all-destinations-btn').addEventListener('click', () => {
+  const selectAllDestinationsBtn = document.getElementById('select-all-destinations-btn');
+  if (selectAllDestinationsBtn) {
+    selectAllDestinationsBtn.addEventListener('click', () => {
     const checkboxes = document.querySelectorAll('.bulk-destination-checkbox');
     checkboxes.forEach(cb => {
       if (!cb.checked) {
@@ -4546,39 +4547,57 @@ export async function initMapApp() {
         cb.dispatchEvent(new Event('change'));
       }
     });
-  });
-
-  document.getElementById('deselect-all-destinations-btn').addEventListener('click', () => {
-    const checkboxes = document.querySelectorAll('.bulk-destination-checkbox');
-    checkboxes.forEach(cb => {
-      if (cb.checked) {
-        cb.checked = false;
-        cb.dispatchEvent(new Event('change'));
-      }
     });
-  });
+  }
 
-  document.getElementById('cancel-bulk-update-btn').addEventListener('click', closeBulkCostUpdateModal);
+  const deselectAllDestinationsBtn = document.getElementById('deselect-all-destinations-btn');
+  if (deselectAllDestinationsBtn) {
+    deselectAllDestinationsBtn.addEventListener('click', () => {
+      const checkboxes = document.querySelectorAll('.bulk-destination-checkbox');
+      checkboxes.forEach(cb => {
+        if (cb.checked) {
+          cb.checked = false;
+          cb.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+  }
 
-  document.getElementById('confirm-bulk-update-btn').addEventListener('click', requestBulkCostUpdate);
+  const cancelBulkUpdateBtn = document.getElementById('cancel-bulk-update-btn');
+  if (cancelBulkUpdateBtn) {
+    cancelBulkUpdateBtn.addEventListener('click', closeBulkCostUpdateModal);
+  }
+
+  const confirmBulkUpdateBtn = document.getElementById('confirm-bulk-update-btn');
+  if (confirmBulkUpdateBtn) {
+    confirmBulkUpdateBtn.addEventListener('click', requestBulkCostUpdate);
+  }
 
   // Close bulk cost modal when clicking outside
-  document.getElementById('bulk-cost-update-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'bulk-cost-update-modal') {
-      closeBulkCostUpdateModal();
-    }
-  });
+  const bulkCostUpdateModal = document.getElementById('bulk-cost-update-modal');
+  if (bulkCostUpdateModal) {
+    bulkCostUpdateModal.addEventListener('click', (e) => {
+      if (e.target.id === 'bulk-cost-update-modal') {
+        closeBulkCostUpdateModal();
+      }
+    });
+  }
 
-  document.getElementById('data-integrity-btn').addEventListener('click', () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    if (scenarioActionsDropdown) scenarioActionsDropdown.style.display = 'none';
-    if (scenarioActionsBtn) scenarioActionsBtn.classList.remove('active');
+  const dataIntegrityBtn = document.getElementById('data-integrity-btn');
+  if (dataIntegrityBtn) {
+    dataIntegrityBtn.addEventListener('click', () => {
+      const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+      const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+      if (scenarioActionsDropdown) scenarioActionsDropdown.style.display = 'none';
+      if (scenarioActionsBtn) scenarioActionsBtn.classList.remove('active');
 
-    showDataIntegrityPanel(workingData, handleDataUpdate);
-  });
+      showDataIntegrityPanel(workingData, handleDataUpdate);
+    });
+  }
 
-  document.getElementById('geo-validation-btn').addEventListener('click', async () => {
+  const geoValidationBtn = document.getElementById('geo-validation-btn');
+  if (geoValidationBtn) {
+    geoValidationBtn.addEventListener('click', async () => {
     const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
     const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
     if (scenarioActionsDropdown) scenarioActionsDropdown.style.display = 'none';
@@ -4594,39 +4613,43 @@ export async function initMapApp() {
     };
 
     await showGeographicValidationPanel(workingData, handleDataUpdate, saveToFirestore);
-  });
+    });
+  }
 
-  document.getElementById('compare-costs-btn').addEventListener('click', async () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    scenarioActionsDropdown.style.display = 'none';
-    scenarioActionsBtn.classList.remove('active');
+  const compareCostsBtn = document.getElementById('compare-costs-btn');
+  if (compareCostsBtn) {
+    compareCostsBtn.addEventListener('click', async () => {
+      const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+      const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+      scenarioActionsDropdown.style.display = 'none';
+      scenarioActionsBtn.classList.remove('active');
 
-    try {
-      const scenarios = await scenarioManager.listScenarios();
-      if (scenarios.length < 2) {
-        alert('You need at least 2 scenarios to compare costs. Create more scenarios first.');
-        return;
+      try {
+        const scenarios = await scenarioManager.listScenarios();
+        if (scenarios.length < 2) {
+          alert('You need at least 2 scenarios to compare costs. Create more scenarios first.');
+          return;
+        }
+
+        // Load scenario data with itineraries
+        const scenariosWithData = await Promise.all(
+          scenarios.map(async (scenario) => {
+            const latestVersion = await scenarioManager.getLatestVersion(scenario.id);
+            return {
+              id: scenario.id,
+              name: scenario.name,
+              itinerary: latestVersion?.itineraryData || null
+            };
+          })
+        );
+
+        await costComparison.showComparisonModal(scenariosWithData.filter(s => s.itinerary));
+      } catch (error) {
+        console.error('Error loading scenarios for comparison:', error);
+        alert('Failed to load scenarios for comparison.');
       }
-
-      // Load scenario data with itineraries
-      const scenariosWithData = await Promise.all(
-        scenarios.map(async (scenario) => {
-          const latestVersion = await scenarioManager.getLatestVersion(scenario.id);
-          return {
-            id: scenario.id,
-            name: scenario.name,
-            itinerary: latestVersion?.itineraryData || null
-          };
-        })
-      );
-
-      await costComparison.showComparisonModal(scenariosWithData.filter(s => s.itinerary));
-    } catch (error) {
-      console.error('Error loading scenarios for comparison:', error);
-      alert('Failed to load scenarios for comparison.');
-    }
-  });
+    });
+  }
 
   // Toggle map visibility
   const mapVisibilityToggle = document.getElementById('map-visibility-toggle');
@@ -4769,10 +4792,15 @@ export async function initMapApp() {
 
   // Duplicate scenario now lives in Manage Scenarios modal (dynamic handler below)
 
-  document.getElementById('import-scenarios-btn').addEventListener('click', openImportScenariosModal);
+  const importScenariosBtn = document.getElementById('import-scenarios-btn');
+  if (importScenariosBtn) {
+    importScenariosBtn.addEventListener('click', openImportScenariosModal);
+  }
 
   // Summary generation button - shows options modal
-  document.getElementById('generate-summary-btn').addEventListener('click', async () => {
+  const generateSummaryBtn = document.getElementById('generate-summary-btn');
+  if (generateSummaryBtn) {
+    generateSummaryBtn.addEventListener('click', async () => {
     // Check if we have locations
     if (!workingData.locations || workingData.locations.length === 0) {
       alert('No locations in itinerary to generate summary');
@@ -4827,7 +4855,8 @@ export async function initMapApp() {
       console.error('Error generating summary:', error);
       alert('Failed to generate summary: ' + error.message);
     }
-  });
+    });
+  }
 
   // Student Dashboard button (in scenario actions dropdown)
   document.getElementById('student-dashboard-btn').addEventListener('click', () => {
@@ -4837,7 +4866,22 @@ export async function initMapApp() {
   });
 
   // View saved summary button (in scenario actions dropdown)
-  document.getElementById('view-summary-btn').addEventListener('click', async () => {
+  const studentDashboardBtn = document.getElementById('student-dashboard-btn');
+  if (studentDashboardBtn) {
+    studentDashboardBtn.addEventListener('click', () => {
+      const studentId = localStorage.getItem('current_student_id');
+      if (studentId) {
+        window.open(`/student-dashboard.html?student_id=${studentId}`, '_blank');
+      } else {
+        // No student selected, let the dashboard pick the first one
+        window.open(`/student-dashboard.html`, '_blank');
+      }
+    });
+  }
+
+  const viewSummaryBtn = document.getElementById('view-summary-btn');
+  if (viewSummaryBtn) {
+    viewSummaryBtn.addEventListener('click', async () => {
     if (!currentScenarioId) {
       alert('Please save your scenario first before viewing summary');
       return;
@@ -4877,22 +4921,44 @@ export async function initMapApp() {
       console.error('Error viewing summary:', error);
       alert('Failed to view summary: ' + error.message);
     }
-  });
+    });
+  }
 
   // Removed standalone scenario-selector; use Manage Scenarios for switching/creating
   
   // Initialize Places API
   initializePlacesAPI();
-  
+
   // Modal event handlers
-  document.getElementById('cancel-add-btn').addEventListener('click', closeAddDestinationModal);
-  document.getElementById('cancel-save-scenario-btn').addEventListener('click', closeSaveScenarioModal);
-  document.getElementById('close-manage-scenarios-btn').addEventListener('click', closeManageScenariosModal);
-  document.getElementById('cancel-import-btn').addEventListener('click', closeImportScenariosModal);
-  document.getElementById('cancel-edit-transport-btn').addEventListener('click', closeTransportEditModal);
+  const cancelAddBtn = document.getElementById('cancel-add-btn');
+  if (cancelAddBtn) {
+    cancelAddBtn.addEventListener('click', closeAddDestinationModal);
+  }
+
+  const cancelSaveScenarioBtn = document.getElementById('cancel-save-scenario-btn');
+  if (cancelSaveScenarioBtn) {
+    cancelSaveScenarioBtn.addEventListener('click', closeSaveScenarioModal);
+  }
+
+  const closeManageScenariosBtn = document.getElementById('close-manage-scenarios-btn');
+  if (closeManageScenariosBtn) {
+    closeManageScenariosBtn.addEventListener('click', closeManageScenariosModal);
+  }
+
+  const cancelImportBtn = document.getElementById('cancel-import-btn');
+  if (cancelImportBtn) {
+    cancelImportBtn.addEventListener('click', closeImportScenariosModal);
+  }
+
+  const cancelEditTransportBtn = document.getElementById('cancel-edit-transport-btn');
+  if (cancelEditTransportBtn) {
+    cancelEditTransportBtn.addEventListener('click', closeTransportEditModal);
+  }
 
   // Broad search button handler (uses Text Search + Geocoding for broader coverage)
-  document.getElementById('broad-search-btn').addEventListener('click', async () => {
+  const broadSearchBtn = document.getElementById('broad-search-btn');
+  if (broadSearchBtn) {
+    broadSearchBtn.addEventListener('click', async () => {
     const searchInput = document.getElementById('location-search');
     const query = searchInput.value.trim();
 
@@ -4955,17 +5021,23 @@ export async function initMapApp() {
       btn.textContent = originalText;
       btn.disabled = false;
     }
-  });
+    });
+  }
 
   // Close transport modal on overlay click
-  document.getElementById('edit-transport-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'edit-transport-modal') {
-      closeTransportEditModal();
-    }
-  });
+  const editTransportModal = document.getElementById('edit-transport-modal');
+  if (editTransportModal) {
+    editTransportModal.addEventListener('click', (e) => {
+      if (e.target.id === 'edit-transport-modal') {
+        closeTransportEditModal();
+      }
+    });
+  }
 
   // Form submissions
-  document.getElementById('add-destination-form').addEventListener('submit', async (e) => {
+  const addDestinationForm = document.getElementById('add-destination-form');
+  if (addDestinationForm) {
+    addDestinationForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const selectedPlaceData = document.getElementById('selected-place').value;
@@ -4991,9 +5063,12 @@ export async function initMapApp() {
       console.error('Error parsing place data:', error);
       alert('Error adding destination. Please try again.');
     }
-  });
-  
-  document.getElementById('save-scenario-form').addEventListener('submit', async (e) => {
+    });
+  }
+
+  const saveScenarioForm = document.getElementById('save-scenario-form');
+  if (saveScenarioForm) {
+    saveScenarioForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const name = document.getElementById('scenario-name').value.trim();
@@ -5037,17 +5112,23 @@ export async function initMapApp() {
       console.error('Error saving scenario:', error);
       alert('Failed to save scenario. Please try again.');
     }
-  });
+    });
+  }
 
-  document.getElementById('edit-transport-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const segmentId = document.getElementById('edit-transport-segment-id').value;
-    if (segmentId) {
-      await saveTransportSegment(segmentId);
-    }
-  });
+  const editTransportForm = document.getElementById('edit-transport-form');
+  if (editTransportForm) {
+    editTransportForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const segmentId = document.getElementById('edit-transport-segment-id').value;
+      if (segmentId) {
+        await saveTransportSegment(segmentId);
+      }
+    });
+  }
 
-  document.getElementById('confirm-import-btn').addEventListener('click', () => {
+  const confirmImportBtn = document.getElementById('confirm-import-btn');
+  if (confirmImportBtn) {
+    confirmImportBtn.addEventListener('click', () => {
         const fileInput = document.getElementById('scenario-file');
         const overwrite = document.getElementById('overwrite-scenarios').checked;
 
@@ -5081,32 +5162,45 @@ export async function initMapApp() {
     };
 
     reader.readAsText(file);
-  });
-  
+    });
+  }
+
   // Close modals when clicking outside
-  document.getElementById('add-destination-modal').addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay')) {
-      closeAddDestinationModal();
-    }
-  });
-  
-  document.getElementById('save-scenario-modal').addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay')) {
-      closeSaveScenarioModal();
-    }
-  });
-  
-  document.getElementById('manage-scenarios-modal').addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay')) {
-      closeManageScenariosModal();
-    }
-  });
-  
-  document.getElementById('import-scenarios-modal').addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay')) {
-      closeImportScenariosModal();
-    }
-  });
+  const addDestinationModal = document.getElementById('add-destination-modal');
+  if (addDestinationModal) {
+    addDestinationModal.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal-overlay')) {
+        closeAddDestinationModal();
+      }
+    });
+  }
+
+  const saveScenarioModal = document.getElementById('save-scenario-modal');
+  if (saveScenarioModal) {
+    saveScenarioModal.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal-overlay')) {
+        closeSaveScenarioModal();
+      }
+    });
+  }
+
+  const manageScenariosModal = document.getElementById('manage-scenarios-modal');
+  if (manageScenariosModal) {
+    manageScenariosModal.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal-overlay')) {
+        closeManageScenariosModal();
+      }
+    });
+  }
+
+  const importScenariosModal = document.getElementById('import-scenarios-modal');
+  if (importScenariosModal) {
+    importScenariosModal.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal-overlay')) {
+        closeImportScenariosModal();
+      }
+    });
+  }
 
   // Handler for when the agent modifies the itinerary
   function ensureLocationDefaults(destination) {
@@ -5350,14 +5444,27 @@ export async function initMapApp() {
 
   // Restore leg/sub-leg selections from saved state
   const initialLeg = savedState.selectedLeg || 'all';
-  const initialSubLeg = savedState.selectedSubLeg || null;
+  let initialSubLeg = savedState.selectedSubLeg || null;
 
   // Set the filter values
   legFilter.value = initialLeg;
   if (initialLeg !== 'all') {
     populateSubLegs(initialLeg);
     if (initialSubLeg) {
-      subLegFilter.value = initialSubLeg;
+      // Validate that the sub-leg exists in the current leg
+      const legs = getLegsForData(workingData, { useDynamic: true });
+      const leg = legs.find(l => l.name === initialLeg);
+      const subLegExists = leg?.sub_legs?.some(sl => sl.name === initialSubLeg);
+
+      if (subLegExists) {
+        subLegFilter.value = initialSubLeg;
+      } else {
+        console.warn(`⚠️ Saved sub-leg "${initialSubLeg}" no longer exists, resetting to "All Destinations"`);
+        initialSubLeg = null;
+        subLegFilter.value = '';
+        // Clear from saved state
+        saveState({ selectedSubLeg: null });
+      }
     }
   }
 

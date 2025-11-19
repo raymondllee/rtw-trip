@@ -120,14 +120,52 @@ function getDurationScalingInfo(location) {
   };
 }
 
+/**
+ * Determine if a cost should scale with duration changes.
+ * Now supports explicit pricing_model configuration (Recommendation G).
+ *
+ * @param {Object} cost - The cost item
+ * @param {string} category - The cost category
+ * @returns {boolean} True if cost should scale with duration
+ */
 function shouldScaleWithDuration(cost, category) {
   if (!cost || typeof cost !== 'object') return false;
 
+  // Check explicit configuration first (highest priority)
   if (cost.duration_invariant === true || cost.durationInvariant === true) return false;
   if (cost.scale_with_duration === false || cost.scaleWithDuration === false) return false;
   if (cost.duration_sensitive === true || cost.durationSensitive === true) return true;
   if (cost.scale_with_duration === true || cost.scaleWithDuration === true) return true;
 
+  // NEW: Check explicit pricing_model object (Recommendation G)
+  const pricingModel = cost.pricing_model || cost.pricingModel;
+  if (pricingModel && typeof pricingModel === 'object') {
+    // If scales_with_duration is explicitly set, use it
+    if (pricingModel.scales_with_duration !== undefined) {
+      return pricingModel.scales_with_duration;
+    }
+
+    // Otherwise infer from pricing type
+    const modelType = String(pricingModel.type || '').toLowerCase();
+    switch (modelType) {
+      case 'fixed':
+        return false;
+      case 'per_day':
+      case 'per_night':
+      case 'per_person_day':
+      case 'per_person_night':
+        return true;
+      case 'custom':
+        // For custom, check if formula references duration
+        const formula = String(pricingModel.custom_formula || '').toLowerCase();
+        return formula.includes('day') || formula.includes('duration') || formula.includes('night');
+      default:
+        // If type is not recognized, fall through to heuristics
+        break;
+    }
+  }
+
+  // Fallback to heuristic detection (legacy support)
   const meta = String(
     cost.pricing_model ??
     cost.pricingModel ??

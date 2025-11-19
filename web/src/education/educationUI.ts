@@ -280,13 +280,14 @@ export function showCurriculumGenerationModal(location: any, scenarioId?: string
 /**
  * Show curriculum viewer modal
  */
-export async function showCurriculumViewerModal(curriculumId: string) {
+export async function showCurriculumViewerModal(curriculumId: string, isEditMode = false) {
   try {
     const response = await educationService.getCurriculum(curriculumId);
     const curriculum = response.curriculum;
 
     // Get the first location's lessons
     const locationLessons = Object.values(curriculum.location_lessons)[0] as any;
+    const locationId = Object.keys(curriculum.location_lessons)[0];
 
     let modal = document.getElementById('curriculum-viewer-modal');
 
@@ -307,7 +308,13 @@ export async function showCurriculumViewerModal(curriculumId: string) {
     modal.innerHTML = `
       <div class="modal modal-large">
         <div class="modal-header">
-          <h3>${curriculum.semester.title}</h3>
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <h3>${curriculum.semester.title}</h3>
+            <label class="toggle-switch" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
+              <input type="checkbox" id="edit-mode-toggle" ${isEditMode ? 'checked' : ''}>
+              <span>Edit Mode</span>
+            </label>
+          </div>
           <button class="modal-close-btn" id="close-viewer-btn">×</button>
         </div>
         <div class="modal-body">
@@ -348,48 +355,174 @@ export async function showCurriculumViewerModal(curriculumId: string) {
 
           <div class="tab-content" id="tab-pretrip">
             <h4>Pre-Trip Preparation</h4>
-            ${renderPreTrip(locationLessons?.pre_trip)}
+            ${renderPreTrip(locationLessons?.pre_trip, isEditMode)}
           </div>
 
           <div class="tab-content" id="tab-onlocation">
-            <h4>On-Location Activities</h4>
-            ${renderOnLocation(locationLessons?.on_location)}
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <h4>On-Location Activities</h4>
+              ${isEditMode ? `
+                <button class="btn-primary btn-sm" id="add-activity-btn">
+                  + Add Activity
+                </button>
+              ` : ''}
+            </div>
+            ${renderOnLocation(locationLessons?.on_location, isEditMode)}
           </div>
 
           <div class="tab-content" id="tab-posttrip">
             <h4>Post-Trip Reflection</h4>
-            ${renderPostTrip(locationLessons?.post_trip)}
+            ${renderPostTrip(locationLessons?.post_trip, isEditMode)}
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn-secondary" id="close-viewer-bottom-btn">Close</button>
-          <button class="btn-primary" onclick="window.open('/curriculum-test.html', '_blank')">
-            Open in Full Editor
-          </button>
+          ${isEditMode ? `
+            <button class="btn-primary" id="save-curriculum-btn">Save Changes</button>
+          ` : `
+            <button class="btn-primary" onclick="window.open('/curriculum-test.html', '_blank')">
+              Open in Full Editor
+            </button>
+          `}
         </div>
       </div>
     `;
 
     modal.style.display = 'flex';
 
-    // Handle close buttons
-    modal.querySelector('#close-viewer-btn')?.addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
-    modal.querySelector('#close-viewer-bottom-btn')?.addEventListener('click', () => {
-      modal.style.display = 'none';
+    // Bind Events
+    const close = () => { if (modal) modal.style.display = 'none'; };
+    modal.querySelector('#close-viewer-btn')?.addEventListener('click', close);
+    modal.querySelector('#close-viewer-bottom-btn')?.addEventListener('click', close);
+
+    // Edit Mode Toggle
+    modal.querySelector('#edit-mode-toggle')?.addEventListener('change', (e) => {
+      showCurriculumViewerModal(curriculumId, (e.target as HTMLInputElement).checked);
     });
 
-    // Handle tab switching
+    // Add Activity Button
+    modal.querySelector('#add-activity-btn')?.addEventListener('click', () => {
+      showAddCustomActivityModal(curriculumId, locationId);
+    });
+
+    // Helper to scrape current state
+    const getUpdatedLocationLessons = () => {
+      const updatedLessons = JSON.parse(JSON.stringify(locationLessons));
+      modal?.querySelectorAll('[contenteditable]').forEach((el) => {
+        const sectionPath = (el as HTMLElement).dataset.section;
+        const indexStr = (el as HTMLElement).dataset.index;
+        const field = (el as HTMLElement).dataset.field;
+
+        if (sectionPath && indexStr && field) {
+          const index = parseInt(indexStr, 10);
+          const parts = sectionPath.split('.');
+          let current = updatedLessons;
+          for (const part of parts) {
+            if (!current[part]) current[part] = [];
+            current = current[part];
+          }
+          if (Array.isArray(current) && current[index]) {
+            current[index][field] = (el as HTMLElement).innerText.trim();
+          }
+        }
+      });
+      return updatedLessons;
+    };
+
+    // Save Changes Button
+    modal.querySelector('#save-curriculum-btn')?.addEventListener('click', async () => {
+      try {
+        const btn = modal?.querySelector('#save-curriculum-btn') as HTMLButtonElement;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Saving...';
+        }
+
+        const updatedLessons = getUpdatedLocationLessons();
+        const updates = { location_lessons: { [locationId]: updatedLessons } };
+
+        await educationService.updateCurriculum(curriculumId, updates);
+
+        alert('Changes saved successfully!');
+        showCurriculumViewerModal(curriculumId, false);
+
+      } catch (error) {
+        console.error('Error saving curriculum:', error);
+        alert(`Failed to save changes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const btn = modal?.querySelector('#save-curriculum-btn') as HTMLButtonElement;
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Save Changes';
+        }
+      }
+    });
+
+    // Add Item Buttons
+    modal.querySelectorAll('.add-item-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const section = (e.currentTarget as HTMLElement).dataset.section;
+        if (!section) return;
+
+        try {
+          const updatedLessons = getUpdatedLocationLessons();
+
+          // Navigate to section
+          const parts = section.split('.');
+          let current = updatedLessons;
+          for (const part of parts) {
+            if (!current[part]) current[part] = {}; // Ensure object exists for path
+            current = current[part];
+          }
+
+          // Add placeholder item based on section
+          const newItem = getPlaceholderItem(parts[parts.length - 1]);
+          if (Array.isArray(current)) {
+            current.push(newItem);
+          } else {
+            // If it's not an array yet (e.g., first item being added), make it an array
+            const parentPath = parts.slice(0, -1);
+            let parent = updatedLessons;
+            for (const part of parentPath) {
+              parent = parent[part];
+            }
+            parent[parts[parts.length - 1]] = [newItem];
+          }
+
+          const updates = { location_lessons: { [locationId]: updatedLessons } };
+          await educationService.updateCurriculum(curriculumId, updates);
+          showCurriculumViewerModal(curriculumId, true); // Reload in edit mode
+
+        } catch (error) {
+          console.error('Error adding item:', error);
+          alert('Failed to add item.');
+        }
+      });
+    });
+
+    // Tab Switching
     modal.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const tabName = (btn as HTMLElement).dataset.tab;
-        modal.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        modal.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        modal?.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        modal?.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
-        modal.querySelector(`#tab-${tabName}`)?.classList.add('active');
+        modal?.querySelector(`#tab-${tabName}`)?.classList.add('active');
       });
     });
+
+    // Listen for activity added event to refresh
+    const refreshHandler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail.planId === curriculumId) {
+        showCurriculumViewerModal(curriculumId, true); // Keep edit mode on
+      }
+    };
+    window.removeEventListener('activity-added', refreshHandler); // Avoid duplicates if possible (though anonymous function makes it hard)
+    // Actually, we should use a named handler or just rely on the modal being rebuilt.
+    // Since we rebuild the modal, the old listeners are gone (garbage collected with the DOM elements).
+    // But window listeners persist.
+    // We should add { once: true } or manage cleanup.
+    window.addEventListener('activity-added', refreshHandler, { once: true });
 
   } catch (error) {
     console.error('Error loading curriculum:', error);
@@ -397,150 +530,149 @@ export async function showCurriculumViewerModal(curriculumId: string) {
   }
 }
 
-function renderPreTrip(preTrip: any): string {
-  if (!preTrip) return '<p>No pre-trip content available.</p>';
+function getPlaceholderItem(type: string): any {
+  switch (type) {
+    case 'readings': return { title: 'New Reading', description: 'Description here', source: 'Source', reading_time_minutes: 15 };
+    case 'videos': return { title: 'New Video', description: 'Description here', source: 'Source', duration_minutes: 10 };
+    case 'preparation_tasks': return { title: 'New Task', description: 'Description here', estimated_duration_minutes: 20 };
+    case 'experiential_activities': return { title: 'New Activity', description: 'Description here', subject: 'General', estimated_duration_minutes: 60 };
+    case 'structured_lessons': return { title: 'New Lesson', description: 'Description here', subject: 'General', estimated_duration_minutes: 45 };
+    case 'reflection_prompts': return { text: 'New Reflection Prompt', type: 'journal', word_count_target: 300 };
+    case 'synthesis_activities': return { title: 'New Synthesis Activity', description: 'Description here' };
+    default: return { title: 'New Item', description: 'Description' };
+  }
+}
 
-  const readings = preTrip.readings || [];
-  const videos = preTrip.videos || [];
-  const tasks = preTrip.preparation_tasks || [];
+function renderPreTrip(preTrip: any, isEditMode: boolean): string {
+  if (!preTrip && !isEditMode) return '<p>No pre-trip content available.</p>';
+
+  const readings = preTrip?.readings || [];
+  const videos = preTrip?.videos || [];
+  const tasks = preTrip?.preparation_tasks || [];
 
   return `
-    ${readings.length > 0 ? `
-      <div class="content-section">
-        <h5>📖 Readings</h5>
-        ${readings.map((r: any) => `
-          <div class="content-item">
-            <div class="content-title">${r.title}</div>
-            <div class="content-meta">${r.source} • ${r.reading_time_minutes} min</div>
-            <div class="content-desc">${r.description}</div>
-            ${r.url ? `<a href="${r.url}" target="_blank" class="content-link">Read →</a>` : ''}
-          </div>
-        `).join('')}
-      </div>
-    ` : ''}
+    <div class="content-section">
+      <h5>📖 Readings</h5>
+      ${readings.map((r: any, i: number) => `
+        <div class="content-item">
+          <div class="content-title" ${isEditMode ? `contenteditable="true" data-section="pre_trip.readings" data-index="${i}" data-field="title"` : ''}>${r.title}</div>
+          <div class="content-meta">${r.source} • ${r.reading_time_minutes} min</div>
+          <div class="content-desc" ${isEditMode ? `contenteditable="true" data-section="pre_trip.readings" data-index="${i}" data-field="description"` : ''}>${r.description}</div>
+          ${r.url ? `<a href="${r.url}" target="_blank" class="content-link">Read →</a>` : ''}
+        </div>
+      `).join('')}
+      ${isEditMode ? `<button class="btn-sm btn-outline add-item-btn" data-section="pre_trip.readings">+ Add Reading</button>` : ''}
+    </div>
 
-    ${videos.length > 0 ? `
-      <div class="content-section">
-        <h5>🎥 Videos</h5>
-        ${videos.map((v: any) => `
-          <div class="content-item">
-            <div class="content-title">${v.title}</div>
-            <div class="content-meta">${v.source} • ${v.duration_minutes} min</div>
-            <div class="content-desc">${v.description}</div>
-            ${v.url ? `<a href="${v.url}" target="_blank" class="content-link">Watch →</a>` : ''}
-          </div>
-        `).join('')}
-      </div>
-    ` : ''}
+    <div class="content-section">
+      <h5>🎥 Videos</h5>
+      ${videos.map((v: any, i: number) => `
+        <div class="content-item">
+          <div class="content-title" ${isEditMode ? `contenteditable="true" data-section="pre_trip.videos" data-index="${i}" data-field="title"` : ''}>${v.title}</div>
+          <div class="content-meta">${v.source} • ${v.duration_minutes} min</div>
+          <div class="content-desc" ${isEditMode ? `contenteditable="true" data-section="pre_trip.videos" data-index="${i}" data-field="description"` : ''}>${v.description}</div>
+          ${v.url ? `<a href="${v.url}" target="_blank" class="content-link">Watch →</a>` : ''}
+        </div>
+      `).join('')}
+      ${isEditMode ? `<button class="btn-sm btn-outline add-item-btn" data-section="pre_trip.videos">+ Add Video</button>` : ''}
+    </div>
 
-    ${tasks.length > 0 ? `
-      <div class="content-section">
-        <h5>✅ Preparation Tasks</h5>
-        ${tasks.map((t: any) => `
-          <div class="content-item">
-            <div class="content-title">${t.title}</div>
-            <div class="content-desc">${t.description}</div>
-            <div class="content-meta">${t.estimated_duration_minutes} minutes</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : ''}
+    <div class="content-section">
+      <h5>✅ Preparation Tasks</h5>
+      ${tasks.map((t: any, i: number) => `
+        <div class="content-item">
+          <div class="content-title" ${isEditMode ? `contenteditable="true" data-section="pre_trip.preparation_tasks" data-index="${i}" data-field="title"` : ''}>${t.title}</div>
+          <div class="content-desc" ${isEditMode ? `contenteditable="true" data-section="pre_trip.preparation_tasks" data-index="${i}" data-field="description"` : ''}>${t.description}</div>
+          <div class="content-meta">${t.estimated_duration_minutes} minutes</div>
+        </div>
+      `).join('')}
+      ${isEditMode ? `<button class="btn-sm btn-outline add-item-btn" data-section="pre_trip.preparation_tasks">+ Add Task</button>` : ''}
+    </div>
   `;
 }
 
-function renderOnLocation(onLocation: any): string {
-  if (!onLocation) return '<p>No on-location content available.</p>';
-
-  const expActivities = onLocation.experiential_activities || [];
-  const structuredLessons = onLocation.structured_lessons || [];
+function renderOnLocation(onLocation: any, isEditMode: boolean): string {
+  if (!onLocation && !isEditMode) return '<p>No on-location content available.</p>';
+  const expActivities = onLocation?.experiential_activities || [];
+  const structuredLessons = onLocation?.structured_lessons || [];
 
   return `
-    ${expActivities.length > 0 ? `
-      <div class="content-section">
-        <h5>🌍 Experiential Activities</h5>
-        ${expActivities.map((a: any) => `
-          <div class="activity-item">
-            <div class="activity-header">
-              <div class="activity-title">${a.title}</div>
-              <div class="activity-meta">
-                <span class="subject-badge">${a.subject}</span>
-                <span>${a.estimated_duration_minutes} min</span>
-              </div>
+    <div class="content-section">
+      <h5>🌍 Experiential Activities</h5>
+      ${expActivities.map((a: any, i: number) => `
+        <div class="activity-item">
+          <div class="activity-header">
+            <div class="activity-title" ${isEditMode ? `contenteditable="true" data-section="on_location.experiential_activities" data-index="${i}" data-field="title"` : ''}>${a.title}</div>
+            <div class="activity-meta">
+              <span class="subject-badge">${a.subject}</span>
+              <span>${a.estimated_duration_minutes} min</span>
             </div>
-            <div class="activity-desc">${a.description}</div>
-            ${a.site_details ? `
-              <div class="site-details">
-                <strong>📍 ${a.site_details.name}</strong>
-                ${a.site_details.address ? `<div>${a.site_details.address}</div>` : ''}
-                ${a.site_details.best_time ? `<div>⏰ ${a.site_details.best_time}</div>` : ''}
-                ${a.site_details.cost_usd ? `<div>💵 $${a.site_details.cost_usd}</div>` : ''}
-              </div>
-            ` : ''}
-            ${a.learning_objectives?.length > 0 ? `
-              <div class="learning-objectives">
-                <strong>Learning Objectives:</strong>
-                <ul>
-                  ${a.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
-                </ul>
-              </div>
-            ` : ''}
           </div>
-        `).join('')}
-      </div>
-    ` : ''}
+          <div class="activity-desc" ${isEditMode ? `contenteditable="true" data-section="on_location.experiential_activities" data-index="${i}" data-field="description"` : ''}>${a.description}</div>
+          ${a.external_links && a.external_links.length > 0 ? `
+            <div class="external-links" style="margin-top: 0.5rem;">
+              ${a.external_links.map((link: string) => `
+                <a href="${link}" target="_blank" class="content-link" style="display: inline-flex; align-items: center; gap: 0.25rem;">🔗 ${link}</a>
+              `).join('')}
+            </div>
+          ` : ''}
+          ${a.site_details ? `
+            <div class="site-details">
+              <strong>📍 ${a.site_details.name}</strong>
+              ${a.site_details.address ? `<div>${a.site_details.address}</div>` : ''}
+            </div>
+          ` : ''}
+        </div>
+      `).join('')}
+      ${isEditMode ? `<button class="btn-sm btn-outline add-item-btn" data-section="on_location.experiential_activities">+ Add Activity</button>` : ''}
+    </div>
 
-    ${structuredLessons.length > 0 ? `
-      <div class="content-section">
-        <h5>📝 Structured Lessons</h5>
-        ${structuredLessons.map((l: any) => `
-          <div class="activity-item">
-            <div class="activity-header">
-              <div class="activity-title">${l.title}</div>
-              <div class="activity-meta">
-                <span class="subject-badge">${l.subject}</span>
-                <span>${l.estimated_duration_minutes} min</span>
-              </div>
+    <div class="content-section">
+      <h5>📝 Structured Lessons</h5>
+      ${structuredLessons.map((l: any, i: number) => `
+        <div class="activity-item">
+          <div class="activity-header">
+            <div class="activity-title" ${isEditMode ? `contenteditable="true" data-section="on_location.structured_lessons" data-index="${i}" data-field="title"` : ''}>${l.title}</div>
+            <div class="activity-meta">
+              <span class="subject-badge">${l.subject}</span>
+              <span>${l.estimated_duration_minutes} min</span>
             </div>
-            <div class="activity-desc">${l.description}</div>
           </div>
-        `).join('')}
-      </div>
-    ` : ''}
+          <div class="activity-desc" ${isEditMode ? `contenteditable="true" data-section="on_location.structured_lessons" data-index="${i}" data-field="description"` : ''}>${l.description}</div>
+        </div>
+      `).join('')}
+      ${isEditMode ? `<button class="btn-sm btn-outline add-item-btn" data-section="on_location.structured_lessons">+ Add Lesson</button>` : ''}
+    </div>
   `;
 }
 
-function renderPostTrip(postTrip: any): string {
-  if (!postTrip) return '<p>No post-trip content available.</p>';
-
-  const reflectionPrompts = postTrip.reflection_prompts || [];
-  const synthesisActivities = postTrip.synthesis_activities || [];
+function renderPostTrip(postTrip: any, isEditMode: boolean): string {
+  if (!postTrip && !isEditMode) return '<p>No post-trip content available.</p>';
+  const reflectionPrompts = postTrip?.reflection_prompts || [];
+  const synthesisActivities = postTrip?.synthesis_activities || [];
 
   return `
-    ${reflectionPrompts.length > 0 ? `
-      <div class="content-section">
-        <h5>💭 Reflection Prompts</h5>
-        ${reflectionPrompts.map((p: any) => `
-          <div class="content-item">
-            <div class="content-desc">${p.text || p.prompt || p.question}</div>
-            <div class="content-meta">
-              ${p.type || 'journal'} • ${p.word_count_target || p.word_count || 300} words
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    ` : ''}
+    <div class="content-section">
+      <h5>💭 Reflection Prompts</h5>
+      ${reflectionPrompts.map((p: any, i: number) => `
+        <div class="content-item">
+          <div class="content-desc" ${isEditMode ? `contenteditable="true" data-section="post_trip.reflection_prompts" data-index="${i}" data-field="text"` : ''}>${p.text || p.prompt || p.question}</div>
+          <div class="content-meta">${p.type || 'journal'} • ${p.word_count_target || p.word_count || 300} words</div>
+        </div>
+      `).join('')}
+      ${isEditMode ? `<button class="btn-sm btn-outline add-item-btn" data-section="post_trip.reflection_prompts">+ Add Prompt</button>` : ''}
+    </div>
 
-    ${synthesisActivities.length > 0 ? `
-      <div class="content-section">
-        <h5>✍️ Synthesis Activities</h5>
-        ${synthesisActivities.map((a: any) => `
-          <div class="content-item">
-            <div class="content-title">${a.title}</div>
-            <div class="content-desc">${a.description}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : ''}
+    <div class="content-section">
+      <h5>✍️ Synthesis Activities</h5>
+      ${synthesisActivities.map((a: any, i: number) => `
+        <div class="content-item">
+          <div class="content-title" ${isEditMode ? `contenteditable="true" data-section="post_trip.synthesis_activities" data-index="${i}" data-field="title"` : ''}>${a.title}</div>
+          <div class="content-desc" ${isEditMode ? `contenteditable="true" data-section="post_trip.synthesis_activities" data-index="${i}" data-field="description"` : ''}>${a.description}</div>
+        </div>
+      `).join('')}
+      ${isEditMode ? `<button class="btn-sm btn-outline add-item-btn" data-section="post_trip.synthesis_activities">+ Add Activity</button>` : ''}
+    </div>
   `;
 }
 
@@ -620,270 +752,107 @@ export function initializeEducationUI(scenarioId?: string, versionId?: string) {
 }
 
 /**
- * Add custom activity to a curriculum
+ * Show modal to add a custom activity
  */
 export function showAddCustomActivityModal(planId: string, locationId: string) {
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.style.display = 'flex';
+  let modal = document.getElementById('add-activity-modal');
+
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'add-activity-modal';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'none';
+    document.body.appendChild(modal);
+  }
 
   modal.innerHTML = `
-    <div class="modal" style="max-width: 600px;">
-      <div class="modal-header">
-        <h3>➕ Add Custom Activity</h3>
-        <button class="modal-close-btn">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-section">
-          <h4>Activity Information</h4>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Activity Title *</label>
-              <input type="text" id="activity-title" required>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Subject *</label>
-              <select id="activity-subject" required>
-                <option value="">Select a subject</option>
-                <option value="science">Science</option>
-                <option value="social_studies">Social Studies</option>
-                <option value="language_arts">Language Arts</option>
-                <option value="math">Mathematics</option>
-                <option value="art">Arts</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Type *</label>
-              <select id="activity-type" required>
-                <option value="">Select a type</option>
-                <option value="experiential">Experiential</option>
-                <option value="reading">Reading</option>
-                <option value="video">Video</option>
-                <option value="reflection">Reflection</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Description *</label>
-            <textarea id="activity-description" rows="4" required></textarea>
-          </div>
-
-          <div class="form-group">
-            <label>Learning Objectives (one per line)</label>
-            <textarea id="activity-objectives" rows="3" placeholder="Enter learning objectives, one per line"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label>Duration (minutes)</label>
-            <input type="number" id="activity-duration" value="60" min="5" max="480">
-          </div>
-
-          <div class="form-section">
-            <h4>External Resources (Optional)</h4>
-            <div id="external-links-container">
-              <div class="external-link-item">
-                <input type="text" class="link-title" placeholder="Resource Title">
-                <input type="url" class="link-url" placeholder="https://example.com">
-                <button type="button" class="btn-remove-link">×</button>
-              </div>
-            </div>
-            <button type="button" id="add-link-btn" class="btn-secondary" style="margin-top: 10px;">
-              + Add Another Link
-            </button>
-          </div>
+    <div class="modal">
+      <h3>Add Custom Activity</h3>
+      <form class="modal-form" id="add-activity-form">
+        <div class="form-group">
+          <label for="activity-title">Activity Title</label>
+          <input type="text" id="activity-title" class="form-input" required placeholder="e.g., Visit the Local Market">
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary cancel-btn">Cancel</button>
-        <button class="btn-primary" id="save-activity-btn">Save Activity</button>
-      </div>
+        
+        <div class="form-group">
+          <label for="activity-type">Type</label>
+          <select id="activity-type" class="form-input">
+            <option value="experiential">Experiential Activity</option>
+            <option value="structured">Structured Lesson</option>
+            <option value="reading">Reading</option>
+            <option value="video">Video</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="activity-subject">Subject</label>
+          <input type="text" id="activity-subject" class="form-input" placeholder="e.g., Social Studies">
+        </div>
+
+        <div class="form-group">
+          <label for="activity-description">Description</label>
+          <textarea id="activity-description" class="form-input" rows="3" required placeholder="Describe the activity..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="activity-url">External Link (optional)</label>
+          <input type="url" id="activity-url" class="form-input" placeholder="https://...">
+        </div>
+
+        <div class="form-group">
+          <label for="activity-duration">Duration (minutes)</label>
+          <input type="number" id="activity-duration" class="form-input" value="60" min="15" step="15">
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-add-activity-btn">Cancel</button>
+          <button type="submit" class="btn-primary">Add Activity</button>
+        </div>
+      </form>
     </div>
   `;
 
-  document.body.appendChild(modal);
+  modal.style.display = 'flex';
 
-  // Close modal handlers
-  const closeModal = () => modal.remove();
-  modal.querySelector('.modal-close-btn')!.addEventListener('click', closeModal);
-  modal.querySelector('.cancel-btn')!.addEventListener('click', closeModal);
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) closeModal();
+  // Bind events
+  modal.querySelector('#cancel-add-activity-btn')?.addEventListener('click', () => {
+    if (modal) modal.style.display = 'none';
   });
 
-  // Add link button
-  modal.querySelector('#add-link-btn')!.addEventListener('click', () => {
-    const container = modal.querySelector('#external-links-container')!;
-    const linkItem = document.createElement('div');
-    linkItem.className = 'external-link-item';
-    linkItem.innerHTML = `
-      <input type="text" class="link-title" placeholder="Resource Title">
-      <input type="url" class="link-url" placeholder="https://example.com">
-      <button type="button" class="btn-remove-link">×</button>
-    `;
-    container.appendChild(linkItem);
+  modal.querySelector('#add-activity-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-    // Add remove handler
-    linkItem.querySelector('.btn-remove-link')!.addEventListener('click', () => {
-      linkItem.remove();
-    });
-  });
+    const title = (document.getElementById('activity-title') as HTMLInputElement).value;
+    const type = (document.getElementById('activity-type') as HTMLSelectElement).value;
+    const subject = (document.getElementById('activity-subject') as HTMLInputElement).value;
+    const description = (document.getElementById('activity-description') as HTMLTextAreaElement).value;
+    const url = (document.getElementById('activity-url') as HTMLInputElement).value;
+    const duration = parseInt((document.getElementById('activity-duration') as HTMLInputElement).value);
 
-  // Remove link handlers for initial item
-  modal.querySelectorAll('.btn-remove-link').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      (e.target as HTMLElement).closest('.external-link-item')!.remove();
-    });
-  });
-
-  // Save activity
-  modal.querySelector('#save-activity-btn')!.addEventListener('click', async () => {
-    const title = (modal.querySelector('#activity-title') as HTMLInputElement).value.trim();
-    const subject = (modal.querySelector('#activity-subject') as HTMLSelectElement).value;
-    const type = (modal.querySelector('#activity-type') as HTMLSelectElement).value;
-    const description = (modal.querySelector('#activity-description') as HTMLTextAreaElement).value.trim();
-
-    if (!title || !subject || !type || !description) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    // Get objectives
-    const objectivesText = (modal.querySelector('#activity-objectives') as HTMLTextAreaElement).value.trim();
-    const objectives = objectivesText ? objectivesText.split('\n').map(o => o.trim()).filter(o => o) : [];
-
-    // Get duration
-    const duration = parseInt((modal.querySelector('#activity-duration') as HTMLInputElement).value);
-
-    // Get external links
-    const linkItems = modal.querySelectorAll('.external-link-item');
-    const externalLinks: any[] = [];
-    linkItems.forEach((item) => {
-      const titleInput = item.querySelector('.link-title') as HTMLInputElement;
-      const urlInput = item.querySelector('.link-url') as HTMLInputElement;
-      if (titleInput.value.trim() && urlInput.value.trim()) {
-        externalLinks.push({
-          title: titleInput.value.trim(),
-          url: urlInput.value.trim(),
-          type: 'external'
-        });
-      }
-    });
-
-    // Prepare request body
-    const requestBody = {
+    const activityData = {
       location_id: locationId,
-      type: type,
-      subject: subject,
-      title: title,
-      description: description,
-      learning_objectives: objectives,
+      title,
+      type,
+      subject,
+      description,
+      external_links: url ? [url] : [],
       estimated_duration_minutes: duration,
-      external_links: externalLinks
+      is_custom: true
     };
 
     try {
-      const response = await fetch(`/api/education/curricula/${planId}/activities`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
+      await educationService.addCustomActivity(planId, activityData);
+      if (modal) modal.style.display = 'none';
 
-      if (!response.ok) {
-        throw new Error(`Failed to save activity: ${response.statusText}`);
-      }
+      // Refresh viewer if open, or just alert success
+      // Ideally we should trigger a refresh of the viewer
+      const event = new CustomEvent('activity-added', { detail: { planId } });
+      window.dispatchEvent(event);
 
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        alert('Activity added successfully!');
-        closeModal();
-        // Reload curriculum viewer if it's open
-        if (document.getElementById('curriculum-viewer-modal')?.style.display === 'flex') {
-          showCurriculumViewerModal(planId);
-        }
-      } else {
-        throw new Error(data.error || 'Unknown error');
-      }
-    } catch (error: any) {
-      console.error('Error saving activity:', error);
-      alert(`Error: ${error.message}`);
+      alert('Activity added successfully!');
+    } catch (error) {
+      console.error('Failed to add activity:', error);
+      alert('Failed to add activity');
     }
-  });
-}
-
-/**
- * Enable edit mode for curriculum viewer
- */
-export function enableCurriculumEditMode(curriculumId: string, modal: HTMLElement) {
-  // Add edit controls to modal
-  const footer = modal.querySelector('.modal-footer')!;
-
-  // Check if edit mode is already enabled
-  if (footer.querySelector('#save-changes-btn')) {
-    return; // Already in edit mode
-  }
-
-  // Add Save and Add Activity buttons
-  const saveBtn = document.createElement('button');
-  saveBtn.id = 'save-changes-btn';
-  saveBtn.className = 'btn-primary';
-  saveBtn.textContent = 'Save Changes';
-  saveBtn.style.display = 'none'; // Initially hidden
-
-  const addActivityBtn = document.createElement('button');
-  addActivityBtn.id = 'add-activity-btn';
-  addActivityBtn.className = 'btn-secondary';
-  addActivityBtn.textContent = '+ Add Custom Activity';
-
-  footer.insertBefore(addActivityBtn, footer.firstChild);
-  footer.appendChild(saveBtn);
-
-  // Make content editable
-  let hasChanges = false;
-  modal.querySelectorAll('.content-title, .content-desc').forEach((element) => {
-    const el = element as HTMLElement;
-    el.contentEditable = 'true';
-    el.style.border = '1px dashed #cbd5e0';
-    el.style.padding = '4px';
-    el.style.borderRadius = '3px';
-
-    el.addEventListener('input', () => {
-      hasChanges = true;
-      saveBtn.style.display = 'inline-block';
-    });
-  });
-
-  // Add activity button handler
-  addActivityBtn.addEventListener('click', () => {
-    // Get location ID from curriculum
-    // This is a simplified implementation - you may need to adjust based on your data structure
-    const locationId = 'location_default'; // TODO: Get actual location ID
-    showAddCustomActivityModal(curriculumId, locationId);
-  });
-
-  // Save changes button handler
-  saveBtn.addEventListener('click', async () => {
-    if (!hasChanges) {
-      alert('No changes to save');
-      return;
-    }
-
-    // Collect changes (simplified - you may want to track specific changes)
-    // For now, just show a success message
-    alert('Edit functionality is being enhanced. Changes will be saved in the next update!');
-
-    // TODO: Implement actual save logic
-    // This would involve:
-    // 1. Collecting all edited content
-    // 2. Building the update payload
-    // 3. Calling the PATCH /api/education/curricula/{planId} endpoint
-    // 4. Refreshing the modal
   });
 }

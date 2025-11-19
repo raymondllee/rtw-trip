@@ -729,6 +729,16 @@ html, body {
   margin: 4px 0;
 }
 
+.scenario-actions-dropdown .dropdown-group-header {
+  padding: 8px 12px 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #666;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+
 /* Anchor dropdown items should look like buttons */
 .scenario-actions-dropdown a.dropdown-item {
   text-decoration: none;

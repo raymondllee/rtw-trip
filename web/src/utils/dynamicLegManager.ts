@@ -3,7 +3,7 @@
  *
  * Automatically discovers legs and sub-legs from destination data.
  * - Legs are created from continents
- * - Sub-legs are created from regions within each continent
+ * - Sub-legs are created from countries within each continent
  * - Always stays in sync with current destinations
  */
 
@@ -14,7 +14,7 @@ export interface DynamicLegStructure {
   stats: {
     totalDestinations: number;
     continents: number;
-    regions: number;
+    countries: number;
   };
 }
 
@@ -47,46 +47,37 @@ export function generateDynamicLegs(data: TripData): DynamicLegStructure {
 
   // Create legs from continents
   const legs: TripLeg[] = sortedContinents.map(([continent, destinations]) => {
-    // Group destinations by region within this continent
-    const regionMap = new Map<string, TripLocation[]>();
+    // Group destinations by country within this continent
+    const countryMap = new Map<string, TripLocation[]>();
 
     for (const location of destinations) {
-      if (!location.region) {
-        console.warn(`⚠️ Location "${location.name}" missing region - will not appear in sub-leg view`);
+      if (!location.country) {
+        console.warn(`⚠️ Location "${location.name}" missing country - will not appear in sub-leg view`);
         continue;
       }
 
-      if (!regionMap.has(location.region)) {
-        regionMap.set(location.region, []);
+      if (!countryMap.has(location.country)) {
+        countryMap.set(location.country, []);
       }
-      regionMap.get(location.region)!.push(location);
+      countryMap.get(location.country)!.push(location);
     }
 
-    // Get unique regions for leg filtering
-    const regions = Array.from(regionMap.keys());
+    // Get unique countries for this continent
+    const countries = Array.from(countryMap.keys());
 
-    // Create sub-legs from regions
-    const subLegs: TripSubLeg[] = Array.from(regionMap.entries())
+    // Create sub-legs from countries
+    const subLegs: TripSubLeg[] = Array.from(countryMap.entries())
       .sort((a, b) => b[1].length - a[1].length) // Sort by destination count
-      .map(([region, regionDestinations]) => {
-        // Get unique countries in this region
-        const countries = Array.from(
-          new Set(
-            regionDestinations
-              .map(loc => loc.country)
-              .filter(Boolean) as string[]
-          )
-        ).sort();
-
+      .map(([country, countryDestinations]) => {
         return {
-          name: region,
-          countries: countries
+          name: country,
+          countries: [country] // Sub-leg is now just the country itself
         };
       });
 
     return {
       name: continent,
-      regions: regions,
+      regions: countries, // Store countries in regions field for compatibility
       sub_legs: subLegs
     };
   });
@@ -94,16 +85,16 @@ export function generateDynamicLegs(data: TripData): DynamicLegStructure {
   const stats = {
     totalDestinations: locations.length,
     continents: legs.length,
-    regions: legs.reduce((sum, leg) => sum + (leg.sub_legs?.length || 0), 0)
+    countries: legs.reduce((sum, leg) => sum + (leg.sub_legs?.length || 0), 0)
   };
 
   console.log('✅ Dynamic legs generated:');
   console.log(`   Destinations: ${stats.totalDestinations}`);
   console.log(`   Continents: ${stats.continents}`);
-  console.log(`   Regions: ${stats.regions}`);
+  console.log(`   Countries: ${stats.countries}`);
 
   legs.forEach(leg => {
-    console.log(`   📍 ${leg.name}: ${leg.regions?.length || 0} regions, ${leg.sub_legs?.length || 0} sub-legs`);
+    console.log(`   📍 ${leg.name}: ${leg.regions?.length || 0} countries, ${leg.sub_legs?.length || 0} sub-legs`);
   });
 
   return { legs, stats };
@@ -139,7 +130,7 @@ export function validateGeographicData(data: TripData): {
   const result = {
     valid: true,
     missingContinent: [] as TripLocation[],
-    missingRegion: [] as TripLocation[],
+    missingRegion: [] as TripLocation[], // Keep for backward compatibility but not used
     missingCountry: [] as TripLocation[]
   };
 
@@ -148,10 +139,7 @@ export function validateGeographicData(data: TripData): {
       result.missingContinent.push(location);
       result.valid = false;
     }
-    if (!location.region) {
-      result.missingRegion.push(location);
-      result.valid = false;
-    }
+    // Region is no longer required
     if (!location.country) {
       result.missingCountry.push(location);
       result.valid = false;
@@ -168,16 +156,16 @@ export function getLegSummary(legs: TripLeg[]): string {
   let summary = '=== DYNAMIC LEG STRUCTURE ===\n\n';
 
   legs.forEach(leg => {
-    const destinationCount = leg.regions?.length || 0;
+    const countryCount = leg.regions?.length || 0;
     const subLegCount = leg.sub_legs?.length || 0;
 
     summary += `📍 ${leg.name}\n`;
-    summary += `   Regions: ${leg.regions?.join(', ') || 'none'}\n`;
+    summary += `   Countries: ${leg.regions?.join(', ') || 'none'}\n`;
     summary += `   Sub-legs: ${subLegCount}\n`;
 
     if (leg.sub_legs && leg.sub_legs.length > 0) {
       leg.sub_legs.forEach(subLeg => {
-        summary += `      - ${subLeg.name} (${subLeg.countries?.length || 0} countries)\n`;
+        summary += `      - ${subLeg.name}\n`;
       });
     }
 

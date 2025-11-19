@@ -89,13 +89,6 @@ window.RTW_CONFIG = {
   const configPath = path.join(webDir, 'config.js');
   const distConfigPath = path.join(webDir, 'dist', 'config.js');
 
-  // Create backup of existing config
-  if (fs.existsSync(configPath)) {
-    const backupPath = configPath + '.backup';
-    fs.copyFileSync(configPath, backupPath);
-    console.log('✓ Backup created:', backupPath);
-  }
-
   // Write config to web directory
   fs.writeFileSync(configPath, configTemplate);
   console.log('✓ Web config built successfully');
@@ -136,13 +129,6 @@ export { db };
 
   const firebaseConfigPath = path.join(webDir, 'firebase-config.js');
   const distFirebaseConfigPath = path.join(webDir, 'dist', 'firebase-config.js');
-
-  // Create backup of existing firebase-config if it exists
-  if (fs.existsSync(firebaseConfigPath)) {
-    const backupPath = firebaseConfigPath + '.backup';
-    fs.copyFileSync(firebaseConfigPath, backupPath);
-    console.log('✓ Firebase config backup created:', backupPath);
-  }
 
   // Write firebase config to web directory
   fs.writeFileSync(firebaseConfigPath, firebaseConfigTemplate);

@@ -1,475 +1,251 @@
-/**
- * Bulk Curriculum Generation UI
- *
- * Modal for generating curricula for multiple locations at once
- */
-
-interface BulkGenerationOptions {
-  locations: any[];
-  scenarioId?: string;
-  versionId?: string;
-  defaultStudent?: any;
-}
-
-interface GenerationProgress {
-  total: number;
-  current: number;
-  successful: number;
-  failed: number;
-  currentLocation?: string;
-}
-
-interface GenerationResult {
-  location_id: string;
-  location_name: string;
-  status: 'success' | 'failed';
-  curriculum_plan_id?: string;
-  error?: string;
-}
 
 /**
- * Show the bulk generation modal
+ * Bulk Generation UI Logic
+ * Handles the modal for generating curricula for multiple locations at once.
  */
-export function showBulkGenerationModal(options: BulkGenerationOptions): void {
-  const { locations, scenarioId, versionId, defaultStudent } = options;
 
-  // Create modal container
-  const modal = document.createElement('div');
-  modal.className = 'education-modal bulk-generation-modal';
-  modal.style.display = 'flex';
+export async function showBulkGenerationModal(studentId: string) {
+    // 1. Create or get modal
+    let modal = document.getElementById('bulk-generation-modal');
+    if (!modal) {
+        modal = createBulkGenerationModal();
+        document.body.appendChild(modal);
+    }
 
-  // Modal content
-  modal.innerHTML = `
-    <div class="education-modal-content" style="max-width: 800px; width: 100%;">
-      <div class="education-modal-header">
-        <h2>🌍 Bulk Generate Curricula</h2>
-        <button class="education-modal-close">&times;</button>
-      </div>
+    // 2. Fetch destinations
+    const destinations = await fetchDestinations();
 
-      <div class="education-modal-body">
-        <!-- Step 1: Location Selection -->
-        <div id="step-selection" class="bulk-step">
-          <h3>Select Locations</h3>
-          <p class="help-text">Choose which destinations to generate curricula for:</p>
+    // 3. Render content
+    renderModalContent(modal, destinations, studentId);
 
-          <div style="margin-bottom: 20px;">
-            <button id="select-all-btn" class="btn-secondary" style="margin-right: 10px;">Select All</button>
-            <button id="deselect-all-btn" class="btn-secondary">Deselect All</button>
-          </div>
+    // 4. Show modal
+    modal.style.display = 'flex';
+}
 
-          <div id="locations-list" class="locations-checklist">
-            <!-- Locations will be inserted here -->
-          </div>
+function createBulkGenerationModal(): HTMLElement {
+    const modal = document.createElement('div');
+    modal.id = 'bulk-generation-modal';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'none';
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    modal.style.zIndex = '1000';
+    modal.style.justifyContent = 'center';
+    modal.style.alignItems = 'center';
 
-          <div style="margin-top: 20px;">
-            <strong>Selected: <span id="selected-count">0</span> of ${locations.length}</strong>
-          </div>
+    return modal;
+}
 
-          <h3 style="margin-top: 30px;">Student Profile</h3>
-          <p class="help-text">Enter the student information for curriculum generation:</p>
+async function fetchDestinations() {
+    try {
+        const response = await fetch('/api/education/destinations');
+        if (!response.ok) throw new Error('Failed to fetch destinations');
+        const data = await response.json();
+        console.log('✅ Fetched destinations:', data.destinations?.length || 0, 'destinations');
+        return data.destinations || [];
+    } catch (error) {
+        console.error('❌ Error fetching destinations:', error);
+        return [];
+    }
+}
 
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Student Name *</label>
-              <input type="text" id="student-name" value="${defaultStudent?.name || ''}" required>
-            </div>
-            <div class="form-group">
-              <label>Age *</label>
-              <input type="number" id="student-age" value="${defaultStudent?.age || 14}" min="5" max="18" required>
-            </div>
-            <div class="form-group">
-              <label>Grade *</label>
-              <input type="number" id="student-grade" value="${defaultStudent?.grade || 8}" min="1" max="12" required>
-            </div>
-            <div class="form-group">
-              <label>State/Region *</label>
-              <input type="text" id="student-state" value="${defaultStudent?.state || 'California'}" required>
-            </div>
-            <div class="form-group">
-              <label>Learning Style *</label>
-              <select id="student-learning-style">
-                <option value="Visual" ${defaultStudent?.learning_style === 'Visual' ? 'selected' : ''}>Visual</option>
-                <option value="Auditory" ${defaultStudent?.learning_style === 'Auditory' ? 'selected' : ''}>Auditory</option>
-                <option value="Kinesthetic" ${defaultStudent?.learning_style === 'Kinesthetic' ? 'selected' : ''}>Kinesthetic</option>
-                <option value="Reading/Writing" ${defaultStudent?.learning_style === 'Reading/Writing' ? 'selected' : ''}>Reading/Writing</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Time Budget (min/day)</label>
-              <input type="number" id="student-time-budget" value="${defaultStudent?.time_budget_minutes_per_day || 60}" min="15" max="240">
-            </div>
-          </div>
+function renderModalContent(modal: HTMLElement, destinations: any[], studentId: string) {
+    console.log('📋 Rendering modal with', destinations.length, 'destinations');
+    modal.innerHTML = `
+        <div class="modal" style="background: #1e293b; padding: 2rem; border-radius: 1rem; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; color: #f8fafc;">
+            <h2 style="margin-bottom: 1.5rem; font-size: 1.5rem;">Generate All Curricula</h2>
 
-          <div class="form-group">
-            <label>Interests (comma-separated)</label>
-            <input type="text" id="student-interests" value="${(defaultStudent?.interests || []).join(', ')}" placeholder="e.g., science, art, music, sports">
-          </div>
-
-          <div class="form-group">
-            <label>Subjects to Cover</label>
-            <div class="checkbox-group">
-              <label><input type="checkbox" value="science" checked> Science</label>
-              <label><input type="checkbox" value="social_studies" checked> Social Studies</label>
-              <label><input type="checkbox" value="language_arts" checked> Language Arts</label>
-              <label><input type="checkbox" value="math"> Mathematics</label>
-              <label><input type="checkbox" value="art"> Arts</label>
-            </div>
-          </div>
-        </div>
-
-        <!-- Step 2: Progress -->
-        <div id="step-progress" class="bulk-step" style="display: none;">
-          <h3>Generating Curricula</h3>
-          <p class="help-text">Please wait while we generate curricula for your selected locations...</p>
-
-          <div class="progress-container">
-            <div class="progress-bar">
-              <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
-            </div>
-            <div class="progress-text">
-              <span id="progress-current">0</span> / <span id="progress-total">0</span> completed
-            </div>
-          </div>
-
-          <div id="current-location" class="current-location-status">
-            Preparing...
-          </div>
-
-          <div class="progress-stats">
-            <div class="stat-item success">
-              <span class="stat-label">✓ Successful:</span>
-              <span id="stat-successful" class="stat-value">0</span>
-            </div>
-            <div class="stat-item error">
-              <span class="stat-label">✗ Failed:</span>
-              <span id="stat-failed" class="stat-value">0</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Step 3: Results -->
-        <div id="step-results" class="bulk-step" style="display: none;">
-          <h3>Generation Complete</h3>
-
-          <div class="results-summary">
-            <div class="summary-card">
-              <div class="summary-icon">🎉</div>
-              <div class="summary-content">
-                <div class="summary-title">
-                  <span id="results-successful">0</span> of <span id="results-total">0</span> curricula generated successfully
+            <div id="bulk-step-1">
+                <p style="margin-bottom: 1rem; color: #94a3b8;">Select locations to generate curriculum for:</p>
+                
+                <div class="actions" style="margin-bottom: 1rem; display: flex; gap: 1rem;">
+                    <button id="select-all-btn" class="btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Select All</button>
+                    <button id="deselect-all-btn" class="btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Deselect All</button>
                 </div>
-                <div class="summary-subtitle" id="results-subtitle"></div>
-              </div>
+
+                <div class="locations-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; margin-bottom: 2rem; max-height: 300px; overflow-y: auto; padding: 0.5rem; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem;">
+                    ${destinations.length > 0 ? destinations.map(dest => `
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.25rem;">
+                            <input type="checkbox" class="location-checkbox" value="${dest.id}" data-name="${dest.name}" data-country="${dest.country || ''}" data-days="${dest.days || 7}" data-arrival="${dest.arrival_date || ''}" data-departure="${dest.departure_date || ''}" checked>
+                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${dest.name}</span>
+                        </label>
+                    `).join('') : '<div style="padding: 2rem; text-align: center; color: #ef4444; grid-column: 1 / -1;">⚠️ No destinations found. Please create a trip scenario first.</div>'}
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem;">Focus Subjects</label>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <label><input type="checkbox" name="subject" value="science" checked> Science</label>
+                        <label><input type="checkbox" name="subject" value="social_studies" checked> Social Studies</label>
+                        <label><input type="checkbox" name="subject" value="language_arts" checked> Language Arts</label>
+                        <label><input type="checkbox" name="subject" value="math"> Math</label>
+                        <label><input type="checkbox" name="subject" value="art"> Art</label>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 1rem;">
+                    <button id="cancel-bulk-btn" class="btn-outline" style="padding: 0.75rem 1.5rem; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: white; border-radius: 0.5rem; cursor: pointer;">Cancel</button>
+                    <button id="start-generate-btn" class="btn-primary" style="padding: 0.75rem 1.5rem; background: #6366f1; color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 600;">Start Generation</button>
+                </div>
             </div>
-          </div>
 
-          <div id="results-list" class="results-list">
-            <!-- Results will be inserted here -->
-          </div>
+            <div id="bulk-step-2" style="display: none;">
+                <div style="text-align: center; padding: 2rem;">
+                    <div class="spinner" style="font-size: 2rem; margin-bottom: 1rem;">🔄</div>
+                    <h3 id="progress-status">Generating curricula...</h3>
+                    <div class="progress-bar" style="width: 100%; height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; margin: 1.5rem 0; overflow: hidden;">
+                        <div id="progress-fill" style="width: 0%; height: 100%; background: #10b981; transition: width 0.3s;"></div>
+                    </div>
+                    <p id="progress-details" style="color: #94a3b8;">0 of 0 completed</p>
+                </div>
+            </div>
 
-          <div id="failed-list" class="failed-list" style="display: none;">
-            <h4>Failed Generations</h4>
-            <div id="failed-items"></div>
-            <button id="retry-failed-btn" class="btn-secondary" style="margin-top: 15px;">
-              🔄 Retry Failed Generations
-            </button>
-          </div>
+            <div id="bulk-step-3" style="display: none;">
+                <div style="text-align: center; padding: 2rem;">
+                    <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Generation Complete!</h3>
+                    <div id="results-summary" style="margin-bottom: 2rem;"></div>
+                    <button id="close-bulk-btn" class="btn-primary" style="padding: 0.75rem 1.5rem; background: #6366f1; color: white; border: none; border-radius: 0.5rem; cursor: pointer;">Close & Refresh</button>
+                </div>
+            </div>
         </div>
-      </div>
-
-      <div class="education-modal-footer">
-        <button id="cancel-btn" class="btn-secondary">Cancel</button>
-        <button id="generate-btn" class="btn-primary">Generate Curricula</button>
-        <button id="done-btn" class="btn-primary" style="display: none;">Done</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-
-  // Populate locations list
-  const locationsList = modal.querySelector('#locations-list') as HTMLElement;
-  locations.forEach((location, index) => {
-    const item = document.createElement('label');
-    item.className = 'location-checkbox-item';
-    item.innerHTML = `
-      <input type="checkbox" value="${location.id}" data-index="${index}" checked>
-      <span class="location-name">📍 ${location.name || location.id}</span>
-      <span class="location-country">${location.country || ''}</span>
     `;
-    locationsList.appendChild(item);
-  });
 
-  // Update selected count
-  function updateSelectedCount() {
-    const checkboxes = locationsList.querySelectorAll('input[type="checkbox"]');
-    const selectedCount = Array.from(checkboxes).filter((cb: any) => cb.checked).length;
-    (modal.querySelector('#selected-count') as HTMLElement).textContent = selectedCount.toString();
-  }
-
-  // Select/Deselect all buttons
-  modal.querySelector('#select-all-btn')!.addEventListener('click', () => {
-    locationsList.querySelectorAll('input[type="checkbox"]').forEach((cb: any) => cb.checked = true);
-    updateSelectedCount();
-  });
-
-  modal.querySelector('#deselect-all-btn')!.addEventListener('click', () => {
-    locationsList.querySelectorAll('input[type="checkbox"]').forEach((cb: any) => cb.checked = false);
-    updateSelectedCount();
-  });
-
-  // Update count on checkbox change
-  locationsList.addEventListener('change', updateSelectedCount);
-
-  // Close modal
-  function closeModal() {
-    modal.remove();
-  }
-
-  modal.querySelector('.education-modal-close')!.addEventListener('click', closeModal);
-  modal.querySelector('#cancel-btn')!.addEventListener('click', closeModal);
-  modal.querySelector('#done-btn')!.addEventListener('click', closeModal);
-
-  // Click outside to close
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      closeModal();
-    }
-  });
-
-  // Generate button
-  modal.querySelector('#generate-btn')!.addEventListener('click', async () => {
-    // Validate form
-    const nameInput = modal.querySelector('#student-name') as HTMLInputElement;
-    const ageInput = modal.querySelector('#student-age') as HTMLInputElement;
-    const gradeInput = modal.querySelector('#student-grade') as HTMLInputElement;
-    const stateInput = modal.querySelector('#student-state') as HTMLInputElement;
-
-    if (!nameInput.value || !ageInput.value || !gradeInput.value || !stateInput.value) {
-      alert('Please fill in all required student information fields');
-      return;
-    }
-
-    // Get selected locations
-    const selectedCheckboxes = Array.from(
-      locationsList.querySelectorAll('input[type="checkbox"]:checked')
-    ) as HTMLInputElement[];
-
-    if (selectedCheckboxes.length === 0) {
-      alert('Please select at least one location');
-      return;
-    }
-
-    const selectedLocations = selectedCheckboxes.map(cb => {
-      const index = parseInt(cb.dataset.index!);
-      return locations[index];
+    // Bind events
+    document.getElementById('cancel-bulk-btn')?.addEventListener('click', () => {
+        modal.style.display = 'none';
     });
 
-    // Get student profile
-    const interestsInput = (modal.querySelector('#student-interests') as HTMLInputElement).value;
-    const interests = interestsInput.split(',').map(i => i.trim()).filter(i => i);
+    document.getElementById('select-all-btn')?.addEventListener('click', () => {
+        modal.querySelectorAll<HTMLInputElement>('.location-checkbox').forEach(cb => cb.checked = true);
+    });
 
-    const subjectCheckboxes = Array.from(
-      modal.querySelectorAll('.checkbox-group input[type="checkbox"]:checked')
-    ) as HTMLInputElement[];
-    const subjects = subjectCheckboxes.map(cb => cb.value);
+    document.getElementById('deselect-all-btn')?.addEventListener('click', () => {
+        modal.querySelectorAll<HTMLInputElement>('.location-checkbox').forEach(cb => cb.checked = false);
+    });
 
-    const studentProfile = {
-      name: nameInput.value,
-      age: parseInt(ageInput.value),
-      grade: parseInt(gradeInput.value),
-      state: stateInput.value,
-      learning_style: (modal.querySelector('#student-learning-style') as HTMLSelectElement).value,
-      time_budget_minutes_per_day: parseInt((modal.querySelector('#student-time-budget') as HTMLInputElement).value),
-      interests: interests,
-      subjects_to_cover: subjects,
-    };
+    document.getElementById('start-generate-btn')?.addEventListener('click', () => {
+        const selectedCheckboxes = Array.from(modal.querySelectorAll<HTMLInputElement>('.location-checkbox:checked'));
+        const selectedLocations = selectedCheckboxes.map(cb => ({
+            id: cb.value,
+            name: cb.getAttribute('data-name') || '',
+            country: cb.getAttribute('data-country') || '',
+            duration_days: parseInt(cb.getAttribute('data-days') || '7'),
+            arrival_date: cb.getAttribute('data-arrival') || '',
+            departure_date: cb.getAttribute('data-departure') || ''
+        }));
 
-    // Start generation
-    await startBulkGeneration(
-      modal,
-      selectedLocations,
-      studentProfile,
-      subjects,
-      scenarioId,
-      versionId
-    );
-  });
+        const selectedSubjects = Array.from(modal.querySelectorAll<HTMLInputElement>('input[name="subject"]:checked')).map(cb => cb.value);
 
-  updateSelectedCount();
+        if (selectedLocations.length === 0) {
+            alert('Please select at least one location.');
+            return;
+        }
+
+        startBulkGeneration(modal, selectedLocations, selectedSubjects, studentId);
+    });
+
+    document.getElementById('close-bulk-btn')?.addEventListener('click', () => {
+        modal.style.display = 'none';
+        window.location.reload(); // Refresh dashboard
+    });
 }
 
-/**
- * Start bulk generation process
- */
-async function startBulkGeneration(
-  modal: HTMLElement,
-  selectedLocations: any[],
-  studentProfile: any,
-  subjects: string[],
-  scenarioId?: string,
-  versionId?: string
-): Promise<void> {
-  // Switch to progress view
-  modal.querySelector('#step-selection')!.setAttribute('style', 'display: none;');
-  modal.querySelector('#step-progress')!.setAttribute('style', 'display: block;');
-  modal.querySelector('#generate-btn')!.setAttribute('style', 'display: none;');
-  modal.querySelector('#cancel-btn')!.setAttribute('disabled', 'true');
+async function startBulkGeneration(modal: HTMLElement, locations: any[], subjects: string[], studentId: string) {
+    const step1 = document.getElementById('bulk-step-1');
+    const step2 = document.getElementById('bulk-step-2');
+    const step3 = document.getElementById('bulk-step-3');
+    const progressStatus = document.getElementById('progress-status');
+    const progressFill = document.getElementById('progress-fill');
+    const progressDetails = document.getElementById('progress-details');
+    const resultsSummary = document.getElementById('results-summary');
 
-  // Initialize progress
-  const progress: GenerationProgress = {
-    total: selectedLocations.length,
-    current: 0,
-    successful: 0,
-    failed: 0,
-  };
+    if (step1) step1.style.display = 'none';
+    if (step2) step2.style.display = 'block';
 
-  updateProgressUI(modal, progress);
-
-  // Prepare request
-  const requestBody = {
-    student: studentProfile,
-    locations: selectedLocations,
-    subjects: subjects,
-    scenario_id: scenarioId,
-    version_id: versionId,
-  };
-
-  try {
-    const response = await fetch('/api/education/bulk-generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to generate curricula: ${response.statusText}`);
+    // Fetch student profile first
+    let student = {};
+    try {
+        const resp = await fetch(`/api/education/students/${studentId}/dashboard`);
+        const data = await resp.json();
+        student = data.dashboard.student_profile;
+    } catch (e) {
+        console.error("Failed to fetch student", e);
+        alert("Failed to fetch student profile");
+        return;
     }
 
-    const data = await response.json();
+    // Call API
+    // Since the backend loops, we just make one call.
+    // BUT if it takes too long, it might timeout.
+    // Ideally we'd chunk it or use the backend loop.
+    // The user asked for "Live updates as each curriculum completes".
+    // If the backend does it all in one go, we can't get live updates unless we stream.
+    // Or we can loop here on the frontend.
+    // "Loops through each location... Returns summary" -> Backend description.
+    // "Progress bar showing 'Generating 15/43...'" -> Frontend description.
+    // If I use the backend endpoint I implemented, it blocks until ALL are done.
+    // So I should probably loop on the frontend to get the progress bar effect, 
+    // calling the SINGLE generation endpoint (or the bulk one with 1 location at a time).
+    // But the user explicitly asked for a "Bulk Generate Curricula Endpoint".
+    // Maybe the backend endpoint is meant to be used for smaller batches?
+    // Or maybe I should use the backend endpoint and just show a spinner?
+    // "Bulk Curriculum Generation - Backend endpoint and frontend modal to generate curricula for all 43 trip locations at once with progress tracking"
+    // "Progress tracking" implies we know the progress.
+    // If I call the bulk endpoint with ALL locations, I won't get progress until the end.
+    // So I will implement the frontend to call the bulk endpoint with *batches* or *single* locations?
+    // OR I will assume the backend endpoint I wrote is fine and I'll just wait.
+    // But 43 locations will timeout.
+    // I'll implement frontend looping to call the bulk endpoint with batches of 1 (effectively single generation but using the bulk endpoint structure) OR just use the bulk endpoint if the user insists on "at once".
+    // Actually, calling the bulk endpoint with a list of 1 location is a safe bet to reuse the endpoint logic while getting progress.
 
-    if (data.status === 'success') {
-      // Show results
-      showResults(modal, data);
-    } else {
-      throw new Error(data.error || 'Unknown error occurred');
+    const total = locations.length;
+    let completed = 0;
+    let successful = 0;
+    let failed = 0;
+
+    // Chunk size of 1 to get progress updates
+    for (const location of locations) {
+        if (progressStatus) progressStatus.textContent = `Generating for ${location.name}...`;
+
+        try {
+            const response = await fetch('/api/education/bulk-generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    student: student,
+                    locations: [location], // Send one at a time
+                    subjects: subjects
+                })
+            });
+
+            const result = await response.json();
+            if (result.status === 'success' && result.successful > 0) {
+                successful++;
+            } else {
+                failed++;
+            }
+        } catch (error) {
+            console.error(`Failed for ${location.name}`, error);
+            failed++;
+        }
+
+        completed++;
+        const percent = Math.round((completed / total) * 100);
+        if (progressFill) progressFill.style.width = `${percent}%`;
+        if (progressDetails) progressDetails.textContent = `${completed} of ${total} completed (${successful} success, ${failed} failed)`;
     }
-  } catch (error: any) {
-    console.error('Error in bulk generation:', error);
-    alert(`Error: ${error.message}`);
 
-    // Re-enable cancel button
-    modal.querySelector('#cancel-btn')!.removeAttribute('disabled');
-    modal.querySelector('#generate-btn')!.setAttribute('style', 'display: inline-block;');
-    modal.querySelector('#step-progress')!.setAttribute('style', 'display: none;');
-    modal.querySelector('#step-selection')!.setAttribute('style', 'display: block;');
-  }
-}
+    if (step2) step2.style.display = 'none';
+    if (step3) step3.style.display = 'block';
 
-/**
- * Update progress UI (called periodically during generation)
- */
-function updateProgressUI(modal: HTMLElement, progress: GenerationProgress): void {
-  const percentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
-
-  (modal.querySelector('#progress-fill') as HTMLElement).style.width = `${percentage}%`;
-  (modal.querySelector('#progress-current') as HTMLElement).textContent = progress.current.toString();
-  (modal.querySelector('#progress-total') as HTMLElement).textContent = progress.total.toString();
-  (modal.querySelector('#stat-successful') as HTMLElement).textContent = progress.successful.toString();
-  (modal.querySelector('#stat-failed') as HTMLElement).textContent = progress.failed.toString();
-
-  if (progress.currentLocation) {
-    (modal.querySelector('#current-location') as HTMLElement).textContent =
-      `Generating curriculum for ${progress.currentLocation}...`;
-  }
-}
-
-/**
- * Show results after generation completes
- */
-function showResults(modal: HTMLElement, data: any): void {
-  // Switch to results view
-  modal.querySelector('#step-progress')!.setAttribute('style', 'display: none;');
-  modal.querySelector('#step-results')!.setAttribute('style', 'display: block;');
-  modal.querySelector('#cancel-btn')!.setAttribute('style', 'display: none;');
-  modal.querySelector('#done-btn')!.setAttribute('style', 'display: inline-block;');
-
-  // Update summary
-  (modal.querySelector('#results-successful') as HTMLElement).textContent = data.successful.toString();
-  (modal.querySelector('#results-total') as HTMLElement).textContent = data.total.toString();
-
-  const subtitleEl = modal.querySelector('#results-subtitle') as HTMLElement;
-  if (data.failed > 0) {
-    subtitleEl.textContent = `${data.failed} generation(s) failed`;
-    subtitleEl.style.color = '#c53030';
-  } else {
-    subtitleEl.textContent = 'All curricula generated successfully!';
-    subtitleEl.style.color = '#2f855a';
-  }
-
-  // Show results list
-  const resultsList = modal.querySelector('#results-list') as HTMLElement;
-  resultsList.innerHTML = '';
-
-  const successfulResults = data.results.filter((r: GenerationResult) => r.status === 'success');
-  const failedResults = data.results.filter((r: GenerationResult) => r.status === 'failed');
-
-  // Show successful results
-  if (successfulResults.length > 0) {
-    const successSection = document.createElement('div');
-    successSection.innerHTML = '<h4 style="color: #2f855a;">✓ Successfully Generated</h4>';
-
-    successfulResults.forEach((result: GenerationResult) => {
-      const item = document.createElement('div');
-      item.className = 'result-item success';
-      item.innerHTML = `
-        <span class="result-icon">✓</span>
-        <span class="result-name">${result.location_name || result.location_id}</span>
-        <a href="/web/index.html?view_curriculum=${result.curriculum_plan_id}" target="_blank" class="result-link">View →</a>
-      `;
-      successSection.appendChild(item);
-    });
-
-    resultsList.appendChild(successSection);
-  }
-
-  // Show failed results
-  if (failedResults.length > 0) {
-    const failedList = modal.querySelector('#failed-list') as HTMLElement;
-    const failedItems = modal.querySelector('#failed-items') as HTMLElement;
-    failedList.style.display = 'block';
-    failedItems.innerHTML = '';
-
-    failedResults.forEach((result: GenerationResult) => {
-      const item = document.createElement('div');
-      item.className = 'result-item error';
-      item.innerHTML = `
-        <span class="result-icon">✗</span>
-        <span class="result-name">${result.location_name || result.location_id}</span>
-        <span class="result-error">${result.error || 'Unknown error'}</span>
-      `;
-      failedItems.appendChild(item);
-    });
-
-    // TODO: Implement retry functionality
-    modal.querySelector('#retry-failed-btn')!.addEventListener('click', () => {
-      alert('Retry functionality coming soon!');
-    });
-  }
-}
-
-/**
- * Get locations from the current scenario
- */
-export async function getScenarioLocations(scenarioId: string, versionId: string): Promise<any[]> {
-  try {
-    // This would normally fetch from the scenario/version
-    // For now, return empty array - will be filled by the caller
-    return [];
-  } catch (error) {
-    console.error('Error fetching locations:', error);
-    return [];
-  }
+    if (resultsSummary) {
+        resultsSummary.innerHTML = `
+            <p style="color: #10b981; font-size: 1.2rem;">✅ ${successful} Successful</p>
+            <p style="color: #ef4444; font-size: 1.2rem;">❌ ${failed} Failed</p>
+        `;
+    }
 }

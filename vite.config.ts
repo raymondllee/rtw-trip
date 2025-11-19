@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 
@@ -5,7 +6,13 @@ export default defineConfig({
   root: resolve(__dirname, 'web'),
   base: '/',
   server: {
-    port: 5173
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5001',
+        changeOrigin: true
+      }
+    }
   },
   build: {
     outDir: resolve(__dirname, 'web', 'dist'),
@@ -13,7 +20,11 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'web', 'index.html'),
-        education: resolve(__dirname, 'web', 'education-dashboard.html')
+        summary: resolve(__dirname, 'web', 'summary-viewer.html'),
+        costManager: resolve(__dirname, 'web', 'cost-manager.html'),
+        bulkEdit: resolve(__dirname, 'web', 'bulk-edit.html'),
+        education: resolve(__dirname, 'web', 'education-dashboard.html'),
+        student_dashboard: resolve(__dirname, 'web', 'student-dashboard.html')
       }
     }
   },

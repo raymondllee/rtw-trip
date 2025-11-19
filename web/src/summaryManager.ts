@@ -50,7 +50,7 @@ export class SummaryManager {
       params.append('scenario', scenario);
     }
 
-    const url = `summary-viewer.html${params.toString() ? '?' + params.toString() : ''}`;
+    const url = `/summary-viewer.html${params.toString() ? '?' + params.toString() : ''}`;
     window.open(url, '_blank');
   }
 

@@ -14,7 +14,7 @@
 
 """Common data schema and types for travel-concierge agents."""
 
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from google.genai import types
 from pydantic import BaseModel, Field
@@ -280,6 +280,66 @@ class PackingList(BaseModel):
     items: list[str]
 
 
+class CostChangeEvent(BaseModel):
+    """A single change event in cost history (Recommendation F)."""
+    timestamp: str = Field(description="ISO 8601 timestamp of the change")
+    changed_by: str = Field(
+        description="User ID or 'ai_research' or 'system'"
+    )
+    previous_value: Dict[str, Any] = Field(
+        description="Previous values of changed fields"
+    )
+    new_value: Dict[str, Any] = Field(
+        description="New values of changed fields"
+    )
+    change_reason: Optional[str] = Field(
+        default=None,
+        description="Reason: 'price_update', 'research', 'booking_confirmed', 'user_edit'"
+    )
+    fields_changed: list[str] = Field(
+        description="List of field names that were changed"
+    )
+
+
+class CostHistory(BaseModel):
+    """Complete history of changes to a cost item (Recommendation F)."""
+    cost_id: str = Field(description="ID of the cost item")
+    changes: list[CostChangeEvent] = Field(
+        default_factory=list,
+        description="List of change events in chronological order"
+    )
+    created_at: str = Field(description="ISO 8601 timestamp of cost creation")
+    updated_at: str = Field(description="ISO 8601 timestamp of last update")
+
+
+class PricingModel(BaseModel):
+    """Pricing model configuration for cost items (Recommendation G)."""
+    type: str = Field(
+        default="fixed",
+        description="Pricing type: 'fixed', 'per_day', 'per_night', 'per_person_day', 'per_person_night', 'custom'"
+    )
+    base_unit: Optional[str] = Field(
+        default=None,
+        description="Base time unit: 'day', 'night', 'week', 'month'"
+    )
+    scales_with_duration: Optional[bool] = Field(
+        default=None,
+        description="Whether cost scales with duration changes"
+    )
+    scales_with_travelers: Optional[bool] = Field(
+        default=None,
+        description="Whether cost scales with number of travelers"
+    )
+    minimum_charge: Optional[float] = Field(
+        default=None,
+        description="Minimum charge regardless of duration"
+    )
+    custom_formula: Optional[str] = Field(
+        default=None,
+        description="Custom formula for cost calculation (e.g., 'base + (days * daily_rate)')"
+    )
+
+
 class CostItem(BaseModel):
     """A single cost item for trip budgeting and tracking."""
     id: str = Field(description="Unique identifier for the cost item")
@@ -307,6 +367,34 @@ class CostItem(BaseModel):
         description="Source: 'manual', 'ai_estimate', 'web_research', 'booking_api'"
     )
     notes: Optional[str] = Field(default=None, description="Additional notes")
+
+    # Pricing model configuration (Recommendation G)
+    pricing_model: Optional[PricingModel] = Field(
+        default=None,
+        description="Explicit pricing model configuration for duration scaling"
+    )
+
+    # Cost history (Recommendation F)
+    history: Optional[list[CostChangeEvent]] = Field(
+        default=None,
+        description="History of changes to this cost item"
+    )
+    created_at: Optional[str] = Field(
+        default=None,
+        description="ISO 8601 timestamp of cost creation"
+    )
+    updated_at: Optional[str] = Field(
+        default=None,
+        description="ISO 8601 timestamp of last update"
+    )
+    created_by: Optional[str] = Field(
+        default=None,
+        description="User ID or 'ai_research' or 'system'"
+    )
+    last_modified_by: Optional[str] = Field(
+        default=None,
+        description="User ID or 'ai_research' or 'system'"
+    )
 
 
 class CostsByCategory(BaseModel):

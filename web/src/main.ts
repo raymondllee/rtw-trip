@@ -6,7 +6,6 @@ import '../transport-segment-manager.js';
 import '../cost-tracker.js';
 import '../cost-ui.js';
 import '../cost-comparison.js';
-import '../cost-bulk-edit.js';
 import '../cost-utils-standalone.js';
 import '../place-id-migration.js';
 

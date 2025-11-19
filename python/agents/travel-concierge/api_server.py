@@ -36,6 +36,11 @@ except Exception:  # pragma: no cover - Firestore optional
 from travel_concierge.tools.cost_tracker import CostTrackerService
 from travel_concierge.tools.cost_manager import _to_float
 from travel_concierge.shared_libraries.types import CostItem
+from travel_concierge.tools.destination_id_validator import (
+    validate_cost_items,
+    is_valid_destination_id,
+    build_destination_lookup
+)
 
 
 def get_transport_icon(transport_mode: str) -> str:
@@ -313,8 +318,8 @@ elif os.path.exists('/app/web'):
     WEB_DIR = '/app/web'
 else:
     # Development: check for dist first, fallback to web
-    dev_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web/dist'))
-    dev_web = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web'))
+    dev_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../web/dist'))
+    dev_web = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../web'))
     WEB_DIR = dev_dist if os.path.exists(dev_dist) else dev_web
 
 app = Flask(__name__, static_folder=WEB_DIR, static_url_path='')
@@ -1420,10 +1425,51 @@ def update_cost(cost_id):
         updated_costs = []
         for cost in version_costs:
             if cost.get('id') == cost_id:
-                # Merge updates into existing cost
-                updated_cost = {**cost, **updates}
+                # Record change history (Recommendation F)
+                from datetime import datetime
+
+                # Find fields that changed
+                fields_changed = []
+                previous_value = {}
+                new_value = {}
+
+                for key, new_val in updates.items():
+                    old_val = cost.get(key)
+                    if old_val != new_val:
+                        fields_changed.append(key)
+                        previous_value[key] = old_val
+                        new_value[key] = new_val
+
+                # Create change event
+                if fields_changed:
+                    change_event = {
+                        'timestamp': datetime.utcnow().isoformat() + 'Z',
+                        'changed_by': data.get('user_id', 'system'),
+                        'previous_value': previous_value,
+                        'new_value': new_value,
+                        'change_reason': data.get('change_reason', 'user_edit'),
+                        'fields_changed': fields_changed
+                    }
+
+                    # Add to history
+                    history = cost.get('history', [])
+                    if not isinstance(history, list):
+                        history = []
+                    history.append(change_event)
+
+                    # Merge updates with history tracking
+                    updated_cost = {**cost, **updates}
+                    updated_cost['history'] = history
+                    updated_cost['updated_at'] = change_event['timestamp']
+                    updated_cost['last_modified_by'] = change_event['changed_by']
+                else:
+                    # No changes, just return existing cost
+                    updated_cost = cost
+
                 updated_costs.append(updated_cost)
                 print(f"✓ Updated cost: {cost_id} - {updated_cost.get('category')} ${updated_cost.get('amount_usd', 0)}")
+                if fields_changed:
+                    print(f"  Changed fields: {', '.join(fields_changed)}")
             else:
                 updated_costs.append(cost)
 
@@ -1792,24 +1838,6 @@ def bulk_save_costs():
 
     print(f"🔍 Looking for costs to remove with aliases: {sorted(destination_aliases)}")
 
-    # Validate destination IDs on incoming cost items
-    import re
-    uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', re.IGNORECASE)
-
-    for item in cost_items:
-        item_dest_id = item.get('destination_id')
-
-        if item_dest_id is None and destination_id is not None:
-            item['destination_id'] = destination_id
-            print(f"  📝 Set destination_id to {destination_id} for {item.get('category')}")
-        elif item_dest_id is not None:
-            item['destination_id'] = str(item_dest_id).strip() or destination_id
-
-        final_dest_id = item.get('destination_id')
-        if final_dest_id and not uuid_pattern.match(str(final_dest_id)):
-            print(f"  ⚠️ WARNING: Cost has non-UUID destination_id: {final_dest_id} for {item.get('category')}")
-            print(f"     This cost may become orphaned! Please use UUIDs only.")
-
     try:
         from google.cloud import firestore
 
@@ -1842,6 +1870,40 @@ def bulk_save_costs():
 
             itinerary_data = latest_version_data.get('itineraryData', {}) or {}
             version_costs = itinerary_data.get('costs', []) or []
+            locations = itinerary_data.get('locations', []) or []
+
+            # Validate and resolve destination IDs for incoming cost items
+            print(f"\n🔍 Validating destination IDs for {len(cost_items)} cost items...")
+
+            # Set destination_id if missing
+            for item in cost_items:
+                if not item.get('destination_id') and destination_id:
+                    item['destination_id'] = destination_id
+                    print(f"  📝 Set destination_id to {destination_id} for {item.get('category')}")
+
+            # Validate and auto-resolve destination IDs
+            try:
+                validated_costs, validation_warnings = validate_cost_items(
+                    cost_items,
+                    locations,
+                    auto_resolve=True,
+                    strict=False  # Don't fail hard, but log warnings
+                )
+
+                # Replace cost_items with validated version
+                cost_items = validated_costs
+
+                # Log validation results
+                if validation_warnings:
+                    print(f"  ⚠️ Validation warnings:")
+                    for warning in validation_warnings:
+                        print(f"    - {warning}")
+                else:
+                    print(f"  ✓ All cost items have valid destination IDs")
+
+            except Exception as e:
+                print(f"  ❌ Validation error: {e}")
+                # Continue anyway, but log the error
 
             print(f"📊 Total costs in database before removal: {len(version_costs)}")
             print(f"📊 Costs with descriptions containing '{destination_name.split(',')[0] if destination_name else ''}': {len([c for c in version_costs if destination_name and destination_name.split(',')[0].lower() in (c.get('description') or '').lower()])}")
@@ -4491,6 +4553,80 @@ def get_curricula_by_location(location_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/education/destinations', methods=['GET'])
+def get_destinations():
+    """Get destinations from the current (most recent) scenario."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = get_firestore_client()
+
+        # Get the most recent scenario for the default user
+        user_id = 'default-user'  # TODO: Replace with actual user ID from auth
+        scenarios_query = (
+            db.collection('scenarios')
+            .where('userId', '==', user_id)
+            .order_by('updatedAt', direction=firestore.Query.DESCENDING)
+            .limit(1)
+        )
+
+        scenarios = list(scenarios_query.stream())
+
+        if not scenarios:
+            return jsonify({
+                'status': 'success',
+                'destinations': []
+            })
+
+        scenario_ref = scenarios[0].reference
+
+        # Get the latest version
+        versions = list(
+            scenario_ref
+            .collection('versions')
+            .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+            .limit(1)
+            .stream()
+        )
+
+        if not versions:
+            return jsonify({
+                'status': 'success',
+                'destinations': []
+            })
+
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        locations = itinerary_data.get('locations', []) or []
+
+        # Transform locations to a simpler format
+        destinations = []
+        for loc in locations:
+            if isinstance(loc, dict):
+                # Try duration_days first, fall back to days
+                duration = loc.get('duration_days', loc.get('days', 0))
+                destinations.append({
+                    'id': loc.get('id', ''),
+                    'name': loc.get('name', ''),
+                    'country': loc.get('country', ''),
+                    'days': duration,
+                    'arrival_date': loc.get('arrival_date', ''),
+                    'departure_date': loc.get('departure_date', '')
+                })
+
+        return jsonify({
+            'status': 'success',
+            'destinations': destinations
+        })
+
+    except Exception as e:
+        print(f"Error getting destinations: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/education/students', methods=['GET'])
 def list_students():
     """List all student profiles."""
@@ -4718,41 +4854,60 @@ def get_student_curricula(student_id):
 
 @app.route('/api/education/students/<student_id>/dashboard', methods=['GET'])
 def get_student_dashboard(student_id):
-    """Get comprehensive dashboard data for a student including stats and progress."""
-    if not firestore:
-        return jsonify({'error': 'Firestore not available'}), 500
+    """Get comprehensive dashboard stats for a student."""
+    """Get comprehensive dashboard stats for a student."""
+    # Fallback for when Firestore is not available
+    if not firestore or not get_firestore_client():
+        print("⚠️ Firestore not available, returning mock dashboard data")
+        return jsonify({
+            'status': 'success',
+            'dashboard': {
+                'student_profile': {
+                    'id': student_id,
+                    'name': 'Alex Explorer (Mock)',
+                    'grade': '7th',
+                    'state': 'CA',
+                    'learning_style': 'Visual'
+                },
+                'statistics': {
+                    'total_curricula': 0,
+                    'total_activities': 0,
+                    'completed_activities': 0,
+                    'completion_rate': 0,
+                    'countries_covered': 0,
+                    'countries': []
+                },
+                'curricula': []
+            }
+        })
 
     try:
         db = get_firestore_client()
 
-        # Get student profile
+        # 1. Get Student Profile
         student_ref = db.collection('student_profiles').document(student_id)
         student_doc = student_ref.get()
-
         if not student_doc.exists:
             return jsonify({'error': 'Student not found'}), 404
 
         student_profile = student_doc.to_dict()
         student_profile['id'] = student_id
 
-        # Convert timestamps in student profile
-        if 'created_at' in student_profile:
-            student_profile['created_at'] = student_profile['created_at'].isoformat() if hasattr(student_profile['created_at'], 'isoformat') else str(student_profile['created_at'])
-        if 'updated_at' in student_profile:
-            student_profile['updated_at'] = student_profile['updated_at'].isoformat() if hasattr(student_profile['updated_at'], 'isoformat') else str(student_profile['updated_at'])
-
-        # Get all curricula for student
-        query = db.collection('curriculum_plans').where('student_profile_id', '==', student_id)
-        curricula_docs = query.stream()
-
+        # 2. Get All Curricula
+        curricula_query = db.collection('curriculum_plans').where('student_profile_id', '==', student_id)
+        curricula_docs = curricula_query.stream()
+        
         curricula = []
+        countries_covered = set()
+        
+        # Stats counters
         total_activities = 0
-        countries = set()
-
+        completed_activities = 0
+        
         for doc in curricula_docs:
             data = doc.to_dict()
             data['id'] = doc.id
-
+            
             # Convert timestamps
             if 'created_at' in data:
                 data['created_at'] = data['created_at'].isoformat() if hasattr(data['created_at'], 'isoformat') else str(data['created_at'])
@@ -4761,53 +4916,53 @@ def get_student_dashboard(student_id):
             if 'generated_at' in data:
                 data['generated_at'] = data['generated_at'].isoformat() if hasattr(data['generated_at'], 'isoformat') else str(data['generated_at'])
 
-            # Count activities (experiential + structured)
-            location_lessons = data.get('location_lessons', {})
-            for location_id, lessons in location_lessons.items():
-                experiential = lessons.get('experiential_learning', [])
-                structured = lessons.get('structured_learning', [])
-                total_activities += len(experiential) + len(structured)
-
-                # Track country from location
-                if 'country' in lessons:
-                    countries.add(lessons['country'])
-
             curricula.append(data)
+            
+            # Track countries
+            if 'country' in data:
+                countries_covered.add(data['country'])
+            
+            # Count activities
+            # Structure: location_lessons -> {location_id} -> on_location -> experiential_activities / structured_lessons
+            loc_lessons = data.get('location_lessons', {})
+            for loc_id, lesson in loc_lessons.items():
+                on_loc = lesson.get('on_location', {})
+                exp = on_loc.get('experiential_activities', [])
+                struct = on_loc.get('structured_lessons', [])
+                total_activities += len(exp) + len(struct)
 
-        # Get completion stats from progress_tracking collection
-        completed_activities = 0
-        try:
-            progress_query = db.collection('progress_tracking').where('student_id', '==', student_id)
-            progress_docs = progress_query.stream()
-
-            for progress_doc in progress_docs:
-                progress_data = progress_doc.to_dict()
-                if progress_data.get('status') == 'completed':
-                    completed_activities += 1
-        except Exception as progress_error:
-            print(f"Warning: Could not fetch progress tracking: {str(progress_error)}")
-            # Continue without progress data
-
-        # Calculate statistics
-        completion_rate = 0
+        # 3. Get Completion Stats from progress_tracking
+        # We'll assume a 'progress_tracking' collection exists or we just use a placeholder for now if it's empty
+        progress_query = db.collection('progress_tracking').where('student_id', '==', student_id)
+        progress_docs = progress_query.stream()
+        completed_ids = set()
+        for p in progress_docs:
+            p_data = p.to_dict()
+            if p_data.get('status') == 'completed':
+                completed_ids.add(p_data.get('activity_id'))
+        
+        completed_activities = len(completed_ids)
+        
+        # Calculate completion rate
+        completion_rate = 0.0
         if total_activities > 0:
             completion_rate = round((completed_activities / total_activities) * 100, 1)
 
-        statistics = {
-            'total_curricula': len(curricula),
-            'total_activities': total_activities,
-            'completed_activities': completed_activities,
-            'completion_rate': completion_rate,
-            'countries_covered': len(countries),
-            'countries': sorted(list(countries))
+        stats = {
+            "total_curricula": len(curricula),
+            "total_activities": total_activities,
+            "completed_activities": completed_activities,
+            "completion_rate": completion_rate,
+            "countries_covered": len(countries_covered),
+            "countries": list(countries_covered)
         }
 
         return jsonify({
-            'status': 'success',
-            'dashboard': {
-                'student_profile': student_profile,
-                'curricula': curricula,
-                'statistics': statistics
+            "status": "success",
+            "dashboard": {
+                "student_profile": student_profile,
+                "curricula": curricula,
+                "statistics": stats
             }
         })
 
@@ -4827,108 +4982,114 @@ def update_curriculum(plan_id):
     try:
         data = request.json
         db = get_firestore_client()
-
-        # Check if curriculum exists
+        
         doc_ref = db.collection('curriculum_plans').document(plan_id)
         doc = doc_ref.get()
-
         if not doc.exists:
-            return jsonify({'error': 'Curriculum plan not found'}), 404
-
+            return jsonify({'error': 'Curriculum not found'}), 404
+            
         # Allowed fields to update
         allowed_fields = ['status', 'location_lessons', 'thematic_threads', 'standards_coverage']
         update_data = {}
-
+        
         for field in allowed_fields:
             if field in data:
                 update_data[field] = data[field]
-
-        # Always update the timestamp
+                
         update_data['updated_at'] = datetime.now()
-
-        # Update in Firestore
+        
         doc_ref.update(update_data)
-
-        # Get updated curriculum
+        
+        # Get updated doc
         updated_doc = doc_ref.get()
-        updated_curriculum = updated_doc.to_dict()
-        updated_curriculum['id'] = plan_id
-
+        updated_data = updated_doc.to_dict()
+        updated_data['id'] = plan_id
+        
         # Convert timestamps
-        if 'created_at' in updated_curriculum:
-            updated_curriculum['created_at'] = updated_curriculum['created_at'].isoformat() if hasattr(updated_curriculum['created_at'], 'isoformat') else str(updated_curriculum['created_at'])
-        if 'updated_at' in updated_curriculum:
-            updated_curriculum['updated_at'] = updated_curriculum['updated_at'].isoformat() if hasattr(updated_curriculum['updated_at'], 'isoformat') else str(updated_curriculum['updated_at'])
-        if 'generated_at' in updated_curriculum:
-            updated_curriculum['generated_at'] = updated_curriculum['generated_at'].isoformat() if hasattr(updated_curriculum['generated_at'], 'isoformat') else str(updated_curriculum['generated_at'])
-
+        if 'created_at' in updated_data:
+            updated_data['created_at'] = updated_data['created_at'].isoformat() if hasattr(updated_data['created_at'], 'isoformat') else str(updated_data['created_at'])
+        if 'updated_at' in updated_data:
+            updated_data['updated_at'] = updated_data['updated_at'].isoformat() if hasattr(updated_data['updated_at'], 'isoformat') else str(updated_data['updated_at'])
+            
         return jsonify({
             'status': 'success',
-            'curriculum': updated_curriculum
+            'curriculum': updated_data
         })
 
     except Exception as e:
         print(f"Error updating curriculum: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/education/curricula/<plan_id>/activities', methods=['POST'])
 def add_custom_activity(plan_id):
-    """Add a custom activity to a curriculum plan."""
+    """Add a custom activity to a curriculum."""
     if not firestore:
         return jsonify({'error': 'Firestore not available'}), 500
 
     try:
         data = request.json
         db = get_firestore_client()
-
-        # Validate curriculum exists
-        curriculum_ref = db.collection('curriculum_plans').document(plan_id)
-        curriculum_doc = curriculum_ref.get()
-
-        if not curriculum_doc.exists:
-            return jsonify({'error': 'Curriculum plan not found'}), 404
-
+        
         # Validate required fields
-        required_fields = ['location_id', 'type', 'subject', 'title', 'description']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
-
-        # Create activity document
-        activity_data = {
-            'curriculum_plan_id': plan_id,
-            'location_id': data['location_id'],
-            'type': data['type'],
-            'subject': data['subject'],
+        if 'title' not in data or 'location_id' not in data:
+            return jsonify({'error': 'Missing title or location_id'}), 400
+            
+        doc_ref = db.collection('curriculum_plans').document(plan_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Curriculum not found'}), 404
+            
+        curr_data = doc.to_dict()
+        location_id = data['location_id']
+        
+        # Check if location exists in curriculum
+        if 'location_lessons' not in curr_data or location_id not in curr_data['location_lessons']:
+             return jsonify({'error': f'Location {location_id} not found in this curriculum'}), 404
+             
+        # Create activity object
+        new_activity = {
+            'id': str(uuid.uuid4()),
             'title': data['title'],
-            'description': data['description'],
+            'type': data.get('type', 'custom'),
+            'subject': data.get('subject', 'general'),
+            'description': data.get('description', ''),
             'learning_objectives': data.get('learning_objectives', []),
             'estimated_duration_minutes': data.get('estimated_duration_minutes', 60),
             'external_links': data.get('external_links', []),
-            'customized': True,
+            'is_custom': True,
             'ai_generated': False,
-            'created_at': datetime.now(),
-            'updated_at': datetime.now()
+            'created_at': datetime.now().isoformat()
         }
-
-        # Add to learning_activities collection
-        activity_ref = db.collection('learning_activities').document()
-        activity_ref.set(activity_data)
-
-        activity_data['id'] = activity_ref.id
-        activity_data['created_at'] = activity_data['created_at'].isoformat()
-        activity_data['updated_at'] = activity_data['updated_at'].isoformat()
-
-        # Update parent curriculum's timestamp
-        curriculum_ref.update({'updated_at': datetime.now()})
-
+        
+        # Add to curriculum structure
+        loc_lesson = curr_data['location_lessons'][location_id]
+        if 'on_location' not in loc_lesson:
+            loc_lesson['on_location'] = {'experiential_activities': [], 'structured_lessons': []}
+            
+        if 'experiential_activities' not in loc_lesson['on_location']:
+            loc_lesson['on_location']['experiential_activities'] = []
+            
+        loc_lesson['on_location']['experiential_activities'].append(new_activity)
+        
+        # Update Firestore
+        doc_ref.update({
+            f'location_lessons.{location_id}': loc_lesson,
+            'updated_at': datetime.now()
+        })
+        
+        # Also save to learning_activities collection
+        activity_ref = db.collection('learning_activities').document(new_activity['id'])
+        activity_record = new_activity.copy()
+        activity_record['curriculum_plan_id'] = plan_id
+        activity_record['student_id'] = curr_data.get('student_profile_id')
+        activity_record['location_id'] = location_id
+        activity_ref.set(activity_record)
+        
         return jsonify({
             'status': 'success',
-            'activity': activity_data
-        }), 201
+            'activity': new_activity
+        })
 
     except Exception as e:
         print(f"Error adding custom activity: {str(e)}")
@@ -4939,150 +5100,143 @@ def add_custom_activity(plan_id):
 
 @app.route('/api/education/bulk-generate', methods=['POST'])
 def bulk_generate_curricula():
-    """Generate curricula for multiple locations in bulk."""
+    """
+    Bulk generate curricula for multiple locations.
+    Iterates through locations and generates concise curriculum for each.
+    """
     if not firestore:
         return jsonify({'error': 'Firestore not available'}), 500
 
     try:
+        from google import genai
+        
         data = request.json
-
-        # Validate required fields
-        if 'student' not in data or 'locations' not in data:
-            return jsonify({'error': 'Missing required fields: student, locations'}), 400
-
-        student = data['student']
-        locations = data['locations']
-        subjects = data.get('subjects', ['science', 'social_studies', 'language_arts'])
-
+        student = data.get('student')
+        locations = data.get('locations', [])
+        subjects = data.get('subjects', [])
+        
+        if not student or not locations:
+            return jsonify({'error': 'Missing student or locations'}), 400
+            
+        print(f"🚀 Starting bulk generation for {len(locations)} locations...")
+        
+        # Initialize Gemini client
+        credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+        if credentials_json:
+            credentials_info = json.loads(credentials_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                credentials_info,
+                scopes=['https://www.googleapis.com/auth/cloud-platform',
+                       'https://www.googleapis.com/auth/generative-language']
+            )
+            client = genai.Client(credentials=credentials)
+        else:
+            client = genai.Client()
+            
+        model_id = 'gemini-2.0-flash-exp'
         results = []
-        successful = 0
-        failed = 0
-
-        # Process each location
+        successful_count = 0
+        failed_count = 0
+        
         for location in locations:
             try:
-                # Generate concise curriculum with Gemini
-                # Build prompt for concise curriculum (2-3 activities, 1-2 readings, 1 video, 2-3 reflections)
-                prompt = f"""Generate a concise, engaging educational curriculum for a student visiting {location.get('name', 'this location')}, {location.get('country', '')}.
+                print(f"  Generating for {location.get('name')}...")
+                
+                # Concise Prompt
+                prompt = f"""
+Role: Expert Educational Travel Planner
+Student: {student.get('name')} (Age {student.get('age')}, Grade {student.get('grade')})
+Interests: {', '.join(student.get('interests', []))}
+Location: {location.get('name')}, {location.get('country')} ({location.get('duration_days', 3)} days)
+Subjects: {', '.join(subjects)}
 
-Student Profile:
-- Name: {student.get('name', 'Student')}
-- Age: {student.get('age', 14)}
-- Grade: {student.get('grade', 8)}
-- State: {student.get('state', 'California')}
-- Learning Style: {student.get('learning_style', 'Visual')}
-- Interests: {', '.join(student.get('interests', []))}
-- Time Budget: {student.get('time_budget_minutes_per_day', 60)} minutes per day
-- Reading Level: Grade {student.get('reading_level', student.get('grade', 8))}
+Task: Create a CONCISE educational plan for this location.
+Requirements:
+1. 2-3 Experiential Activities (specific sites, hands-on)
+2. 1-2 Readings (articles/books)
+3. 1 Educational Video
+4. 2-3 Reflection Prompts
 
-Focus Subjects: {', '.join(subjects)}
-
-Create a CONCISE curriculum with:
-1. 2-3 experiential learning activities (hands-on experiences at this location)
-2. 1-2 pre-trip reading resources
-3. 1 video resource
-4. 2-3 reflection prompts
-
-Keep each activity brief but meaningful. Focus on location-specific learning opportunities.
-
-Return ONLY valid JSON in this exact format:
+Output JSON format:
 {{
-  "location_lessons": {{
-    "{location.get('id', 'location')}": {{
-      "location_name": "{location.get('name', '')}",
-      "country": "{location.get('country', '')}",
-      "duration_weeks": 1,
-      "experiential_learning": [
-        {{
-          "subject": "science",
-          "title": "Activity Title",
-          "description": "Brief description",
-          "learning_objectives": ["Objective 1", "Objective 2"],
-          "estimated_duration_minutes": 90
-        }}
-      ],
-      "structured_learning": [
-        {{
-          "type": "reading",
-          "title": "Article Title",
-          "description": "What students will learn",
-          "url": "https://example.com",
-          "estimated_duration_minutes": 30
-        }},
-        {{
-          "type": "video",
-          "title": "Video Title",
-          "description": "Video description",
-          "url": "https://youtube.com/watch?v=...",
-          "estimated_duration_minutes": 15
-        }}
-      ],
-      "reflection_prompts": [
-        "Reflection question 1?",
-        "Reflection question 2?"
-      ]
-    }}
+  "location_id": "{location.get('id')}",
+  "location_name": "{location.get('name')}",
+  "pre_trip": {{
+    "readings": [ {{"title": "...", "source": "...", "description": "..."}} ],
+    "videos": [ {{"title": "...", "source": "...", "description": "..."}} ]
   }},
-  "thematic_threads": ["Theme 1", "Theme 2"],
-  "standards_coverage": {{
-    "science": ["Standard 1"],
-    "social_studies": ["Standard 1"]
+  "on_location": {{
+    "experiential_activities": [
+      {{
+        "title": "...",
+        "type": "experiential",
+        "subject": "...",
+        "description": "...",
+        "learning_objectives": ["..."],
+        "site_details": {{"name": "...", "address": "..."}}
+      }}
+    ],
+    "structured_lessons": []
+  }},
+  "post_trip": {{
+    "reflection_prompts": [ {{"text": "...", "type": "journal"}} ]
   }}
-}}"""
-
-                # Call Gemini API
-                model = genai.GenerativeModel('gemini-2.0-flash-exp')
-                response = model.generate_content(prompt)
-
-                # Parse response
-                response_text = response.text.strip()
-
-                # Clean up response (remove markdown code blocks if present)
-                if response_text.startswith('```json'):
-                    response_text = response_text[7:]
-                if response_text.startswith('```'):
-                    response_text = response_text[3:]
-                if response_text.endswith('```'):
-                    response_text = response_text[:-3]
-                response_text = response_text.strip()
-
-                curriculum_data = json.loads(response_text)
-
-                # Prepare metadata
-                metadata = {
-                    'scenario_id': data.get('scenario_id', 'bulk_generation'),
-                    'version_id': data.get('version_id', 'v1'),
-                    'status': 'active',
-                    'generated_by': 'bulk_generation',
-                    'generation_mode': 'concise'
-                }
-
-                # Save to Firestore using existing helper
-                result = _save_curriculum_to_firestore(student, location, curriculum_data, metadata)
-
+}}
+"""
+                # Generate
+                response = client.models.generate_content(
+                    model=model_id,
+                    contents=prompt,
+                    config={'temperature': 0.7, 'max_output_tokens': 4000}
+                )
+                
+                # Parse JSON
+                text = response.text
+                # (Simplified cleaning logic)
+                if '```json' in text:
+                    text = text.split('```json')[1].split('```')[0]
+                elif '```' in text:
+                    text = text.split('```')[1]
+                
+                curriculum_json = json.loads(text.strip())
+                
+                # Save to Firestore
+                # We need to call _save_curriculum_to_firestore but it's not easily importable if it's not in scope
+                # Wait, we are in the same file, so we can call it directly!
+                # Assuming _save_curriculum_to_firestore is defined in this file (which it is).
+                
+                saved_ids = _save_curriculum_to_firestore(
+                    student_profile=student,
+                    location=location,
+                    curriculum_data=curriculum_json,
+                    metadata={
+                        'model_used': model_id,
+                        'generation_type': 'bulk_concise',
+                        'generation_time': datetime.now().isoformat()
+                    }
+                )
+                
                 results.append({
                     'location_id': location.get('id'),
-                    'location_name': location.get('name'),
                     'status': 'success',
-                    'curriculum_plan_id': result.get('curriculum_plan_id')
+                    'curriculum_plan_id': saved_ids.get('curriculum_plan_id')
                 })
-                successful += 1
-
-            except Exception as location_error:
-                print(f"Error generating curriculum for {location.get('name', 'location')}: {str(location_error)}")
+                successful_count += 1
+                
+            except Exception as loc_e:
+                print(f"  ❌ Failed for {location.get('name')}: {str(loc_e)}")
                 results.append({
                     'location_id': location.get('id'),
-                    'location_name': location.get('name'),
                     'status': 'failed',
-                    'error': str(location_error)
+                    'error': str(loc_e)
                 })
-                failed += 1
+                failed_count += 1
 
         return jsonify({
             'status': 'success',
             'total': len(locations),
-            'successful': successful,
-            'failed': failed,
+            'successful': successful_count,
+            'failed': failed_count,
             'results': results
         })
 
@@ -5093,7 +5247,6 @@ Return ONLY valid JSON in this exact format:
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/education/destinations', methods=['GET'])
 def get_destinations():
     """Get destinations from the current (most recent) scenario."""
     if not firestore:
