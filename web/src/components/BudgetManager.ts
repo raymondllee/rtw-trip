@@ -231,14 +231,16 @@ export class BudgetManager {
     const categories = new Set<string>();
     const countries = new Set<string>();
 
+    // Get countries from ALL locations in the itinerary, not just those with costs
+    (this.tripData.locations || []).forEach(location => {
+      if (location.country) {
+        countries.add(location.country);
+      }
+    });
+
+    // Get categories from existing costs
     (this.tripData.costs || []).forEach(cost => {
       if (cost.category) categories.add(cost.category);
-      if (cost.destination_id) {
-        const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
-        if (location?.country) {
-          countries.add(location.country);
-        }
-      }
     });
 
     // Create modal
