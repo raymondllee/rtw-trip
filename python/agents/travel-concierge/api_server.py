@@ -4585,48 +4585,70 @@ def get_curricula_by_location(location_id):
 
 @app.route('/api/education/destinations', methods=['GET'])
 def get_destinations():
-    """Get all destinations from scenarios for the testing lab destination selector."""
+    """Get destinations from the current (most recent) scenario."""
     if not firestore:
         return jsonify({'error': 'Firestore not available'}), 500
 
     try:
         db = get_firestore_client()
-        scenarios_ref = db.collection('scenarios')
-        scenario_docs = scenarios_ref.stream()
 
-        all_destinations = []
-        seen_ids = set()
+        # Get the most recent scenario for the default user
+        user_id = 'default-user'  # TODO: Replace with actual user ID from auth
+        scenarios_query = (
+            db.collection('scenarios')
+            .where('userId', '==', user_id)
+            .order_by('updatedAt', direction=firestore.Query.DESCENDING)
+            .limit(1)
+        )
 
-        for scenario_doc in scenario_docs:
-            # Get the latest version for this scenario
-            versions_ref = scenario_doc.reference.collection('versions')
-            # Get the most recent version (orderBy created_at desc, limit 1)
-            versions = versions_ref.order_by('created_at', direction=firestore.Query.DESCENDING).limit(1).stream()
+        scenarios = list(scenarios_query.stream())
 
-            for version_doc in versions:
-                version_data = version_doc.to_dict()
-                data = version_data.get('data', {})
-                locations = data.get('locations', [])
+        if not scenarios:
+            return jsonify({
+                'status': 'success',
+                'destinations': []
+            })
 
-                for location in locations:
-                    # Skip if we've already seen this destination
-                    location_id = location.get('id')
-                    if not location_id or location_id in seen_ids:
-                        continue
-                    seen_ids.add(location_id)
+        scenario_ref = scenarios[0].reference
 
-                    # Extract destination info
-                    all_destinations.append({
-                        'id': location_id,
-                        'name': location.get('name', ''),
-                        'country': location.get('country', ''),
-                        'days': location.get('days', 0)
-                    })
+        # Get the latest version
+        versions = list(
+            scenario_ref
+            .collection('versions')
+            .order_by('versionNumber', direction=firestore.Query.DESCENDING)
+            .limit(1)
+            .stream()
+        )
 
-        # Sort by name
-        all_destinations.sort(key=lambda d: d['name'])
+        if not versions:
+            return jsonify({
+                'status': 'success',
+                'destinations': []
+            })
 
-        return jsonify({'destinations': all_destinations})
+        latest_version_data = versions[0].to_dict() or {}
+        itinerary_data = latest_version_data.get('itineraryData', {}) or {}
+        locations = itinerary_data.get('locations', []) or []
+
+        # Transform locations to a simpler format
+        destinations = []
+        for loc in locations:
+            if isinstance(loc, dict):
+                # Try duration_days first, fall back to days
+                duration = loc.get('duration_days', loc.get('days', 0))
+                destinations.append({
+                    'id': loc.get('id', ''),
+                    'name': loc.get('name', ''),
+                    'country': loc.get('country', ''),
+                    'days': duration,
+                    'arrival_date': loc.get('arrival_date', ''),
+                    'departure_date': loc.get('departure_date', '')
+                })
+
+        return jsonify({
+            'status': 'success',
+            'destinations': destinations
+        })
 
     except Exception as e:
         print(f"Error getting destinations: {str(e)}")
