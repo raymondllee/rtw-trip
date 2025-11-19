@@ -839,17 +839,28 @@ export class BudgetManager {
       const categoryGroupNote = (this.container.querySelector('#category-group-note') as HTMLTextAreaElement)?.value.trim();
       const countryGroupNote = (this.container.querySelector('#country-group-note') as HTMLTextAreaElement)?.value.trim();
 
+      // Build budget object, only including note fields if they have values
       const newBudget: TripBudget = {
         total_budget_usd: totalBudget,
         budgets_by_category,
         budgets_by_country,
         contingency_pct: contingency,
-        alerts: [],
-        category_notes: Object.keys(category_notes).length > 0 ? category_notes : undefined,
-        country_notes: Object.keys(country_notes).length > 0 ? country_notes : undefined,
-        category_group_note: categoryGroupNote || undefined,
-        country_group_note: countryGroupNote || undefined
+        alerts: []
       };
+
+      // Only add note fields if they have values (Firestore doesn't accept undefined)
+      if (Object.keys(category_notes).length > 0) {
+        newBudget.category_notes = category_notes;
+      }
+      if (Object.keys(country_notes).length > 0) {
+        newBudget.country_notes = country_notes;
+      }
+      if (categoryGroupNote) {
+        newBudget.category_group_note = categoryGroupNote;
+      }
+      if (countryGroupNote) {
+        newBudget.country_group_note = countryGroupNote;
+      }
 
       this.budget = newBudget;
       this.onBudgetUpdate?.(newBudget);
