@@ -347,13 +347,24 @@ function initBudgetTab() {
     tripData,
     tripData.budget,
     async (updatedBudget) => {
-      // Save budget to Firestore when updated
+      // Save budget to both scenario AND version to ensure persistence
       try {
+        // Update the scenario document
         const scenarioRef = doc(db, 'scenarios', scenarioId);
-        await updateDoc(scenarioRef, {
+
+        // Also update currentVersionData so the budget persists in the version
+        currentVersionData.itineraryData.budget = updatedBudget;
+
+        // Get the current version number
+        const currentVersion = currentScenario.currentVersion || 0;
+
+        // Update the version document with the budget
+        const versionRef = doc(db, 'scenarios', scenarioId, 'versions', `v${currentVersion}`);
+        await updateDoc(versionRef, {
           'itineraryData.budget': updatedBudget,
           updatedAt: Timestamp.now()
         });
+
         console.log('✅ Budget saved to Firestore');
       } catch (error) {
         console.error('❌ Failed to save budget:', error);
