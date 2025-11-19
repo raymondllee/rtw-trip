@@ -4352,6 +4352,8 @@ def list_curricula():
         status = request.args.get('status')
         limit = int(request.args.get('limit', 50))
 
+        has_filters = bool(student_id or status or country)
+
         if student_id:
             query = query.where('student_profile_id', '==', student_id)
         if status:
@@ -4359,8 +4361,10 @@ def list_curricula():
         if country:
             query = query.where('country', '==', country)
 
-        # Order by creation date (newest first)
-        query = query.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
+        # Only use ORDER BY if no filters (to avoid needing composite indexes)
+        # Otherwise, sort in Python after fetching
+        if not has_filters:
+            query = query.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
 
         docs = query.stream()
         curricula = []
@@ -4381,6 +4385,11 @@ def list_curricula():
                 data['generated_at'] = data['generated_at'].isoformat() if hasattr(data['generated_at'], 'isoformat') else str(data['generated_at'])
 
             curricula.append(data)
+
+        # Sort by created_at in Python if we had filters
+        if has_filters:
+            curricula.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            curricula = curricula[:limit]  # Apply limit after sorting
 
         return jsonify({
             'status': 'success',
@@ -4565,8 +4574,9 @@ def get_student_curricula(student_id):
 
     try:
         db = get_firestore_client()
+        # Query without ORDER BY to avoid needing composite index
+        # We'll sort in Python instead
         query = db.collection('curriculum_plans').where('student_profile_id', '==', student_id)
-        query = query.order_by('created_at', direction=firestore.Query.DESCENDING)
 
         docs = query.stream()
         curricula = []
@@ -4583,6 +4593,9 @@ def get_student_curricula(student_id):
                 data['generated_at'] = data['generated_at'].isoformat() if hasattr(data['generated_at'], 'isoformat') else str(data['generated_at'])
 
             curricula.append(data)
+
+        # Sort by created_at in Python (most recent first)
+        curricula.sort(key=lambda x: x.get('created_at', ''), reverse=True)
 
         return jsonify({
             'status': 'success',
