@@ -4512,17 +4512,8 @@ export async function initMapApp() {
     openAddDestinationModal(null); // null means auto-calculate insertion point
   });
 
-  // Bulk cost update button
-  document.getElementById('bulk-update-costs-btn').addEventListener('click', () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    scenarioActionsDropdown.style.display = 'none';
-    scenarioActionsBtn.classList.remove('active');
-
-    openBulkCostUpdateModal();
-  });
-
-  document.getElementById('bulk-edit-costs-btn').addEventListener('click', () => {
+  // Manage Costs & Budget button - navigates to unified cost manager
+  document.getElementById('manage-costs-budget-btn').addEventListener('click', () => {
     const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
     const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
     scenarioActionsDropdown.style.display = 'none';
@@ -4533,8 +4524,8 @@ export async function initMapApp() {
       return;
     }
 
-    // Navigate to full-screen bulk edit page
-    window.location.href = `./bulk-edit.html?scenario=${currentScenarioId}`;
+    // Navigate to unified cost & budget manager page
+    window.location.href = `./cost-manager.html?scenario=${currentScenarioId}`;
   });
 
   // Bulk cost update modal event listeners
