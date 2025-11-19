@@ -185,6 +185,30 @@ export class BudgetManager {
             </div>
           </div>
 
+          <!-- Always-visible budget summary -->
+          <div class="budget-summary-box">
+            <div class="summary-row">
+              <span class="summary-label">Total Budget:</span>
+              <span class="summary-value">${this.formatCurrency(currentBudget)}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Allocated to Categories:</span>
+              <span class="summary-value" id="category-total-allocated">${this.formatCurrency(
+                Array.from(categories).reduce((sum, cat) => {
+                  return sum + (this.budget?.budgets_by_category?.[cat] || 0);
+                }, 0)
+              )}</span>
+              <span class="summary-percentage" id="category-total-pct">${currentBudget > 0 ?
+                ((Array.from(categories).reduce((sum, cat) => sum + (this.budget?.budgets_by_category?.[cat] || 0), 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Unallocated:</span>
+              <span class="summary-value" id="category-unallocated">${this.formatCurrency(
+                currentBudget - Array.from(categories).reduce((sum, cat) => sum + (this.budget?.budgets_by_category?.[cat] || 0), 0)
+              )}</span>
+            </div>
+          </div>
+
           <div id="allocation-status" style="display: none;" class="allocation-status">
             <div class="allocation-info">
               <strong>Total Allocated:</strong> <span id="total-allocated-pct">0</span>%
@@ -245,6 +269,30 @@ export class BudgetManager {
                   <span class="toggle-slider"></span>
                   <span class="toggle-label">Use %</span>
                 </label>
+              </div>
+            </div>
+
+            <!-- Always-visible budget summary for countries -->
+            <div class="budget-summary-box">
+              <div class="summary-row">
+                <span class="summary-label">Total Budget:</span>
+                <span class="summary-value">${this.formatCurrency(currentBudget)}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Allocated to Countries:</span>
+                <span class="summary-value" id="country-total-allocated">${this.formatCurrency(
+                  Array.from(countries).reduce((sum, country) => {
+                    return sum + (this.budget?.budgets_by_country?.[country] || 0);
+                  }, 0)
+                )}</span>
+                <span class="summary-percentage" id="country-total-pct">${currentBudget > 0 ?
+                  ((Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Unallocated:</span>
+                <span class="summary-value" id="country-unallocated">${this.formatCurrency(
+                  currentBudget - Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0)
+                )}</span>
               </div>
             </div>
 
@@ -355,6 +403,52 @@ export class BudgetManager {
 
     let isPercentageMode = false;
 
+    // Update budget summary for categories
+    const updateCategorySummary = () => {
+      const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+      let totalAllocated = 0;
+
+      this.container.querySelectorAll('.cat-input').forEach(input => {
+        const el = input as HTMLInputElement;
+        const dollarValue = parseFloat(el.dataset.dollarValue!) || 0;
+        totalAllocated += dollarValue;
+      });
+
+      const categoryTotalEl = this.container.querySelector('#category-total-allocated') as HTMLElement;
+      const categoryPctEl = this.container.querySelector('#category-total-pct') as HTMLElement;
+      const categoryUnallocatedEl = this.container.querySelector('#category-unallocated') as HTMLElement;
+
+      if (categoryTotalEl) {
+        categoryTotalEl.textContent = `$${totalAllocated.toLocaleString()}`;
+      }
+      if (categoryPctEl) {
+        const pct = totalBudget > 0 ? (totalAllocated / totalBudget * 100) : 0;
+        categoryPctEl.textContent = `${pct.toFixed(1)}%`;
+
+        // Color code based on allocation status
+        if (Math.abs(pct - 100) < 0.1) {
+          categoryPctEl.style.color = '#28a745'; // Green for fully allocated
+        } else if (pct > 100) {
+          categoryPctEl.style.color = '#dc3545'; // Red for over-allocated
+        } else {
+          categoryPctEl.style.color = '#ffc107'; // Orange for under-allocated
+        }
+      }
+      if (categoryUnallocatedEl) {
+        const unallocated = totalBudget - totalAllocated;
+        categoryUnallocatedEl.textContent = `$${unallocated.toLocaleString()}`;
+
+        // Color code the unallocated amount
+        if (Math.abs(unallocated) < 1) {
+          categoryUnallocatedEl.style.color = '#28a745';
+        } else if (unallocated < 0) {
+          categoryUnallocatedEl.style.color = '#dc3545';
+        } else {
+          categoryUnallocatedEl.style.color = '#ffc107';
+        }
+      }
+    };
+
     // Update calculated displays for categories
     const updateCalculatedDisplays = () => {
       const totalBudget = parseFloat(totalBudgetInput.value) || 0;
@@ -380,6 +474,8 @@ export class BudgetManager {
       if (isPercentageMode) {
         updateAllocationStatus();
       }
+
+      updateCategorySummary();
     };
 
     // Update allocation status for categories
@@ -460,6 +556,52 @@ export class BudgetManager {
 
     let isCountryPercentageMode = false;
 
+    // Update budget summary for countries
+    const updateCountrySummary = () => {
+      const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+      let totalAllocated = 0;
+
+      this.container.querySelectorAll('.country-input').forEach(input => {
+        const el = input as HTMLInputElement;
+        const dollarValue = parseFloat(el.dataset.dollarValue!) || 0;
+        totalAllocated += dollarValue;
+      });
+
+      const countryTotalEl = this.container.querySelector('#country-total-allocated') as HTMLElement;
+      const countryPctEl = this.container.querySelector('#country-total-pct') as HTMLElement;
+      const countryUnallocatedEl = this.container.querySelector('#country-unallocated') as HTMLElement;
+
+      if (countryTotalEl) {
+        countryTotalEl.textContent = `$${totalAllocated.toLocaleString()}`;
+      }
+      if (countryPctEl) {
+        const pct = totalBudget > 0 ? (totalAllocated / totalBudget * 100) : 0;
+        countryPctEl.textContent = `${pct.toFixed(1)}%`;
+
+        // Color code based on allocation status
+        if (Math.abs(pct - 100) < 0.1) {
+          countryPctEl.style.color = '#28a745'; // Green for fully allocated
+        } else if (pct > 100) {
+          countryPctEl.style.color = '#dc3545'; // Red for over-allocated
+        } else {
+          countryPctEl.style.color = '#ffc107'; // Orange for under-allocated
+        }
+      }
+      if (countryUnallocatedEl) {
+        const unallocated = totalBudget - totalAllocated;
+        countryUnallocatedEl.textContent = `$${unallocated.toLocaleString()}`;
+
+        // Color code the unallocated amount
+        if (Math.abs(unallocated) < 1) {
+          countryUnallocatedEl.style.color = '#28a745';
+        } else if (unallocated < 0) {
+          countryUnallocatedEl.style.color = '#dc3545';
+        } else {
+          countryUnallocatedEl.style.color = '#ffc107';
+        }
+      }
+    };
+
     // Update calculated displays for countries
     const updateCountryCalculatedDisplays = () => {
       const totalBudget = parseFloat(totalBudgetInput.value) || 0;
@@ -491,6 +633,8 @@ export class BudgetManager {
       if (isCountryPercentageMode) {
         updateCountryAllocationStatus();
       }
+
+      updateCountrySummary();
     };
 
     // Update allocation status for countries
@@ -1022,6 +1166,48 @@ export const budgetManagerStyles = `
 .allocation-remainder {
   font-weight: 600;
   font-size: 14px;
+}
+
+.budget-summary-box {
+  padding: 15px;
+  background: white;
+  border-radius: 6px;
+  margin: 15px 0;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.summary-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.summary-label {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.summary-value {
+  font-weight: 700;
+  color: #333;
+  font-size: 16px;
+  transition: color 0.2s;
+}
+
+.summary-percentage {
+  font-weight: 600;
+  font-size: 14px;
+  margin-left: 10px;
+  transition: color 0.2s;
 }
 
 .budget-items-edit {
