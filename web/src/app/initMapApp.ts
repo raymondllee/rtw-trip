@@ -1456,6 +1456,23 @@ export async function initMapApp() {
     }
   }
 
+  async function updateViewSummaryButtonState() {
+    const viewSummaryBtn = document.getElementById('view-summary-btn');
+    if (!currentScenarioId) {
+      // No scenario selected, disable button
+      viewSummaryBtn.disabled = true;
+      return;
+    }
+
+    try {
+      // Check if current scenario has a saved summary
+      const hasSummary = await scenarioManager.hasSummary(currentScenarioId);
+      viewSummaryBtn.disabled = !hasSummary;
+    } catch (error) {
+      console.error('Error checking summary status:', error);
+      viewSummaryBtn.disabled = true;
+    }
+  }
 
   // Display current scenario name in the Scenario section
   function updateScenarioNameDisplay() {
@@ -3651,6 +3668,9 @@ export async function initMapApp() {
         if (window.switchChatForScenario) {
           await window.switchChatForScenario(scenarioId);
         }
+
+        // Update view summary button state
+        await updateViewSummaryButtonState();
       }
     } catch (error) {
       console.error('Error loading scenario:', error);
@@ -4492,8 +4512,17 @@ export async function initMapApp() {
     openAddDestinationModal(null); // null means auto-calculate insertion point
   });
 
-  // Manage Costs & Budget button - navigates to unified cost manager
-  document.getElementById('manage-costs-budget-btn').addEventListener('click', () => {
+  // Bulk cost update button
+  document.getElementById('bulk-update-costs-btn').addEventListener('click', () => {
+    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+    scenarioActionsDropdown.style.display = 'none';
+    scenarioActionsBtn.classList.remove('active');
+
+    openBulkCostUpdateModal();
+  });
+
+  document.getElementById('bulk-edit-costs-btn').addEventListener('click', () => {
     const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
     const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
     scenarioActionsDropdown.style.display = 'none';
@@ -4504,8 +4533,8 @@ export async function initMapApp() {
       return;
     }
 
-    // Navigate to unified cost & budget manager page
-    window.location.href = `./cost-manager.html?scenario=${currentScenarioId}`;
+    // Navigate to full-screen bulk edit page
+    window.location.href = `./bulk-edit.html?scenario=${currentScenarioId}`;
   });
 
   // Bulk cost update modal event listeners
@@ -4742,14 +4771,8 @@ export async function initMapApp() {
 
   document.getElementById('import-scenarios-btn').addEventListener('click', openImportScenariosModal);
 
-  // View Trip Summary button - generates and opens summary
-  document.getElementById('view-trip-summary-btn').addEventListener('click', async () => {
-    // Close dropdown
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    if (scenarioActionsDropdown) scenarioActionsDropdown.style.display = 'none';
-    if (scenarioActionsBtn) scenarioActionsBtn.classList.remove('active');
-
+  // Summary generation button - shows options modal
+  document.getElementById('generate-summary-btn').addEventListener('click', async () => {
     // Check if we have locations
     if (!workingData.locations || workingData.locations.length === 0) {
       alert('No locations in itinerary to generate summary');
@@ -4797,9 +4820,61 @@ export async function initMapApp() {
 
       // Generate and view summary with options
       await summaryManager.generateAndView(itineraryData, currentScenarioId, options, scenarioMetadata);
+
+      // Update view summary button state after generation
+      await updateViewSummaryButtonState();
     } catch (error) {
       console.error('Error generating summary:', error);
       alert('Failed to generate summary: ' + error.message);
+    }
+  });
+
+  // View saved summary button (in scenario actions dropdown)
+  document.getElementById('student-dashboard-btn').addEventListener('click', () => {
+    const studentId = localStorage.getItem('current_student_id') || 'student_default';
+    localStorage.setItem('current_student_id', studentId);
+    window.open(`/student-dashboard.html?student_id=${studentId}`, '_blank');
+  });
+
+  document.getElementById('view-summary-btn').addEventListener('click', async () => {
+    if (!currentScenarioId) {
+      alert('Please save your scenario first before viewing summary');
+      return;
+    }
+
+    try {
+      // Check if scenario has a saved summary
+      const hasSummary = await scenarioManager.hasSummary(currentScenarioId);
+
+      if (hasSummary) {
+        // View the saved summary
+        const summary = await scenarioManager.getSummary(currentScenarioId);
+
+        // Store summary data for viewer
+        sessionStorage.setItem('summaryItineraryData', JSON.stringify({
+          trip: workingData.trip || {},
+          locations: workingData.locations || [],
+          legs: workingData.legs || [],
+          costs: workingData.costs || []
+        }));
+        sessionStorage.setItem('summaryScenarioId', currentScenarioId);
+
+        // Open with saved summary
+        const params = new URLSearchParams({
+          scenario: currentScenarioId,
+          id: 'saved'
+        });
+        window.open(`summary-viewer.html?${params.toString()}`, '_blank');
+      } else {
+        // No saved summary, offer to generate
+        const generate = confirm('This scenario does not have a saved summary yet. Generate one now?');
+        if (generate) {
+          document.getElementById('generate-summary-btn').click();
+        }
+      }
+    } catch (error) {
+      console.error('Error viewing summary:', error);
+      alert('Failed to view summary: ' + error.message);
     }
   });
 
@@ -5307,6 +5382,9 @@ export async function initMapApp() {
       await showGeographicValidationPanel(workingData, handleDataUpdate, saveToFirestore);
     });
   }
+
+  // Initialize view summary button state
+  updateViewSummaryButtonState();
 
   // Expose debug functions globally
   window.debugRTW = {

@@ -95,8 +95,37 @@ class SessionStore:
             except Exception as exc:  # pragma: no cover
                 self._logger.warning('Firestore client unavailable (%s); using in-memory store', exc)
                 self._use_firestore = False
+        
+        self._ensure_default_student()
 
-    @staticmethod
+    def _ensure_default_student(self):
+        """Ensure the default student profile exists."""
+        student_id = 'student_default'
+        default_student = {
+            'name': 'Alex Explorer',
+            'age': 12,
+            'grade': '7th',
+            'interests': ['History', 'Geography', 'Photography'],
+            'learning_style': 'Visual',
+            'state': 'CA',
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
+
+        if self._use_firestore and self._client:
+            try:
+                doc_ref = self._client.collection('student_profiles').document(student_id)
+                if not doc_ref.get().exists:
+                    doc_ref.set(default_student)
+                    self._logger.info(f"Created default student profile: {student_id}")
+            except Exception as e:
+                self._logger.error(f"Error creating default student: {e}")
+        else:
+            # In-memory fallback (mocking the student profile for dashboard)
+            # We don't have a separate in-memory store for students in this class, 
+            # but we can add a method to retrieve it or mock the API response.
+            pass
+
     def _now() -> float:
         return time.time()
 
@@ -318,8 +347,8 @@ elif os.path.exists('/app/web'):
     WEB_DIR = '/app/web'
 else:
     # Development: check for dist first, fallback to web
-    dev_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web/dist'))
-    dev_web = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../web'))
+    dev_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../web/dist'))
+    dev_web = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../web'))
     WEB_DIR = dev_dist if os.path.exists(dev_dist) else dev_web
 
 app = Flask(__name__, static_folder=WEB_DIR, static_url_path='')
@@ -4777,8 +4806,448 @@ def get_student_curricula(student_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/education/students', methods=['GET'])
+def get_all_students():
+    """Get all student profiles."""
+    if not firestore or not get_firestore_client():
+        # Mock response if Firestore is unavailable
+        return jsonify({
+            'status': 'success',
+            'students': [
+                {'id': 'student_default', 'name': 'Alex Explorer (Mock)', 'grade': '7th'}
+            ]
+        })
 
-@app.route('/api/education/destinations', methods=['GET'])
+    try:
+        db = get_firestore_client()
+        docs = db.collection('student_profiles').stream()
+        students = []
+        for doc in docs:
+            data = doc.to_dict()
+            data['id'] = doc.id
+            # Convert timestamps
+            if 'created_at' in data:
+                data['created_at'] = data['created_at'].isoformat() if hasattr(data['created_at'], 'isoformat') else str(data['created_at'])
+            if 'updated_at' in data:
+                data['updated_at'] = data['updated_at'].isoformat() if hasattr(data['updated_at'], 'isoformat') else str(data['updated_at'])
+            students.append(data)
+            
+        return jsonify({
+            'status': 'success',
+            'students': students
+        })
+    except Exception as e:
+        print(f"Error listing students: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/education/students/<student_id>/dashboard', methods=['GET'])
+def get_student_dashboard(student_id):
+    """Get comprehensive dashboard stats for a student."""
+    """Get comprehensive dashboard stats for a student."""
+    # Fallback for when Firestore is not available
+    if not firestore or not get_firestore_client():
+        print("⚠️ Firestore not available, returning mock dashboard data")
+        return jsonify({
+            'status': 'success',
+            'dashboard': {
+                'student_profile': {
+                    'id': student_id,
+                    'name': 'Alex Explorer (Mock)',
+                    'grade': '7th',
+                    'state': 'CA',
+                    'learning_style': 'Visual'
+                },
+                'statistics': {
+                    'total_curricula': 0,
+                    'total_activities': 0,
+                    'completed_activities': 0,
+                    'completion_rate': 0,
+                    'countries_covered': 0,
+                    'countries': []
+                },
+                'curricula': []
+            }
+        })
+
+    try:
+        db = get_firestore_client()
+
+        # 1. Get Student Profile
+        student_ref = db.collection('student_profiles').document(student_id)
+        student_doc = student_ref.get()
+        if not student_doc.exists:
+            # Auto-create if missing (double safety)
+            student_data = {
+                'name': 'Alex Explorer',
+                'age': 12,
+                'grade': '7th',
+                'interests': ['History', 'Geography', 'Photography'],
+                'learning_style': 'Visual',
+                'state': 'CA',
+                'created_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow()
+            }
+            student_ref.set(student_data)
+            student_profile = student_data
+        else:
+            student_profile = student_doc.to_dict()
+        
+        student_profile['id'] = student_id
+
+        # 2. Get All Curricula
+        curricula_query = db.collection('curriculum_plans').where('student_profile_id', '==', student_id)
+        curricula_docs = curricula_query.stream()
+        
+        curricula = []
+        countries_covered = set()
+        
+        # Stats counters
+        total_activities = 0
+        completed_activities = 0
+        
+        for doc in curricula_docs:
+            data = doc.to_dict()
+            data['id'] = doc.id
+            
+            # Convert timestamps
+            if 'created_at' in data:
+                data['created_at'] = data['created_at'].isoformat() if hasattr(data['created_at'], 'isoformat') else str(data['created_at'])
+            if 'updated_at' in data:
+                data['updated_at'] = data['updated_at'].isoformat() if hasattr(data['updated_at'], 'isoformat') else str(data['updated_at'])
+            if 'generated_at' in data:
+                data['generated_at'] = data['generated_at'].isoformat() if hasattr(data['generated_at'], 'isoformat') else str(data['generated_at'])
+
+            curricula.append(data)
+            
+            # Track countries
+            if 'country' in data:
+                countries_covered.add(data['country'])
+            
+            # Count activities
+            # Structure: location_lessons -> {location_id} -> on_location -> experiential_activities / structured_lessons
+            loc_lessons = data.get('location_lessons', {})
+            for loc_id, lesson in loc_lessons.items():
+                on_loc = lesson.get('on_location', {})
+                exp = on_loc.get('experiential_activities', [])
+                struct = on_loc.get('structured_lessons', [])
+                total_activities += len(exp) + len(struct)
+
+        # 3. Get Completion Stats from progress_tracking
+        # We'll assume a 'progress_tracking' collection exists or we just use a placeholder for now if it's empty
+        progress_query = db.collection('progress_tracking').where('student_id', '==', student_id)
+        progress_docs = progress_query.stream()
+        completed_ids = set()
+        for p in progress_docs:
+            p_data = p.to_dict()
+            if p_data.get('status') == 'completed':
+                completed_ids.add(p_data.get('activity_id'))
+        
+        completed_activities = len(completed_ids)
+        
+        # Calculate completion rate
+        completion_rate = 0.0
+        if total_activities > 0:
+            completion_rate = round((completed_activities / total_activities) * 100, 1)
+
+        stats = {
+            "total_curricula": len(curricula),
+            "total_activities": total_activities,
+            "completed_activities": completed_activities,
+            "completion_rate": completion_rate,
+            "countries_covered": len(countries_covered),
+            "countries": list(countries_covered)
+        }
+
+        return jsonify({
+            "status": "success",
+            "dashboard": {
+                "student_profile": student_profile,
+                "curricula": curricula,
+                "statistics": stats
+            }
+        })
+
+    except Exception as e:
+        print(f"Error getting student dashboard: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/curricula/<plan_id>', methods=['PATCH'])
+def update_curriculum(plan_id):
+    """Update an existing curriculum plan."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        data = request.json
+        db = get_firestore_client()
+        
+        doc_ref = db.collection('curriculum_plans').document(plan_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Curriculum not found'}), 404
+            
+        # Allowed fields to update
+        allowed_fields = ['status', 'location_lessons', 'thematic_threads', 'standards_coverage']
+        update_data = {}
+        
+        for field in allowed_fields:
+            if field in data:
+                update_data[field] = data[field]
+                
+        update_data['updated_at'] = datetime.now()
+        
+        doc_ref.update(update_data)
+        
+        # Get updated doc
+        updated_doc = doc_ref.get()
+        updated_data = updated_doc.to_dict()
+        updated_data['id'] = plan_id
+        
+        # Convert timestamps
+        if 'created_at' in updated_data:
+            updated_data['created_at'] = updated_data['created_at'].isoformat() if hasattr(updated_data['created_at'], 'isoformat') else str(updated_data['created_at'])
+        if 'updated_at' in updated_data:
+            updated_data['updated_at'] = updated_data['updated_at'].isoformat() if hasattr(updated_data['updated_at'], 'isoformat') else str(updated_data['updated_at'])
+            
+        return jsonify({
+            'status': 'success',
+            'curriculum': updated_data
+        })
+
+    except Exception as e:
+        print(f"Error updating curriculum: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/curricula/<plan_id>/activities', methods=['POST'])
+def add_custom_activity(plan_id):
+    """Add a custom activity to a curriculum."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        data = request.json
+        db = get_firestore_client()
+        
+        # Validate required fields
+        if 'title' not in data or 'location_id' not in data:
+            return jsonify({'error': 'Missing title or location_id'}), 400
+            
+        doc_ref = db.collection('curriculum_plans').document(plan_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Curriculum not found'}), 404
+            
+        curr_data = doc.to_dict()
+        location_id = data['location_id']
+        
+        # Check if location exists in curriculum
+        if 'location_lessons' not in curr_data or location_id not in curr_data['location_lessons']:
+             return jsonify({'error': f'Location {location_id} not found in this curriculum'}), 404
+             
+        # Create activity object
+        new_activity = {
+            'id': str(uuid.uuid4()),
+            'title': data['title'],
+            'type': data.get('type', 'custom'),
+            'subject': data.get('subject', 'general'),
+            'description': data.get('description', ''),
+            'learning_objectives': data.get('learning_objectives', []),
+            'estimated_duration_minutes': data.get('estimated_duration_minutes', 60),
+            'external_links': data.get('external_links', []),
+            'is_custom': True,
+            'ai_generated': False,
+            'created_at': datetime.now().isoformat()
+        }
+        
+        # Add to curriculum structure
+        loc_lesson = curr_data['location_lessons'][location_id]
+        if 'on_location' not in loc_lesson:
+            loc_lesson['on_location'] = {'experiential_activities': [], 'structured_lessons': []}
+            
+        if 'experiential_activities' not in loc_lesson['on_location']:
+            loc_lesson['on_location']['experiential_activities'] = []
+            
+        loc_lesson['on_location']['experiential_activities'].append(new_activity)
+        
+        # Update Firestore
+        doc_ref.update({
+            f'location_lessons.{location_id}': loc_lesson,
+            'updated_at': datetime.now()
+        })
+        
+        # Also save to learning_activities collection
+        activity_ref = db.collection('learning_activities').document(new_activity['id'])
+        activity_record = new_activity.copy()
+        activity_record['curriculum_plan_id'] = plan_id
+        activity_record['student_id'] = curr_data.get('student_profile_id')
+        activity_record['location_id'] = location_id
+        activity_ref.set(activity_record)
+        
+        return jsonify({
+            'status': 'success',
+            'activity': new_activity
+        })
+
+    except Exception as e:
+        print(f"Error adding custom activity: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/bulk-generate', methods=['POST'])
+def bulk_generate_curricula():
+    """
+    Bulk generate curricula for multiple locations.
+    Iterates through locations and generates concise curriculum for each.
+    """
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        from google import genai
+        
+        data = request.json
+        student = data.get('student')
+        locations = data.get('locations', [])
+        subjects = data.get('subjects', [])
+        
+        if not student or not locations:
+            return jsonify({'error': 'Missing student or locations'}), 400
+            
+        print(f"🚀 Starting bulk generation for {len(locations)} locations...")
+        
+        # Initialize Gemini client
+        credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+        if credentials_json:
+            credentials_info = json.loads(credentials_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                credentials_info,
+                scopes=['https://www.googleapis.com/auth/cloud-platform',
+                       'https://www.googleapis.com/auth/generative-language']
+            )
+            client = genai.Client(credentials=credentials)
+        else:
+            client = genai.Client()
+            
+        model_id = 'gemini-2.0-flash-exp'
+        results = []
+        successful_count = 0
+        failed_count = 0
+        
+        for location in locations:
+            try:
+                print(f"  Generating for {location.get('name')}...")
+                
+                # Concise Prompt
+                prompt = f"""
+Role: Expert Educational Travel Planner
+Student: {student.get('name')} (Age {student.get('age')}, Grade {student.get('grade')})
+Interests: {', '.join(student.get('interests', []))}
+Location: {location.get('name')}, {location.get('country')} ({location.get('duration_days', 3)} days)
+Subjects: {', '.join(subjects)}
+
+Task: Create a CONCISE educational plan for this location.
+Requirements:
+1. 2-3 Experiential Activities (specific sites, hands-on)
+2. 1-2 Readings (articles/books)
+3. 1 Educational Video
+4. 2-3 Reflection Prompts
+
+Output JSON format:
+{{
+  "location_id": "{location.get('id')}",
+  "location_name": "{location.get('name')}",
+  "pre_trip": {{
+    "readings": [ {{"title": "...", "source": "...", "description": "..."}} ],
+    "videos": [ {{"title": "...", "source": "...", "description": "..."}} ]
+  }},
+  "on_location": {{
+    "experiential_activities": [
+      {{
+        "title": "...",
+        "type": "experiential",
+        "subject": "...",
+        "description": "...",
+        "learning_objectives": ["..."],
+        "site_details": {{"name": "...", "address": "..."}}
+      }}
+    ],
+    "structured_lessons": []
+  }},
+  "post_trip": {{
+    "reflection_prompts": [ {{"text": "...", "type": "journal"}} ]
+  }}
+}}
+"""
+                # Generate
+                response = client.models.generate_content(
+                    model=model_id,
+                    contents=prompt,
+                    config={'temperature': 0.7, 'max_output_tokens': 4000}
+                )
+                
+                # Parse JSON
+                text = response.text
+                # (Simplified cleaning logic)
+                if '```json' in text:
+                    text = text.split('```json')[1].split('```')[0]
+                elif '```' in text:
+                    text = text.split('```')[1]
+                
+                curriculum_json = json.loads(text.strip())
+                
+                # Save to Firestore
+                # We need to call _save_curriculum_to_firestore but it's not easily importable if it's not in scope
+                # Wait, we are in the same file, so we can call it directly!
+                # Assuming _save_curriculum_to_firestore is defined in this file (which it is).
+                
+                saved_ids = _save_curriculum_to_firestore(
+                    student_profile=student,
+                    location=location,
+                    curriculum_data=curriculum_json,
+                    metadata={
+                        'model_used': model_id,
+                        'generation_type': 'bulk_concise',
+                        'generation_time': datetime.now().isoformat()
+                    }
+                )
+                
+                results.append({
+                    'location_id': location.get('id'),
+                    'status': 'success',
+                    'curriculum_plan_id': saved_ids.get('curriculum_plan_id')
+                })
+                successful_count += 1
+                
+            except Exception as loc_e:
+                print(f"  ❌ Failed for {location.get('name')}: {str(loc_e)}")
+                results.append({
+                    'location_id': location.get('id'),
+                    'status': 'failed',
+                    'error': str(loc_e)
+                })
+                failed_count += 1
+
+        return jsonify({
+            'status': 'success',
+            'total': len(locations),
+            'successful': successful_count,
+            'failed': failed_count,
+            'results': results
+        })
+
+    except Exception as e:
+        print(f"Error in bulk generation: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 def get_destinations():
     """Get destinations from the current (most recent) scenario."""
     if not firestore:

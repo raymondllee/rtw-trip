@@ -186,6 +186,42 @@ export class EducationService {
 
     return await response.json();
   }
+
+  /**
+   * Update a curriculum plan
+   */
+  async updateCurriculum(planId: string, updates: any): Promise<{ status: 'success'; updated_at: string }> {
+    const response = await fetch(`${this.baseUrl}/api/education/curricula/${planId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update curriculum');
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Add a custom activity to a curriculum plan
+   */
+  async addCustomActivity(planId: string, activityData: any): Promise<{ status: 'success'; activity_id: string }> {
+    const response = await fetch(`${this.baseUrl}/api/education/curricula/${planId}/activities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(activityData)
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to add custom activity');
+    }
+
+    return await response.json();
+  }
 }
 
 // Export singleton instance

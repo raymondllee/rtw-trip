@@ -17,7 +17,8 @@ export default defineConfig({
         summary: resolve(__dirname, 'web', 'summary-viewer.html'),
         costManager: resolve(__dirname, 'web', 'cost-manager.html'),
         bulkEdit: resolve(__dirname, 'web', 'bulk-edit.html'),
-        education: resolve(__dirname, 'web', 'education-dashboard.html')
+        education: resolve(__dirname, 'web', 'education-dashboard.html'),
+        student_dashboard: resolve(__dirname, 'web', 'student-dashboard.html')
       }
     }
   },
