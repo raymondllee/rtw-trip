@@ -612,46 +612,116 @@ function renderCurricula(curriculaData: CurriculumPlan[]) {
     }
 };
 
-function displayCurriculumDetails(curriculum: CurriculumPlan) {
+function displayCurriculumDetails(curriculum: any) {
     const modal = document.getElementById('curriculum-detail-modal');
     const content = document.getElementById('curriculum-detail-content');
-    if (!modal || !content) return;
+    if (!modal || !content) {
+        console.error('Modal elements not found');
+        return;
+    }
 
+    console.log('Displaying curriculum:', curriculum);
     const locations = curriculum.location_lessons || {};
 
     content.innerHTML = `
         <div class="curriculum-details">
-            <h3>${curriculum.semester_overview?.title || 'Untitled Curriculum'}</h3>
-            <p><strong>Status:</strong> <span class="curriculum-status ${curriculum.status}">${curriculum.status}</span></p>
-            <p><strong>Duration:</strong> ${curriculum.semester_overview?.duration_weeks || 0} weeks</p>
-            <p><strong>Subjects:</strong> ${(curriculum.semester_overview?.subjects_covered || []).join(', ')}</p>
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                <div>
+                    <h3 style="margin: 0 0 8px 0;">${curriculum.semester_overview?.title || 'Untitled Curriculum'}</h3>
+                    <p style="margin: 4px 0;"><strong>Status:</strong> <span class="curriculum-status ${curriculum.status}">${curriculum.status}</span></p>
+                    <p style="margin: 4px 0;"><strong>Duration:</strong> ${curriculum.semester_overview?.duration_weeks || 0} weeks</p>
+                    <p style="margin: 4px 0;"><strong>Subjects:</strong> ${(curriculum.semester_overview?.subjects_covered || []).join(', ')}</p>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="editCurriculum('${curriculum.id}')">✏️ Edit with AI</button>
+            </div>
 
             ${Object.entries(locations).map(([locId, location]: [string, any]) => `
-                <div style="margin-top: 24px; padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
-                    <h4>${location.location_name}</h4>
+                <div class="location-section">
+                    <h4 style="margin-top: 0; color: var(--primary-color);">${location.location_name}</h4>
 
-                    ${location.pre_trip ? `
-                        <div style="margin-top: 16px;">
-                            <strong>Pre-Trip Activities:</strong>
-                            ${location.pre_trip.readings?.length > 0 ? `<p>Readings: ${location.pre_trip.readings.length}</p>` : ''}
-                            ${location.pre_trip.videos?.length > 0 ? `<p>Videos: ${location.pre_trip.videos.length}</p>` : ''}
-                            ${location.pre_trip.prep_tasks?.length > 0 ? `<p>Prep Tasks: ${location.pre_trip.prep_tasks.length}</p>` : ''}
+                    ${location.pre_trip && (location.pre_trip.readings?.length || location.pre_trip.videos?.length || location.pre_trip.prep_tasks?.length) ? `
+                        <div class="activity-group">
+                            <strong style="color: var(--primary-color);">📖 Pre-Trip Activities</strong>
+                            ${location.pre_trip.readings?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Readings (${location.pre_trip.readings.length}):</strong>
+                                    <ul>
+                                        ${location.pre_trip.readings.map((r: any) => `<li>${r.title || r.description || r}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            ${location.pre_trip.videos?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Videos (${location.pre_trip.videos.length}):</strong>
+                                    <ul>
+                                        ${location.pre_trip.videos.map((v: any) => `<li>${v.title || v.description || v}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            ${location.pre_trip.prep_tasks?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Prep Tasks (${location.pre_trip.prep_tasks.length}):</strong>
+                                    <ul>
+                                        ${location.pre_trip.prep_tasks.map((t: any) => `<li>${t.title || t.description || t}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
                         </div>
                     ` : ''}
 
-                    ${location.on_location ? `
-                        <div style="margin-top: 16px;">
-                            <strong>On-Location Activities:</strong>
-                            ${location.on_location.experiential_activities?.length > 0 ? `<p>Experiential: ${location.on_location.experiential_activities.length}</p>` : ''}
-                            ${location.on_location.structured_lessons?.length > 0 ? `<p>Structured Lessons: ${location.on_location.structured_lessons.length}</p>` : ''}
+                    ${location.on_location && (location.on_location.experiential_activities?.length || location.on_location.structured_lessons?.length) ? `
+                        <div class="activity-group">
+                            <strong style="color: var(--primary-color);">🎯 On-Location Activities</strong>
+                            ${location.on_location.experiential_activities?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Experiential Activities (${location.on_location.experiential_activities.length}):</strong>
+                                    <ul>
+                                        ${location.on_location.experiential_activities.map((a: any) => `
+                                            <li>
+                                                <strong>${a.title}</strong>
+                                                ${a.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${a.description}</span>` : ''}
+                                                ${a.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${a.estimated_duration_minutes} min</span>` : ''}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            ${location.on_location.structured_lessons?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Structured Lessons (${location.on_location.structured_lessons.length}):</strong>
+                                    <ul>
+                                        ${location.on_location.structured_lessons.map((l: any) => `
+                                            <li>
+                                                <strong>${l.title}</strong>
+                                                ${l.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${l.description}</span>` : ''}
+                                                ${l.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${l.estimated_duration_minutes} min</span>` : ''}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
                         </div>
                     ` : ''}
 
-                    ${location.post_trip ? `
-                        <div style="margin-top: 16px;">
-                            <strong>Post-Trip Activities:</strong>
-                            ${location.post_trip.reflection_prompts?.length > 0 ? `<p>Reflections: ${location.post_trip.reflection_prompts.length}</p>` : ''}
-                            ${location.post_trip.synthesis_activities?.length > 0 ? `<p>Synthesis: ${location.post_trip.synthesis_activities.length}</p>` : ''}
+                    ${location.post_trip && (location.post_trip.reflection_prompts?.length || location.post_trip.synthesis_activities?.length) ? `
+                        <div class="activity-group">
+                            <strong style="color: var(--primary-color);">💭 Post-Trip Activities</strong>
+                            ${location.post_trip.reflection_prompts?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Reflection Prompts (${location.post_trip.reflection_prompts.length}):</strong>
+                                    <ul>
+                                        ${location.post_trip.reflection_prompts.map((p: any) => `<li>${p.prompt || p.title || p}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            ${location.post_trip.synthesis_activities?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Synthesis Activities (${location.post_trip.synthesis_activities.length}):</strong>
+                                    <ul>
+                                        ${location.post_trip.synthesis_activities.map((s: any) => `<li>${s.title || s.description || s}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
                         </div>
                     ` : ''}
                 </div>
@@ -882,6 +952,70 @@ function hideLoading() {
         overlay.style.display = 'none';
     }
 }
+
+// Edit curriculum with AI
+(window as any).editCurriculum = async (curriculumId: string) => {
+    const curriculum = curricula.find(c => c.id === curriculumId);
+    if (!curriculum) {
+        showError('Curriculum not found');
+        return;
+    }
+
+    // Close the detail modal first
+    closeModal('curriculum-detail-modal');
+
+    // Open the edit modal
+    const editModal = document.getElementById('edit-curriculum-modal');
+    if (!editModal) {
+        showError('Edit modal not found');
+        return;
+    }
+
+    // Store current curriculum for editing
+    (window as any).currentEditingCurriculum = curriculum;
+
+    // Set the curriculum title in the modal
+    const titleEl = document.getElementById('edit-curriculum-title');
+    if (titleEl) {
+        titleEl.textContent = curriculum.semester_overview?.title || 'Untitled Curriculum';
+    }
+
+    // Clear previous instructions
+    (document.getElementById('edit-instructions') as HTMLTextAreaElement).value = '';
+
+    openModal('edit-curriculum-modal');
+};
+
+// Apply AI modifications to curriculum
+(window as any).applyAIModifications = async () => {
+    const instructions = (document.getElementById('edit-instructions') as HTMLTextAreaElement).value;
+    if (!instructions.trim()) {
+        showError('Please provide modification instructions');
+        return;
+    }
+
+    const curriculum = (window as any).currentEditingCurriculum;
+    if (!curriculum) {
+        showError('No curriculum selected for editing');
+        return;
+    }
+
+    try {
+        showLoading('Applying AI modifications... This may take 30-60 seconds');
+
+        // TODO: Create API endpoint for curriculum modification
+        // For now, we'll show a message that this feature is coming soon
+        alert('AI curriculum modification feature is coming soon!\\n\\nYou can currently:\\n- Export the curriculum as JSON\\n- Make manual edits\\n- Re-generate a new curriculum with different parameters');
+
+        closeModal('edit-curriculum-modal');
+
+    } catch (error) {
+        console.error('Error applying modifications:', error);
+        showError('Failed to apply modifications');
+    } finally {
+        hideLoading();
+    }
+};
 
 function showSuccess(message: string) {
     alert(message); // TODO: Replace with better toast notification

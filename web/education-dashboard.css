@@ -706,6 +706,60 @@ body {
     margin-bottom: var(--spacing-lg);
 }
 
+/* Curriculum Details */
+.curriculum-details .location-section {
+    margin-top: 24px;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    border-left: 4px solid var(--primary-color);
+}
+
+.curriculum-details .location-section h4 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 18px;
+    color: var(--primary-color);
+}
+
+.curriculum-details .activity-group {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--bg-primary);
+    border-radius: var(--border-radius);
+}
+
+.curriculum-details .activity-group > strong {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 15px;
+    color: var(--primary-color);
+}
+
+.curriculum-details .activity-list {
+    margin-top: 12px;
+}
+
+.curriculum-details .activity-list strong {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.curriculum-details .activity-list ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.curriculum-details .activity-list li {
+    margin: 8px 0;
+    line-height: 1.6;
+}
+
+.curriculum-details .activity-list li strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
 /* Loading */
 .loading-overlay {
     position: fixed;
