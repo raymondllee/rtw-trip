@@ -4566,6 +4566,102 @@ def create_student():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/education/students/<student_id>', methods=['PUT'])
+def update_student(student_id):
+    """Update an existing student profile."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        data = request.json
+        db = get_firestore_client()
+
+        # Check if student exists
+        doc_ref = db.collection('student_profiles').document(student_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Student not found'}), 404
+
+        # Update student profile
+        student_data = {
+            'name': data['name'],
+            'age': data['age'],
+            'grade': data['grade'],
+            'state': data['state'],
+            'learning_style': data['learning_style'],
+            'interests': data.get('interests', []),
+            'time_budget_minutes_per_day': data.get('time_budget_minutes_per_day', 60),
+            'reading_level': data.get('reading_level', data['grade']),
+            'subjects_to_cover': data.get('subjects_to_cover', []),
+            'updated_at': datetime.now(),
+        }
+
+        # Update in Firestore
+        doc_ref.update(student_data)
+
+        # Get updated student
+        updated_doc = doc_ref.get()
+        updated_data = updated_doc.to_dict()
+        updated_data['id'] = student_id
+
+        # Convert timestamps
+        if 'created_at' in updated_data:
+            updated_data['created_at'] = updated_data['created_at'].isoformat() if hasattr(updated_data['created_at'], 'isoformat') else str(updated_data['created_at'])
+        if 'updated_at' in updated_data:
+            updated_data['updated_at'] = updated_data['updated_at'].isoformat() if hasattr(updated_data['updated_at'], 'isoformat') else str(updated_data['updated_at'])
+
+        return jsonify({
+            'status': 'success',
+            'student': updated_data
+        })
+
+    except Exception as e:
+        print(f"Error updating student: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/education/students/<student_id>', methods=['DELETE'])
+def delete_student(student_id):
+    """Delete a student profile and all associated curricula."""
+    if not firestore:
+        return jsonify({'error': 'Firestore not available'}), 500
+
+    try:
+        db = get_firestore_client()
+
+        # Check if student exists
+        doc_ref = db.collection('student_profiles').document(student_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return jsonify({'error': 'Student not found'}), 404
+
+        # Delete all curricula for this student
+        curricula_query = db.collection('curriculum_plans').where('student_profile_id', '==', student_id)
+        curricula_docs = curricula_query.stream()
+
+        deleted_curricula = 0
+        for curriculum_doc in curricula_docs:
+            curriculum_doc.reference.delete()
+            deleted_curricula += 1
+
+        # Delete the student profile
+        doc_ref.delete()
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Student deleted successfully. {deleted_curricula} curricula also deleted.',
+            'deleted_curricula_count': deleted_curricula
+        })
+
+    except Exception as e:
+        print(f"Error deleting student: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/education/students/<student_id>/curricula', methods=['GET'])
 def get_student_curricula(student_id):
     """Get all curricula for a specific student."""

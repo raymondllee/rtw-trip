@@ -278,6 +278,72 @@
         </div>
     </div>
 
+    <!-- Edit Student Modal -->
+    <div id="edit-student-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Student Profile</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-student-form">
+                    <input type="hidden" id="edit-student-id">
+                    <div class="form-group">
+                        <label for="edit-student-name">Name *</label>
+                        <input type="text" id="edit-student-name" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-student-age">Age *</label>
+                            <input type="number" id="edit-student-age" min="5" max="18" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-student-grade">Grade *</label>
+                            <input type="number" id="edit-student-grade" min="1" max="12" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-student-state">State *</label>
+                        <select id="edit-student-state" required>
+                            <option value="">Select State</option>
+                            <option value="California">California</option>
+                            <option value="New York">New York</option>
+                            <option value="Texas">Texas</option>
+                            <option value="Florida">Florida</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Learning Style *</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="edit-student-learning-style" value="experiential"> Experiential</label>
+                            <label><input type="radio" name="edit-student-learning-style" value="structured"> Structured</label>
+                            <label><input type="radio" name="edit-student-learning-style" value="mixed"> Mixed</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-student-interests">Interests (comma-separated)</label>
+                        <input type="text" id="edit-student-interests" placeholder="e.g., marine biology, photography, architecture">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-student-time-budget">Time Budget (min/day)</label>
+                            <input type="number" id="edit-student-time-budget" min="15" max="480" step="15" value="60">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-student-reading-level">Reading Level (grade)</label>
+                            <input type="number" id="edit-student-reading-level" min="1" max="12">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('edit-student-modal')">Cancel</button>
+                <button class="btn btn-primary" id="update-student-btn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Curriculum Detail Modal -->
     <div id="curriculum-detail-modal" class="modal">
         <div class="modal-content modal-large">

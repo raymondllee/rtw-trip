@@ -193,6 +193,21 @@ body {
     font-size: 12px;
 }
 
+.btn-icon {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+    background: var(--bg-secondary);
+    border-color: var(--primary-color);
+}
+
 /* Search and Filters */
 .search-input {
     padding: 8px 16px;
@@ -244,9 +259,13 @@ body {
 
 .student-card-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-md);
+}
+
+.student-card-header .student-info {
+    flex: 1;
 }
 
 .student-avatar {

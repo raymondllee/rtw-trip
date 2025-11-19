@@ -177,7 +177,16 @@ function renderStudents(studentsData: any[]) {
                     <div class="student-meta">
                         ${student.age} years old • Grade ${student.grade} • ${student.state}
                     </div>
+                    ${student.interests && student.interests.length > 0 ? `
+                        <div class="student-meta" style="margin-top: 4px;">
+                            Interests: ${student.interests.slice(0, 3).join(', ')}${student.interests.length > 3 ? '...' : ''}
+                        </div>
+                    ` : ''}
+                    <div class="student-meta" style="margin-top: 4px;">
+                        Learning Style: ${student.learning_style} • ${student.time_budget_minutes_per_day || 60} min/day
+                    </div>
                 </div>
+                <button class="btn-icon" onclick="editStudent('${student.id}')" title="Edit student">✏️</button>
             </div>
 
             <div class="student-progress">
@@ -205,6 +214,7 @@ function renderStudents(studentsData: any[]) {
             <div class="student-actions">
                 <button class="btn btn-primary btn-sm" onclick="viewStudentCurricula('${student.id}')">View Curricula</button>
                 <button class="btn btn-secondary btn-sm" onclick="generateForStudent('${student.id}')">+ Generate</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteStudent('${student.id}', '${student.name.replace(/'/g, "\\'")}')">Delete</button>
             </div>
         </div>
     `).join('');
@@ -300,7 +310,116 @@ function initializeStudentForm() {
             hideLoading();
         }
     });
+
+    // Edit student form
+    document.getElementById('update-student-btn')?.addEventListener('click', async () => {
+        const form = document.getElementById('edit-student-form') as HTMLFormElement;
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const studentId = (document.getElementById('edit-student-id') as HTMLInputElement).value;
+        const name = (document.getElementById('edit-student-name') as HTMLInputElement).value;
+        const age = parseInt((document.getElementById('edit-student-age') as HTMLInputElement).value);
+        const grade = parseInt((document.getElementById('edit-student-grade') as HTMLInputElement).value);
+        const state = (document.getElementById('edit-student-state') as HTMLSelectElement).value;
+        const learningStyleRadio = document.querySelector('input[name="edit-student-learning-style"]:checked') as HTMLInputElement;
+        const learningStyle = learningStyleRadio?.value || 'experiential';
+        const interestsValue = (document.getElementById('edit-student-interests') as HTMLInputElement).value;
+        const interests = interestsValue ? interestsValue.split(',').map(i => i.trim()) : [];
+        const timeBudget = parseInt((document.getElementById('edit-student-time-budget') as HTMLInputElement).value) || 60;
+        const readingLevel = parseInt((document.getElementById('edit-student-reading-level') as HTMLInputElement).value) || grade;
+
+        try {
+            showLoading('Updating student profile...');
+
+            const response = await fetch(`http://localhost:5001/api/education/students/${studentId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name,
+                    age,
+                    grade,
+                    state,
+                    learning_style: learningStyle,
+                    interests,
+                    time_budget_minutes_per_day: timeBudget,
+                    reading_level: readingLevel,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update student');
+            }
+
+            closeModal('edit-student-modal');
+            await loadStudents();
+            showSuccess('Student profile updated successfully!');
+        } catch (error) {
+            console.error('Error updating student:', error);
+            showError('Failed to update student profile');
+        } finally {
+            hideLoading();
+        }
+    });
 }
+
+// Edit student function
+(window as any).editStudent = async (studentId: string) => {
+    const student = students.find(s => s.id === studentId);
+    if (!student) {
+        showError('Student not found');
+        return;
+    }
+
+    // Populate edit form
+    (document.getElementById('edit-student-id') as HTMLInputElement).value = student.id;
+    (document.getElementById('edit-student-name') as HTMLInputElement).value = student.name;
+    (document.getElementById('edit-student-age') as HTMLInputElement).value = student.age.toString();
+    (document.getElementById('edit-student-grade') as HTMLInputElement).value = student.grade.toString();
+    (document.getElementById('edit-student-state') as HTMLSelectElement).value = student.state;
+
+    const learningStyleRadios = document.getElementsByName('edit-student-learning-style') as NodeListOf<HTMLInputElement>;
+    learningStyleRadios.forEach(radio => {
+        radio.checked = radio.value === student.learning_style;
+    });
+
+    (document.getElementById('edit-student-interests') as HTMLInputElement).value = student.interests?.join(', ') || '';
+    (document.getElementById('edit-student-time-budget') as HTMLInputElement).value = (student.time_budget_minutes_per_day || 60).toString();
+    (document.getElementById('edit-student-reading-level') as HTMLInputElement).value = (student.reading_level || student.grade).toString();
+
+    openModal('edit-student-modal');
+};
+
+// Delete student function
+(window as any).deleteStudent = async (studentId: string, studentName: string) => {
+    if (!confirm(`Are you sure you want to delete ${studentName}? This will also delete all their curricula and cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        showLoading('Deleting student...');
+
+        const response = await fetch(`http://localhost:5001/api/education/students/${studentId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete student');
+        }
+
+        await loadStudents();
+        showSuccess('Student deleted successfully');
+    } catch (error) {
+        console.error('Error deleting student:', error);
+        showError('Failed to delete student');
+    } finally {
+        hideLoading();
+    }
+};
 
 // Curricula
 async function loadCurricula() {
