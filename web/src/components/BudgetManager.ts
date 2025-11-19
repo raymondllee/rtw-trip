@@ -355,16 +355,21 @@ export class BudgetManager {
 
     document.body.appendChild(modal);
 
+    // Track if changes have been made
+    let isDirty = false;
+
     // Event listeners
-    const closeDialog = () => {
+    const closeDialog = (force: boolean = false) => {
+      if (!force && isDirty) {
+        const confirmClose = confirm('You have unsaved changes. Are you sure you want to close without saving?');
+        if (!confirmClose) return;
+      }
       modal.remove();
     };
 
-    modal.querySelector('#close-edit-dialog')?.addEventListener('click', closeDialog);
-    modal.querySelector('#cancel-edit-btn')?.addEventListener('click', closeDialog);
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeDialog();
-    });
+    modal.querySelector('#close-edit-dialog')?.addEventListener('click', () => closeDialog());
+    modal.querySelector('#cancel-edit-btn')?.addEventListener('click', () => closeDialog());
+    // Removed backdrop click-to-close to prevent accidental closure
 
     // Category percentage/dollar toggle logic
     const categoryModeToggle = modal.querySelector('#category-mode-toggle') as HTMLInputElement;
@@ -443,6 +448,8 @@ export class BudgetManager {
       // Show/hide allocation status
       allocationStatus.style.display = isPercentageMode ? 'block' : 'none';
 
+      // Note: Don't mark as dirty just for switching modes, only for actual value changes
+
       // Update all input fields and labels
       modal.querySelectorAll('.cat-input').forEach(input => {
         const el = input as HTMLInputElement;
@@ -469,13 +476,32 @@ export class BudgetManager {
       updateCalculatedDisplays();
     });
 
-    // Update calculated displays when input changes
+    // Mark as dirty and update calculated displays when input changes
+    const markDirty = () => {
+      isDirty = true;
+    };
+
     modal.querySelectorAll('.cat-input').forEach(input => {
-      input.addEventListener('input', updateCalculatedDisplays);
+      input.addEventListener('input', () => {
+        markDirty();
+        updateCalculatedDisplays();
+      });
     });
 
-    // Update calculated displays when total budget changes
-    totalBudgetInput.addEventListener('input', updateCalculatedDisplays);
+    // Track changes in total budget
+    totalBudgetInput.addEventListener('input', () => {
+      markDirty();
+      updateCalculatedDisplays();
+    });
+
+    // Track changes in contingency
+    const contingencyInput = modal.querySelector('#contingency-pct') as HTMLInputElement;
+    contingencyInput?.addEventListener('input', markDirty);
+
+    // Track changes in country budgets
+    modal.querySelectorAll('[data-country]').forEach(input => {
+      input.addEventListener('input', markDirty);
+    });
 
     modal.querySelector('#save-budget-btn')?.addEventListener('click', () => {
       const totalBudgetInput = modal.querySelector('#total-budget') as HTMLInputElement;
@@ -513,7 +539,7 @@ export class BudgetManager {
       this.budget = newBudget;
       this.onBudgetUpdate?.(newBudget);
       this.render();
-      closeDialog();
+      closeDialog(true); // Force close without confirmation since we just saved
     });
   }
 
