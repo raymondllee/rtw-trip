@@ -729,6 +729,16 @@ html, body {
   margin: 4px 0;
 }
 
+/* Anchor dropdown items should look like buttons */
+.scenario-actions-dropdown a.dropdown-item {
+  text-decoration: none;
+  color: #333;
+}
+
+.scenario-actions-dropdown a.dropdown-item:hover {
+  text-decoration: none;
+}
+
 /* Position the dropdown relative to sidebar */
 .sidebar {
   position: relative;

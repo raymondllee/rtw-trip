@@ -1,0 +1,1308 @@
+/**
+ * Education Dashboard
+ * Main interface for managing students, curricula, and testing
+ */
+
+import { educationService } from './educationService';
+import type { CurriculumPlan, StudentProfile } from '../types/education';
+
+// State
+let currentView: 'students' | 'curricula' | 'testing' = 'students';
+let students: StudentProfile[] = [];
+let curricula: CurriculumPlan[] = [];
+let filteredCurricula: CurriculumPlan[] = [];
+let destinations: any[] = [];
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', () => {
+    initializeNavigation();
+    initializeModals();
+    initializeStudentForm();
+    initializeTestingLab();
+    initializeCurriculaFilters();
+
+    // Load initial data
+    loadStudents();
+    loadCurricula();
+    loadDestinations();
+});
+
+// Navigation
+function initializeNavigation() {
+    const navTabs = document.querySelectorAll('.nav-tab');
+    navTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const view = tab.getAttribute('data-view') as 'students' | 'curricula' | 'testing';
+            switchView(view);
+        });
+    });
+}
+
+function switchView(view: 'students' | 'curricula' | 'testing') {
+    currentView = view;
+
+    // Update nav tabs
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.getAttribute('data-view') === view);
+    });
+
+    // Update view sections
+    document.querySelectorAll('.view-section').forEach(section => {
+        section.classList.toggle('active', section.id === `${view}-view`);
+    });
+
+    // Reload data when switching to a view
+    if (view === 'students') {
+        loadStudents();
+    } else if (view === 'curricula') {
+        loadCurricula();
+    }
+}
+
+// Modal Management
+function initializeModals() {
+    // Close buttons
+    document.querySelectorAll('.modal-close').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const modal = (e.target as HTMLElement).closest('.modal');
+            if (modal) {
+                closeModal(modal.id);
+            }
+        });
+    });
+
+    // Click outside to close
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal(modal.id);
+            }
+        });
+    });
+
+    // New student button
+    document.getElementById('new-student-btn')?.addEventListener('click', () => {
+        openModal('new-student-modal');
+    });
+}
+
+function openModal(modalId: string) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('active');
+    }
+}
+
+function closeModal(modalId: string) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+// Make closeModal global for HTML onclick handlers
+(window as any).closeModal = closeModal;
+
+// Students
+async function loadStudents() {
+    try {
+        showLoading('Loading students...');
+
+        // Load students from Firestore
+        const response = await fetch('http://localhost:5001/api/education/students');
+        if (!response.ok) {
+            throw new Error('Failed to load students');
+        }
+
+        students = await response.json();
+
+        // For each student, count their curricula
+        const studentsWithStats = await Promise.all(
+            students.map(async (student) => {
+                const response = await educationService.getStudentCurricula(student.id);
+                const studentCurricula = response.curricula;
+                const completedCount = studentCurricula.filter(c => c.status === 'completed').length;
+                const totalActivities = studentCurricula.reduce((sum, c) => {
+                    const locations = c.location_lessons || {};
+                    return sum + Object.values(locations).reduce((locationSum: number, location: any) => {
+                        const experiential = location.on_location?.experiential_activities?.length || 0;
+                        const structured = location.on_location?.structured_lessons?.length || 0;
+                        return locationSum + experiential + structured;
+                    }, 0);
+                }, 0);
+
+                return {
+                    ...student,
+                    curriculaCount: studentCurricula.length,
+                    completedCount,
+                    totalActivities,
+                    completionPercentage: totalActivities > 0 ? Math.round((completedCount / totalActivities) * 100) : 0,
+                    totalHours: 0 // TODO: Calculate from progress tracking
+                };
+            })
+        );
+
+        renderStudents(studentsWithStats);
+        updateStudentFilters(students);
+        updateStudentSelector();
+    } catch (error) {
+        console.error('Error loading students:', error);
+        showError('Failed to load students');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function loadDestinations() {
+    try {
+        const response = await fetch('http://localhost:5001/api/education/destinations');
+        if (!response.ok) {
+            throw new Error('Failed to fetch destinations');
+        }
+        const data = await response.json();
+        destinations = data.destinations || [];
+        updateDestinationSelector();
+    } catch (error) {
+        console.error('Error loading destinations:', error);
+        // Don't show error to user - destinations are optional
+    }
+}
+
+function renderStudents(studentsData: any[]) {
+    const container = document.getElementById('students-container');
+    if (!container) return;
+
+    if (studentsData.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">👤</div>
+                <h3>No students yet</h3>
+                <p>Create a student profile to start generating curricula</p>
+                <button class="btn btn-primary" onclick="document.getElementById('new-student-btn').click()">+ Create First Student</button>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = studentsData.map(student => `
+        <div class="student-card">
+            <div class="student-card-header">
+                <div class="student-avatar">
+                    ${student.name.charAt(0).toUpperCase()}
+                </div>
+                <div class="student-info">
+                    <h3>${student.name}</h3>
+                    <div class="student-meta">
+                        ${student.age} years old • Grade ${student.grade} • ${student.state}
+                    </div>
+                    ${student.interests && student.interests.length > 0 ? `
+                        <div class="student-meta" style="margin-top: 4px;">
+                            Interests: ${student.interests.slice(0, 3).join(', ')}${student.interests.length > 3 ? '...' : ''}
+                        </div>
+                    ` : ''}
+                    <div class="student-meta" style="margin-top: 4px;">
+                        Learning Style: ${student.learning_style} • ${student.time_budget_minutes_per_day || 60} min/day
+                    </div>
+                </div>
+                <button class="btn-icon" onclick="editStudent('${student.id}')" title="Edit student">✏️</button>
+            </div>
+
+            <div class="student-progress">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" style="width: ${student.completionPercentage || 0}%"></div>
+                </div>
+                <div class="progress-text">${student.completionPercentage || 0}% Complete</div>
+            </div>
+
+            <div class="student-stats">
+                <div class="stat">
+                    <div class="stat-value">${student.curriculaCount || 0}</div>
+                    <div class="stat-label">Curricula</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${student.totalHours || 0}h</div>
+                    <div class="stat-label">Logged</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">${student.totalActivities || 0}</div>
+                    <div class="stat-label">Activities</div>
+                </div>
+            </div>
+
+            <div class="student-actions">
+                <button class="btn btn-primary btn-sm" onclick="viewStudentCurricula('${student.id}')">View Curricula</button>
+                <button class="btn btn-secondary btn-sm" onclick="generateForStudent('${student.id}')">+ Generate</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteStudent('${student.id}', '${student.name.replace(/'/g, "\\'")}')">Delete</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Make functions global for HTML onclick handlers
+(window as any).viewStudentCurricula = async (studentId: string) => {
+    switchView('curricula');
+    const filterSelect = document.getElementById('filter-student') as HTMLSelectElement;
+    if (filterSelect) {
+        filterSelect.value = studentId;
+        applyFilters();
+    }
+};
+
+(window as any).generateForStudent = (studentId: string) => {
+    const student = students.find(s => s.id === studentId);
+    if (student) {
+        // Switch to testing lab and pre-fill student info
+        switchView('testing');
+        prefillTestingLab(student);
+    }
+};
+
+function prefillTestingLab(student: StudentProfile) {
+    (document.getElementById('test-student-name') as HTMLInputElement).value = student.name;
+    (document.getElementById('test-student-age') as HTMLInputElement).value = student.age.toString();
+    (document.getElementById('test-student-grade') as HTMLInputElement).value = student.grade.toString();
+    (document.getElementById('test-student-state') as HTMLSelectElement).value = student.state;
+
+    const learningStyleRadios = document.getElementsByName('learning-style') as NodeListOf<HTMLInputElement>;
+    learningStyleRadios.forEach(radio => {
+        radio.checked = radio.value === student.learning_style;
+    });
+
+    if (student.interests && student.interests.length > 0) {
+        (document.getElementById('test-student-interests') as HTMLInputElement).value = student.interests.join(', ');
+    }
+}
+
+// Student Form
+function initializeStudentForm() {
+    document.getElementById('save-student-btn')?.addEventListener('click', async () => {
+        const form = document.getElementById('new-student-form') as HTMLFormElement;
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const name = (document.getElementById('student-name') as HTMLInputElement).value;
+        const age = parseInt((document.getElementById('student-age') as HTMLInputElement).value);
+        const grade = parseInt((document.getElementById('student-grade') as HTMLInputElement).value);
+        const state = (document.getElementById('student-state') as HTMLSelectElement).value;
+        const learningStyleRadio = document.querySelector('input[name="student-learning-style"]:checked') as HTMLInputElement;
+        const learningStyle = learningStyleRadio?.value || 'experiential';
+        const interestsValue = (document.getElementById('student-interests') as HTMLInputElement).value;
+        const interests = interestsValue ? interestsValue.split(',').map(i => i.trim()) : [];
+        const timeBudget = parseInt((document.getElementById('student-time-budget') as HTMLInputElement).value) || 60;
+        const readingLevel = parseInt((document.getElementById('student-reading-level') as HTMLInputElement).value) || grade;
+
+        try {
+            showLoading('Creating student profile...');
+
+            const response = await fetch('http://localhost:5001/api/education/students', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name,
+                    age,
+                    grade,
+                    state,
+                    learning_style: learningStyle,
+                    interests,
+                    time_budget_minutes_per_day: timeBudget,
+                    reading_level: readingLevel,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create student');
+            }
+
+            closeModal('new-student-modal');
+            form.reset();
+            await loadStudents();
+            showSuccess('Student profile created successfully!');
+        } catch (error) {
+            console.error('Error creating student:', error);
+            showError('Failed to create student profile');
+        } finally {
+            hideLoading();
+        }
+    });
+
+    // Edit student form
+    document.getElementById('update-student-btn')?.addEventListener('click', async () => {
+        const form = document.getElementById('edit-student-form') as HTMLFormElement;
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const studentId = (document.getElementById('edit-student-id') as HTMLInputElement).value;
+        const name = (document.getElementById('edit-student-name') as HTMLInputElement).value;
+        const age = parseInt((document.getElementById('edit-student-age') as HTMLInputElement).value);
+        const grade = parseInt((document.getElementById('edit-student-grade') as HTMLInputElement).value);
+        const state = (document.getElementById('edit-student-state') as HTMLSelectElement).value;
+        const learningStyleRadio = document.querySelector('input[name="edit-student-learning-style"]:checked') as HTMLInputElement;
+        const learningStyle = learningStyleRadio?.value || 'experiential';
+        const interestsValue = (document.getElementById('edit-student-interests') as HTMLInputElement).value;
+        const interests = interestsValue ? interestsValue.split(',').map(i => i.trim()) : [];
+        const timeBudget = parseInt((document.getElementById('edit-student-time-budget') as HTMLInputElement).value) || 60;
+        const readingLevel = parseInt((document.getElementById('edit-student-reading-level') as HTMLInputElement).value) || grade;
+
+        try {
+            showLoading('Updating student profile...');
+
+            const response = await fetch(`http://localhost:5001/api/education/students/${studentId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name,
+                    age,
+                    grade,
+                    state,
+                    learning_style: learningStyle,
+                    interests,
+                    time_budget_minutes_per_day: timeBudget,
+                    reading_level: readingLevel,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update student');
+            }
+
+            closeModal('edit-student-modal');
+            await loadStudents();
+            showSuccess('Student profile updated successfully!');
+        } catch (error) {
+            console.error('Error updating student:', error);
+            showError('Failed to update student profile');
+        } finally {
+            hideLoading();
+        }
+    });
+}
+
+// Edit student function
+(window as any).editStudent = async (studentId: string) => {
+    const student = students.find(s => s.id === studentId);
+    if (!student) {
+        showError('Student not found');
+        return;
+    }
+
+    // Populate edit form
+    (document.getElementById('edit-student-id') as HTMLInputElement).value = student.id;
+    (document.getElementById('edit-student-name') as HTMLInputElement).value = student.name;
+    (document.getElementById('edit-student-age') as HTMLInputElement).value = student.age.toString();
+    (document.getElementById('edit-student-grade') as HTMLInputElement).value = student.grade.toString();
+    (document.getElementById('edit-student-state') as HTMLSelectElement).value = student.state;
+
+    const learningStyleRadios = document.getElementsByName('edit-student-learning-style') as NodeListOf<HTMLInputElement>;
+    learningStyleRadios.forEach(radio => {
+        radio.checked = radio.value === student.learning_style;
+    });
+
+    (document.getElementById('edit-student-interests') as HTMLInputElement).value = student.interests?.join(', ') || '';
+    (document.getElementById('edit-student-time-budget') as HTMLInputElement).value = (student.time_budget_minutes_per_day || 60).toString();
+    (document.getElementById('edit-student-reading-level') as HTMLInputElement).value = (student.reading_level || student.grade).toString();
+
+    openModal('edit-student-modal');
+};
+
+// Delete student function
+(window as any).deleteStudent = async (studentId: string, studentName: string) => {
+    if (!confirm(`Are you sure you want to delete ${studentName}? This will also delete all their curricula and cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        showLoading('Deleting student...');
+
+        const response = await fetch(`http://localhost:5001/api/education/students/${studentId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete student');
+        }
+
+        await loadStudents();
+        showSuccess('Student deleted successfully');
+    } catch (error) {
+        console.error('Error deleting student:', error);
+        showError('Failed to delete student');
+    } finally {
+        hideLoading();
+    }
+};
+
+// Curricula
+async function loadCurricula() {
+    try {
+        showLoading('Loading curricula...');
+
+        const response = await educationService.listCurricula();
+        curricula = response.curricula;
+        filteredCurricula = curricula;
+
+        renderCurricula(filteredCurricula);
+    } catch (error) {
+        console.error('Error loading curricula:', error);
+        showError('Failed to load curricula');
+    } finally {
+        hideLoading();
+    }
+}
+
+function initializeCurriculaFilters() {
+    // Generate curriculum button
+    document.getElementById('generate-curriculum-btn')?.addEventListener('click', () => {
+        switchView('testing');
+    });
+
+    // Filter listeners
+    const filters = ['filter-student', 'filter-location', 'filter-status', 'sort-curricula'];
+    filters.forEach(filterId => {
+        document.getElementById(filterId)?.addEventListener('change', applyFilters);
+    });
+
+    document.getElementById('curricula-search')?.addEventListener('input', applyFilters);
+}
+
+function applyFilters() {
+    const studentFilter = (document.getElementById('filter-student') as HTMLSelectElement)?.value;
+    const locationFilter = (document.getElementById('filter-location') as HTMLSelectElement)?.value;
+    const statusFilter = (document.getElementById('filter-status') as HTMLSelectElement)?.value;
+    const sortBy = (document.getElementById('sort-curricula') as HTMLSelectElement)?.value;
+    const searchText = (document.getElementById('curricula-search') as HTMLInputElement)?.value.toLowerCase();
+
+    filteredCurricula = curricula.filter(curriculum => {
+        if (studentFilter && curriculum.student_profile_id !== studentFilter) return false;
+        if (statusFilter && curriculum.status !== statusFilter) return false;
+
+        // Location filter - check if any location matches
+        if (locationFilter) {
+            const locations = curriculum.location_lessons || {};
+            const hasLocation = Object.values(locations).some((loc: any) => loc.location_id === locationFilter);
+            if (!hasLocation) return false;
+        }
+
+        // Search filter
+        if (searchText) {
+            const searchableText = `${curriculum.semester_overview?.title || ''} ${curriculum.location_lessons ? Object.values(curriculum.location_lessons).map((l: any) => l.location_name).join(' ') : ''}`.toLowerCase();
+            if (!searchableText.includes(searchText)) return false;
+        }
+
+        return true;
+    });
+
+    // Sort
+    if (sortBy === 'recent') {
+        filteredCurricula.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    } else if (sortBy === 'oldest') {
+        filteredCurricula.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    } else if (sortBy === 'location') {
+        filteredCurricula.sort((a, b) => {
+            const aLoc = a.location_lessons ? Object.values(a.location_lessons)[0]?.location_name : '';
+            const bLoc = b.location_lessons ? Object.values(b.location_lessons)[0]?.location_name : '';
+            return (aLoc || '').localeCompare(bLoc || '');
+        });
+    }
+
+    renderCurricula(filteredCurricula);
+}
+
+function updateStudentFilters(studentsData: StudentProfile[]) {
+    const filterSelect = document.getElementById('filter-student') as HTMLSelectElement;
+    if (!filterSelect) return;
+
+    const currentValue = filterSelect.value;
+    filterSelect.innerHTML = '<option value="">All Students</option>' +
+        studentsData.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    filterSelect.value = currentValue;
+}
+
+function renderCurricula(curriculaData: CurriculumPlan[]) {
+    const container = document.getElementById('curricula-container');
+    if (!container) return;
+
+    if (curriculaData.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📚</div>
+                <h3>No curricula found</h3>
+                <p>Try adjusting your filters or generate a new curriculum</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = curriculaData.map(curriculum => {
+        const locations = curriculum.location_lessons || {};
+        const locationNames = Object.values(locations).map((l: any) => l.location_name).join(', ');
+        const totalActivities = Object.values(locations).reduce((sum: number, location: any) => {
+            const experiential = location.on_location?.experiential_activities?.length || 0;
+            const structured = location.on_location?.structured_lessons?.length || 0;
+            return sum + experiential + structured;
+        }, 0);
+
+        const subjects = curriculum.semester_overview?.subjects_covered || [];
+        const startDate = curriculum.semester_overview?.start_date ? new Date(curriculum.semester_overview.start_date).toLocaleDateString() : '';
+        const endDate = curriculum.semester_overview?.end_date ? new Date(curriculum.semester_overview.end_date).toLocaleDateString() : '';
+        const duration = curriculum.semester_overview?.duration_weeks || 0;
+
+        return `
+            <div class="curriculum-card">
+                <div class="curriculum-header">
+                    <div>
+                        <div class="curriculum-title">${curriculum.semester_overview?.title || 'Untitled Curriculum'}</div>
+                        <div style="font-size: 14px; color: var(--text-secondary); margin-top: 4px;">
+                            ${locationNames}
+                        </div>
+                    </div>
+                    <span class="curriculum-status ${curriculum.status}">${curriculum.status}</span>
+                </div>
+
+                <div class="curriculum-meta">
+                    <div class="meta-item">
+                        <span class="meta-icon">📅</span>
+                        ${startDate} - ${endDate}
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-icon">📊</span>
+                        ${totalActivities} activities
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-icon">⏱️</span>
+                        ${duration} weeks
+                    </div>
+                </div>
+
+                ${subjects.length > 0 ? `
+                    <div class="curriculum-subjects">
+                        ${subjects.map(subject => `<span class="subject-badge">${subject}</span>`).join('')}
+                    </div>
+                ` : ''}
+
+                <div class="curriculum-actions">
+                    <button class="btn btn-primary btn-sm" onclick="viewCurriculum('${curriculum.id}')">View Details</button>
+                    <button class="btn btn-secondary btn-sm" onclick="exportCurriculum('${curriculum.id}')">Export</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Make functions global
+(window as any).viewCurriculum = async (curriculumId: string) => {
+    try {
+        showLoading('Loading curriculum details...');
+        const response = await educationService.getCurriculum(curriculumId);
+        displayCurriculumDetails(response.curriculum);
+    } catch (error) {
+        console.error('Error loading curriculum:', error);
+        showError('Failed to load curriculum details');
+    } finally {
+        hideLoading();
+    }
+};
+
+(window as any).exportCurriculum = async (curriculumId: string) => {
+    try {
+        const response = await educationService.getCurriculum(curriculumId);
+        const dataStr = JSON.stringify(response.curriculum, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+        const exportFileDefaultName = `curriculum_${curriculumId}.json`;
+
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+
+        showSuccess('Curriculum exported successfully!');
+    } catch (error) {
+        console.error('Error exporting curriculum:', error);
+        showError('Failed to export curriculum');
+    }
+};
+
+function displayCurriculumDetails(curriculum: any) {
+    const modal = document.getElementById('curriculum-detail-modal');
+    const content = document.getElementById('curriculum-detail-content');
+    if (!modal || !content) {
+        console.error('Modal elements not found');
+        return;
+    }
+
+    console.log('Displaying curriculum:', curriculum);
+    const locations = curriculum.location_lessons || {};
+
+    content.innerHTML = `
+        <div class="curriculum-details">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                <div>
+                    <h3 style="margin: 0 0 8px 0;">${curriculum.semester_overview?.title || 'Untitled Curriculum'}</h3>
+                    <p style="margin: 4px 0;"><strong>Status:</strong> <span class="curriculum-status ${curriculum.status}">${curriculum.status}</span></p>
+                    <p style="margin: 4px 0;"><strong>Duration:</strong> ${curriculum.semester_overview?.duration_weeks || 0} weeks</p>
+                    <p style="margin: 4px 0;"><strong>Subjects:</strong> ${(curriculum.semester_overview?.subjects_covered || []).join(', ')}</p>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="editCurriculum('${curriculum.id}')">✏️ Edit with AI</button>
+            </div>
+
+            ${Object.entries(locations).map(([locId, location]: [string, any]) => `
+                <div class="location-section">
+                    <h4 style="margin-top: 0; color: var(--primary-color);">${location.location_name}</h4>
+
+                    ${location.pre_trip && (location.pre_trip.readings?.length || location.pre_trip.videos?.length || location.pre_trip.prep_tasks?.length) ? `
+                        <div class="activity-group">
+                            <strong style="color: var(--primary-color);">📖 Pre-Trip Activities</strong>
+                            ${location.pre_trip.readings?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Readings (${location.pre_trip.readings.length}):</strong>
+                                    <ul>
+                                        ${location.pre_trip.readings.map((r: any) => `
+                                            <li>
+                                                <strong>${r.title || r.description || r}</strong>
+                                                ${r.description && r.title !== r.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${r.description}</span>` : ''}
+                                                ${r.url ? `<br><a href="${r.url}" target="_blank" style="font-size: 12px; color: var(--primary-color);">🔗 ${r.url}</a>` : ''}
+                                                ${r.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${r.estimated_duration_minutes} min</span>` : ''}
+                                                ${r.learning_objectives && r.learning_objectives.length > 0 ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📚 Learning Objectives</summary>
+                                                        <ul style="margin: 4px 0; padding-left: 20px; font-size: 12px;">
+                                                            ${r.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
+                                                        </ul>
+                                                    </details>
+                                                ` : ''}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            ${location.pre_trip.videos?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Videos (${location.pre_trip.videos.length}):</strong>
+                                    <ul>
+                                        ${location.pre_trip.videos.map((v: any) => `
+                                            <li>
+                                                <strong>${v.title || v.description || v}</strong>
+                                                ${v.description && v.title !== v.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${v.description}</span>` : ''}
+                                                ${v.url ? `<br><a href="${v.url}" target="_blank" style="font-size: 12px; color: var(--primary-color);">🔗 ${v.url}</a>` : ''}
+                                                ${v.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${v.estimated_duration_minutes} min</span>` : ''}
+                                                ${v.key_concepts && v.key_concepts.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 12px;">📋 Key concepts: ${v.key_concepts.join(', ')}</span>` : ''}
+                                                ${v.learning_objectives && v.learning_objectives.length > 0 ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📚 Learning Objectives</summary>
+                                                        <ul style="margin: 4px 0; padding-left: 20px; font-size: 12px;">
+                                                            ${v.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
+                                                        </ul>
+                                                    </details>
+                                                ` : ''}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            ${location.pre_trip.prep_tasks?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Prep Tasks (${location.pre_trip.prep_tasks.length}):</strong>
+                                    <ul>
+                                        ${location.pre_trip.prep_tasks.map((t: any) => `
+                                            <li>
+                                                <strong>${t.title || t.description || t}</strong>
+                                                ${t.description && t.title !== t.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${t.description}</span>` : ''}
+                                                ${t.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${t.estimated_duration_minutes} min</span>` : ''}
+                                                ${t.materials_needed && t.materials_needed.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 12px;">📦 Materials: ${t.materials_needed.join(', ')}</span>` : ''}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+
+                    ${location.on_location && (location.on_location.experiential_activities?.length || location.on_location.structured_lessons?.length) ? `
+                        <div class="activity-group">
+                            <strong style="color: var(--primary-color);">🎯 On-Location Activities</strong>
+                            ${location.on_location.experiential_activities?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Experiential Activities (${location.on_location.experiential_activities.length}):</strong>
+                                    <ul>
+                                        ${location.on_location.experiential_activities.map((a: any) => `
+                                            <li style="margin-bottom: 16px;">
+                                                <strong>${a.title}</strong>
+                                                ${a.subject ? `<span style="color: var(--primary-color); font-size: 12px; margin-left: 8px;">📚 ${a.subject}</span>` : ''}
+                                                ${a.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${a.description}</span>` : ''}
+                                                ${a.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${a.estimated_duration_minutes} min</span>` : ''}
+                                                ${a.site_details ? `
+                                                    <br><details style="margin-top: 8px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📍 Site Details</summary>
+                                                        <div style="margin: 6px 0; padding-left: 12px; font-size: 12px; color: var(--text-secondary);">
+                                                            ${a.site_details.address ? `<div>📍 ${a.site_details.address}</div>` : ''}
+                                                            ${a.site_details.best_time ? `<div>🕐 Best time: ${a.site_details.best_time}</div>` : ''}
+                                                            ${a.site_details.cost_usd !== undefined ? `<div>💰 Cost: $${a.site_details.cost_usd}</div>` : ''}
+                                                            ${a.site_details.what_to_bring && a.site_details.what_to_bring.length > 0 ? `<div>🎒 Bring: ${a.site_details.what_to_bring.join(', ')}</div>` : ''}
+                                                        </div>
+                                                    </details>
+                                                ` : ''}
+                                                ${a.learning_objectives && a.learning_objectives.length > 0 ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📚 Learning Objectives</summary>
+                                                        <ul style="margin: 4px 0; padding-left: 20px; font-size: 12px;">
+                                                            ${a.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
+                                                        </ul>
+                                                    </details>
+                                                ` : ''}
+                                                ${a.instructions ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📋 Instructions</summary>
+                                                        <div style="margin: 6px 0; padding-left: 12px; font-size: 12px;">
+                                                            ${a.instructions.before ? `<div style="margin-bottom: 8px;"><strong>Before:</strong><br>${a.instructions.before}</div>` : ''}
+                                                            ${a.instructions.during ? `<div style="margin-bottom: 8px;"><strong>During:</strong><br>${a.instructions.during}</div>` : ''}
+                                                            ${a.instructions.after ? `<div><strong>After:</strong><br>${a.instructions.after}</div>` : ''}
+                                                        </div>
+                                                    </details>
+                                                ` : ''}
+                                                ${a.standards && a.standards.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 11px;">🎯 Standards: ${a.standards.join(', ')}</span>` : ''}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            ${location.on_location.structured_lessons?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Structured Lessons (${location.on_location.structured_lessons.length}):</strong>
+                                    <ul>
+                                        ${location.on_location.structured_lessons.map((l: any) => `
+                                            <li style="margin-bottom: 16px;">
+                                                <strong>${l.title}</strong>
+                                                ${l.subject ? `<span style="color: var(--primary-color); font-size: 12px; margin-left: 8px;">📚 ${l.subject}</span>` : ''}
+                                                ${l.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${l.description}</span>` : ''}
+                                                ${l.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${l.estimated_duration_minutes} min</span>` : ''}
+                                                ${l.materials_needed && l.materials_needed.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 12px;">📦 Materials: ${l.materials_needed.join(', ')}</span>` : ''}
+                                                ${l.learning_objectives && l.learning_objectives.length > 0 ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📚 Learning Objectives</summary>
+                                                        <ul style="margin: 4px 0; padding-left: 20px; font-size: 12px;">
+                                                            ${l.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
+                                                        </ul>
+                                                    </details>
+                                                ` : ''}
+                                                ${l.instructions ? `
+                                                    <br><details style="margin-top: 6px;">
+                                                        <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📋 Instructions</summary>
+                                                        <div style="margin: 6px 0; padding-left: 12px; font-size: 12px;">
+                                                            ${typeof l.instructions === 'string' ? l.instructions : ''}
+                                                            ${l.instructions.before ? `<div style="margin-bottom: 8px;"><strong>Before:</strong><br>${l.instructions.before}</div>` : ''}
+                                                            ${l.instructions.during ? `<div style="margin-bottom: 8px;"><strong>During:</strong><br>${l.instructions.during}</div>` : ''}
+                                                            ${l.instructions.after ? `<div><strong>After:</strong><br>${l.instructions.after}</div>` : ''}
+                                                        </div>
+                                                    </details>
+                                                ` : ''}
+                                                ${l.standards && l.standards.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 11px;">🎯 Standards: ${l.standards.join(', ')}</span>` : ''}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+
+                    ${location.post_trip && (location.post_trip.reflection_prompts?.length || location.post_trip.synthesis_activities?.length) ? `
+                        <div class="activity-group">
+                            <strong style="color: var(--primary-color);">💭 Post-Trip Activities</strong>
+                            ${location.post_trip.reflection_prompts?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Reflection Prompts (${location.post_trip.reflection_prompts.length}):</strong>
+                                    <ul>
+                                        ${location.post_trip.reflection_prompts.map((p: any) => {
+                                            const text = typeof p === 'string' ? p : (p.text || p.prompt || p.question || p.title || p.description || '');
+                                            return `
+                                                <li style="margin-bottom: 12px;">
+                                                    ${text}
+                                                    ${typeof p === 'object' && p.word_count_target ? `<br><span style="color: var(--text-secondary); font-size: 12px;">📝 Target: ${p.word_count_target} words</span>` : ''}
+                                                    ${typeof p === 'object' && p.subject ? `<span style="color: var(--primary-color); font-size: 12px; margin-left: 8px;">📚 ${p.subject}</span>` : ''}
+                                                </li>
+                                            `;
+                                        }).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            ${location.post_trip.synthesis_activities?.length > 0 ? `
+                                <div class="activity-list">
+                                    <strong>Synthesis Activities (${location.post_trip.synthesis_activities.length}):</strong>
+                                    <ul>
+                                        ${location.post_trip.synthesis_activities.map((s: any) => {
+                                            const title = typeof s === 'string' ? s : (s.title || s.description || s.activity || s.text || '');
+                                            return `
+                                                <li style="margin-bottom: 12px;">
+                                                    <strong>${title}</strong>
+                                                    ${typeof s === 'object' && s.subject ? `<span style="color: var(--primary-color); font-size: 12px; margin-left: 8px;">📚 ${s.subject}</span>` : ''}
+                                                    ${typeof s === 'object' && s.description && s.title !== s.description ? `<br><span style="color: var(--text-secondary); font-size: 13px;">${s.description}</span>` : ''}
+                                                    ${typeof s === 'object' && s.estimated_duration_minutes ? `<br><span style="color: var(--text-secondary); font-size: 12px;">⏱️ ${s.estimated_duration_minutes} min</span>` : ''}
+                                                    ${typeof s === 'object' && s.materials_needed && s.materials_needed.length > 0 ? `<br><span style="color: var(--text-secondary); font-size: 12px;">📦 Materials: ${s.materials_needed.join(', ')}</span>` : ''}
+                                                    ${typeof s === 'object' && s.learning_objectives && s.learning_objectives.length > 0 ? `
+                                                        <br><details style="margin-top: 6px;">
+                                                            <summary style="cursor: pointer; font-size: 12px; color: var(--primary-color);">📚 Learning Objectives</summary>
+                                                            <ul style="margin: 4px 0; padding-left: 20px; font-size: 12px;">
+                                                                ${s.learning_objectives.map((obj: string) => `<li>${obj}</li>`).join('')}
+                                                            </ul>
+                                                        </details>
+                                                    ` : ''}
+                                                </li>
+                                            `;
+                                        }).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    openModal('curriculum-detail-modal');
+}
+
+// Testing Lab
+let selectedTestStudent: string | null = null;
+
+function initializeTestingLab() {
+    document.getElementById('test-generate-btn')?.addEventListener('click', generateTestCurriculum);
+    document.getElementById('test-reset-btn')?.addEventListener('click', resetTestingForm);
+
+    // Student selector change handler
+    document.getElementById('test-student-selector')?.addEventListener('change', (e) => {
+        const select = e.target as HTMLSelectElement;
+        const studentId = select.value;
+
+        if (studentId) {
+            const student = students.find(s => s.id === studentId);
+            if (student) {
+                selectedTestStudent = studentId;
+                populateTestingLabWithStudent(student);
+            }
+        } else {
+            selectedTestStudent = null;
+            clearStudentFields();
+        }
+    });
+
+    // Location selector change handler
+    document.getElementById('test-location-selector')?.addEventListener('change', (e) => {
+        const select = e.target as HTMLSelectElement;
+        const destinationId = select.value;
+
+        if (destinationId) {
+            const destination = destinations.find(d => d.id === destinationId);
+            if (destination) {
+                populateTestingLabWithDestination(destination);
+            }
+        } else {
+            clearLocationFields();
+        }
+    });
+}
+
+function populateTestingLabWithStudent(student: any) {
+    (document.getElementById('test-student-name') as HTMLInputElement).value = student.name;
+    (document.getElementById('test-student-age') as HTMLInputElement).value = student.age.toString();
+    (document.getElementById('test-student-grade') as HTMLInputElement).value = student.grade.toString();
+    (document.getElementById('test-student-state') as HTMLSelectElement).value = student.state;
+
+    const learningStyleRadios = document.getElementsByName('learning-style') as NodeListOf<HTMLInputElement>;
+    learningStyleRadios.forEach(radio => {
+        radio.checked = radio.value === student.learning_style;
+    });
+
+    if (student.interests && student.interests.length > 0) {
+        (document.getElementById('test-student-interests') as HTMLInputElement).value = student.interests.join(', ');
+    }
+
+    (document.getElementById('test-time-budget') as HTMLInputElement).value = (student.time_budget_minutes_per_day || 60).toString();
+    (document.getElementById('test-reading-level') as HTMLInputElement).value = (student.reading_level || student.grade).toString();
+}
+
+function clearStudentFields() {
+    (document.getElementById('test-student-name') as HTMLInputElement).value = '';
+    (document.getElementById('test-student-age') as HTMLInputElement).value = '';
+    (document.getElementById('test-student-grade') as HTMLInputElement).value = '';
+}
+
+function populateTestingLabWithDestination(destination: any) {
+    (document.getElementById('test-location-name') as HTMLInputElement).value = destination.name;
+    (document.getElementById('test-location-country') as HTMLInputElement).value = destination.country;
+    (document.getElementById('test-location-duration') as HTMLInputElement).value = destination.days.toString();
+}
+
+function clearLocationFields() {
+    (document.getElementById('test-location-name') as HTMLInputElement).value = '';
+    (document.getElementById('test-location-country') as HTMLInputElement).value = '';
+    (document.getElementById('test-location-duration') as HTMLInputElement).value = '';
+}
+
+function updateStudentSelector() {
+    const selector = document.getElementById('test-student-selector') as HTMLSelectElement;
+    if (!selector) return;
+
+    const currentValue = selector.value;
+    selector.innerHTML = '<option value="">-- Enter Manually --</option>' +
+        students.map(s => `<option value="${s.id}">${s.name} (${s.age} years, Grade ${s.grade})</option>`).join('');
+
+    // Auto-select first student if no current selection
+    if (!currentValue && students.length > 0) {
+        selector.value = students[0].id;
+        selectedTestStudent = students[0].id;
+        populateTestingLabWithStudent(students[0]);
+    } else if (currentValue && students.find(s => s.id === currentValue)) {
+        // Restore selection if possible
+        selector.value = currentValue;
+    }
+}
+
+function updateDestinationSelector() {
+    const selector = document.getElementById('test-location-selector') as HTMLSelectElement;
+    if (!selector) return;
+
+    selector.innerHTML = '<option value="">-- Enter Manually --</option>' +
+        destinations.map(d => `<option value="${d.id}">${d.name}, ${d.country} (${d.days} days)</option>`).join('');
+}
+
+async function generateTestCurriculum() {
+    const name = (document.getElementById('test-student-name') as HTMLInputElement).value;
+    const age = parseInt((document.getElementById('test-student-age') as HTMLInputElement).value);
+    const grade = parseInt((document.getElementById('test-student-grade') as HTMLInputElement).value);
+    const state = (document.getElementById('test-student-state') as HTMLSelectElement).value;
+
+    const learningStyleRadio = document.querySelector('input[name="learning-style"]:checked') as HTMLInputElement;
+    const learningStyle = learningStyleRadio?.value || 'experiential';
+
+    const interestsValue = (document.getElementById('test-student-interests') as HTMLInputElement).value;
+    const interests = interestsValue ? interestsValue.split(',').map(i => i.trim()) : [];
+
+    const locationName = (document.getElementById('test-location-name') as HTMLInputElement).value;
+    const locationCountry = (document.getElementById('test-location-country') as HTMLInputElement).value;
+    const duration = parseInt((document.getElementById('test-location-duration') as HTMLInputElement).value);
+
+    const highlightsValue = (document.getElementById('test-location-highlights') as HTMLTextAreaElement).value;
+    const highlights = highlightsValue ? highlightsValue.split(',').map(h => h.trim()) : [];
+
+    const subjectCheckboxes = document.querySelectorAll('input[name="subjects"]:checked') as NodeListOf<HTMLInputElement>;
+    const subjects = Array.from(subjectCheckboxes).map(cb => cb.value);
+
+    const timeBudget = parseInt((document.getElementById('test-time-budget') as HTMLInputElement).value);
+    const readingLevel = parseInt((document.getElementById('test-reading-level') as HTMLInputElement).value);
+
+    if (!name || !locationName || !locationCountry || subjects.length === 0) {
+        showError('Please fill in all required fields');
+        return;
+    }
+
+    try {
+        showLoading('Generating curriculum... This may take 30-60 seconds');
+
+        const result = await educationService.generateCurriculum({
+            student: {
+                id: selectedTestStudent || undefined,
+                name,
+                age,
+                grade,
+                state,
+                learning_style: learningStyle as any,
+                interests,
+                time_budget_minutes_per_day: timeBudget,
+                reading_level: readingLevel,
+            },
+            location: {
+                id: `${locationName.toLowerCase().replace(/\s+/g, '_')}_${locationCountry.toLowerCase().replace(/\s+/g, '_')}`,
+                name: locationName,
+                country: locationCountry,
+                duration_days: duration,
+                highlights,
+            },
+            subjects,
+        });
+
+        console.log('Generation result:', result);
+        displayTestResults(result);
+
+        if (result.status === 'success' && result.curriculum) {
+            showSuccess('Curriculum generated successfully!');
+        } else {
+            showError('Curriculum generated but there may be issues. Check the results below.');
+        }
+    } catch (error) {
+        console.error('Error generating curriculum:', error);
+        showError('Failed to generate curriculum. Please try again.');
+    } finally {
+        hideLoading();
+    }
+}
+
+function displayTestResults(result: any) {
+    const resultsContainer = document.getElementById('test-results');
+    const resultsContent = document.getElementById('test-results-content');
+    if (!resultsContainer || !resultsContent) return;
+
+    console.log('displayTestResults received:', result);
+
+    // Check if curriculum generation failed
+    if (result.status === 'partial_success' || !result.curriculum) {
+        resultsContent.innerHTML = `
+            <div class="result-summary">
+                <h4>⚠️ Generation Issue</h4>
+                <p>The curriculum was generated but there was an issue parsing the response.</p>
+                ${result.error ? `<p style="color: var(--text-secondary); font-size: 14px;">Error: ${result.error}</p>` : ''}
+                ${result.raw_text ? `
+                    <details style="margin-top: 16px;">
+                        <summary style="cursor: pointer; color: var(--primary-color);">View Raw Response</summary>
+                        <pre style="background: var(--bg-secondary); padding: 12px; border-radius: var(--border-radius); overflow-x: auto; font-size: 12px; margin-top: 8px;">${result.raw_text}</pre>
+                    </details>
+                ` : ''}
+            </div>
+        `;
+        resultsContainer.style.display = 'block';
+        return;
+    }
+
+    const curriculum = result.curriculum;
+    console.log('Curriculum:', curriculum);
+
+    // The test endpoint returns a single location directly, not in location_lessons
+    const location = curriculum;
+
+    let totalActivities = 0;
+    let preTripCount = 0;
+    let onLocationCount = 0;
+    let postTripCount = 0;
+
+    // Count activities from the single location
+    preTripCount = (location.pre_trip?.readings?.length || 0) +
+                   (location.pre_trip?.videos?.length || 0) +
+                   (location.pre_trip?.preparation_tasks?.length || 0);
+
+    onLocationCount = (location.on_location?.experiential_activities?.length || 0) +
+                      (location.on_location?.structured_lessons?.length || 0);
+
+    postTripCount = (location.post_trip?.reflection_prompts?.length || 0) +
+                    (location.post_trip?.synthesis_activities?.length || 0);
+
+    totalActivities = preTripCount + onLocationCount + postTripCount;
+    console.log(`Total activities: ${totalActivities} (pre=${preTripCount}, on=${onLocationCount}, post=${postTripCount})`);
+
+    resultsContent.innerHTML = `
+        <div class="result-summary">
+            <h4>✅ Generation Complete</h4>
+            <p>Model: ${result.metadata?.model_used || 'Gemini 2.0 Flash'}</p>
+            <p>Generated: ${new Date(result.metadata?.generation_time).toLocaleString()}</p>
+
+            <div class="result-stats">
+                <div class="result-stat">
+                    <div class="result-stat-value">${totalActivities}</div>
+                    <div class="result-stat-label">Total Activities</div>
+                </div>
+                <div class="result-stat">
+                    <div class="result-stat-value">${preTripCount}</div>
+                    <div class="result-stat-label">Pre-Trip</div>
+                </div>
+                <div class="result-stat">
+                    <div class="result-stat-value">${onLocationCount}</div>
+                    <div class="result-stat-label">On-Location</div>
+                </div>
+                <div class="result-stat">
+                    <div class="result-stat-value">${postTripCount}</div>
+                    <div class="result-stat-label">Post-Trip</div>
+                </div>
+            </div>
+
+            <div class="result-actions">
+                <button class="btn btn-primary" onclick="saveTestCurriculum('${result.saved_ids?.curriculum_plan_id || ''}')">
+                    💾 Save to Student
+                </button>
+                <button class="btn btn-secondary" onclick="downloadTestResults()">
+                    📥 Download JSON
+                </button>
+                <button class="btn btn-secondary" onclick="viewFullCurriculum('${result.saved_ids?.curriculum_plan_id || ''}')">
+                    👁️ View Full Details
+                </button>
+            </div>
+        </div>
+
+        <h4 style="margin-top: 24px;">Activity Preview</h4>
+        ${location.on_location?.experiential_activities?.slice(0, 3).map((activity: any) => `
+            <div class="activity-preview">
+                <h4>${activity.title}</h4>
+                <p>${activity.description || ''}</p>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
+                    ${activity.subject} • ${activity.estimated_duration_minutes || 0} min
+                </div>
+            </div>
+        `).join('') || '<p style="color: var(--text-secondary);">No activities generated</p>'}
+    `;
+
+    resultsContainer.style.display = 'block';
+
+    // Store result for later use
+    (window as any).lastTestResult = result;
+}
+
+function resetTestingForm() {
+    // Reset selectors
+    const studentSelector = document.getElementById('test-student-selector') as HTMLSelectElement;
+    const locationSelector = document.getElementById('test-location-selector') as HTMLSelectElement;
+
+    if (studentSelector) {
+        studentSelector.value = '';
+    }
+    if (locationSelector) {
+        locationSelector.value = '';
+    }
+
+    selectedTestStudent = null;
+
+    // Clear all fields
+    clearStudentFields();
+    clearLocationFields();
+
+    const resultsContainer = document.getElementById('test-results');
+    if (resultsContainer) {
+        resultsContainer.style.display = 'none';
+    }
+}
+
+(window as any).saveTestCurriculum = async (curriculumId: string) => {
+    if (!curriculumId) {
+        showError('No curriculum to save');
+        return;
+    }
+
+    if (selectedTestStudent) {
+        const student = students.find(s => s.id === selectedTestStudent);
+        showSuccess(`Curriculum saved to ${student?.name || 'selected student'}'s profile!`);
+    } else {
+        showSuccess('Curriculum saved to database!');
+    }
+
+    await loadCurricula();
+    switchView('curricula');
+};
+
+(window as any).downloadTestResults = () => {
+    const result = (window as any).lastTestResult;
+    if (!result) {
+        showError('No results to download');
+        return;
+    }
+
+    const dataStr = JSON.stringify(result, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+    const exportFileDefaultName = 'test_curriculum_result.json';
+
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+
+    showSuccess('Results downloaded successfully!');
+};
+
+(window as any).viewFullCurriculum = (curriculumId: string) => {
+    if (curriculumId) {
+        (window as any).viewCurriculum(curriculumId);
+    }
+};
+
+// UI Helpers
+function showLoading(message: string = 'Loading...') {
+    const overlay = document.getElementById('loading-overlay');
+    const messageEl = document.getElementById('loading-message');
+    if (overlay && messageEl) {
+        messageEl.textContent = message;
+        overlay.style.display = 'flex';
+    }
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+// Edit curriculum with AI
+(window as any).editCurriculum = async (curriculumId: string) => {
+    const curriculum = curricula.find(c => c.id === curriculumId);
+    if (!curriculum) {
+        showError('Curriculum not found');
+        return;
+    }
+
+    // Close the detail modal first
+    closeModal('curriculum-detail-modal');
+
+    // Open the edit modal
+    const editModal = document.getElementById('edit-curriculum-modal');
+    if (!editModal) {
+        showError('Edit modal not found');
+        return;
+    }
+
+    // Store current curriculum for editing
+    (window as any).currentEditingCurriculum = curriculum;
+
+    // Set the curriculum title in the modal
+    const titleEl = document.getElementById('edit-curriculum-title');
+    if (titleEl) {
+        titleEl.textContent = curriculum.semester_overview?.title || 'Untitled Curriculum';
+    }
+
+    // Clear previous instructions
+    (document.getElementById('edit-instructions') as HTMLTextAreaElement).value = '';
+
+    openModal('edit-curriculum-modal');
+};
+
+// Apply AI modifications to curriculum
+(window as any).applyAIModifications = async () => {
+    const instructions = (document.getElementById('edit-instructions') as HTMLTextAreaElement).value;
+    if (!instructions.trim()) {
+        showError('Please provide modification instructions');
+        return;
+    }
+
+    const curriculum = (window as any).currentEditingCurriculum;
+    if (!curriculum) {
+        showError('No curriculum selected for editing');
+        return;
+    }
+
+    try {
+        showLoading('Applying AI modifications... This may take 30-60 seconds');
+
+        // TODO: Create API endpoint for curriculum modification
+        // For now, we'll show a message that this feature is coming soon
+        alert('AI curriculum modification feature is coming soon!\\n\\nYou can currently:\\n- Export the curriculum as JSON\\n- Make manual edits\\n- Re-generate a new curriculum with different parameters');
+
+        closeModal('edit-curriculum-modal');
+
+    } catch (error) {
+        console.error('Error applying modifications:', error);
+        showError('Failed to apply modifications');
+    } finally {
+        hideLoading();
+    }
+};
+
+function showSuccess(message: string) {
+    alert(message); // TODO: Replace with better toast notification
+}
+
+function showError(message: string) {
+    alert('Error: ' + message); // TODO: Replace with better toast notification
+}
