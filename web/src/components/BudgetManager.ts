@@ -325,19 +325,60 @@ export class BudgetManager {
             <h4>Budget by Country</h4>
             <div id="country-budgets">
               ${Array.from(countries).map(country => {
+                // Calculate total days in this country
+                const countryDays = (this.tripData.locations || [])
+                  .filter(loc => loc.country === country)
+                  .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
+
+                // Calculate current costs in this country
                 const countryCosts = (this.tripData.costs || [])
                   .filter(c => {
                     const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
                     return location?.country === country;
                   })
                   .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+
                 const countryBudget = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
+                const currentPerDay = countryDays > 0 ? countryCosts / countryDays : 0;
+                const budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
+
                 return `
                   <div class="form-group">
-                    <label for="country-${country}">${country}</label>
-                    <div class="budget-input-group">
-                      <input type="number" id="country-${country}" data-country="${country}" value="${Math.round(countryBudget)}" min="0" step="10">
-                      <span class="current-spend">Current: $${Math.round(countryCosts).toLocaleString()}</span>
+                    <label for="country-${country}">${country} <span style="color: #666; font-weight: normal;">(${countryDays} day${countryDays !== 1 ? 's' : ''})</span></label>
+
+                    <div style="display: flex; gap: 12px; margin-bottom: 8px;">
+                      <div style="flex: 1;">
+                        <label style="font-size: 12px; color: #666; margin-bottom: 4px;">Total Budget</label>
+                        <div class="budget-input-group">
+                          <input type="number"
+                                 class="country-total-input"
+                                 id="country-${country}"
+                                 data-country="${country}"
+                                 data-days="${countryDays}"
+                                 value="${Math.round(countryBudget)}"
+                                 min="0"
+                                 step="10">
+                          <span style="font-size: 12px; color: #666;">USD</span>
+                        </div>
+                      </div>
+
+                      <div style="flex: 1;">
+                        <label style="font-size: 12px; color: #666; margin-bottom: 4px;">Per Day</label>
+                        <div class="budget-input-group">
+                          <input type="number"
+                                 class="country-perday-input"
+                                 data-country="${country}"
+                                 data-days="${countryDays}"
+                                 value="${Math.round(budgetPerDay)}"
+                                 min="0"
+                                 step="1">
+                          <span style="font-size: 12px; color: #666;">USD/day</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style="display: flex; gap: 16px; font-size: 12px; color: #666;">
+                      <span>Current Spend: $${Math.round(countryCosts).toLocaleString()} ($${Math.round(currentPerDay)}/day)</span>
                     </div>
                   </div>
                 `;
@@ -498,9 +539,37 @@ export class BudgetManager {
     const contingencyInput = modal.querySelector('#contingency-pct') as HTMLInputElement;
     contingencyInput?.addEventListener('input', markDirty);
 
-    // Track changes in country budgets
-    modal.querySelectorAll('[data-country]').forEach(input => {
-      input.addEventListener('input', markDirty);
+    // Sync country total and per-day inputs
+    modal.querySelectorAll('.country-total-input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        markDirty();
+        const totalInput = e.target as HTMLInputElement;
+        const country = totalInput.dataset.country!;
+        const days = parseFloat(totalInput.dataset.days!) || 1;
+        const total = parseFloat(totalInput.value) || 0;
+        const perDay = total / days;
+
+        const perDayInput = modal.querySelector(`.country-perday-input[data-country="${country}"]`) as HTMLInputElement;
+        if (perDayInput) {
+          perDayInput.value = Math.round(perDay).toString();
+        }
+      });
+    });
+
+    modal.querySelectorAll('.country-perday-input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        markDirty();
+        const perDayInput = e.target as HTMLInputElement;
+        const country = perDayInput.dataset.country!;
+        const days = parseFloat(perDayInput.dataset.days!) || 1;
+        const perDay = parseFloat(perDayInput.value) || 0;
+        const total = perDay * days;
+
+        const totalInput = modal.querySelector(`.country-total-input[data-country="${country}"]`) as HTMLInputElement;
+        if (totalInput) {
+          totalInput.value = Math.round(total).toString();
+        }
+      });
     });
 
     modal.querySelector('#save-budget-btn')?.addEventListener('click', () => {
@@ -520,9 +589,9 @@ export class BudgetManager {
         budgets_by_category[category] = dollarValue;
       });
 
-      // Collect country budgets (always in dollars)
+      // Collect country budgets (always in dollars) - use total inputs
       const budgets_by_country: Record<string, number> = {};
-      modal.querySelectorAll('[data-country]').forEach(input => {
+      modal.querySelectorAll('.country-total-input').forEach(input => {
         const el = input as HTMLInputElement;
         const country = el.dataset.country!;
         budgets_by_country[country] = parseFloat(el.value) || 0;
