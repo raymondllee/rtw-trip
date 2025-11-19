@@ -311,10 +311,115 @@ function initGenerateCostsTab() {
     updateSelectionCount();
   });
 
-  // Note: Actual AI generation would integrate with the existing chat/agent system
-  // For now, we'll show a placeholder message
-  startBtn.addEventListener('click', () => {
-    alert('AI cost generation will be integrated with the existing agent system. This feature triggers the same AI research as "Update Multiple Costs" but within this unified interface.');
+  // Implement actual AI cost generation
+  startBtn.addEventListener('click', async () => {
+    if (selectedDestinations.size === 0) return;
+
+    // Disable buttons and show progress
+    startBtn.disabled = true;
+    const progressSection = document.getElementById('generate-progress');
+    const progressFill = document.getElementById('generate-progress-fill');
+    const progressText = document.getElementById('generate-progress-text');
+    progressSection.style.display = 'block';
+
+    const selectedLocations = Array.from(selectedDestinations).map(idx => locations[idx]);
+    let completed = 0;
+    const total = selectedLocations.length;
+    const results = { success: [], failed: [], partial: [] };
+
+    // Get API base URL
+    const apiBaseUrl = 'http://localhost:5001';
+
+    for (const location of selectedLocations) {
+      const locationName = location.name || location.city || 'Unknown';
+      const item = items[locations.indexOf(location)];
+      const statusEl = item.querySelector('[data-progress-status]');
+
+      try {
+        // Update UI to show processing
+        statusEl.textContent = '⏳ Researching costs...';
+        statusEl.style.color = '#1a73e8';
+
+        // Build payload
+        const payload = {
+          session_id: scenarioId,
+          scenario_id: scenarioId,
+          destination_name: locationName,
+          destination_id: location.id,
+          duration_days: Math.max(1, Math.round(location.duration_days || 1)),
+          arrival_date: location.arrival_date || null,
+          departure_date: location.departure_date || null,
+          num_travelers: 1, // TODO: Get from trip data if available
+          travel_style: location.travel_style || location.activity_type || 'mid-range',
+        };
+
+        // Call API
+        const response = await fetch(`${apiBaseUrl}/api/costs/research`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || data?.message || `Request failed with status ${response.status}`);
+        }
+
+        if (data?.status === 'partial') {
+          results.partial.push(locationName);
+          statusEl.textContent = '⚠️ Partial results (no structured pricing)';
+          statusEl.style.color = '#ffc107';
+        } else {
+          results.success.push(locationName);
+          statusEl.textContent = '✅ Costs generated successfully';
+          statusEl.style.color = '#28a745';
+        }
+
+      } catch (error) {
+        console.error(`Failed to generate costs for ${locationName}:`, error);
+        results.failed.push({ name: locationName, error: error.message });
+        statusEl.textContent = `❌ Failed: ${error.message}`;
+        statusEl.style.color = '#dc3545';
+      }
+
+      // Update progress
+      completed++;
+      const percentage = (completed / total) * 100;
+      progressFill.style.width = `${percentage}%`;
+      progressText.textContent = `Processed ${completed} of ${total} destinations`;
+    }
+
+    // Show results summary
+    let summaryHTML = '<div style="margin-top: 16px; padding: 16px; background: white; border-radius: 6px; border: 1px solid #e0e0e0;">';
+    summaryHTML += '<h3 style="margin: 0 0 12px 0; font-size: 16px;">Generation Complete</h3>';
+
+    if (results.success.length > 0) {
+      summaryHTML += `<div style="margin-bottom: 8px; color: #28a745;">✅ <strong>${results.success.length} destination${results.success.length !== 1 ? 's' : ''}</strong> processed successfully</div>`;
+    }
+
+    if (results.partial.length > 0) {
+      summaryHTML += `<div style="margin-bottom: 8px; color: #ffc107;">⚠️ <strong>${results.partial.length} destination${results.partial.length !== 1 ? 's' : ''}</strong> with partial results</div>`;
+    }
+
+    if (results.failed.length > 0) {
+      summaryHTML += `<div style="margin-bottom: 12px; color: #dc3545;">❌ <strong>${results.failed.length} destination${results.failed.length !== 1 ? 's' : ''}</strong> failed</div>`;
+      summaryHTML += '<div style="font-size: 13px; color: #666;">';
+      results.failed.forEach(f => {
+        summaryHTML += `<div>• ${f.name}: ${f.error}</div>`;
+      });
+      summaryHTML += '</div>';
+    }
+
+    summaryHTML += '<div style="margin-top: 16px;"><button class="btn btn-secondary" onclick="window.location.reload()">Refresh Page to See New Costs</button></div>';
+    summaryHTML += '</div>';
+
+    progressSection.insertAdjacentHTML('afterend', summaryHTML);
+    progressText.textContent = 'Complete!';
+
+    // Re-enable button
+    startBtn.disabled = false;
+    startBtn.textContent = 'Generate More Costs';
   });
 }
 
