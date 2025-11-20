@@ -2664,43 +2664,11 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
         const destNames = destinations.map(d => d.name || d.city).join(', ');
 
-        // Build enriched destination data for prompt
-        const enrichedDestinations = destinations.map(dest => {
-          const localCurrency = getCurrencyForDestination(dest.id, this.tripData.locations || []);
-          return {
-            id: dest.id,
-            normalizedId: String(dest.id),
-            name: dest.name || dest.city,
-            city: dest.city,
-            country: dest.country,
-            region: dest.region,
-            activityType: dest.activity_type,
-            durationDays: dest.duration_days || 1,
-            arrivalDate: dest.arrival_date,
-            departureDate: dest.departure_date,
-            highlights: Array.isArray(dest.highlights) ? dest.highlights : [],
-            notes: dest.notes || '',
-            localCurrency: localCurrency
-          };
-        });
-
-        // Generate initial prompt
-        const initialPrompt = this.generateCostPrompt(enrichedDestinations, country);
-
-        // Show prompt editing modal
-        const editedPrompt = await this.showPromptEditModal(
-          initialPrompt,
-          `Generate Costs for ${country}`
-        );
-
-        // If user cancelled, exit
-        if (!editedPrompt) return;
-
         // Show progress UI
         const originalBtn = btn as HTMLButtonElement;
         const originalText = originalBtn.innerHTML;
         originalBtn.disabled = true;
-        originalBtn.innerHTML = '⏳ Generating costs...';
+        originalBtn.innerHTML = '⏳ Researching costs...';
 
         // Find and open the costs section to show progress
         const costsSection = this.container.querySelector(
@@ -2717,10 +2685,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           progressDiv.innerHTML = `
             <div style="padding: 20px; text-align: center; background: #f0f8ff; border-radius: 6px; margin: 15px 0;">
               <div style="font-size: 16px; font-weight: 600; color: #1a73e8; margin-bottom: 8px;">
-                🤖 AI is generating cost estimates...
+                🔍 Researching current prices from the web...
               </div>
               <div style="font-size: 14px; color: #666; margin-bottom: 12px;">
-                Researching ${destNames}
+                Analyzing costs for ${destNames}
               </div>
               <div style="width: 100%; height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden;">
                 <div style="width: 100%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2, #667eea); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></div>
@@ -2737,57 +2705,11 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         }
 
         try {
-          // Call generation with edited prompt
-          const config = getRuntimeConfig();
-          const chatApiUrl = config.endpoints.chat;
-          const scenarioId = (window as any).currentScenarioId || null;
-
-          const response = await fetch(chatApiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: editedPrompt,
-              context: {
-                destinations: enrichedDestinations.map(d => ({
-                  id: d.id,
-                  name: d.name,
-                  country: d.country,
-                  duration_days: d.durationDays
-                }))
-              },
-              scenario_id: scenarioId,
-              session_id: null
-            })
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API error: ${response.status} - ${errorText}`);
-          }
-
-          const data = await response.json();
-          const responseText = data.response || data.text || '';
-          const generatedCosts = this.parseAICostResponse(responseText, enrichedDestinations);
-
-          if (generatedCosts.length === 0) {
-            throw new Error('No costs were generated');
-          }
-
-          // Add generated costs to tripData
-          if (!this.tripData.costs) {
-            this.tripData.costs = [];
-          }
-          this.tripData.costs.push(...generatedCosts);
-
-          // Save costs via callback
-          if (this.onCostsUpdate) {
-            await this.onCostsUpdate(generatedCosts);
-          }
+          // Call backend cost research API for each destination
+          await this.generateCostsForCountry(country, destinationIds);
 
           // Show success message
-          originalBtn.innerHTML = `✓ Generated ${generatedCosts.length} costs`;
+          originalBtn.innerHTML = `✓ Costs researched`;
           originalBtn.style.background = '#28a745';
 
           // Remove progress UI and refresh display
@@ -2845,10 +2767,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           }
 
           // Show error
-          originalBtn.innerHTML = '✗ Generation failed';
+          originalBtn.innerHTML = '✗ Research failed';
           originalBtn.style.background = '#dc3545';
 
-          alert(`Failed to generate costs: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          alert(`Failed to research costs: ${error instanceof Error ? error.message : 'Unknown error'}`);
 
           // Reset button after 3 seconds
           setTimeout(() => {
