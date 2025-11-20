@@ -339,7 +339,9 @@ function initBudgetTab() {
     locations: currentVersionData.itineraryData.locations || [],
     legs: currentVersionData.itineraryData.legs || [],
     costs: currentVersionData.itineraryData.costs || [],
-    budget: currentVersionData.itineraryData.budget || null
+    budget: currentVersionData.itineraryData.budget || null,
+    num_travelers: currentVersionData.itineraryData.num_travelers,
+    traveler_composition: currentVersionData.itineraryData.traveler_composition
   };
 
   budgetManager = new BudgetManager(
@@ -410,6 +412,31 @@ function initBudgetTab() {
         budgetManager.updateData(tripData, tripData.budget);
       } catch (error) {
         console.error('❌ Failed to save costs:', error);
+        throw error;
+      }
+    },
+    async (updatedTripData) => {
+      // Save trip data (num_travelers, traveler_composition) to version document
+      try {
+        if (!currentVersionData.id) {
+          throw new Error('Version document ID not found');
+        }
+
+        // Update currentVersionData
+        currentVersionData.itineraryData.num_travelers = updatedTripData.num_travelers;
+        currentVersionData.itineraryData.traveler_composition = updatedTripData.traveler_composition;
+
+        // Save to Firestore
+        const versionRef = doc(db, 'scenarios', scenarioId, 'versions', currentVersionData.id);
+        await updateDoc(versionRef, {
+          'itineraryData.num_travelers': updatedTripData.num_travelers,
+          'itineraryData.traveler_composition': updatedTripData.traveler_composition,
+          updatedAt: Timestamp.now()
+        });
+
+        console.log('✅ Traveler data saved to Firestore');
+      } catch (error) {
+        console.error('❌ Failed to save traveler data:', error);
         throw error;
       }
     }
