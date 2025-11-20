@@ -924,10 +924,18 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         ${Object.entries(costsByDestination).map(([destName, costs]) => {
           const firstCost = costs[0];
           const destinationId = firstCost?.destination_id;
+          const destLocation = (this.tripData.locations || []).find(loc => loc.id === destinationId);
+          const destDays = destLocation?.duration_days || 0;
+          const destDateRange = destLocation?.arrival_date && destLocation?.departure_date
+            ? `${new Date(destLocation.arrival_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(destLocation.departure_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+            : '';
           return `
           <div class="destination-costs-section" data-destination-id="${destinationId}">
             <div class="destination-header">
-              <span>${destName}</span>
+              <span>
+                ${destName}
+                ${destDays || destDateRange ? `<span class="dest-meta">(${destDays ? `${destDays} day${destDays !== 1 ? 's' : ''}` : ''}${destDays && destDateRange ? ' • ' : ''}${destDateRange})</span>` : ''}
+              </span>
               <button class="btn-xs btn-secondary regenerate-destination-costs-btn"
                       data-destination-id="${destinationId}"
                       data-destination-name="${destName}"
@@ -951,7 +959,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                 </tr>
               </thead>
               <tbody>
-                ${costs.map(cost => this.renderEditableCostRow(cost)).join('')}
+                ${this.renderCostsGroupedByCategory(costs, destinationId, destName).join('')}
               </tbody>
               <tfoot>
                 <tr class="total-row">
@@ -1071,6 +1079,51 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         </td>
       </tr>
     `;
+  }
+
+  private renderCostsGroupedByCategory(costs: any[], destinationId: any, destinationName: string): string[] {
+    // Group costs by category
+    const costsByCategory: { [key: string]: any[] } = {};
+    costs.forEach(cost => {
+      const category = cost.category || 'other';
+      if (!costsByCategory[category]) {
+        costsByCategory[category] = [];
+      }
+      costsByCategory[category].push(cost);
+    });
+
+    const rows: string[] = [];
+
+    // Render each category group
+    Object.entries(costsByCategory).forEach(([category, categoryCosts]) => {
+      // Add category header row with regenerate button
+      rows.push(`
+        <tr class="category-header-row">
+          <td colspan="10" class="category-header-cell">
+            <div class="category-header-content">
+              <span class="category-title">
+                ${this.getCategoryIcon(category)} ${category.replace(/_/g, ' ').toUpperCase()}
+                <span class="category-count">(${categoryCosts.length} item${categoryCosts.length !== 1 ? 's' : ''})</span>
+              </span>
+              <button class="btn-xs btn-secondary regenerate-category-costs-btn"
+                      data-destination-id="${destinationId}"
+                      data-destination-name="${destinationName}"
+                      data-category="${category}"
+                      title="Regenerate ${category} costs">
+                🔄 Regenerate
+              </button>
+            </div>
+          </td>
+        </tr>
+      `);
+
+      // Add cost rows for this category
+      categoryCosts.forEach(cost => {
+        rows.push(this.renderEditableCostRow(cost));
+      });
+    });
+
+    return rows;
   }
 
   private renderAddCostSection(country: string, destinations: any[]): string {
@@ -1351,6 +1404,8 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <div class="section-header">
               <h4>🌍 Budget by Country</h4>
               <div class="mode-controls">
+                <button class="btn-xs btn-secondary" id="show-all-costs-btn" title="Expand all cost sections">📂 Show All Costs</button>
+                <button class="btn-xs btn-secondary" id="hide-all-costs-btn" title="Collapse all cost sections" style="display: none;">📁 Hide All Costs</button>
                 <span class="mode-indicator" id="country-mode-indicator">Mode: Dollar Amounts</span>
                 <div class="country-mode-selector">
                   <button class="mode-btn active" data-mode="dollars" id="country-mode-dollars">$</button>
@@ -1416,6 +1471,27 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                 const countryDestinations = (this.tripData.locations || [])
                   .filter(loc => loc.country === country);
 
+                // Calculate date range for country
+                const countryDates = countryDestinations
+                  .filter(loc => loc.arrival_date || loc.departure_date)
+                  .map(loc => ({
+                    arrival: loc.arrival_date ? new Date(loc.arrival_date) : null,
+                    departure: loc.departure_date ? new Date(loc.departure_date) : null
+                  }))
+                  .filter(d => d.arrival || d.departure);
+
+                let countryDateRange = '';
+                if (countryDates.length > 0) {
+                  const validArrivals = countryDates.filter(d => d.arrival).map(d => d.arrival!);
+                  const validDepartures = countryDates.filter(d => d.departure).map(d => d.departure!);
+
+                  if (validArrivals.length > 0 && validDepartures.length > 0) {
+                    const earliestArrival = new Date(Math.min(...validArrivals.map(d => d.getTime())));
+                    const latestDeparture = new Date(Math.max(...validDepartures.map(d => d.getTime())));
+                    countryDateRange = `${earliestArrival.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${latestDeparture.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+                  }
+                }
+
                 const countryCosts = countryCostsArray.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
                 const categoryBreakdown = this.renderCategoryBreakdown(countryCostsArray);
 
@@ -1447,7 +1523,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                   <div class="budget-item-edit">
                     <div class="item-header-row">
                       <div class="item-label-with-note">
-                        <span class="item-label-text">${country} <span class="days-label">(${countryDays} day${countryDays !== 1 ? 's' : ''})</span></span>
+                        <span class="item-label-text">
+                          ${country}
+                          <span class="days-label">(${countryDays} day${countryDays !== 1 ? 's' : ''}${countryDateRange ? ` • ${countryDateRange}` : ''})</span>
+                        </span>
                         <button class="note-toggle-btn" data-country="${country}" title="${countryNote ? 'Edit Note' : 'Add Note'}">
                           ${countryNote ? '📝' : '📄'}
                         </button>
@@ -3077,6 +3156,186 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           originalBtn.style.background = '#dc3545';
 
           alert(`Failed to regenerate costs: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+          // Reset button after 3 seconds
+          setTimeout(() => {
+            originalBtn.innerHTML = originalText;
+            originalBtn.style.background = '';
+            originalBtn.disabled = false;
+          }, 3000);
+        }
+      });
+    });
+
+    // Setup show all costs button
+    const showAllBtn = this.container.querySelector('#show-all-costs-btn');
+    const hideAllBtn = this.container.querySelector('#hide-all-costs-btn');
+
+    showAllBtn?.addEventListener('click', () => {
+      this.container.querySelectorAll('.item-costs-section[data-country]').forEach(section => {
+        (section as HTMLElement).style.display = 'block';
+      });
+      if (showAllBtn) (showAllBtn as HTMLElement).style.display = 'none';
+      if (hideAllBtn) (hideAllBtn as HTMLElement).style.display = 'inline-block';
+    });
+
+    hideAllBtn?.addEventListener('click', () => {
+      this.container.querySelectorAll('.item-costs-section[data-country]').forEach(section => {
+        (section as HTMLElement).style.display = 'none';
+      });
+      if (hideAllBtn) (hideAllBtn as HTMLElement).style.display = 'none';
+      if (showAllBtn) (showAllBtn as HTMLElement).style.display = 'inline-block';
+    });
+
+    // Setup regenerate category costs buttons
+    this.container.querySelectorAll('.regenerate-category-costs-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const destinationId = btn.getAttribute('data-destination-id');
+        const destinationName = btn.getAttribute('data-destination-name');
+        const category = btn.getAttribute('data-category');
+
+        if (!destinationId || !category) {
+          alert('Missing destination or category information');
+          return;
+        }
+
+        const originalBtn = btn as HTMLButtonElement;
+        const originalText = originalBtn.innerHTML;
+
+        try {
+          // Get destination info
+          const location = (this.tripData.locations || []).find(loc => String(loc.id) === destinationId);
+          if (!location) {
+            throw new Error('Destination not found');
+          }
+
+          const destination = {
+            id: location.id,
+            name: location.name || '',
+            arrival_date: location.arrival_date || '',
+            departure_date: location.departure_date || '',
+            country: location.country || ''
+          };
+
+          // Build enriched destination with local currency
+          const localCurrency = getCurrencyForDestination(destination.id, this.tripData.locations || []);
+          const enrichedDestination = {
+            ...destination,
+            localCurrency: localCurrency
+          };
+
+          // Generate initial prompt for specific category
+          const categoryName = category.replace(/_/g, ' ');
+          const basePrompt = this.generateCostPrompt([enrichedDestination], destination.country);
+          const categoryPrompt = `${basePrompt}
+
+IMPORTANT: Generate costs ONLY for the "${categoryName}" category. Do not include costs for other categories.`;
+
+          // Show prompt editing modal
+          const editedPrompt = await this.showPromptEditModal(
+            categoryPrompt,
+            `Regenerate ${categoryName} Costs for ${destinationName || destination.name}`
+          );
+
+          // If user cancelled, exit
+          if (!editedPrompt) return;
+
+          // Disable button and show progress
+          originalBtn.disabled = true;
+          originalBtn.innerHTML = '🔄 Regenerating...';
+
+          // Delete existing costs for this category in this destination
+          const existingCosts = (this.tripData.costs || []).filter(c =>
+            String(c.destination_id) === destinationId && c.category === category
+          );
+
+          if (existingCosts.length > 0) {
+            // Mark costs for deletion and remove from local data
+            existingCosts.forEach(cost => {
+              const costId = cost.id || `${cost.destination_id}_${cost.category}_${Date.now()}`;
+              const deletedCost = { ...cost, _deleted: true };
+              this.editedCosts.set(costId, deletedCost);
+            });
+
+            // Remove from local data
+            this.tripData.costs = (this.tripData.costs || []).filter(c =>
+              !(String(c.destination_id) === destinationId && c.category === category)
+            );
+          }
+
+          // Call API with edited prompt
+          const config = getRuntimeConfig();
+          const chatApiUrl = config.endpoints.chat;
+          const scenarioId = (window as any).currentScenarioId || null;
+
+          const response = await fetch(chatApiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: editedPrompt,
+              context: {
+                destinations: [{
+                  id: enrichedDestination.id,
+                  name: enrichedDestination.name,
+                  arrival_date: enrichedDestination.arrival_date,
+                  departure_date: enrichedDestination.departure_date,
+                  country: enrichedDestination.country
+                }]
+              },
+              scenario_id: scenarioId,
+              session_id: null
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`API request failed: ${response.statusText}`);
+          }
+
+          const responseData = await response.json();
+          const responseText = responseData.response || '';
+
+          // Parse the AI response
+          const generatedCosts = this.parseAICostResponse(responseText, [enrichedDestination]);
+
+          if (generatedCosts.length === 0) {
+            throw new Error('No costs were generated');
+          }
+
+          // Add generated costs to tripData
+          if (!this.tripData.costs) {
+            this.tripData.costs = [];
+          }
+          this.tripData.costs.push(...generatedCosts);
+
+          // Save costs via callback
+          if (this.onCostsUpdate) {
+            await this.onCostsUpdate(generatedCosts);
+          }
+
+          // Show success message
+          originalBtn.innerHTML = `✓ Regenerated ${generatedCosts.length} costs`;
+          originalBtn.style.background = '#28a745';
+
+          // Refresh the entire budget manager to show new costs
+          this.render();
+
+          // Reset button after 3 seconds
+          setTimeout(() => {
+            originalBtn.innerHTML = originalText;
+            originalBtn.style.background = '';
+            originalBtn.disabled = false;
+          }, 3000);
+
+        } catch (error) {
+          console.error('Failed to regenerate category costs:', error);
+
+          // Show error
+          originalBtn.innerHTML = '✗ Regeneration failed';
+          originalBtn.style.background = '#dc3545';
+
+          alert(`Failed to regenerate ${category} costs: ${error instanceof Error ? error.message : 'Unknown error'}`);
 
           // Reset button after 3 seconds
           setTimeout(() => {
@@ -4725,6 +4984,45 @@ textarea.auto-resize {
   border-radius: 4px;
   font-size: 14px;
   min-width: 150px;
+}
+
+/* Category header row */
+.category-header-row {
+  background: #f0f7ff;
+  border-top: 2px solid #dee2e6;
+}
+
+.category-header-cell {
+  padding: 10px 12px !important;
+}
+
+.category-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.category-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #007bff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.category-count {
+  font-weight: 400;
+  font-size: 11px;
+  color: #666;
+  margin-left: 8px;
+}
+
+/* Destination meta info */
+.dest-meta {
+  font-weight: 400;
+  font-size: 12px;
+  color: #666;
+  margin-left: 6px;
 }
 </style>
 `;
