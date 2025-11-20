@@ -370,11 +370,18 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
       parsed = JSON.parse(jsonText);
     } catch (error) {
       console.error('Failed to parse AI response:', error);
-      console.error('Response text:', responseText);
-      throw new Error('Failed to parse AI response as JSON');
+      console.error('Original response text:', responseText);
+      console.error('Extracted JSON text:', jsonText);
+
+      // Show a preview in the error message
+      const preview = responseText.length > 200
+        ? responseText.substring(0, 200) + '...'
+        : responseText;
+      throw new Error(`Failed to parse AI response as JSON. Response preview: "${preview}"`);
     }
 
     if (!Array.isArray(parsed)) {
+      console.error('Parsed response is not an array:', parsed);
       throw new Error('AI response is not an array');
     }
 
