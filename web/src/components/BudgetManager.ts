@@ -365,9 +365,22 @@ export class BudgetManager {
     });
 
     if (countryCosts.length === 0) {
+      const destinationCount = countryDestinations.length;
+      const destinationLabel = destinationCount === 1 ? `${destinationCount} destination` : `${destinationCount} destinations`;
+
       return `
-        <div class="no-costs-message">No costs recorded for this country yet.</div>
-        ${this.renderAddCostSection(country, countryDestinations)}
+        <div class="no-costs-container">
+          <div class="no-costs-message">
+            <p style="margin: 0 0 12px 0;">No costs recorded for this country yet.</p>
+            <button class="btn-primary generate-costs-btn" data-country="${country}" data-destinations="${countryDestinations.map(d => d.id).join(',')}">
+              🤖 Generate AI Cost Estimates for ${destinationLabel}
+            </button>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #666;">
+              Or add costs manually below
+            </p>
+          </div>
+          ${this.renderAddCostSection(country, countryDestinations)}
+        </div>
       `;
     }
 
@@ -1908,6 +1921,40 @@ export class BudgetManager {
         }
       });
     }
+
+    // Generate costs button for countries without costs
+    this.container.querySelectorAll('.generate-costs-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const country = (btn as HTMLElement).dataset.country!;
+        const destinationIds = (btn as HTMLElement).dataset.destinations?.split(',') || [];
+
+        const destinations = destinationIds
+          .map(id => (this.tripData.locations || []).find(loc => String(loc.id) === id))
+          .filter(d => d);
+
+        const destNames = destinations.map(d => d.name || d.city).join(', ');
+
+        // Show information about AI generation
+        // Note: Actual AI generation would integrate with the existing chat/agent system
+        const message = `AI Cost Generation for ${country}\n\n` +
+          `This feature will generate cost estimates for:\n${destNames}\n\n` +
+          `The AI will research and estimate costs for:\n` +
+          `• Accommodation (hotels, hostels, etc.)\n` +
+          `• Activities (tours, attractions, etc.)\n` +
+          `• Food (restaurants, markets, etc.)\n` +
+          `• Local Transport (buses, trains, taxis, etc.)\n\n` +
+          `Generated costs will automatically use the local currency for each destination based on country mappings.\n\n` +
+          `Note: AI cost generation will be integrated with the existing agent system. ` +
+          `This feature will trigger the same AI research as "Generate Costs" tab.`;
+
+        alert(message);
+
+        // Future implementation would:
+        // 1. Call AI agent to generate costs for these destinations
+        // 2. Use getCurrencyForDestination() to set proper currency
+        // 3. Save generated costs and trigger render
+      });
+    });
   }
 
   private setupAutoResizeTextareas() {
@@ -3072,14 +3119,39 @@ export const budgetManagerStyles = `
   border: 1px solid #b8daff;
 }
 
-.no-costs-message {
-  padding: 20px;
-  text-align: center;
-  color: #666;
-  font-style: italic;
+.no-costs-container {
   background: white;
   border-radius: 6px;
-  border: 1px dashed #ddd;
+  border: 1px solid #e0e0e0;
+}
+
+.no-costs-message {
+  padding: 24px;
+  text-align: center;
+  color: #666;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.generate-costs-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.generate-costs-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.generate-costs-btn:active {
+  transform: translateY(0);
 }
 
 /* Editable costs table styles */
