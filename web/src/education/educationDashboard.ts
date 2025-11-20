@@ -684,6 +684,20 @@ function renderCurricula(curriculaData: CurriculumPlan[]) {
 };
 
 // Activity rendering helpers
+function generateActivityId(locId: string, section: string, type: string, index: number): string {
+    return `activity_${locId}_${section}_${type}_${index}`;
+}
+
+function renderActivityWrapper(content: string, activityId: string, activityType: string, locationId: string, sectionType: string): string {
+    const editModeClass = isEditMode ? 'edit-mode' : '';
+    return `
+        <div class="activity-item ${editModeClass}" data-activity-id="${activityId}" data-activity-type="${activityType}" data-location-id="${locationId}" data-section="${sectionType}">
+            ${content}
+            ${renderActivityActions(activityId, activityType, locationId)}
+        </div>
+    `;
+}
+
 function renderActivityActions(activityId: string, activityType: string, locationId: string): string {
     if (!isEditMode) return '';
 
@@ -708,10 +722,16 @@ function renderActivityActions(activityId: string, activityType: string, locatio
 function renderSectionActions(sectionType: string, locationId: string): string {
     if (!isEditMode) return '';
 
+    const sectionNames = {
+        'pre_trip': 'Pre-Trip',
+        'on_location': 'On-Location',
+        'post_trip': 'Post-Trip'
+    };
+
     return `
         <div style="margin-top: 12px; padding: 12px; background: var(--bg-primary); border-radius: 4px; border: 1px dashed var(--border-color);">
             <button class="activity-action-btn primary" onclick="addActivity('${sectionType}', '${locationId}')">
-                ➕ Add ${sectionType === 'pre_trip' ? 'Pre-Trip' : sectionType === 'on_location' ? 'On-Location' : 'Post-Trip'} Activity
+                ➕ Add ${sectionNames[sectionType] || sectionType} Activity
             </button>
             <button class="activity-action-btn primary" onclick="regenerateSection('${sectionType}', '${locationId}')">
                 🔄 Regenerate This Section
@@ -795,8 +815,9 @@ function displayCurriculumDetails(curriculum: any) {
                     <p style="margin: 4px 0;"><strong>Duration:</strong> ${curriculum.semester_overview?.duration_weeks || 0} weeks</p>
                     <p style="margin: 4px 0;"><strong>Subjects:</strong> ${(curriculum.semester_overview?.subjects_covered || []).join(', ')}</p>
                 </div>
-                <button class="btn btn-primary btn-sm" onclick="editCurriculum('${curriculum.id}')">✏️ Edit with AI</button>
             </div>
+
+            ${renderRegenerationPanel(curriculum)}
 
             ${Object.entries(locations).map(([locId, location]: [string, any]) => `
                 <div class="location-section">
@@ -1011,7 +1032,76 @@ function displayCurriculumDetails(curriculum: any) {
         </div>
     `;
 
+    // Add section actions in edit mode (after DOM is ready)
+    if (isEditMode) {
+        setTimeout(() => injectSectionActions(curriculum), 0);
+    }
+
+    // Setup regeneration scope change listener
+    setTimeout(() => {
+        const regenScope = document.getElementById('regen-scope');
+        if (regenScope) {
+            regenScope.addEventListener('change', (e) => {
+                const value = (e.target as HTMLSelectElement).value;
+                const locationSelect = document.getElementById('regen-location-select');
+                if (locationSelect) {
+                    locationSelect.style.display = value === 'location' || value === 'section' ? 'block' : 'none';
+                }
+            });
+        }
+    }, 0);
+
     openModal('curriculum-detail-modal');
+}
+
+// Inject section action buttons after sections are rendered
+function injectSectionActions(curriculum: any) {
+    const locations = curriculum.location_lessons || {};
+
+    Object.entries(locations).forEach(([locId, location]: [string, any]) => {
+        // Find activity groups and add section actions
+        const locationSection = document.querySelector(`[data-location-id="${locId}"]`) ||
+                               Array.from(document.querySelectorAll('.location-section'))
+                                   .find(el => el.querySelector('h4')?.textContent?.includes(location.location_name || ''));
+
+        if (!locationSection) return;
+
+        // Add actions to pre-trip section
+        if (location.pre_trip) {
+            const preTripGroup = Array.from(locationSection.querySelectorAll('.activity-group'))
+                .find(g => g.textContent?.includes('Pre-Trip Activities'));
+            if (preTripGroup && !preTripGroup.querySelector('.section-actions')) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'section-actions';
+                actionsDiv.innerHTML = renderSectionActions('pre_trip', locId);
+                preTripGroup.appendChild(actionsDiv);
+            }
+        }
+
+        // Add actions to on-location section
+        if (location.on_location) {
+            const onLocationGroup = Array.from(locationSection.querySelectorAll('.activity-group'))
+                .find(g => g.textContent?.includes('On-Location Activities'));
+            if (onLocationGroup && !onLocationGroup.querySelector('.section-actions')) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'section-actions';
+                actionsDiv.innerHTML = renderSectionActions('on_location', locId);
+                onLocationGroup.appendChild(actionsDiv);
+            }
+        }
+
+        // Add actions to post-trip section
+        if (location.post_trip) {
+            const postTripGroup = Array.from(locationSection.querySelectorAll('.activity-group'))
+                .find(g => g.textContent?.includes('Post-Trip Activities'));
+            if (postTripGroup && !postTripGroup.querySelector('.section-actions')) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'section-actions';
+                actionsDiv.innerHTML = renderSectionActions('post_trip', locId);
+                postTripGroup.appendChild(actionsDiv);
+            }
+        }
+    });
 }
 
 // Testing Lab
@@ -1442,6 +1532,312 @@ function hideLoading() {
     } finally {
         hideLoading();
     }
+};
+
+// Activity Action Handlers
+
+(window as any).editActivity = async (activityId: string, activityType: string, locationId: string) => {
+    const activityEl = document.querySelector(`[data-activity-id="${activityId}"]`);
+    if (!activityEl) return;
+
+    const section = activityEl.getAttribute('data-section');
+    if (!currentCurriculum || !section) return;
+
+    // Get the activity data from the curriculum
+    const location = currentCurriculum.location_lessons[locationId];
+    if (!location) return;
+
+    // Find the activity in the appropriate section
+    let activities: any[] = [];
+    let activityIndex = -1;
+
+    if (section === 'pre_trip' && activityType === 'reading') {
+        activities = location.pre_trip?.readings || [];
+    } else if (section === 'pre_trip' && activityType === 'video') {
+        activities = location.pre_trip?.videos || [];
+    } else if (section === 'pre_trip' && activityType === 'task') {
+        activities = location.pre_trip?.prep_tasks || [];
+    } else if (section === 'on_location' && activityType === 'experiential') {
+        activities = location.on_location?.experiential_activities || [];
+    } else if (section === 'on_location' && activityType === 'structured') {
+        activities = location.on_location?.structured_lessons || [];
+    } else if (section === 'post_trip' && activityType === 'reflection') {
+        activities = location.post_trip?.reflection_prompts || [];
+    } else if (section === 'post_trip' && activityType === 'synthesis') {
+        activities = location.post_trip?.synthesis_activities || [];
+    }
+
+    // Parse activity ID to get index
+    const parts = activityId.split('_');
+    activityIndex = parseInt(parts[parts.length - 1]);
+
+    const activity = activities[activityIndex];
+    if (!activity) return;
+
+    // Create inline edit form
+    const currentTitle = typeof activity === 'string' ? activity : (activity.title || activity.text || activity.prompt || '');
+    const currentDesc = typeof activity === 'object' ? (activity.description || '') : '';
+
+    const editForm = `
+        <div style="background: var(--bg-secondary); padding: 12px; border-radius: 4px; margin: 8px 0;">
+            <div class="form-group" style="margin-bottom: 8px;">
+                <label style="font-weight: 500; font-size: 12px; display: block; margin-bottom: 4px;">Title/Text</label>
+                <input type="text" id="edit-title-${activityId}" class="inline-edit-input" value="${currentTitle.replace(/"/g, '&quot;')}" />
+            </div>
+            ${typeof activity === 'object' ? `
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <label style="font-weight: 500; font-size: 12px; display: block; margin-bottom: 4px;">Description</label>
+                    <textarea id="edit-desc-${activityId}" class="inline-edit-textarea">${currentDesc}</textarea>
+                </div>
+            ` : ''}
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button class="activity-action-btn primary" onclick="saveActivityEdit('${activityId}', '${activityType}', '${locationId}', '${section}', ${activityIndex})">
+                    💾 Save
+                </button>
+                <button class="activity-action-btn" onclick="cancelActivityEdit('${activityId}')">
+                    ❌ Cancel
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Replace activity content with edit form
+    const contentDiv = activityEl.querySelector(':scope > div, :scope > strong, :scope > span') || activityEl;
+    (window as any)[`original_content_${activityId}`] = contentDiv.innerHTML;
+    contentDiv.innerHTML = editForm;
+};
+
+(window as any).saveActivityEdit = async (activityId: string, activityType: string, locationId: string, section: string, activityIndex: number) => {
+    const titleInput = document.getElementById(`edit-title-${activityId}`) as HTMLInputElement;
+    const descInput = document.getElementById(`edit-desc-${activityId}`) as HTMLTextAreaElement;
+
+    if (!titleInput) return;
+
+    const newTitle = titleInput.value.trim();
+    const newDesc = descInput ? descInput.value.trim() : '';
+
+    if (!newTitle) {
+        showError('Title cannot be empty');
+        return;
+    }
+
+    if (!currentCurriculum) return;
+
+    // Update the curriculum data
+    const location = currentCurriculum.location_lessons[locationId];
+    if (!location) return;
+
+    let activities: any[] = [];
+
+    if (section === 'pre_trip' && activityType === 'reading') {
+        activities = location.pre_trip.readings;
+    } else if (section === 'pre_trip' && activityType === 'video') {
+        activities = location.pre_trip.videos;
+    } else if (section === 'pre_trip' && activityType === 'task') {
+        activities = location.pre_trip.prep_tasks;
+    } else if (section === 'on_location' && activityType === 'experiential') {
+        activities = location.on_location.experiential_activities;
+    } else if (section === 'on_location' && activityType === 'structured') {
+        activities = location.on_location.structured_lessons;
+    } else if (section === 'post_trip' && activityType === 'reflection') {
+        activities = location.post_trip.reflection_prompts;
+    } else if (section === 'post_trip' && activityType === 'synthesis') {
+        activities = location.post_trip.synthesis_activities;
+    }
+
+    const activity = activities[activityIndex];
+    if (typeof activity === 'string') {
+        activities[activityIndex] = newTitle;
+    } else if (typeof activity === 'object') {
+        if (activity.title !== undefined) activity.title = newTitle;
+        else if (activity.text !== undefined) activity.text = newTitle;
+        else if (activity.prompt !== undefined) activity.prompt = newTitle;
+
+        if (newDesc && activity.description !== undefined) {
+            activity.description = newDesc;
+        }
+    }
+
+    try {
+        showLoading('Saving changes...');
+
+        // Save to backend
+        await educationService.updateCurriculum(currentCurriculum.id, currentCurriculum);
+
+        showSuccess('Activity updated successfully!');
+
+        // Refresh display
+        displayCurriculumDetails(currentCurriculum);
+
+    } catch (error) {
+        console.error('Error saving activity:', error);
+        showError('Failed to save activity');
+    } finally {
+        hideLoading();
+    }
+};
+
+(window as any).cancelActivityEdit = (activityId: string) => {
+    const activityEl = document.querySelector(`[data-activity-id="${activityId}"]`);
+    if (!activityEl) return;
+
+    const contentDiv = activityEl.querySelector(':scope > div') || activityEl;
+    const originalContent = (window as any)[`original_content_${activityId}`];
+
+    if (originalContent) {
+        contentDiv.innerHTML = originalContent;
+        delete (window as any)[`original_content_${activityId}`];
+    } else {
+        // Just refresh the whole view
+        if (currentCurriculum) {
+            displayCurriculumDetails(currentCurriculum);
+        }
+    }
+};
+
+(window as any).deleteActivity = async (activityId: string, activityType: string, locationId: string) => {
+    if (!confirm('Are you sure you want to delete this activity? This action cannot be undone.')) {
+        return;
+    }
+
+    const activityEl = document.querySelector(`[data-activity-id="${activityId}"]`);
+    if (!activityEl) return;
+
+    const section = activityEl.getAttribute('data-section');
+    if (!currentCurriculum || !section) return;
+
+    // Parse activity ID to get index
+    const parts = activityId.split('_');
+    const activityIndex = parseInt(parts[parts.length - 1]);
+
+    const location = currentCurriculum.location_lessons[locationId];
+    if (!location) return;
+
+    // Remove from appropriate section
+    try {
+        if (section === 'pre_trip' && activityType === 'reading') {
+            location.pre_trip.readings.splice(activityIndex, 1);
+        } else if (section === 'pre_trip' && activityType === 'video') {
+            location.pre_trip.videos.splice(activityIndex, 1);
+        } else if (section === 'pre_trip' && activityType === 'task') {
+            location.pre_trip.prep_tasks.splice(activityIndex, 1);
+        } else if (section === 'on_location' && activityType === 'experiential') {
+            location.on_location.experiential_activities.splice(activityIndex, 1);
+        } else if (section === 'on_location' && activityType === 'structured') {
+            location.on_location.structured_lessons.splice(activityIndex, 1);
+        } else if (section === 'post_trip' && activityType === 'reflection') {
+            location.post_trip.reflection_prompts.splice(activityIndex, 1);
+        } else if (section === 'post_trip' && activityType === 'synthesis') {
+            location.post_trip.synthesis_activities.splice(activityIndex, 1);
+        }
+
+        showLoading('Deleting activity...');
+
+        // Save to backend
+        await educationService.updateCurriculum(currentCurriculum.id, currentCurriculum);
+
+        showSuccess('Activity deleted successfully!');
+
+        // Refresh display
+        displayCurriculumDetails(currentCurriculum);
+
+    } catch (error) {
+        console.error('Error deleting activity:', error);
+        showError('Failed to delete activity');
+    } finally {
+        hideLoading();
+    }
+};
+
+(window as any).toggleActivityComplete = async (activityId: string) => {
+    // TODO: Implement completion tracking
+    // This would require a progress_tracking system
+    alert('Activity completion tracking coming soon! This will integrate with the progress tracking system.');
+};
+
+(window as any).duplicateActivity = async (activityId: string, activityType: string, locationId: string) => {
+    // TODO: Show modal to select destination location
+    alert('Activity duplication coming soon! You will be able to copy activities to other locations.');
+};
+
+(window as any).addActivity = async (sectionType: string, locationId: string) => {
+    if (!currentCurriculum) return;
+
+    const location = currentCurriculum.location_lessons[locationId];
+    if (!location) return;
+
+    // Simple form to add new activity
+    const newActivityPrompt = prompt('Enter activity title:');
+    if (!newActivityPrompt || !newActivityPrompt.trim()) return;
+
+    const newActivityDesc = prompt('Enter activity description (optional):');
+
+    const newActivity = {
+        title: newActivityPrompt.trim(),
+        description: newActivityDesc?.trim() || '',
+        estimated_duration_minutes: 30
+    };
+
+    try {
+        // Add to appropriate section
+        if (sectionType === 'pre_trip') {
+            if (!location.pre_trip.prep_tasks) location.pre_trip.prep_tasks = [];
+            location.pre_trip.prep_tasks.push(newActivity);
+        } else if (sectionType === 'on_location') {
+            if (!location.on_location.experiential_activities) location.on_location.experiential_activities = [];
+            location.on_location.experiential_activities.push(newActivity);
+        } else if (sectionType === 'post_trip') {
+            if (!location.post_trip.synthesis_activities) location.post_trip.synthesis_activities = [];
+            location.post_trip.synthesis_activities.push(newActivity);
+        }
+
+        showLoading('Adding activity...');
+
+        // Save to backend
+        await educationService.updateCurriculum(currentCurriculum.id, currentCurriculum);
+
+        showSuccess('Activity added successfully!');
+
+        // Refresh display
+        displayCurriculumDetails(currentCurriculum);
+
+    } catch (error) {
+        console.error('Error adding activity:', error);
+        showError('Failed to add activity');
+    } finally {
+        hideLoading();
+    }
+};
+
+(window as any).regenerateSection = async (sectionType: string, locationId: string) => {
+    if (!confirm(`Regenerate the ${sectionType.replace('_', '-')} section? This will replace existing activities.`)) {
+        return;
+    }
+
+    // TODO: Implement section regeneration
+    alert('Section regeneration coming soon! This will use AI to regenerate just this section.');
+};
+
+(window as any).executeRegeneration = async (curriculumId: string) => {
+    const scope = (document.getElementById('regen-scope') as HTMLSelectElement)?.value;
+    const instructions = (document.getElementById('regen-instructions') as HTMLTextAreaElement)?.value || '';
+
+    if (!scope) {
+        showError('Please select a regeneration scope');
+        return;
+    }
+
+    if (!confirm(`Regenerate ${scope === 'full' ? 'entire curriculum' : scope}? This will replace existing content.`)) {
+        return;
+    }
+
+    // TODO: Implement full regeneration with AI
+    alert(`Regeneration feature coming soon!\n\nScope: ${scope}\nInstructions: ${instructions}\n\nThis will use AI to regenerate the curriculum with your specified modifications.`);
+};
+
+(window as any).compareBeforeRegenerate = async (curriculumId: string) => {
+    // TODO: Implement preview/comparison view
+    alert('Preview feature coming soon! This will show a side-by-side comparison of current vs. regenerated curriculum.');
 };
 
 function showSuccess(message: string) {
