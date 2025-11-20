@@ -423,6 +423,65 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     return allCosts;
   }
 
+  private async showPromptEditModal(prompt: string, title: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      // Create modal overlay
+      const modal = document.createElement('div');
+      modal.className = 'prompt-edit-modal-overlay';
+      modal.innerHTML = `
+        <div class="prompt-edit-modal">
+          <div class="prompt-edit-header">
+            <h3>${title}</h3>
+            <button class="close-modal-btn">×</button>
+          </div>
+          <div class="prompt-edit-body">
+            <p style="margin-bottom: 10px; color: #666; font-size: 13px;">Review and edit the prompt before sending to AI:</p>
+            <textarea class="prompt-edit-textarea">${prompt}</textarea>
+          </div>
+          <div class="prompt-edit-footer">
+            <button class="btn-secondary cancel-prompt-btn">Cancel</button>
+            <button class="btn-primary generate-with-prompt-btn">Generate Costs</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      const textarea = modal.querySelector('.prompt-edit-textarea') as HTMLTextAreaElement;
+      const closeBtn = modal.querySelector('.close-modal-btn');
+      const cancelBtn = modal.querySelector('.cancel-prompt-btn');
+      const generateBtn = modal.querySelector('.generate-with-prompt-btn');
+
+      const cleanup = () => {
+        modal.remove();
+      };
+
+      closeBtn?.addEventListener('click', () => {
+        cleanup();
+        resolve(null);
+      });
+
+      cancelBtn?.addEventListener('click', () => {
+        cleanup();
+        resolve(null);
+      });
+
+      generateBtn?.addEventListener('click', () => {
+        const editedPrompt = textarea.value;
+        cleanup();
+        resolve(editedPrompt);
+      });
+
+      // Close on overlay click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          cleanup();
+          resolve(null);
+        }
+      });
+    });
+  }
+
   private getCurrenciesForCountry(country: string): string[] {
     const countryCosts = (this.tripData.costs || [])
       .filter(c => {
@@ -645,6 +704,14 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     const countryCurrencies = this.getCurrenciesForCountry(country);
     const hasCurrencies = countryCurrencies.length > 0;
 
+    // Build exchange rate display for all currencies used in this country
+    const ratesDisplay = countryCurrencies.length > 0
+      ? countryCurrencies.map(curr => {
+          const rate = this.exchangeRates[curr] || 1;
+          return `<span class="currency-rate-item">1 ${curr} = $${(1 / rate).toFixed(4)} USD</span>`;
+        }).join(' • ')
+      : '';
+
     return `
       <div class="country-costs-table" data-country="${country}">
         <div class="costs-table-actions">
@@ -654,12 +721,30 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
               🔄 Refresh Rates (${countryCurrencies.join(', ')})
             </button>
           ` : ''}
+          <button class="btn-sm btn-secondary regenerate-country-costs-btn" data-country="${country}" data-destinations="${countryDestinations.map(d => d.id).join(',')}" title="Regenerate all costs for this country">
+            🔄 Regenerate Costs
+          </button>
           <span class="auto-save-indicator"></span>
-          <span class="rates-fetch-date">Rates: ${this.ratesFetchDate}</span>
         </div>
-        ${Object.entries(costsByDestination).map(([destName, costs]) => `
-          <div class="destination-costs-section">
-            <div class="destination-header">${destName}</div>
+        ${ratesDisplay ? `
+          <div class="exchange-rates-header">
+            <strong>Exchange Rates:</strong> ${ratesDisplay} <span class="rates-date-small">(${this.ratesFetchDate})</span>
+          </div>
+        ` : ''}
+        ${Object.entries(costsByDestination).map(([destName, costs]) => {
+          const firstCost = costs[0];
+          const destinationId = firstCost?.destination_id;
+          return `
+          <div class="destination-costs-section" data-destination-id="${destinationId}">
+            <div class="destination-header">
+              <span>${destName}</span>
+              <button class="btn-xs btn-secondary regenerate-destination-costs-btn"
+                      data-destination-id="${destinationId}"
+                      data-destination-name="${destName}"
+                      title="Regenerate costs for ${destName}">
+                🔄 Regenerate
+              </button>
+            </div>
             <table class="costs-table editable-costs-table">
               <thead>
                 <tr>
@@ -688,7 +773,8 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
               </tfoot>
             </table>
           </div>
-        `).join('')}
+        `;
+        }).join('')}
         <div class="country-total-row" data-country="${country}">
           <strong>Total for ${country}:</strong>
           <strong class="country-total-amount">${this.formatCurrency(
@@ -706,12 +792,6 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     const amountUsd = cost.amount_usd || amount;
     // Default to local currency if not set
     const currency = cost.currency || getCurrencyForDestination(cost.destination_id, this.tripData.locations || []);
-
-    // Get exchange rate for display
-    const rate = currency === 'USD' ? 1 : (this.exchangeRates[currency] || 1);
-    const rateDisplay = currency !== 'USD'
-      ? `<div class="exchange-rate-info">1 ${currency} = $${(1 / rate).toFixed(4)} USD<br><span class="rate-date">${this.ratesFetchDate}</span></div>`
-      : '';
 
     return `
       <tr class="editable-cost-row" data-cost-id="${costId}">
@@ -731,7 +811,6 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         <td>
           <div class="currency-display-wrapper">
             <div class="currency-code-display">${currency}</div>
-            ${rateDisplay}
           </div>
           <input type="hidden"
                  class="currency-field"
@@ -3374,6 +3453,41 @@ export const budgetManagerStyles = `
   background: #f0f7ff;
   border-left: 4px solid #007bff;
   border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.exchange-rates-header {
+  padding: 10px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #333;
+  border: 1px solid #e0e0e0;
+}
+
+.currency-rate-item {
+  font-family: monospace;
+  color: #555;
+}
+
+.rates-date-small {
+  color: #999;
+  font-size: 11px;
+  font-style: italic;
+}
+
+.btn-xs {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.regenerate-destination-costs-btn,
+.regenerate-country-costs-btn {
+  white-space: nowrap;
 }
 
 .costs-table {
@@ -3738,6 +3852,91 @@ textarea.auto-resize {
 .rate-date {
   font-size: 9px;
   color: #999;
+}
+
+/* Prompt Edit Modal */
+.prompt-edit-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.prompt-edit-modal {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.prompt-edit-header {
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.prompt-edit-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.close-modal-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.close-modal-btn:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.prompt-edit-body {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.prompt-edit-textarea {
+  width: 100%;
+  min-height: 300px;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.prompt-edit-footer {
+  padding: 20px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 </style>
 `;
