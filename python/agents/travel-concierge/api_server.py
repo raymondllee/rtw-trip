@@ -5321,7 +5321,8 @@ def get_destinations():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='0.0.0.0', port=port, debug=True)
 def _to_float(value) -> float:
     """Best-effort conversion of mixed values to floats."""
     if isinstance(value, (int, float)):

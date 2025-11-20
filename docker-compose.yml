@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: python/agents/travel-concierge/Dockerfile
+    ports:
+      - "${FLASK_PORT:-5001}:5001"
+    environment:
+      - PORT=5001
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=${GOOGLE_APPLICATION_CREDENTIALS_JSON}
+    volumes:
+      - ./python:/app/python
+      - ./logs:/app/logs
+
+  adk:
+    build:
+      context: .
+      dockerfile: python/agents/travel-concierge/Dockerfile
+    command: adk api_server travel_concierge --port 8000 --host 0.0.0.0
+    ports:
+      - "${ADK_PORT:-8000}:8000"
+    environment:
+      - PYTHONPATH=/app/python/agents
+    volumes:
+      - ./python:/app/python
+      - ./logs:/app/logs
+
+  frontend:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      - VITE_API_TARGET=http://backend:5001
+      - VITE_PORT=5173
+    volumes:
+      - ./web:/app/web
+      - ./package.json:/app/package.json
+      - ./vite.config.ts:/app/vite.config.ts
+    depends_on:
+      - backend

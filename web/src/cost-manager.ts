@@ -43,12 +43,12 @@ function initTabSwitching() {
       document.getElementById(`tab-${tabName}`).classList.add('active');
 
       // Initialize tab content on first view
-      if (tabName === 'edit-costs' && !bulkEditor) {
+      if (tabName === 'budget' && !budgetManager) {
+        initBudgetTab();
+      } else if (tabName === 'edit-costs' && !bulkEditor) {
         initEditCostsTab();
       } else if (tabName === 'generate-costs') {
         initGenerateCostsTab();
-      } else if (tabName === 'budget' && !budgetManager) {
-        initBudgetTab();
       }
     });
   });
@@ -400,8 +400,8 @@ async function initialize() {
     // Initialize tab switching
     initTabSwitching();
 
-    // Initialize the first tab (Edit Costs)
-    initEditCostsTab();
+    // Initialize the first tab (Budget Management)
+    initBudgetTab();
 
   } catch (error) {
     console.error('Failed to load scenario:', error);

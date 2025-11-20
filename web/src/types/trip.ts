@@ -190,6 +190,11 @@ export interface TripBudget {
   alerts: BudgetAlert[];
   created_at?: string;
   updated_at?: string;
+  // Notes for budget line items and groups
+  category_notes?: Record<string, string>;  // Notes per category
+  country_notes?: Record<string, string>;   // Notes per country
+  category_group_note?: string;             // Note for entire category section
+  country_group_note?: string;              // Note for entire country section
 }
 
 export interface TripData {

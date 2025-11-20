@@ -189,25 +189,27 @@
     </div>
 
     <div class="tab-navigation">
-      <button class="tab-button active" data-tab="edit-costs">
-        📊 Review & Edit Costs
+      <button class="tab-button active" data-tab="budget">
+        💵 Budget Management
       </button>
       <button class="tab-button" data-tab="generate-costs">
         🤖 Generate Costs (AI)
       </button>
-      <button class="tab-button" data-tab="budget">
-        💵 Budget Management
+      <button class="tab-button" data-tab="edit-costs">
+        📊 Review & Edit Costs
       </button>
       <button class="tab-button" data-tab="analysis">
         📈 Cost Analysis
       </button>
     </div>
 
-    <!-- Tab 1: Review & Edit Costs -->
-    <div id="tab-edit-costs" class="tab-content active">
+    <!-- Tab 1: Budget Management -->
+    <div id="tab-budget" class="tab-content active">
       <div class="tab-panel">
-        <div class="loading-spinner">
-          Loading costs...
+        <div id="budget-container">
+          <div class="loading-spinner">
+            Loading budget...
+          </div>
         </div>
       </div>
     </div>
@@ -223,13 +225,11 @@
       </div>
     </div>
 
-    <!-- Tab 3: Budget Management -->
-    <div id="tab-budget" class="tab-content">
+    <!-- Tab 3: Review & Edit Costs -->
+    <div id="tab-edit-costs" class="tab-content">
       <div class="tab-panel">
-        <div id="budget-container">
-          <div class="loading-spinner">
-            Loading budget...
-          </div>
+        <div class="loading-spinner">
+          Loading costs...
         </div>
       </div>
     </div>
