@@ -5,6 +5,7 @@
 
 import type { TripBudget, TripData } from '../types/trip';
 import { calculateBudgetStatus, createDefaultBudget } from '../utils/budgetTracker';
+import { getCurrencyForDestination } from '../utils/currencyMapping';
 
 export class BudgetManager {
   private container: HTMLElement;
@@ -141,7 +142,10 @@ export class BudgetManager {
         CNY: 7.24,
         INR: 83.12,
         THB: 34.50,
-        VND: 24450
+        VND: 24450,
+        FJD: 2.24,
+        SGD: 1.34,
+        NZD: 1.68
       };
       this.ratesFetchDate = 'Using default rates';
     }
@@ -199,6 +203,33 @@ export class BudgetManager {
     return Array.from(currencies);
   }
 
+  private updateExchangeRateDisplays(country?: string) {
+    // Update exchange rate displays without full re-render
+    const costs = country
+      ? (this.tripData.costs || []).filter(c => {
+          const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+          return location?.country === country;
+        })
+      : (this.tripData.costs || []);
+
+    costs.forEach(cost => {
+      const currency = cost.currency || 'USD';
+      if (currency === 'USD') return;
+
+      const costId = cost.id || `${cost.destination_id}_${cost.category}_${Date.now()}`;
+      const row = this.container.querySelector(`.editable-cost-row[data-cost-id="${costId}"]`);
+
+      if (row) {
+        const rateInfo = row.querySelector('.exchange-rate-info');
+        const rate = this.exchangeRates[currency] || 1;
+
+        if (rateInfo) {
+          rateInfo.innerHTML = `1 ${currency} = $${(1 / rate).toFixed(4)} USD<br><span class="rate-date">${this.ratesFetchDate}</span>`;
+        }
+      }
+    });
+  }
+
   private convertCurrency(amount: number, fromCurrency: string, toCurrency: string): number {
     if (fromCurrency === toCurrency) return amount;
 
@@ -225,7 +256,10 @@ export class BudgetManager {
       CNY: '¥',
       INR: '₹',
       THB: '฿',
-      VND: '₫'
+      VND: '₫',
+      FJD: 'FJ$',
+      SGD: 'S$',
+      NZD: 'NZ$'
     };
     return symbols[currency] || currency;
   }
@@ -237,11 +271,38 @@ export class BudgetManager {
   }
 
   updateData(tripData: TripData, budget?: TripBudget) {
+    // Save the current open/closed state of country sections before re-rendering
+    const openCountries = new Set<string>();
+    this.container.querySelectorAll('.item-costs-section').forEach(section => {
+      const country = (section as HTMLElement).dataset.country;
+      const display = (section as HTMLElement).style.display;
+      if (country && display !== 'none') {
+        openCountries.add(country);
+      }
+    });
+
     this.tripData = tripData;
     if (budget !== undefined) {
       this.budget = budget;
     }
     this.render();
+
+    // Restore the open/closed state after rendering
+    openCountries.forEach(country => {
+      const section = this.container.querySelector(`.item-costs-section[data-country="${country}"]`) as HTMLElement;
+      if (section) {
+        section.style.display = 'block';
+
+        // Auto-resize all textareas in restored sections
+        section.querySelectorAll('textarea.auto-resize').forEach(textarea => {
+          const el = textarea as HTMLTextAreaElement;
+          requestAnimationFrame(() => {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+          });
+        });
+      }
+    });
   }
 
   private formatCurrency(amount: number): string {
@@ -383,12 +444,13 @@ export class BudgetManager {
     const costId = cost.id || `${cost.destination_id}_${cost.category}_${Date.now()}`;
     const amount = cost.amount || 0;
     const amountUsd = cost.amount_usd || amount;
-    const currency = cost.currency || 'USD';
+    // Default to local currency if not set
+    const currency = cost.currency || getCurrencyForDestination(cost.destination_id, this.tripData.locations || []);
 
     // Get exchange rate for display
     const rate = currency === 'USD' ? 1 : (this.exchangeRates[currency] || 1);
     const rateDisplay = currency !== 'USD'
-      ? `<div class="exchange-rate-info" title="Rate as of ${this.ratesFetchDate}">1 USD = ${this.getCurrencySymbol(currency)}${rate.toFixed(2)}</div>`
+      ? `<div class="exchange-rate-info">1 ${currency} = $${(1 / rate).toFixed(4)} USD<br><span class="rate-date">${this.ratesFetchDate}</span></div>`
       : '';
 
     return `
@@ -407,21 +469,15 @@ export class BudgetManager {
                  placeholder="Description">
         </td>
         <td>
-          <select class="cost-field-select currency-select"
-                  data-cost-id="${costId}"
-                  data-field="currency">
-            <option value="USD" ${currency === 'USD' ? 'selected' : ''}>USD</option>
-            <option value="EUR" ${currency === 'EUR' ? 'selected' : ''}>EUR</option>
-            <option value="GBP" ${currency === 'GBP' ? 'selected' : ''}>GBP</option>
-            <option value="JPY" ${currency === 'JPY' ? 'selected' : ''}>JPY</option>
-            <option value="AUD" ${currency === 'AUD' ? 'selected' : ''}>AUD</option>
-            <option value="CAD" ${currency === 'CAD' ? 'selected' : ''}>CAD</option>
-            <option value="CNY" ${currency === 'CNY' ? 'selected' : ''}>CNY</option>
-            <option value="INR" ${currency === 'INR' ? 'selected' : ''}>INR</option>
-            <option value="THB" ${currency === 'THB' ? 'selected' : ''}>THB</option>
-            <option value="VND" ${currency === 'VND' ? 'selected' : ''}>VND</option>
-          </select>
-          ${rateDisplay}
+          <div class="currency-display-wrapper">
+            <div class="currency-code-display">${currency}</div>
+            ${rateDisplay}
+          </div>
+          <input type="hidden"
+                 class="currency-field"
+                 data-cost-id="${costId}"
+                 data-field="currency"
+                 value="${currency}">
         </td>
         <td class="text-right">
           <div class="currency-input-wrapper">
@@ -466,12 +522,11 @@ export class BudgetManager {
                  value="${cost.date || ''}">
         </td>
         <td>
-          <input type="text"
-                 class="cost-field-input notes-input"
-                 data-cost-id="${costId}"
-                 data-field="notes"
-                 value="${cost.notes || ''}"
-                 placeholder="Notes">
+          <textarea class="cost-field-input notes-input auto-resize"
+                    data-cost-id="${costId}"
+                    data-field="notes"
+                    placeholder="Notes"
+                    rows="1">${cost.notes || ''}</textarea>
         </td>
         <td>
           <button class="btn-icon delete-cost-btn" data-cost-id="${costId}" title="Delete cost">🗑️</button>
@@ -525,6 +580,9 @@ export class BudgetManager {
                 <option value="INR">INR</option>
                 <option value="THB">THB</option>
                 <option value="VND">VND</option>
+                <option value="FJD">FJD</option>
+                <option value="SGD">SGD</option>
+                <option value="NZD">NZD</option>
               </select>
             </div>
             <div class="form-group">
@@ -1358,12 +1416,22 @@ export class BudgetManager {
         if (costsSection) {
           const isVisible = costsSection.style.display !== 'none';
           costsSection.style.display = isVisible ? 'none' : 'block';
+
           // Update button text to indicate state
           const btnElement = btn as HTMLElement;
           if (isVisible) {
             btnElement.innerHTML = btnElement.innerHTML.replace('▼', '▶').replace('Hide', 'View');
           } else {
             btnElement.innerHTML = btnElement.innerHTML.replace('▶', '▼').replace('View', 'Hide');
+
+            // Auto-resize all textareas in this section when opening
+            costsSection.querySelectorAll('textarea.auto-resize').forEach(textarea => {
+              const el = textarea as HTMLTextAreaElement;
+              requestAnimationFrame(() => {
+                el.style.height = 'auto';
+                el.style.height = el.scrollHeight + 'px';
+              });
+            });
           }
         }
       });
@@ -1528,9 +1596,9 @@ export class BudgetManager {
         // If amount changes, auto-convert to USD
         if (fieldName === 'amount') {
           const row = inputEl.closest('tr');
-          const currencySelect = row?.querySelector('.currency-select') as HTMLSelectElement;
+          const currencyField = row?.querySelector('.currency-field') as HTMLInputElement;
           const usdInput = row?.querySelector('.usd-input') as HTMLInputElement;
-          const currency = currencySelect?.value || 'USD';
+          const currency = currencyField?.value || editedCost.currency || 'USD';
           const amount = parseFloat(inputEl.value) || 0;
 
           if (usdInput) {
@@ -1548,9 +1616,9 @@ export class BudgetManager {
         // If USD amount changes, reverse calculate original currency amount
         if (fieldName === 'amount_usd') {
           const row = inputEl.closest('tr');
-          const currencySelect = row?.querySelector('.currency-select') as HTMLSelectElement;
+          const currencyField = row?.querySelector('.currency-field') as HTMLInputElement;
           const amountInput = row?.querySelector('.amount-input') as HTMLInputElement;
-          const currency = currencySelect?.value || 'USD';
+          const currency = currencyField?.value || editedCost.currency || 'USD';
           const usdAmount = parseFloat(inputEl.value) || 0;
 
           if (amountInput && currency !== 'USD') {
@@ -1573,13 +1641,33 @@ export class BudgetManager {
       }
     });
 
+    // Auto-resize textareas
+    this.setupAutoResizeTextareas();
+
     // Add cost button
     this.container.querySelectorAll('.add-cost-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const country = (btn as HTMLElement).dataset.country!;
         const addSection = this.container.querySelector(`.add-cost-section[data-country="${country}"]`) as HTMLElement;
         if (addSection) {
-          addSection.style.display = addSection.style.display === 'none' ? 'block' : 'none';
+          const isOpening = addSection.style.display === 'none';
+          addSection.style.display = isOpening ? 'block' : 'none';
+
+          // Set default currency to local currency when opening the form
+          if (isOpening) {
+            const currencySelect = addSection.querySelector('.new-cost-currency') as HTMLSelectElement;
+            if (currencySelect) {
+              // Find the first destination in this country to get its currency
+              const destinations = (this.tripData.locations || []).filter(loc => loc.country === country);
+              if (destinations.length > 0) {
+                const localCurrency = getCurrencyForDestination(destinations[0].id, this.tripData.locations || []);
+                currencySelect.value = localCurrency;
+
+                // Trigger change event to update USD field disabled state
+                currencySelect.dispatchEvent(new Event('change'));
+              }
+            }
+          }
         }
       });
     });
@@ -1723,13 +1811,47 @@ export class BudgetManager {
 
         try {
           await this.refreshExchangeRates(currencies);
-          alert(`✅ Exchange rates refreshed for ${currencies.join(', ')}\nRates as of: ${this.ratesFetchDate}`);
-          this.render();
+
+          // Update the rate display text
+          const ratesDateEl = btn.closest('.costs-table-actions')?.querySelector('.rates-fetch-date');
+          if (ratesDateEl) {
+            ratesDateEl.textContent = `Rates: ${this.ratesFetchDate}`;
+          }
+
+          // Highlight all exchange rate displays for this country
+          const countrySection = this.container.querySelector(`.item-costs-section[data-country="${country}"]`);
+          if (countrySection) {
+            countrySection.querySelectorAll('.exchange-rate-info').forEach(rateInfo => {
+              const el = rateInfo as HTMLElement;
+              el.style.transition = 'background-color 0.3s ease';
+              el.style.backgroundColor = '#d4edda';
+              el.style.padding = '4px 6px';
+              el.style.borderRadius = '3px';
+
+              // Remove highlight after 2 seconds
+              setTimeout(() => {
+                el.style.backgroundColor = '';
+                el.style.padding = '';
+                el.style.borderRadius = '';
+              }, 2000);
+            });
+          }
+
+          // Update exchange rate displays without full re-render
+          this.updateExchangeRateDisplays(country);
+
+          // Show success message in button briefly
+          btn.textContent = '✓ Refreshed';
+          setTimeout(() => {
+            btn.textContent = originalText;
+          }, 1500);
         } catch (error) {
-          alert('❌ Failed to refresh exchange rates. Please try again.');
+          btn.textContent = '✗ Failed';
+          setTimeout(() => {
+            btn.textContent = originalText;
+          }, 2000);
           console.error('Failed to refresh rates:', error);
         } finally {
-          btn.textContent = originalText;
           (btn as HTMLButtonElement).disabled = false;
         }
       });
@@ -1750,17 +1872,68 @@ export class BudgetManager {
 
         try {
           await this.refreshExchangeRates();
-          alert(`✅ Exchange rates refreshed for all currencies\nRates as of: ${this.ratesFetchDate}\nCurrencies: ${allCurrencies.join(', ')}`);
-          this.render();
+
+          // Highlight all exchange rate displays
+          this.container.querySelectorAll('.exchange-rate-info').forEach(rateInfo => {
+            const el = rateInfo as HTMLElement;
+            el.style.transition = 'background-color 0.3s ease';
+            el.style.backgroundColor = '#d4edda';
+            el.style.padding = '4px 6px';
+            el.style.borderRadius = '3px';
+
+            // Remove highlight after 2 seconds
+            setTimeout(() => {
+              el.style.backgroundColor = '';
+              el.style.padding = '';
+              el.style.borderRadius = '';
+            }, 2000);
+          });
+
+          // Update all exchange rate displays without full re-render
+          this.updateExchangeRateDisplays();
+
+          // Show success message in button briefly
+          refreshAllBtn.textContent = '✓ Refreshed';
+          setTimeout(() => {
+            refreshAllBtn.textContent = originalText;
+          }, 1500);
         } catch (error) {
-          alert('❌ Failed to refresh exchange rates. Please try again.');
+          refreshAllBtn.textContent = '✗ Failed';
+          setTimeout(() => {
+            refreshAllBtn.textContent = originalText;
+          }, 2000);
           console.error('Failed to refresh rates:', error);
         } finally {
-          refreshAllBtn.textContent = originalText;
           (refreshAllBtn as HTMLButtonElement).disabled = false;
         }
       });
     }
+  }
+
+  private setupAutoResizeTextareas() {
+    // Function to auto-resize a textarea based on its content
+    const autoResize = (textarea: HTMLTextAreaElement) => {
+      // Reset height to get accurate scrollHeight
+      textarea.style.height = 'auto';
+      // Set height to scrollHeight to fit content
+      textarea.style.height = textarea.scrollHeight + 'px';
+    };
+
+    // Setup auto-resize for all textareas with the auto-resize class
+    this.container.querySelectorAll('textarea.auto-resize').forEach(textarea => {
+      const el = textarea as HTMLTextAreaElement;
+
+      // Initial resize - use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        autoResize(el);
+      });
+
+      // Resize on input
+      el.addEventListener('input', () => autoResize(el));
+
+      // Resize on focus (in case content was changed programmatically)
+      el.addEventListener('focus', () => autoResize(el));
+    });
   }
 
   render() {
@@ -2653,6 +2826,7 @@ export const budgetManagerStyles = `
   font-size: 13px;
   font-family: inherit;
   resize: vertical;
+  box-sizing: border-box;
 }
 
 .group-note-input:focus {
@@ -2972,6 +3146,18 @@ export const budgetManagerStyles = `
   color: #999;
 }
 
+textarea.cost-field-input {
+  resize: none;
+  overflow: hidden;
+  min-height: 34px;
+  line-height: 1.4;
+}
+
+textarea.auto-resize {
+  resize: none;
+  overflow: hidden;
+}
+
 .btn-icon {
   background: none;
   border: none;
@@ -3008,6 +3194,7 @@ export const budgetManagerStyles = `
   display: flex;
   gap: 12px;
   margin-bottom: 12px;
+  align-items: flex-start;
 }
 
 .form-group {
@@ -3064,18 +3251,38 @@ export const budgetManagerStyles = `
   color: #666;
   pointer-events: none;
   z-index: 1;
+  font-size: 14px;
 }
 
 .currency-input-wrapper .cost-field-input {
-  padding-left: 24px;
+  padding-left: 36px;
+  text-align: right;
+}
+
+.currency-display-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.currency-code-display {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  padding: 4px 0;
 }
 
 .exchange-rate-info {
   font-size: 10px;
   color: #666;
-  margin-top: 2px;
   font-style: italic;
   white-space: nowrap;
+  line-height: 1.3;
+}
+
+.rate-date {
+  font-size: 9px;
+  color: #999;
 }
 </style>
 `;
