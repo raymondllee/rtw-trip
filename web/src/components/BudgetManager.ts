@@ -2836,7 +2836,19 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           }
 
           // Call backend cost research API
-          await this.generateCostsForCountry(country, destinationIds);
+          const newCosts = await this.generateCostsForCountry(country, destinationIds);
+
+          // Add new costs to tripData
+          if (!this.tripData.costs) {
+            this.tripData.costs = [];
+          }
+          this.tripData.costs.push(...newCosts);
+
+          // If costs were saved but not returned, we need to reload from Firestore
+          // For now, show a message and suggest refreshing
+          if (newCosts.length === 0) {
+            console.warn('Backend saved costs but did not return them. Costs will appear after page refresh.');
+          }
 
           // Show success message
           originalBtn.innerHTML = `✓ Costs researched`;
@@ -2916,7 +2928,18 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           }
 
           // Call backend cost research API for this single destination
-          await this.generateCostsForCountry(location.country || '', [destinationId]);
+          const newCosts = await this.generateCostsForCountry(location.country || '', [destinationId]);
+
+          // Add new costs to tripData
+          if (!this.tripData.costs) {
+            this.tripData.costs = [];
+          }
+          this.tripData.costs.push(...newCosts);
+
+          // If costs were saved but not returned, we need to reload from Firestore
+          if (newCosts.length === 0) {
+            console.warn('Backend saved costs but did not return them. Costs will appear after page refresh.');
+          }
 
           // Show success message
           originalBtn.innerHTML = `✓ Costs researched`;
