@@ -313,72 +313,80 @@ export class BudgetManager {
       throw new Error('No valid destinations found');
     }
 
-    // Build enriched destination data for the prompt
-    const enrichedDestinations = destinations.map(dest => {
-      const localCurrency = getCurrencyForDestination(dest.id, this.tripData.locations || []);
-
-      return {
-        id: dest.id,
-        normalizedId: String(dest.id),
-        name: dest.name || dest.city,
-        city: dest.city,
-        country: dest.country,
-        region: dest.region,
-        activityType: dest.activity_type,
-        durationDays: dest.duration_days || 1,
-        arrivalDate: dest.arrival_date,
-        departureDate: dest.departure_date,
-        highlights: Array.isArray(dest.highlights) ? dest.highlights : [],
-        notes: dest.notes || '',
-        localCurrency: localCurrency
-      };
-    });
-
-    // Generate prompt
-    const prompt = this.generateCostPrompt(enrichedDestinations, country);
-
     // Get API configuration
     const config = getRuntimeConfig();
-    const chatApiUrl = config.endpoints.chat;
+    const apiBaseUrl = config.endpoints.api || 'http://localhost:5001';
 
     // Get scenario ID from window
     const scenarioId = (window as any).currentScenarioId || null;
 
-    // Call the chat API
-    const response = await fetch(chatApiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: prompt,
-        context: {
-          destinations: enrichedDestinations.map(d => ({
-            id: d.id,
-            name: d.name,
-            country: d.country,
-            duration_days: d.durationDays
-          }))
-        },
-        scenario_id: scenarioId,
-        session_id: null // New session for cost generation
-      })
-    });
+    // Get travel style and num travelers
+    const numTravelers = this.tripData.num_travelers || 1;
+    const accommodationPref = this.tripData.accommodation_preference || 'mid-range';
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API error: ${response.status} - ${errorText}`);
+    // Generate costs for each destination by calling backend cost research API
+    const allCosts: any[] = [];
+
+    for (let i = 0; i < destinations.length; i++) {
+      const dest = destinations[i];
+      const localCurrency = getCurrencyForDestination(dest.id, this.tripData.locations || []);
+
+      // Build destination name
+      const destinationName = `${dest.name || dest.city}, ${dest.country}`;
+
+      // Get previous and next destinations for context
+      const previousDest = i > 0 ? destinations[i - 1] : null;
+      const nextDest = i < destinations.length - 1 ? destinations[i + 1] : null;
+
+      const payload = {
+        session_id: `budget_manager_${Date.now()}`,
+        scenario_id: scenarioId,
+        destination_name: destinationName,
+        destination_id: String(dest.id),
+        duration_days: Math.max(1, Math.round(dest.duration_days || 1)),
+        arrival_date: dest.arrival_date || '',
+        departure_date: dest.departure_date || '',
+        num_travelers: numTravelers,
+        travel_style: accommodationPref,
+        previous_destination: previousDest ? `${previousDest.name || previousDest.city}, ${previousDest.country}` : undefined,
+        next_destination: nextDest ? `${nextDest.name || nextDest.city}, ${nextDest.country}` : undefined
+      };
+
+      // Call backend cost research API
+      const response = await fetch(`${apiBaseUrl}/api/costs/research`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || `Request failed with status ${response.status}`;
+        throw new Error(`Failed to research costs for ${destinationName}: ${errorMessage}`);
+      }
+
+      const data = await response.json();
+
+      // Check if research returned partial results
+      if (data.status === 'partial') {
+        console.warn(`Partial result for ${destinationName}:`, data);
+        continue; // Skip this destination
+      }
+
+      // The backend saves costs directly to Firestore, but also returns them
+      // Extract costs from the response if available
+      if (data.research && Array.isArray(data.research)) {
+        allCosts.push(...data.research);
+      } else if (data.costs_saved) {
+        // Costs were saved but not returned - we'll need to fetch them
+        // For now, just log success
+        console.log(`✓ Generated ${data.costs_saved} costs for ${destinationName}`);
+      }
     }
 
-    const data = await response.json();
-
-    // Extract the response text
-    const responseText = data.response || data.text || '';
-
-    // Try to parse JSON from the response
-    let costs = this.parseAICostResponse(responseText, enrichedDestinations);
-
-    return costs;
+    return allCosts;
   }
 
   private generateCostPrompt(destinations: any[], country: string): string {
@@ -995,12 +1003,55 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     // Calculate total estimated cost
     const { total, breakdown } = this.calculateTotalEstimatedCost(cost);
 
+    // Get research metadata if available
+    const confidence = cost.confidence || '';
+    const sources = cost.sources || [];
+    const amountLow = cost.amount_low;
+    const amountMid = cost.amount_mid || amountUsd;
+    const amountHigh = cost.amount_high;
+    const hasResearchData = confidence || sources.length > 0 || (amountLow && amountHigh);
+
+    // Build confidence indicator
+    let confidenceIndicator = '';
+    if (confidence) {
+      const confidenceColors: Record<string, string> = {
+        'high': '#28a745',
+        'medium': '#ffc107',
+        'low': '#dc3545'
+      };
+      const confidenceColor = confidenceColors[confidence.toLowerCase()] || '#6c757d';
+      confidenceIndicator = `<span class="confidence-badge" style="background-color: ${confidenceColor}" title="Confidence: ${confidence}">${confidence.charAt(0).toUpperCase()}</span>`;
+    }
+
+    // Build estimate range display
+    let estimateRange = '';
+    if (amountLow && amountHigh) {
+      estimateRange = `<div class="estimate-range" title="Low: $${Math.round(amountLow)} | Mid: $${Math.round(amountMid)} | High: $${Math.round(amountHigh)}">
+        $${Math.round(amountLow)}-$${Math.round(amountHigh)}
+      </div>`;
+    }
+
+    // Build sources list
+    let sourcesHtml = '';
+    if (sources.length > 0) {
+      sourcesHtml = `<div class="cost-sources">
+        ${sources.slice(0, 2).map((url: string) => {
+          const domain = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+          return `<a href="${url}" target="_blank" class="source-link" title="${url}">${domain}</a>`;
+        }).join(', ')}
+        ${sources.length > 2 ? `<span class="more-sources" title="${sources.slice(2).join('\n')}">+${sources.length - 2} more</span>` : ''}
+      </div>`;
+    }
+
     return `
       <tr class="editable-cost-row" data-cost-id="${costId}">
         <td>
-          <span class="category-badge" style="background-color: ${this.getCategoryColor(cost.category || 'other')}">
-            ${this.getCategoryIcon(cost.category || 'other')} ${(cost.category || 'other').replace(/_/g, ' ')}
-          </span>
+          <div class="category-cell">
+            <span class="category-badge" style="background-color: ${this.getCategoryColor(cost.category || 'other')}">
+              ${this.getCategoryIcon(cost.category || 'other')} ${(cost.category || 'other').replace(/_/g, ' ')}
+            </span>
+            ${confidenceIndicator}
+          </div>
         </td>
         <td>
           <input type="text"
@@ -1009,6 +1060,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                  data-field="description"
                  value="${cost.description || ''}"
                  placeholder="Description">
+          ${sourcesHtml}
         </td>
         <td>
           <div class="currency-display-wrapper">
@@ -1031,6 +1083,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                    step="1"
                    min="0">
           </div>
+          ${estimateRange}
         </td>
         <td class="text-right">
           <div class="currency-input-wrapper">
@@ -4490,6 +4543,52 @@ export const budgetManagerStyles = `
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
+}
+
+.category-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.confidence-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cost-sources {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #6c757d;
+}
+
+.source-link {
+  color: #007bff;
+  text-decoration: none;
+  margin-right: 4px;
+}
+
+.source-link:hover {
+  text-decoration: underline;
+}
+
+.more-sources {
+  color: #6c757d;
+  font-style: italic;
+  cursor: help;
+}
+
+.estimate-range {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #6c757d;
+  font-style: italic;
 }
 
 .status-badge {
