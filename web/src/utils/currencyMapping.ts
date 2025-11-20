@@ -43,7 +43,7 @@ export const COUNTRY_CURRENCY_MAP: Record<string, string> = {
   'Fiji': 'FJD',
 
   // South America
-  'Brazil': 'USD', // BRL not yet supported, use USD
+  'Brazil': 'BRL',
   'Argentina': 'USD', // ARS not yet supported, use USD
   'Chile': 'USD', // CLP not yet supported, use USD
   'Peru': 'USD', // PEN not yet supported, use USD

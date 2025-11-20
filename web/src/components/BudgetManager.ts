@@ -146,7 +146,8 @@ export class BudgetManager {
         VND: 24450,
         FJD: 2.24,
         SGD: 1.34,
-        NZD: 1.68
+        NZD: 1.68,
+        BRL: 5.75
       };
       this.ratesFetchDate = 'Using default rates';
     }
