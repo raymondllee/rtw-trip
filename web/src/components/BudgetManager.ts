@@ -2797,45 +2797,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         const originalText = originalBtn.innerHTML;
 
         try {
-          // Get destinations for this country
-          const destinations = (this.tripData.locations || [])
-            .filter(loc => destinationIds.includes(String(loc.id)))
-            .map(loc => ({
-              id: loc.id,
-              name: loc.name || '',
-              arrival_date: loc.arrival_date || '',
-              departure_date: loc.departure_date || '',
-              country: loc.country || ''
-            }));
-
-          // Build enriched destinations with local currency
-          const enrichedDestinations = destinations.map(dest => {
-            const localCurrency = getCurrencyForDestination(dest.id, this.tripData.locations || []);
-            return {
-              id: dest.id,
-              name: dest.name,
-              arrival_date: dest.arrival_date,
-              departure_date: dest.departure_date,
-              country: dest.country,
-              localCurrency: localCurrency
-            };
-          });
-
-          // Generate initial prompt
-          const initialPrompt = this.generateCostPrompt(enrichedDestinations, country);
-
-          // Show prompt editing modal
-          const editedPrompt = await this.showPromptEditModal(
-            initialPrompt,
-            `Regenerate Costs for ${country}`
-          );
-
-          // If user cancelled, exit
-          if (!editedPrompt) return;
-
           // Disable button and show progress
           originalBtn.disabled = true;
-          originalBtn.innerHTML = '🔄 Regenerating...';
+          originalBtn.innerHTML = '🔄 Researching...';
 
           // Delete existing costs for this country
           const existingCosts = (this.tripData.costs || []).filter(c => {
@@ -2858,59 +2822,11 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             });
           }
 
-          // Call API with edited prompt
-          const config = getRuntimeConfig();
-          const chatApiUrl = config.endpoints.chat;
-          const scenarioId = (window as any).currentScenarioId || null;
-
-          const response = await fetch(chatApiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: editedPrompt,
-              context: {
-                destinations: enrichedDestinations.map(d => ({
-                  id: d.id,
-                  name: d.name,
-                  arrival_date: d.arrival_date,
-                  departure_date: d.departure_date,
-                  country: d.country
-                }))
-              },
-              scenario_id: scenarioId,
-              session_id: null
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`API request failed: ${response.statusText}`);
-          }
-
-          const responseData = await response.json();
-          const responseText = responseData.response || '';
-
-          // Parse the AI response
-          const generatedCosts = this.parseAICostResponse(responseText, enrichedDestinations);
-
-          if (generatedCosts.length === 0) {
-            throw new Error('No costs were generated');
-          }
-
-          // Add generated costs to tripData
-          if (!this.tripData.costs) {
-            this.tripData.costs = [];
-          }
-          this.tripData.costs.push(...generatedCosts);
-
-          // Save costs via callback
-          if (this.onCostsUpdate) {
-            await this.onCostsUpdate(generatedCosts);
-          }
+          // Call backend cost research API
+          await this.generateCostsForCountry(country, destinationIds);
 
           // Show success message
-          originalBtn.innerHTML = `✓ Regenerated ${generatedCosts.length} costs`;
+          originalBtn.innerHTML = `✓ Costs researched`;
           originalBtn.style.background = '#28a745';
 
           // Refresh the entire budget manager to show new costs
@@ -2927,7 +2843,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           console.error('Failed to regenerate costs:', error);
 
           // Show error
-          originalBtn.innerHTML = '✗ Regeneration failed';
+          originalBtn.innerHTML = '✗ Research failed';
           originalBtn.style.background = '#dc3545';
 
           alert(`Failed to regenerate costs: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -2963,36 +2879,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             throw new Error('Destination not found');
           }
 
-          const destination = {
-            id: location.id,
-            name: location.name || '',
-            arrival_date: location.arrival_date || '',
-            departure_date: location.departure_date || '',
-            country: location.country || ''
-          };
-
-          // Build enriched destination with local currency
-          const localCurrency = getCurrencyForDestination(destination.id, this.tripData.locations || []);
-          const enrichedDestination = {
-            ...destination,
-            localCurrency: localCurrency
-          };
-
-          // Generate initial prompt for single destination
-          const initialPrompt = this.generateCostPrompt([enrichedDestination], destination.country);
-
-          // Show prompt editing modal
-          const editedPrompt = await this.showPromptEditModal(
-            initialPrompt,
-            `Regenerate Costs for ${destinationName || destination.name}`
-          );
-
-          // If user cancelled, exit
-          if (!editedPrompt) return;
-
           // Disable button and show progress
           originalBtn.disabled = true;
-          originalBtn.innerHTML = '🔄 Regenerating...';
+          originalBtn.innerHTML = '🔄 Researching...';
 
           // Delete existing costs for this destination
           const existingCosts = (this.tripData.costs || []).filter(c =>
@@ -3013,59 +2902,11 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             );
           }
 
-          // Call API with edited prompt
-          const config = getRuntimeConfig();
-          const chatApiUrl = config.endpoints.chat;
-          const scenarioId = (window as any).currentScenarioId || null;
-
-          const response = await fetch(chatApiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: editedPrompt,
-              context: {
-                destinations: [{
-                  id: enrichedDestination.id,
-                  name: enrichedDestination.name,
-                  arrival_date: enrichedDestination.arrival_date,
-                  departure_date: enrichedDestination.departure_date,
-                  country: enrichedDestination.country
-                }]
-              },
-              scenario_id: scenarioId,
-              session_id: null
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`API request failed: ${response.statusText}`);
-          }
-
-          const responseData = await response.json();
-          const responseText = responseData.response || '';
-
-          // Parse the AI response
-          const generatedCosts = this.parseAICostResponse(responseText, [enrichedDestination]);
-
-          if (generatedCosts.length === 0) {
-            throw new Error('No costs were generated');
-          }
-
-          // Add generated costs to tripData
-          if (!this.tripData.costs) {
-            this.tripData.costs = [];
-          }
-          this.tripData.costs.push(...generatedCosts);
-
-          // Save costs via callback
-          if (this.onCostsUpdate) {
-            await this.onCostsUpdate(generatedCosts);
-          }
+          // Call backend cost research API for this single destination
+          await this.generateCostsForCountry(location.country || '', [destinationId]);
 
           // Show success message
-          originalBtn.innerHTML = `✓ Regenerated ${generatedCosts.length} costs`;
+          originalBtn.innerHTML = `✓ Costs researched`;
           originalBtn.style.background = '#28a745';
 
           // Refresh the entire budget manager to show new costs
@@ -3082,7 +2923,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           console.error('Failed to regenerate costs:', error);
 
           // Show error
-          originalBtn.innerHTML = '✗ Regeneration failed';
+          originalBtn.innerHTML = '✗ Research failed';
           originalBtn.style.background = '#dc3545';
 
           alert(`Failed to regenerate costs: ${error instanceof Error ? error.message : 'Unknown error'}`);
