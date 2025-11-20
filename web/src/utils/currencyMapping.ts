@@ -4,6 +4,7 @@
 export const COUNTRY_CURRENCY_MAP: Record<string, string> = {
   // North America
   'United States': 'USD',
+  'USA': 'USD', // Alias for United States
   'Canada': 'CAD',
   'Mexico': 'USD', // USD commonly accepted
 
@@ -19,10 +20,10 @@ export const COUNTRY_CURRENCY_MAP: Record<string, string> = {
   'Greece': 'EUR',
   'Ireland': 'EUR',
   'United Kingdom': 'GBP',
-  'Switzerland': 'USD', // CHF not yet supported, use USD
-  'Norway': 'USD', // NOK not yet supported, use USD
-  'Sweden': 'USD', // SEK not yet supported, use USD
-  'Denmark': 'USD', // DKK not yet supported, use USD
+  'Switzerland': 'CHF',
+  'Norway': 'NOK',
+  'Sweden': 'SEK',
+  'Denmark': 'DKK',
 
   // Asia
   'Japan': 'JPY',
@@ -31,11 +32,13 @@ export const COUNTRY_CURRENCY_MAP: Record<string, string> = {
   'Thailand': 'THB',
   'Vietnam': 'VND',
   'Singapore': 'SGD',
-  'Malaysia': 'USD', // MYR not yet supported, use USD
-  'Indonesia': 'USD', // IDR not yet supported, use USD
-  'Philippines': 'USD', // PHP not yet supported, use USD
-  'South Korea': 'USD', // KRW not yet supported, use USD
-  'Taiwan': 'USD', // TWD not yet supported, use USD
+  'Malaysia': 'MYR',
+  'Indonesia': 'IDR',
+  'Philippines': 'PHP',
+  'South Korea': 'KRW',
+  'Taiwan': 'TWD',
+  'Bhutan': 'BTN',
+  'Nepal': 'NPR',
 
   // Oceania
   'Australia': 'AUD',
@@ -44,23 +47,28 @@ export const COUNTRY_CURRENCY_MAP: Record<string, string> = {
 
   // South America
   'Brazil': 'BRL',
-  'Argentina': 'USD', // ARS not yet supported, use USD
-  'Chile': 'USD', // CLP not yet supported, use USD
-  'Peru': 'USD', // PEN not yet supported, use USD
-  'Colombia': 'USD', // COP not yet supported, use USD
+  'Argentina': 'ARS',
+  'Chile': 'CLP',
+  'Peru': 'PEN',
+  'Colombia': 'COP',
 
   // Africa
-  'South Africa': 'USD', // ZAR not yet supported, use USD
-  'Egypt': 'USD', // EGP not yet supported, use USD
-  'Morocco': 'USD', // MAD not yet supported, use USD
-  'Kenya': 'USD', // KES not yet supported, use USD
-  'Tanzania': 'USD', // TZS not yet supported, use USD
+  'South Africa': 'ZAR',
+  'Egypt': 'EGP',
+  'Morocco': 'MAD',
+  'Kenya': 'KES',
+  'Tanzania': 'TZS',
+  'Namibia': 'NAD',
+  'Madagascar': 'MGA',
 
   // Middle East
-  'United Arab Emirates': 'USD', // AED not yet supported, use USD
-  'Saudi Arabia': 'USD', // SAR not yet supported, use USD
-  'Israel': 'USD', // ILS not yet supported, use USD
-  'Turkey': 'USD', // TRY not yet supported, use USD
+  'United Arab Emirates': 'AED',
+  'Saudi Arabia': 'SAR',
+  'Israel': 'ILS',
+  'Turkey': 'TRY',
+
+  // Antarctica
+  'Antarctica': 'USD', // No official currency, USD commonly used for logistics
 };
 
 /**

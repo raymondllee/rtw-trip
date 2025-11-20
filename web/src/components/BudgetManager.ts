@@ -135,19 +135,51 @@ export class BudgetManager {
       // Set default rates if API fails
       this.exchangeRates = {
         USD: 1,
+        // Europe
         EUR: 0.92,
         GBP: 0.79,
+        CHF: 0.88,
+        NOK: 10.50,
+        SEK: 10.30,
+        DKK: 6.85,
+        // Asia
         JPY: 149.50,
-        AUD: 1.52,
-        CAD: 1.36,
         CNY: 7.24,
         INR: 83.12,
         THB: 34.50,
         VND: 24450,
-        FJD: 2.24,
         SGD: 1.34,
+        MYR: 4.65,
+        IDR: 15600,
+        PHP: 56.50,
+        KRW: 1320,
+        TWD: 31.50,
+        BTN: 83.12,
+        NPR: 133,
+        // Oceania
+        AUD: 1.52,
         NZD: 1.68,
-        BRL: 5.75
+        FJD: 2.24,
+        // Americas
+        CAD: 1.36,
+        BRL: 5.75,
+        ARS: 350,
+        CLP: 920,
+        PEN: 3.70,
+        COP: 3900,
+        // Africa
+        ZAR: 18.50,
+        EGP: 30.90,
+        MAD: 10.10,
+        KES: 129,
+        TZS: 2500,
+        NAD: 18.50,
+        MGA: 4500,
+        // Middle East
+        AED: 3.67,
+        SAR: 3.75,
+        ILS: 3.65,
+        TRY: 32
       };
       this.ratesFetchDate = 'Using default rates';
     }
@@ -1055,6 +1087,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                     return location?.country === country;
                   });
 
+                // Get destinations for this country for the Generate Costs button
+                const countryDestinations = (this.tripData.locations || [])
+                  .filter(loc => loc.country === country);
+
                 const countryCosts = countryCostsArray.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
                 const categoryBreakdown = this.renderCategoryBreakdown(countryCostsArray);
 
@@ -1065,6 +1101,23 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                 const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
                 const countryNote = this.budget?.country_notes?.[country] || '';
 
+                // Determine which button to show: Generate Costs or View Costs
+                const hasCosts = countryCostsArray.length > 0;
+                const destinationLabel = countryDestinations.length === 1
+                  ? '1 destination'
+                  : `${countryDestinations.length} destinations`;
+
+                const costsButton = hasCosts
+                  ? `<button class="costs-toggle-btn" data-country="${country}" title="View Costs">
+                       💰 View Costs (${countryCostsArray.length})
+                     </button>`
+                  : `<button class="generate-costs-btn inline-generate-btn"
+                             data-country="${country}"
+                             data-destinations="${countryDestinations.map(d => d.id).join(',')}"
+                             title="Generate AI cost estimates">
+                       🤖 Generate Costs (${destinationLabel})
+                     </button>`;
+
                 return `
                   <div class="budget-item-edit">
                     <div class="item-header-row">
@@ -1074,9 +1127,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                           ${countryNote ? '📝' : '📄'}
                         </button>
                         ${countryNote ? `<span class="inline-note">${countryNote}</span>` : ''}
-                        <button class="costs-toggle-btn" data-country="${country}" title="View Costs">
-                          💰 View Costs (${countryCostsArray.length})
-                        </button>
+                        ${costsButton}
                       </div>
                     </div>
                     <div class="item-input-row">
@@ -3484,6 +3535,12 @@ export const budgetManagerStyles = `
 
 .generate-costs-btn:active {
   transform: translateY(0);
+}
+
+.inline-generate-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+  margin-left: 8px;
 }
 
 /* Editable costs table styles */
