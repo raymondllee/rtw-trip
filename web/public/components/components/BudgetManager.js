@@ -1,7 +1,19 @@
+"use strict";
 /**
  * Budget Manager UI Component (Recommendation J)
  * Provides integrated budget tracking, editing, and management interface
  */
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -11,9 +23,39 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { calculateBudgetStatus, createDefaultBudget } from '../utils/budgetTracker';
-export class BudgetManager {
-    constructor(container, tripData, budget, onBudgetUpdate, onCostsUpdate) {
+var __generator = (this && this.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g = Object.create((typeof Iterator === "function" ? Iterator : Object).prototype);
+    return g.next = verb(0), g["throw"] = verb(1), g["return"] = verb(2), typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (g && (g = 0, op[0] && (_ = 0)), _) try {
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.budgetManagerStyles = exports.BudgetManager = void 0;
+var budgetTracker_1 = require("../utils/budgetTracker");
+var currencyMapping_1 = require("../utils/currencyMapping");
+var BudgetManager = /** @class */ (function () {
+    function BudgetManager(container, tripData, budget, onBudgetUpdate, onCostsUpdate) {
         this.editedCosts = new Map();
         this.exchangeRates = {};
         this.ratesFetchDate = '';
@@ -28,41 +70,61 @@ export class BudgetManager {
         this.fetchExchangeRates();
         this.render();
     }
-    scheduleAutoSave() {
+    BudgetManager.prototype.scheduleAutoSave = function () {
+        var _this = this;
         // Clear existing timer
         if (this.autoSaveTimer !== null) {
             window.clearTimeout(this.autoSaveTimer);
         }
         // Schedule save for 2 seconds after last edit
-        this.autoSaveTimer = window.setTimeout(() => __awaiter(this, void 0, void 0, function* () {
-            yield this.saveAllCosts();
-        }), 2000);
-    }
-    saveAllCosts() {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.editedCosts.size === 0 || !this.onCostsUpdate)
-                return;
-            try {
-                const costsToSave = Array.from(this.editedCosts.values());
-                // Show saving indicator
-                this.showSavingIndicator(true);
-                yield this.onCostsUpdate(costsToSave);
-                // Clear edited costs after successful save
-                this.editedCosts.clear();
-                // Update totals without full re-render
-                this.updateCostTotals();
-                // Show success indicator briefly
-                this.showSavingIndicator(false, true);
-            }
-            catch (error) {
-                console.error('Failed to auto-save costs:', error);
-                this.showSavingIndicator(false, false, 'Failed to save');
-            }
+        this.autoSaveTimer = window.setTimeout(function () { return __awaiter(_this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, this.saveAllCosts()];
+                    case 1:
+                        _a.sent();
+                        return [2 /*return*/];
+                }
+            });
+        }); }, 2000);
+    };
+    BudgetManager.prototype.saveAllCosts = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var costsToSave, error_1;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (this.editedCosts.size === 0 || !this.onCostsUpdate)
+                            return [2 /*return*/];
+                        _a.label = 1;
+                    case 1:
+                        _a.trys.push([1, 3, , 4]);
+                        costsToSave = Array.from(this.editedCosts.values());
+                        // Show saving indicator
+                        this.showSavingIndicator(true);
+                        return [4 /*yield*/, this.onCostsUpdate(costsToSave)];
+                    case 2:
+                        _a.sent();
+                        // Clear edited costs after successful save
+                        this.editedCosts.clear();
+                        // Update totals without full re-render
+                        this.updateCostTotals();
+                        // Show success indicator briefly
+                        this.showSavingIndicator(false, true);
+                        return [3 /*break*/, 4];
+                    case 3:
+                        error_1 = _a.sent();
+                        console.error('Failed to auto-save costs:', error_1);
+                        this.showSavingIndicator(false, false, 'Failed to save');
+                        return [3 /*break*/, 4];
+                    case 4: return [2 /*return*/];
+                }
+            });
         });
-    }
-    showSavingIndicator(saving, success, message) {
-        const indicators = this.container.querySelectorAll('.auto-save-indicator');
-        indicators.forEach(indicator => {
+    };
+    BudgetManager.prototype.showSavingIndicator = function (saving, success, message) {
+        var indicators = this.container.querySelectorAll('.auto-save-indicator');
+        indicators.forEach(function (indicator) {
             if (saving) {
                 indicator.textContent = '💾 Saving...';
                 indicator.className = 'auto-save-indicator saving';
@@ -70,7 +132,7 @@ export class BudgetManager {
             else if (success) {
                 indicator.textContent = '✓ Saved';
                 indicator.className = 'auto-save-indicator saved';
-                setTimeout(() => {
+                setTimeout(function () {
                     indicator.textContent = '';
                     indicator.className = 'auto-save-indicator';
                 }, 2000);
@@ -80,122 +142,174 @@ export class BudgetManager {
                 indicator.className = 'auto-save-indicator error';
             }
         });
-    }
-    updateCostTotals() {
+    };
+    BudgetManager.prototype.updateCostTotals = function () {
+        var _this = this;
         // Update totals for each country without full re-render
-        const countries = new Set();
-        (this.tripData.locations || []).forEach(loc => {
+        var countries = new Set();
+        (this.tripData.locations || []).forEach(function (loc) {
             if (loc.country)
                 countries.add(loc.country);
         });
-        countries.forEach(country => {
-            const countryCosts = (this.tripData.costs || [])
-                .filter(c => {
-                const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+        countries.forEach(function (country) {
+            var countryCosts = (_this.tripData.costs || [])
+                .filter(function (c) {
+                var location = (_this.tripData.locations || []).find(function (loc) { return loc.id === c.destination_id; });
                 return (location === null || location === void 0 ? void 0 : location.country) === country;
             });
-            const total = countryCosts.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
-            const totalElement = this.container.querySelector(`.country-total-row[data-country="${country}"] .country-total-amount`);
+            var total = countryCosts.reduce(function (sum, c) { return sum + (c.amount_usd || c.amount || 0); }, 0);
+            var totalElement = _this.container.querySelector(".country-total-row[data-country=\"".concat(country, "\"] .country-total-amount"));
             if (totalElement) {
-                totalElement.textContent = this.formatCurrency(total);
+                totalElement.textContent = _this.formatCurrency(total);
             }
         });
-    }
-    fetchExchangeRates() {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                // Using exchangerate-api.io free tier (1500 requests/month)
-                const response = yield fetch('https://api.exchangerate-api.com/v4/latest/USD');
-                const data = yield response.json();
-                if (data && data.rates) {
-                    this.exchangeRates = data.rates;
-                    this.ratesFetchDate = new Date(data.time_last_updated * 1000).toLocaleDateString();
-                    console.log('✅ Exchange rates fetched:', this.ratesFetchDate);
+    };
+    BudgetManager.prototype.fetchExchangeRates = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var response, data, error_2;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        _a.trys.push([0, 3, , 4]);
+                        return [4 /*yield*/, fetch('https://api.exchangerate-api.com/v4/latest/USD')];
+                    case 1:
+                        response = _a.sent();
+                        return [4 /*yield*/, response.json()];
+                    case 2:
+                        data = _a.sent();
+                        if (data && data.rates) {
+                            this.exchangeRates = data.rates;
+                            this.ratesFetchDate = new Date(data.time_last_updated * 1000).toLocaleDateString();
+                            console.log('✅ Exchange rates fetched:', this.ratesFetchDate);
+                        }
+                        return [3 /*break*/, 4];
+                    case 3:
+                        error_2 = _a.sent();
+                        console.error('Failed to fetch exchange rates:', error_2);
+                        // Set default rates if API fails
+                        this.exchangeRates = {
+                            USD: 1,
+                            EUR: 0.92,
+                            GBP: 0.79,
+                            JPY: 149.50,
+                            AUD: 1.52,
+                            CAD: 1.36,
+                            CNY: 7.24,
+                            INR: 83.12,
+                            THB: 34.50,
+                            VND: 24450,
+                            FJD: 2.24,
+                            SGD: 1.34,
+                            NZD: 1.68
+                        };
+                        this.ratesFetchDate = 'Using default rates';
+                        return [3 /*break*/, 4];
+                    case 4: return [2 /*return*/];
                 }
-            }
-            catch (error) {
-                console.error('Failed to fetch exchange rates:', error);
-                // Set default rates if API fails
-                this.exchangeRates = {
-                    USD: 1,
-                    EUR: 0.92,
-                    GBP: 0.79,
-                    JPY: 149.50,
-                    AUD: 1.52,
-                    CAD: 1.36,
-                    CNY: 7.24,
-                    INR: 83.12,
-                    THB: 34.50,
-                    VND: 24450
-                };
-                this.ratesFetchDate = 'Using default rates';
-            }
+            });
         });
-    }
-    refreshExchangeRates(currencies) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const response = yield fetch('https://api.exchangerate-api.com/v4/latest/USD');
-                const data = yield response.json();
-                if (data && data.rates) {
-                    // Update specific currencies if provided, otherwise update all
-                    if (currencies && currencies.length > 0) {
-                        currencies.forEach(currency => {
-                            if (data.rates[currency]) {
-                                this.exchangeRates[currency] = data.rates[currency];
+    };
+    BudgetManager.prototype.refreshExchangeRates = function (currencies) {
+        return __awaiter(this, void 0, void 0, function () {
+            var response, data_1, error_3;
+            var _this = this;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        _a.trys.push([0, 3, , 4]);
+                        return [4 /*yield*/, fetch('https://api.exchangerate-api.com/v4/latest/USD')];
+                    case 1:
+                        response = _a.sent();
+                        return [4 /*yield*/, response.json()];
+                    case 2:
+                        data_1 = _a.sent();
+                        if (data_1 && data_1.rates) {
+                            // Update specific currencies if provided, otherwise update all
+                            if (currencies && currencies.length > 0) {
+                                currencies.forEach(function (currency) {
+                                    if (data_1.rates[currency]) {
+                                        _this.exchangeRates[currency] = data_1.rates[currency];
+                                    }
+                                });
                             }
-                        });
-                    }
-                    else {
-                        this.exchangeRates = data.rates;
-                    }
-                    this.ratesFetchDate = new Date(data.time_last_updated * 1000).toLocaleDateString();
-                    console.log('✅ Exchange rates refreshed:', currencies ? currencies.join(', ') : 'all');
+                            else {
+                                this.exchangeRates = data_1.rates;
+                            }
+                            this.ratesFetchDate = new Date(data_1.time_last_updated * 1000).toLocaleDateString();
+                            console.log('✅ Exchange rates refreshed:', currencies ? currencies.join(', ') : 'all');
+                        }
+                        return [3 /*break*/, 4];
+                    case 3:
+                        error_3 = _a.sent();
+                        console.error('Failed to refresh exchange rates:', error_3);
+                        throw error_3;
+                    case 4: return [2 /*return*/];
                 }
-            }
-            catch (error) {
-                console.error('Failed to refresh exchange rates:', error);
-                throw error;
-            }
+            });
         });
-    }
-    getCurrenciesForCountry(country) {
-        const countryCosts = (this.tripData.costs || [])
-            .filter(c => {
-            const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+    };
+    BudgetManager.prototype.getCurrenciesForCountry = function (country) {
+        var _this = this;
+        var countryCosts = (this.tripData.costs || [])
+            .filter(function (c) {
+            var location = (_this.tripData.locations || []).find(function (loc) { return loc.id === c.destination_id; });
             return (location === null || location === void 0 ? void 0 : location.country) === country;
         });
-        const currencies = new Set();
-        countryCosts.forEach(cost => {
+        var currencies = new Set();
+        countryCosts.forEach(function (cost) {
             if (cost.currency && cost.currency !== 'USD') {
                 currencies.add(cost.currency);
             }
         });
         return Array.from(currencies);
-    }
-    getAllCurrencies() {
-        const currencies = new Set();
-        (this.tripData.costs || []).forEach(cost => {
+    };
+    BudgetManager.prototype.getAllCurrencies = function () {
+        var currencies = new Set();
+        (this.tripData.costs || []).forEach(function (cost) {
             if (cost.currency && cost.currency !== 'USD') {
                 currencies.add(cost.currency);
             }
         });
         return Array.from(currencies);
-    }
-    convertCurrency(amount, fromCurrency, toCurrency) {
+    };
+    BudgetManager.prototype.updateExchangeRateDisplays = function (country) {
+        var _this = this;
+        // Update exchange rate displays without full re-render
+        var costs = country
+            ? (this.tripData.costs || []).filter(function (c) {
+                var location = (_this.tripData.locations || []).find(function (loc) { return loc.id === c.destination_id; });
+                return (location === null || location === void 0 ? void 0 : location.country) === country;
+            })
+            : (this.tripData.costs || []);
+        costs.forEach(function (cost) {
+            var currency = cost.currency || 'USD';
+            if (currency === 'USD')
+                return;
+            var costId = cost.id || "".concat(cost.destination_id, "_").concat(cost.category, "_").concat(Date.now());
+            var row = _this.container.querySelector(".editable-cost-row[data-cost-id=\"".concat(costId, "\"]"));
+            if (row) {
+                var rateInfo = row.querySelector('.exchange-rate-info');
+                var rate = _this.exchangeRates[currency] || 1;
+                if (rateInfo) {
+                    rateInfo.innerHTML = "1 ".concat(currency, " = $").concat((1 / rate).toFixed(4), " USD<br><span class=\"rate-date\">").concat(_this.ratesFetchDate, "</span>");
+                }
+            }
+        });
+    };
+    BudgetManager.prototype.convertCurrency = function (amount, fromCurrency, toCurrency) {
         if (fromCurrency === toCurrency)
             return amount;
         // Convert to USD first, then to target currency
-        const amountInUSD = fromCurrency === 'USD'
+        var amountInUSD = fromCurrency === 'USD'
             ? amount
             : amount / (this.exchangeRates[fromCurrency] || 1);
-        const result = toCurrency === 'USD'
+        var result = toCurrency === 'USD'
             ? amountInUSD
             : amountInUSD * (this.exchangeRates[toCurrency] || 1);
         return result;
-    }
-    getCurrencySymbol(currency) {
-        const symbols = {
+    };
+    BudgetManager.prototype.getCurrencySymbol = function (currency) {
+        var symbols = {
             USD: '$',
             EUR: '€',
             GBP: '£',
@@ -205,35 +319,63 @@ export class BudgetManager {
             CNY: '¥',
             INR: '₹',
             THB: '฿',
-            VND: '₫'
+            VND: '₫',
+            FJD: 'FJ$',
+            SGD: 'S$',
+            NZD: 'NZ$'
         };
         return symbols[currency] || currency;
-    }
-    formatCurrencyAmount(amount, currency) {
-        const symbol = this.getCurrencySymbol(currency);
-        const rounded = Math.round(amount);
-        return `${symbol}${rounded.toLocaleString()}`;
-    }
-    updateData(tripData, budget) {
+    };
+    BudgetManager.prototype.formatCurrencyAmount = function (amount, currency) {
+        var symbol = this.getCurrencySymbol(currency);
+        var rounded = Math.round(amount);
+        return "".concat(symbol).concat(rounded.toLocaleString());
+    };
+    BudgetManager.prototype.updateData = function (tripData, budget) {
+        var _this = this;
+        // Save the current open/closed state of country sections before re-rendering
+        var openCountries = new Set();
+        this.container.querySelectorAll('.item-costs-section').forEach(function (section) {
+            var country = section.dataset.country;
+            var display = section.style.display;
+            if (country && display !== 'none') {
+                openCountries.add(country);
+            }
+        });
         this.tripData = tripData;
         if (budget !== undefined) {
             this.budget = budget;
         }
         this.render();
-    }
-    formatCurrency(amount) {
-        return `$${Math.round(amount).toLocaleString()}`;
-    }
-    getAlertIcon(type) {
+        // Restore the open/closed state after rendering
+        openCountries.forEach(function (country) {
+            var section = _this.container.querySelector(".item-costs-section[data-country=\"".concat(country, "\"]"));
+            if (section) {
+                section.style.display = 'block';
+                // Auto-resize all textareas in restored sections
+                section.querySelectorAll('textarea.auto-resize').forEach(function (textarea) {
+                    var el = textarea;
+                    requestAnimationFrame(function () {
+                        el.style.height = 'auto';
+                        el.style.height = el.scrollHeight + 'px';
+                    });
+                });
+            }
+        });
+    };
+    BudgetManager.prototype.formatCurrency = function (amount) {
+        return "$".concat(Math.round(amount).toLocaleString());
+    };
+    BudgetManager.prototype.getAlertIcon = function (type) {
         switch (type) {
             case 'exceeded': return '🔴';
             case 'warning': return '⚠️';
             case 'info': return 'ℹ️';
             default: return '📊';
         }
-    }
-    getCategoryColor(category) {
-        const colors = {
+    };
+    BudgetManager.prototype.getCategoryColor = function (category) {
+        var colors = {
             'flight': '#3498db',
             'accommodation': '#e74c3c',
             'activity': '#9b59b6',
@@ -245,9 +387,9 @@ export class BudgetManager {
             'other': '#95a5a6'
         };
         return colors[category] || '#95a5a6';
-    }
-    getCategoryIcon(category) {
-        const icons = {
+    };
+    BudgetManager.prototype.getCategoryIcon = function (category) {
+        var icons = {
             'flight': '✈️',
             'accommodation': '🏨',
             'activity': '🎯',
@@ -259,699 +401,212 @@ export class BudgetManager {
             'other': '📦'
         };
         return icons[category] || '📦';
-    }
-    renderCostsTableForCountry(country) {
-        const countryCosts = (this.tripData.costs || [])
-            .filter(c => {
-            const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+    };
+    BudgetManager.prototype.renderCostsTableForCountry = function (country) {
+        var _this = this;
+        var countryCosts = (this.tripData.costs || [])
+            .filter(function (c) {
+            var location = (_this.tripData.locations || []).find(function (loc) { return loc.id === c.destination_id; });
             return (location === null || location === void 0 ? void 0 : location.country) === country;
         });
         // Get destinations for this country to allow adding new costs
-        const countryDestinations = (this.tripData.locations || [])
-            .filter(loc => loc.country === country);
-        const hasChanges = Array.from(this.editedCosts.values()).some(cost => {
-            const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
+        var countryDestinations = (this.tripData.locations || [])
+            .filter(function (loc) { return loc.country === country; });
+        var hasChanges = Array.from(this.editedCosts.values()).some(function (cost) {
+            var location = (_this.tripData.locations || []).find(function (loc) { return loc.id === cost.destination_id; });
             return (location === null || location === void 0 ? void 0 : location.country) === country;
         });
         if (countryCosts.length === 0) {
-            return `
-        <div class="no-costs-message">No costs recorded for this country yet.</div>
-        ${this.renderAddCostSection(country, countryDestinations)}
-      `;
+            return "\n        <div class=\"no-costs-message\">No costs recorded for this country yet.</div>\n        ".concat(this.renderAddCostSection(country, countryDestinations), "\n      ");
         }
         // Group costs by destination
-        const costsByDestination = {};
-        countryCosts.forEach(cost => {
-            const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
-            const destName = (location === null || location === void 0 ? void 0 : location.name) || (location === null || location === void 0 ? void 0 : location.city) || 'Unknown';
+        var costsByDestination = {};
+        countryCosts.forEach(function (cost) {
+            var location = (_this.tripData.locations || []).find(function (loc) { return loc.id === cost.destination_id; });
+            var destName = (location === null || location === void 0 ? void 0 : location.name) || (location === null || location === void 0 ? void 0 : location.city) || 'Unknown';
             if (!costsByDestination[destName]) {
                 costsByDestination[destName] = [];
             }
             costsByDestination[destName].push(cost);
         });
-        const countryCurrencies = this.getCurrenciesForCountry(country);
-        const hasCurrencies = countryCurrencies.length > 0;
-        return `
-      <div class="country-costs-table" data-country="${country}">
-        <div class="costs-table-actions">
-          <button class="btn-sm btn-success add-cost-btn" data-country="${country}">+ Add Cost</button>
-          ${hasCurrencies ? `
-            <button class="btn-sm btn-secondary refresh-country-rates-btn" data-country="${country}" title="Refresh exchange rates for ${countryCurrencies.join(', ')}">
-              🔄 Refresh Rates (${countryCurrencies.join(', ')})
-            </button>
-          ` : ''}
-          <span class="auto-save-indicator"></span>
-          <span class="rates-fetch-date">Rates: ${this.ratesFetchDate}</span>
-        </div>
-        ${Object.entries(costsByDestination).map(([destName, costs]) => `
-          <div class="destination-costs-section">
-            <div class="destination-header">${destName}</div>
-            <table class="costs-table editable-costs-table">
-              <thead>
-                <tr>
-                  <th style="width: 140px;">Category</th>
-                  <th style="width: 200px;">Description</th>
-                  <th style="width: 80px;">Currency</th>
-                  <th style="width: 100px;" class="text-right">Amount</th>
-                  <th style="width: 100px;" class="text-right">USD</th>
-                  <th style="width: 120px;">Status</th>
-                  <th style="width: 110px;">Date</th>
-                  <th style="width: 200px;">Notes</th>
-                  <th style="width: 60px;">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${costs.map(cost => this.renderEditableCostRow(cost)).join('')}
-              </tbody>
-              <tfoot>
-                <tr class="total-row">
-                  <td colspan="4"><strong>Subtotal for ${destName}</strong></td>
-                  <td class="text-right"><strong>${this.formatCurrency(costs.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0))}</strong></td>
-                  <td colspan="4"></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        `).join('')}
-        <div class="country-total-row" data-country="${country}">
-          <strong>Total for ${country}:</strong>
-          <strong class="country-total-amount">${this.formatCurrency(countryCosts.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0))}</strong>
-        </div>
-        ${this.renderAddCostSection(country, countryDestinations)}
-      </div>
-    `;
-    }
-    renderEditableCostRow(cost) {
-        const costId = cost.id || `${cost.destination_id}_${cost.category}_${Date.now()}`;
-        const amount = cost.amount || 0;
-        const amountUsd = cost.amount_usd || amount;
-        const currency = cost.currency || 'USD';
+        var countryCurrencies = this.getCurrenciesForCountry(country);
+        var hasCurrencies = countryCurrencies.length > 0;
+        return "\n      <div class=\"country-costs-table\" data-country=\"".concat(country, "\">\n        <div class=\"costs-table-actions\">\n          <button class=\"btn-sm btn-success add-cost-btn\" data-country=\"").concat(country, "\">+ Add Cost</button>\n          ").concat(hasCurrencies ? "\n            <button class=\"btn-sm btn-secondary refresh-country-rates-btn\" data-country=\"".concat(country, "\" title=\"Refresh exchange rates for ").concat(countryCurrencies.join(', '), "\">\n              \uD83D\uDD04 Refresh Rates (").concat(countryCurrencies.join(', '), ")\n            </button>\n          ") : '', "\n          <span class=\"auto-save-indicator\"></span>\n          <span class=\"rates-fetch-date\">Rates: ").concat(this.ratesFetchDate, "</span>\n        </div>\n        ").concat(Object.entries(costsByDestination).map(function (_a) {
+            var destName = _a[0], costs = _a[1];
+            return "\n          <div class=\"destination-costs-section\">\n            <div class=\"destination-header\">".concat(destName, "</div>\n            <table class=\"costs-table editable-costs-table\">\n              <thead>\n                <tr>\n                  <th style=\"width: 140px;\">Category</th>\n                  <th style=\"width: 200px;\">Description</th>\n                  <th style=\"width: 80px;\">Currency</th>\n                  <th style=\"width: 100px;\" class=\"text-right\">Amount</th>\n                  <th style=\"width: 100px;\" class=\"text-right\">USD</th>\n                  <th style=\"width: 120px;\">Status</th>\n                  <th style=\"width: 110px;\">Date</th>\n                  <th style=\"width: 200px;\">Notes</th>\n                  <th style=\"width: 60px;\">Actions</th>\n                </tr>\n              </thead>\n              <tbody>\n                ").concat(costs.map(function (cost) { return _this.renderEditableCostRow(cost); }).join(''), "\n              </tbody>\n              <tfoot>\n                <tr class=\"total-row\">\n                  <td colspan=\"4\"><strong>Subtotal for ").concat(destName, "</strong></td>\n                  <td class=\"text-right\"><strong>").concat(_this.formatCurrency(costs.reduce(function (sum, c) { return sum + (c.amount_usd || c.amount || 0); }, 0)), "</strong></td>\n                  <td colspan=\"4\"></td>\n                </tr>\n              </tfoot>\n            </table>\n          </div>\n        ");
+        }).join(''), "\n        <div class=\"country-total-row\" data-country=\"").concat(country, "\">\n          <strong>Total for ").concat(country, ":</strong>\n          <strong class=\"country-total-amount\">").concat(this.formatCurrency(countryCosts.reduce(function (sum, c) { return sum + (c.amount_usd || c.amount || 0); }, 0)), "</strong>\n        </div>\n        ").concat(this.renderAddCostSection(country, countryDestinations), "\n      </div>\n    ");
+    };
+    BudgetManager.prototype.renderEditableCostRow = function (cost) {
+        var costId = cost.id || "".concat(cost.destination_id, "_").concat(cost.category, "_").concat(Date.now());
+        var amount = cost.amount || 0;
+        var amountUsd = cost.amount_usd || amount;
+        // Default to local currency if not set
+        var currency = cost.currency || (0, currencyMapping_1.getCurrencyForDestination)(cost.destination_id, this.tripData.locations || []);
         // Get exchange rate for display
-        const rate = currency === 'USD' ? 1 : (this.exchangeRates[currency] || 1);
-        const rateDisplay = currency !== 'USD'
-            ? `<div class="exchange-rate-info" title="Rate as of ${this.ratesFetchDate}">1 USD = ${this.getCurrencySymbol(currency)}${rate.toFixed(2)}</div>`
+        var rate = currency === 'USD' ? 1 : (this.exchangeRates[currency] || 1);
+        var rateDisplay = currency !== 'USD'
+            ? "<div class=\"exchange-rate-info\">1 ".concat(currency, " = $").concat((1 / rate).toFixed(4), " USD<br><span class=\"rate-date\">").concat(this.ratesFetchDate, "</span></div>")
             : '';
-        return `
-      <tr class="editable-cost-row" data-cost-id="${costId}">
-        <td>
-          <span class="category-badge" style="background-color: ${this.getCategoryColor(cost.category || 'other')}">
-            ${this.getCategoryIcon(cost.category || 'other')} ${(cost.category || 'other').replace(/_/g, ' ')}
-          </span>
-        </td>
-        <td>
-          <input type="text"
-                 class="cost-field-input"
-                 data-cost-id="${costId}"
-                 data-field="description"
-                 value="${cost.description || ''}"
-                 placeholder="Description">
-        </td>
-        <td>
-          <select class="cost-field-select currency-select"
-                  data-cost-id="${costId}"
-                  data-field="currency">
-            <option value="USD" ${currency === 'USD' ? 'selected' : ''}>USD</option>
-            <option value="EUR" ${currency === 'EUR' ? 'selected' : ''}>EUR</option>
-            <option value="GBP" ${currency === 'GBP' ? 'selected' : ''}>GBP</option>
-            <option value="JPY" ${currency === 'JPY' ? 'selected' : ''}>JPY</option>
-            <option value="AUD" ${currency === 'AUD' ? 'selected' : ''}>AUD</option>
-            <option value="CAD" ${currency === 'CAD' ? 'selected' : ''}>CAD</option>
-            <option value="CNY" ${currency === 'CNY' ? 'selected' : ''}>CNY</option>
-            <option value="INR" ${currency === 'INR' ? 'selected' : ''}>INR</option>
-            <option value="THB" ${currency === 'THB' ? 'selected' : ''}>THB</option>
-            <option value="VND" ${currency === 'VND' ? 'selected' : ''}>VND</option>
-          </select>
-          ${rateDisplay}
-        </td>
-        <td class="text-right">
-          <div class="currency-input-wrapper">
-            <span class="currency-symbol">${this.getCurrencySymbol(currency)}</span>
-            <input type="number"
-                   class="cost-field-input amount-input"
-                   data-cost-id="${costId}"
-                   data-field="amount"
-                   value="${Math.round(amount)}"
-                   step="1"
-                   min="0">
-          </div>
-        </td>
-        <td class="text-right">
-          <div class="currency-input-wrapper">
-            <span class="currency-symbol">$</span>
-            <input type="number"
-                   class="cost-field-input usd-input"
-                   data-cost-id="${costId}"
-                   data-field="amount_usd"
-                   value="${Math.round(amountUsd)}"
-                   step="1"
-                   min="0"
-                   ${currency === 'USD' ? 'disabled' : ''}>
-          </div>
-        </td>
-        <td>
-          <select class="cost-field-select status-select"
-                  data-cost-id="${costId}"
-                  data-field="status">
-            <option value="estimated" ${(cost.status || 'estimated') === 'estimated' ? 'selected' : ''}>Estimated</option>
-            <option value="researched" ${cost.status === 'researched' ? 'selected' : ''}>Researched</option>
-            <option value="booked" ${cost.status === 'booked' ? 'selected' : ''}>Booked</option>
-            <option value="paid" ${cost.status === 'paid' ? 'selected' : ''}>Paid</option>
-          </select>
-        </td>
-        <td>
-          <input type="date"
-                 class="cost-field-input date-input"
-                 data-cost-id="${costId}"
-                 data-field="date"
-                 value="${cost.date || ''}">
-        </td>
-        <td>
-          <input type="text"
-                 class="cost-field-input notes-input"
-                 data-cost-id="${costId}"
-                 data-field="notes"
-                 value="${cost.notes || ''}"
-                 placeholder="Notes">
-        </td>
-        <td>
-          <button class="btn-icon delete-cost-btn" data-cost-id="${costId}" title="Delete cost">🗑️</button>
-        </td>
-      </tr>
-    `;
-    }
-    renderAddCostSection(country, destinations) {
-        return `
-      <div class="add-cost-section" data-country="${country}" style="display: none;">
-        <div class="add-cost-form">
-          <h5>Add New Cost for ${country}</h5>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Destination</label>
-              <select class="new-cost-field" data-field="destination_id">
-                <option value="">Select destination...</option>
-                ${destinations.map(dest => `<option value="${dest.id}">${dest.name || dest.city}</option>`).join('')}
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Category</label>
-              <select class="new-cost-field" data-field="category">
-                <option value="accommodation">🏨 Accommodation</option>
-                <option value="food">🍽️ Food</option>
-                <option value="transport">🚗 Transport</option>
-                <option value="activity">🎯 Activity</option>
-                <option value="flight">✈️ Flight</option>
-                <option value="other">📦 Other</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Description</label>
-              <input type="text" class="new-cost-field" data-field="description" placeholder="Description">
-            </div>
-            <div class="form-group">
-              <label>Currency</label>
-              <select class="new-cost-field new-cost-currency" data-field="currency">
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="JPY">JPY</option>
-                <option value="AUD">AUD</option>
-                <option value="CAD">CAD</option>
-                <option value="CNY">CNY</option>
-                <option value="INR">INR</option>
-                <option value="THB">THB</option>
-                <option value="VND">VND</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Amount</label>
-              <input type="number" class="new-cost-field new-cost-amount" data-field="amount" step="0.01" min="0" value="0">
-            </div>
-            <div class="form-group">
-              <label>Amount (USD)</label>
-              <input type="number" class="new-cost-field new-cost-usd" data-field="amount_usd" step="0.01" min="0" value="0">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Status</label>
-              <select class="new-cost-field" data-field="status">
-                <option value="estimated">Estimated</option>
-                <option value="researched">Researched</option>
-                <option value="booked">Booked</option>
-                <option value="paid">Paid</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Date</label>
-              <input type="date" class="new-cost-field" data-field="date">
-            </div>
-            <div class="form-group">
-              <label>Notes</label>
-              <input type="text" class="new-cost-field" data-field="notes" placeholder="Notes">
-            </div>
-          </div>
-          <div class="form-actions">
-            <button class="btn-sm btn-primary save-new-cost-btn" data-country="${country}">Save New Cost</button>
-            <button class="btn-sm btn-secondary cancel-new-cost-btn" data-country="${country}">Cancel</button>
-          </div>
-        </div>
-      </div>
-    `;
-    }
-    renderCategoryBreakdown(costs) {
-        const categoryTotals = {};
-        let total = 0;
-        costs.forEach(cost => {
-            const cat = cost.category || 'other';
-            const amount = cost.amount_usd || cost.amount || 0;
+        return "\n      <tr class=\"editable-cost-row\" data-cost-id=\"".concat(costId, "\">\n        <td>\n          <span class=\"category-badge\" style=\"background-color: ").concat(this.getCategoryColor(cost.category || 'other'), "\">\n            ").concat(this.getCategoryIcon(cost.category || 'other'), " ").concat((cost.category || 'other').replace(/_/g, ' '), "\n          </span>\n        </td>\n        <td>\n          <input type=\"text\"\n                 class=\"cost-field-input\"\n                 data-cost-id=\"").concat(costId, "\"\n                 data-field=\"description\"\n                 value=\"").concat(cost.description || '', "\"\n                 placeholder=\"Description\">\n        </td>\n        <td>\n          <div class=\"currency-display-wrapper\">\n            <div class=\"currency-code-display\">").concat(currency, "</div>\n            ").concat(rateDisplay, "\n          </div>\n          <input type=\"hidden\"\n                 class=\"currency-field\"\n                 data-cost-id=\"").concat(costId, "\"\n                 data-field=\"currency\"\n                 value=\"").concat(currency, "\">\n        </td>\n        <td class=\"text-right\">\n          <div class=\"currency-input-wrapper\">\n            <span class=\"currency-symbol\">").concat(this.getCurrencySymbol(currency), "</span>\n            <input type=\"number\"\n                   class=\"cost-field-input amount-input\"\n                   data-cost-id=\"").concat(costId, "\"\n                   data-field=\"amount\"\n                   value=\"").concat(Math.round(amount), "\"\n                   step=\"1\"\n                   min=\"0\">\n          </div>\n        </td>\n        <td class=\"text-right\">\n          <div class=\"currency-input-wrapper\">\n            <span class=\"currency-symbol\">$</span>\n            <input type=\"number\"\n                   class=\"cost-field-input usd-input\"\n                   data-cost-id=\"").concat(costId, "\"\n                   data-field=\"amount_usd\"\n                   value=\"").concat(Math.round(amountUsd), "\"\n                   step=\"1\"\n                   min=\"0\"\n                   ").concat(currency === 'USD' ? 'disabled' : '', ">\n          </div>\n        </td>\n        <td>\n          <select class=\"cost-field-select status-select\"\n                  data-cost-id=\"").concat(costId, "\"\n                  data-field=\"status\">\n            <option value=\"estimated\" ").concat((cost.status || 'estimated') === 'estimated' ? 'selected' : '', ">Estimated</option>\n            <option value=\"researched\" ").concat(cost.status === 'researched' ? 'selected' : '', ">Researched</option>\n            <option value=\"booked\" ").concat(cost.status === 'booked' ? 'selected' : '', ">Booked</option>\n            <option value=\"paid\" ").concat(cost.status === 'paid' ? 'selected' : '', ">Paid</option>\n          </select>\n        </td>\n        <td>\n          <input type=\"date\"\n                 class=\"cost-field-input date-input\"\n                 data-cost-id=\"").concat(costId, "\"\n                 data-field=\"date\"\n                 value=\"").concat(cost.date || '', "\">\n        </td>\n        <td>\n          <textarea class=\"cost-field-input notes-input auto-resize\"\n                    data-cost-id=\"").concat(costId, "\"\n                    data-field=\"notes\"\n                    placeholder=\"Notes\"\n                    rows=\"1\">").concat(cost.notes || '', "</textarea>\n        </td>\n        <td>\n          <button class=\"btn-icon delete-cost-btn\" data-cost-id=\"").concat(costId, "\" title=\"Delete cost\">\uD83D\uDDD1\uFE0F</button>\n        </td>\n      </tr>\n    ");
+    };
+    BudgetManager.prototype.renderAddCostSection = function (country, destinations) {
+        return "\n      <div class=\"add-cost-section\" data-country=\"".concat(country, "\" style=\"display: none;\">\n        <div class=\"add-cost-form\">\n          <h5>Add New Cost for ").concat(country, "</h5>\n          <div class=\"form-row\">\n            <div class=\"form-group\">\n              <label>Destination</label>\n              <select class=\"new-cost-field\" data-field=\"destination_id\">\n                <option value=\"\">Select destination...</option>\n                ").concat(destinations.map(function (dest) {
+            return "<option value=\"".concat(dest.id, "\">").concat(dest.name || dest.city, "</option>");
+        }).join(''), "\n              </select>\n            </div>\n            <div class=\"form-group\">\n              <label>Category</label>\n              <select class=\"new-cost-field\" data-field=\"category\">\n                <option value=\"accommodation\">\uD83C\uDFE8 Accommodation</option>\n                <option value=\"food\">\uD83C\uDF7D\uFE0F Food</option>\n                <option value=\"transport\">\uD83D\uDE97 Transport</option>\n                <option value=\"activity\">\uD83C\uDFAF Activity</option>\n                <option value=\"flight\">\u2708\uFE0F Flight</option>\n                <option value=\"other\">\uD83D\uDCE6 Other</option>\n              </select>\n            </div>\n          </div>\n          <div class=\"form-row\">\n            <div class=\"form-group\">\n              <label>Description</label>\n              <input type=\"text\" class=\"new-cost-field\" data-field=\"description\" placeholder=\"Description\">\n            </div>\n            <div class=\"form-group\">\n              <label>Currency</label>\n              <select class=\"new-cost-field new-cost-currency\" data-field=\"currency\">\n                <option value=\"USD\">USD</option>\n                <option value=\"EUR\">EUR</option>\n                <option value=\"GBP\">GBP</option>\n                <option value=\"JPY\">JPY</option>\n                <option value=\"AUD\">AUD</option>\n                <option value=\"CAD\">CAD</option>\n                <option value=\"CNY\">CNY</option>\n                <option value=\"INR\">INR</option>\n                <option value=\"THB\">THB</option>\n                <option value=\"VND\">VND</option>\n                <option value=\"FJD\">FJD</option>\n                <option value=\"SGD\">SGD</option>\n                <option value=\"NZD\">NZD</option>\n              </select>\n            </div>\n            <div class=\"form-group\">\n              <label>Amount</label>\n              <input type=\"number\" class=\"new-cost-field new-cost-amount\" data-field=\"amount\" step=\"0.01\" min=\"0\" value=\"0\">\n            </div>\n            <div class=\"form-group\">\n              <label>Amount (USD)</label>\n              <input type=\"number\" class=\"new-cost-field new-cost-usd\" data-field=\"amount_usd\" step=\"0.01\" min=\"0\" value=\"0\">\n            </div>\n          </div>\n          <div class=\"form-row\">\n            <div class=\"form-group\">\n              <label>Status</label>\n              <select class=\"new-cost-field\" data-field=\"status\">\n                <option value=\"estimated\">Estimated</option>\n                <option value=\"researched\">Researched</option>\n                <option value=\"booked\">Booked</option>\n                <option value=\"paid\">Paid</option>\n              </select>\n            </div>\n            <div class=\"form-group\">\n              <label>Date</label>\n              <input type=\"date\" class=\"new-cost-field\" data-field=\"date\">\n            </div>\n            <div class=\"form-group\">\n              <label>Notes</label>\n              <input type=\"text\" class=\"new-cost-field\" data-field=\"notes\" placeholder=\"Notes\">\n            </div>\n          </div>\n          <div class=\"form-actions\">\n            <button class=\"btn-sm btn-primary save-new-cost-btn\" data-country=\"").concat(country, "\">Save New Cost</button>\n            <button class=\"btn-sm btn-secondary cancel-new-cost-btn\" data-country=\"").concat(country, "\">Cancel</button>\n          </div>\n        </div>\n      </div>\n    ");
+    };
+    BudgetManager.prototype.renderCategoryBreakdown = function (costs) {
+        var _this = this;
+        var categoryTotals = {};
+        var total = 0;
+        costs.forEach(function (cost) {
+            var cat = cost.category || 'other';
+            var amount = cost.amount_usd || cost.amount || 0;
             categoryTotals[cat] = (categoryTotals[cat] || 0) + amount;
             total += amount;
         });
         if (total === 0)
             return '';
         return Object.entries(categoryTotals)
-            .sort((a, b) => b[1] - a[1])
-            .map(([cat, amount]) => {
-            const pct = (amount / total) * 100;
-            const color = this.getCategoryColor(cat);
-            return `<div class="cat-breakdown-item" style="background-color: ${color}" title="${cat.replace(/_/g, ' ')}: ${this.formatCurrency(amount)} (${pct.toFixed(0)}%)"></div>`;
+            .sort(function (a, b) { return b[1] - a[1]; })
+            .map(function (_a) {
+            var cat = _a[0], amount = _a[1];
+            var pct = (amount / total) * 100;
+            var color = _this.getCategoryColor(cat);
+            return "<div class=\"cat-breakdown-item\" style=\"background-color: ".concat(color, "\" title=\"").concat(cat.replace(/_/g, ' '), ": ").concat(_this.formatCurrency(amount), " (").concat(pct.toFixed(0), "%)\"></div>");
         })
             .join('');
-    }
-    renderNoBudget() {
-        const totalCosts = (this.tripData.costs || [])
-            .reduce((sum, cost) => sum + (cost.amount_usd || cost.amount || 0), 0);
-        return `
-      <div class="budget-manager no-budget">
-        <div class="budget-header">
-          <h3>💰 Budget Management</h3>
-          <p class="budget-subtitle">No budget set for this trip</p>
-        </div>
-
-        <div class="current-spending">
-          <div class="spending-summary">
-            <div class="spending-label">Current Total Spending</div>
-            <div class="spending-amount">${this.formatCurrency(totalCosts)}</div>
-          </div>
-        </div>
-
-        <div class="budget-actions">
-          <button class="btn-primary" id="create-budget-btn">
-            Create Budget (+10% Contingency)
-          </button>
-          <button class="btn-secondary" id="custom-budget-btn">
-            Set Custom Budget
-          </button>
-        </div>
-
-        <div class="budget-help">
-          <p>💡 <strong>Tip:</strong> Setting a budget helps you track spending and receive alerts when approaching limits.</p>
-        </div>
-      </div>
-    `;
-    }
-    renderBudgetStatus() {
+    };
+    BudgetManager.prototype.renderNoBudget = function () {
+        var totalCosts = (this.tripData.costs || [])
+            .reduce(function (sum, cost) { return sum + (cost.amount_usd || cost.amount || 0); }, 0);
+        return "\n      <div class=\"budget-manager no-budget\">\n        <div class=\"budget-header\">\n          <h3>\uD83D\uDCB0 Budget Management</h3>\n          <p class=\"budget-subtitle\">No budget set for this trip</p>\n        </div>\n\n        <div class=\"current-spending\">\n          <div class=\"spending-summary\">\n            <div class=\"spending-label\">Current Total Spending</div>\n            <div class=\"spending-amount\">".concat(this.formatCurrency(totalCosts), "</div>\n          </div>\n        </div>\n\n        <div class=\"budget-actions\">\n          <button class=\"btn-primary\" id=\"create-budget-btn\">\n            Create Budget (+10% Contingency)\n          </button>\n          <button class=\"btn-secondary\" id=\"custom-budget-btn\">\n            Set Custom Budget\n          </button>\n        </div>\n\n        <div class=\"budget-help\">\n          <p>\uD83D\uDCA1 <strong>Tip:</strong> Setting a budget helps you track spending and receive alerts when approaching limits.</p>\n        </div>\n      </div>\n    ");
+    };
+    BudgetManager.prototype.renderBudgetStatus = function () {
+        var _this = this;
         var _a, _b;
         if (!this.budget)
             return this.renderNoBudget();
-        const status = calculateBudgetStatus(this.budget, this.tripData);
-        const progressBarClass = status.percentage_used > 100 ? 'over-budget' :
+        var status = (0, budgetTracker_1.calculateBudgetStatus)(this.budget, this.tripData);
+        var progressBarClass = status.percentage_used > 100 ? 'over-budget' :
             status.percentage_used > 90 ? 'warning' :
                 status.percentage_used > 80 ? 'caution' : '';
-        const progressWidth = Math.min(status.percentage_used, 100);
+        var progressWidth = Math.min(status.percentage_used, 100);
         // Get all categories and countries from trip data
-        const categories = new Set();
-        const countries = new Set();
-        (this.tripData.costs || []).forEach(cost => {
+        var categories = new Set();
+        var countries = new Set();
+        (this.tripData.costs || []).forEach(function (cost) {
             if (cost.category)
                 categories.add(cost.category);
         });
-        (this.tripData.locations || []).forEach(loc => {
+        (this.tripData.locations || []).forEach(function (loc) {
             if (loc.country)
                 countries.add(loc.country);
         });
-        const currentBudget = this.budget.total_budget_usd || 0;
-        const allCurrencies = this.getAllCurrencies();
-        const hasAnyCurrencies = allCurrencies.length > 0;
-        return `
-      <div class="budget-manager integrated">
-        <div class="budget-header-compact">
-          <div class="header-row">
-            <h3>💰 Budget Management</h3>
-            <div class="header-actions">
-              ${hasAnyCurrencies ? `
-                <button class="btn-secondary-sm" id="refresh-all-rates-btn" title="Refresh all exchange rates (${allCurrencies.join(', ')})">
-                  🔄 Refresh All Rates
-                </button>
-              ` : ''}
-              <button class="btn-primary-sm" id="save-budget-btn">💾 Save</button>
-            </div>
-          </div>
-          <div class="budget-overview-compact">
-            <div class="budget-field">
-              <label>Total:</label>
-              <input type="number" id="total-budget" value="${currentBudget}" min="0" step="100">
-              <span>USD</span>
-            </div>
-            <div class="budget-field">
-              <label>Contingency:</label>
-              <input type="number" id="contingency-pct" value="${this.budget.contingency_pct || 0}" min="0" max="100" step="1">
-              <span>%</span>
-            </div>
-            <div class="budget-stat">
-              <span class="stat-label">Estimated:</span>
-              <span class="stat-value ${progressBarClass}">${this.formatCurrency(status.total_spent)} <span class="stat-pct">(${status.percentage_used.toFixed(1)}%)</span></span>
-            </div>
-            <div class="budget-stat">
-              <span class="stat-label">Remaining:</span>
-              <span class="stat-value ${status.total_remaining < 0 ? 'negative' : 'positive'}">
-                ${this.formatCurrency(status.total_remaining)}
-              </span>
-            </div>
-          </div>
-          <div class="budget-progress-compact">
-            <div class="progress-bar ${progressBarClass}">
-              <div class="progress-fill" style="width: ${progressWidth}%"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Alerts -->
-        ${status.alerts.length > 0 ? `
-          <div class="budget-alerts">
-            <h4>🔔 Alerts</h4>
-            ${status.alerts.map(alert => `
-              <div class="budget-alert alert-${alert.type}">
-                <span class="alert-icon">${this.getAlertIcon(alert.type)}</span>
-                <span class="alert-message">${alert.message}</span>
-              </div>
-            `).join('')}
-          </div>
-        ` : ''}
-
-        <!-- Budget by Country -->
-        ${countries.size > 0 ? `
-          <div class="budget-edit-section">
-            <div class="section-header">
-              <h4>🌍 Budget by Country</h4>
-              <div class="mode-controls">
-                <span class="mode-indicator" id="country-mode-indicator">Mode: Dollar Amounts</span>
-                <div class="country-mode-selector">
-                  <button class="mode-btn active" data-mode="dollars" id="country-mode-dollars">$</button>
-                  <button class="mode-btn" data-mode="percent" id="country-mode-percent">%</button>
-                  <button class="mode-btn" data-mode="perday" id="country-mode-perday">$/day</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Group note for countries -->
-            <div class="group-note-section">
-              <label class="note-label">📝 Country Budget Notes:</label>
-              <textarea class="group-note-input"
-                        id="country-group-note"
-                        placeholder="Add notes about country budgeting strategy..."
-                        rows="2">${((_a = this.budget) === null || _a === void 0 ? void 0 : _a.country_group_note) || ''}</textarea>
-            </div>
-
-            <!-- Always-visible budget summary for countries -->
-            <div class="budget-summary-box">
-              <div class="summary-row">
-                <span class="summary-label">Total Budget:</span>
-                <span class="summary-value" id="country-total-budget">${this.formatCurrency(currentBudget)}</span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Allocated to Countries:</span>
-                <span class="summary-value" id="country-total-allocated">${this.formatCurrency(Array.from(countries).reduce((sum, country) => {
+        var currentBudget = this.budget.total_budget_usd || 0;
+        var allCurrencies = this.getAllCurrencies();
+        var hasAnyCurrencies = allCurrencies.length > 0;
+        return "\n      <div class=\"budget-manager integrated\">\n        <div class=\"budget-header-compact\">\n          <div class=\"header-row\">\n            <h3>\uD83D\uDCB0 Budget Management</h3>\n            <div class=\"header-actions\">\n              ".concat(hasAnyCurrencies ? "\n                <button class=\"btn-secondary-sm\" id=\"refresh-all-rates-btn\" title=\"Refresh all exchange rates (".concat(allCurrencies.join(', '), ")\">\n                  \uD83D\uDD04 Refresh All Rates\n                </button>\n              ") : '', "\n              <button class=\"btn-primary-sm\" id=\"save-budget-btn\">\uD83D\uDCBE Save</button>\n            </div>\n          </div>\n          <div class=\"budget-overview-compact\">\n            <div class=\"budget-field\">\n              <label>Total:</label>\n              <input type=\"number\" id=\"total-budget\" value=\"").concat(currentBudget, "\" min=\"0\" step=\"100\">\n              <span>USD</span>\n            </div>\n            <div class=\"budget-field\">\n              <label>Contingency:</label>\n              <input type=\"number\" id=\"contingency-pct\" value=\"").concat(this.budget.contingency_pct || 0, "\" min=\"0\" max=\"100\" step=\"1\">\n              <span>%</span>\n            </div>\n            <div class=\"budget-stat\">\n              <span class=\"stat-label\">Estimated:</span>\n              <span class=\"stat-value ").concat(progressBarClass, "\">").concat(this.formatCurrency(status.total_spent), " <span class=\"stat-pct\">(").concat(status.percentage_used.toFixed(1), "%)</span></span>\n            </div>\n            <div class=\"budget-stat\">\n              <span class=\"stat-label\">Remaining:</span>\n              <span class=\"stat-value ").concat(status.total_remaining < 0 ? 'negative' : 'positive', "\">\n                ").concat(this.formatCurrency(status.total_remaining), "\n              </span>\n            </div>\n          </div>\n          <div class=\"budget-progress-compact\">\n            <div class=\"progress-bar ").concat(progressBarClass, "\">\n              <div class=\"progress-fill\" style=\"width: ").concat(progressWidth, "%\"></div>\n            </div>\n          </div>\n        </div>\n\n        <!-- Alerts -->\n        ").concat(status.alerts.length > 0 ? "\n          <div class=\"budget-alerts\">\n            <h4>\uD83D\uDD14 Alerts</h4>\n            ".concat(status.alerts.map(function (alert) { return "\n              <div class=\"budget-alert alert-".concat(alert.type, "\">\n                <span class=\"alert-icon\">").concat(_this.getAlertIcon(alert.type), "</span>\n                <span class=\"alert-message\">").concat(alert.message, "</span>\n              </div>\n            "); }).join(''), "\n          </div>\n        ") : '', "\n\n        <!-- Budget by Country -->\n        ").concat(countries.size > 0 ? "\n          <div class=\"budget-edit-section\">\n            <div class=\"section-header\">\n              <h4>\uD83C\uDF0D Budget by Country</h4>\n              <div class=\"mode-controls\">\n                <span class=\"mode-indicator\" id=\"country-mode-indicator\">Mode: Dollar Amounts</span>\n                <div class=\"country-mode-selector\">\n                  <button class=\"mode-btn active\" data-mode=\"dollars\" id=\"country-mode-dollars\">$</button>\n                  <button class=\"mode-btn\" data-mode=\"percent\" id=\"country-mode-percent\">%</button>\n                  <button class=\"mode-btn\" data-mode=\"perday\" id=\"country-mode-perday\">$/day</button>\n                </div>\n              </div>\n            </div>\n\n            <!-- Group note for countries -->\n            <div class=\"group-note-section\">\n              <label class=\"note-label\">\uD83D\uDCDD Country Budget Notes:</label>\n              <textarea class=\"group-note-input\"\n                        id=\"country-group-note\"\n                        placeholder=\"Add notes about country budgeting strategy...\"\n                        rows=\"2\">".concat(((_a = this.budget) === null || _a === void 0 ? void 0 : _a.country_group_note) || '', "</textarea>\n            </div>\n\n            <!-- Always-visible budget summary for countries -->\n            <div class=\"budget-summary-box\">\n              <div class=\"summary-row\">\n                <span class=\"summary-label\">Total Budget:</span>\n                <span class=\"summary-value\" id=\"country-total-budget\">").concat(this.formatCurrency(currentBudget), "</span>\n              </div>\n              <div class=\"summary-row\">\n                <span class=\"summary-label\">Allocated to Countries:</span>\n                <span class=\"summary-value\" id=\"country-total-allocated\">").concat(this.formatCurrency(Array.from(countries).reduce(function (sum, country) {
             var _a, _b;
-            return sum + (((_b = (_a = this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_country) === null || _b === void 0 ? void 0 : _b[country]) || 0);
-        }, 0))}</span>
-                <span class="summary-percentage" id="country-total-pct">${currentBudget > 0 ?
-            ((Array.from(countries).reduce((sum, country) => { var _a, _b; return sum + (((_b = (_a = this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_country) === null || _b === void 0 ? void 0 : _b[country]) || 0); }, 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Unallocated:</span>
-                <span class="summary-value" id="country-unallocated">${this.formatCurrency(currentBudget - Array.from(countries).reduce((sum, country) => { var _a, _b; return sum + (((_b = (_a = this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_country) === null || _b === void 0 ? void 0 : _b[country]) || 0); }, 0))}</span>
-              </div>
-            </div>
-
-            <div id="country-allocation-status" style="display: none;" class="allocation-status">
-              <div class="allocation-info">
-                <strong>Total Allocated:</strong> <span id="country-total-allocated-pct">0</span>%
-              </div>
-              <div id="country-allocation-remainder" class="allocation-remainder"></div>
-            </div>
-
-            <div class="budget-items-edit">
-              ${Array.from(countries).map(country => {
+            return sum + (((_b = (_a = _this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_country) === null || _b === void 0 ? void 0 : _b[country]) || 0);
+        }, 0)), "</span>\n                <span class=\"summary-percentage\" id=\"country-total-pct\">").concat(currentBudget > 0 ?
+            ((Array.from(countries).reduce(function (sum, country) { var _a, _b; return sum + (((_b = (_a = _this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_country) === null || _b === void 0 ? void 0 : _b[country]) || 0); }, 0) / currentBudget) * 100).toFixed(1) : 0, "%</span>\n              </div>\n              <div class=\"summary-row\">\n                <span class=\"summary-label\">Unallocated:</span>\n                <span class=\"summary-value\" id=\"country-unallocated\">").concat(this.formatCurrency(currentBudget - Array.from(countries).reduce(function (sum, country) { var _a, _b; return sum + (((_b = (_a = _this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_country) === null || _b === void 0 ? void 0 : _b[country]) || 0); }, 0)), "</span>\n              </div>\n            </div>\n\n            <div id=\"country-allocation-status\" style=\"display: none;\" class=\"allocation-status\">\n              <div class=\"allocation-info\">\n                <strong>Total Allocated:</strong> <span id=\"country-total-allocated-pct\">0</span>%\n              </div>\n              <div id=\"country-allocation-remainder\" class=\"allocation-remainder\"></div>\n            </div>\n\n            <div class=\"budget-items-edit\">\n              ").concat(Array.from(countries).map(function (country) {
             var _a, _b, _c, _d, _e;
-            const countryDays = (this.tripData.locations || [])
-                .filter(loc => loc.country === country)
-                .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
-            const countryCostsArray = (this.tripData.costs || [])
-                .filter(c => {
-                const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+            var countryDays = (_this.tripData.locations || [])
+                .filter(function (loc) { return loc.country === country; })
+                .reduce(function (sum, loc) { return sum + (loc.duration_days || 0); }, 0);
+            var countryCostsArray = (_this.tripData.costs || [])
+                .filter(function (c) {
+                var location = (_this.tripData.locations || []).find(function (loc) { return loc.id === c.destination_id; });
                 return (location === null || location === void 0 ? void 0 : location.country) === country;
             });
-            const countryCosts = countryCostsArray.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
-            const categoryBreakdown = this.renderCategoryBreakdown(countryCostsArray);
-            const countryBudget = ((_b = (_a = this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_country) === null || _b === void 0 ? void 0 : _b[country]) || countryCosts * 1.1;
-            const budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
-            const countryPct = currentBudget > 0 ? (countryBudget / currentBudget * 100) : 0;
-            const pct = ((_c = status.by_country[country]) === null || _c === void 0 ? void 0 : _c.percentage) || 0;
-            const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
-            const countryNote = ((_e = (_d = this.budget) === null || _d === void 0 ? void 0 : _d.country_notes) === null || _e === void 0 ? void 0 : _e[country]) || '';
-            return `
-                  <div class="budget-item-edit">
-                    <div class="item-header-row">
-                      <div class="item-label-with-note">
-                        <span class="item-label-text">${country} <span class="days-label">(${countryDays} day${countryDays !== 1 ? 's' : ''})</span></span>
-                        <button class="note-toggle-btn" data-country="${country}" title="${countryNote ? 'Edit Note' : 'Add Note'}">
-                          ${countryNote ? '📝' : '📄'}
-                        </button>
-                        ${countryNote ? `<span class="inline-note">${countryNote}</span>` : ''}
-                        <button class="costs-toggle-btn" data-country="${country}" title="View Costs">
-                          💰 View Costs (${countryCostsArray.length})
-                        </button>
-                      </div>
-                    </div>
-                    <div class="item-input-row">
-                      <div class="input-with-unit">
-                        <input type="number"
-                               class="country-input"
-                               data-country="${country}"
-                               data-days="${countryDays}"
-                               data-dollar-value="${Math.round(countryBudget)}"
-                               value="${Math.round(countryBudget)}"
-                               min="0"
-                               step="10">
-                        <span class="input-unit" data-country="${country}">USD</span>
-                      </div>
-                      <span class="calc-arrow">→</span>
-                      <div class="calculated-display">
-                        <span class="calc-value" data-country="${country}">${countryPct.toFixed(1)}%</span>
-                      </div>
-                      <div class="item-status">
-                        <span class="country-per-day-display" data-country="${country}">$${Math.round(budgetPerDay)}/day</span>
-                        <div class="est-cost-with-breakdown">
-                          <span class="current-spend">Est: ${this.formatCurrency(countryCosts)}</span>
-                          ${categoryBreakdown ? `<div class="cat-breakdown-bar">${categoryBreakdown}</div>` : ''}
-                        </div>
-                        <div class="mini-progress-bar ${barClass}">
-                          <div class="mini-progress-fill" style="width: ${Math.min(pct, 100)}%"></div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="item-note-section" data-country="${country}" style="display: none">
-                      <textarea class="item-note-input"
-                                data-country="${country}"
-                                placeholder="Add notes about this country budget..."
-                                rows="2">${countryNote}</textarea>
-                    </div>
-                    <div class="item-costs-section" data-country="${country}" style="display: none">
-                      ${this.renderCostsTableForCountry(country)}
-                    </div>
-                  </div>
-                `;
-        }).join('')}
-            </div>
-          </div>
-        ` : ''}
-
-        <!-- Budget by Category -->
-        <div class="budget-edit-section">
-          <div class="section-header">
-            <h4>📊 Budget by Category</h4>
-            <div class="mode-controls">
-              <span class="mode-indicator" id="category-mode-indicator">Mode: Dollar Amounts</span>
-              <label class="toggle-switch">
-                <input type="checkbox" id="category-mode-toggle">
-                <span class="toggle-slider"></span>
-                <span class="toggle-label">Use %</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Group note for categories -->
-          <div class="group-note-section">
-            <label class="note-label">📝 Category Budget Notes:</label>
-            <textarea class="group-note-input"
-                      id="category-group-note"
-                      placeholder="Add notes about category budgeting strategy..."
-                      rows="2">${((_b = this.budget) === null || _b === void 0 ? void 0 : _b.category_group_note) || ''}</textarea>
-          </div>
-
-          <!-- Always-visible budget summary -->
-          <div class="budget-summary-box">
-            <div class="summary-row">
-              <span class="summary-label">Total Budget:</span>
-              <span class="summary-value" id="category-total-budget">${this.formatCurrency(currentBudget)}</span>
-            </div>
-            <div class="summary-row">
-              <span class="summary-label">Allocated to Categories:</span>
-              <span class="summary-value" id="category-total-allocated">${this.formatCurrency(Array.from(categories).reduce((sum, cat) => {
+            var countryCosts = countryCostsArray.reduce(function (sum, c) { return sum + (c.amount_usd || c.amount || 0); }, 0);
+            var categoryBreakdown = _this.renderCategoryBreakdown(countryCostsArray);
+            var countryBudget = ((_b = (_a = _this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_country) === null || _b === void 0 ? void 0 : _b[country]) || countryCosts * 1.1;
+            var budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
+            var countryPct = currentBudget > 0 ? (countryBudget / currentBudget * 100) : 0;
+            var pct = ((_c = status.by_country[country]) === null || _c === void 0 ? void 0 : _c.percentage) || 0;
+            var barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
+            var countryNote = ((_e = (_d = _this.budget) === null || _d === void 0 ? void 0 : _d.country_notes) === null || _e === void 0 ? void 0 : _e[country]) || '';
+            return "\n                  <div class=\"budget-item-edit\">\n                    <div class=\"item-header-row\">\n                      <div class=\"item-label-with-note\">\n                        <span class=\"item-label-text\">".concat(country, " <span class=\"days-label\">(").concat(countryDays, " day").concat(countryDays !== 1 ? 's' : '', ")</span></span>\n                        <button class=\"note-toggle-btn\" data-country=\"").concat(country, "\" title=\"").concat(countryNote ? 'Edit Note' : 'Add Note', "\">\n                          ").concat(countryNote ? '📝' : '📄', "\n                        </button>\n                        ").concat(countryNote ? "<span class=\"inline-note\">".concat(countryNote, "</span>") : '', "\n                        <button class=\"costs-toggle-btn\" data-country=\"").concat(country, "\" title=\"View Costs\">\n                          \uD83D\uDCB0 View Costs (").concat(countryCostsArray.length, ")\n                        </button>\n                      </div>\n                    </div>\n                    <div class=\"item-input-row\">\n                      <div class=\"input-with-unit\">\n                        <input type=\"number\"\n                               class=\"country-input\"\n                               data-country=\"").concat(country, "\"\n                               data-days=\"").concat(countryDays, "\"\n                               data-dollar-value=\"").concat(Math.round(countryBudget), "\"\n                               value=\"").concat(Math.round(countryBudget), "\"\n                               min=\"0\"\n                               step=\"10\">\n                        <span class=\"input-unit\" data-country=\"").concat(country, "\">USD</span>\n                      </div>\n                      <span class=\"calc-arrow\">\u2192</span>\n                      <div class=\"calculated-display\">\n                        <span class=\"calc-value\" data-country=\"").concat(country, "\">").concat(countryPct.toFixed(1), "%</span>\n                      </div>\n                      <div class=\"item-status\">\n                        <span class=\"country-per-day-display\" data-country=\"").concat(country, "\">$").concat(Math.round(budgetPerDay), "/day</span>\n                        <div class=\"est-cost-with-breakdown\">\n                          <span class=\"current-spend\">Est: ").concat(_this.formatCurrency(countryCosts), "</span>\n                          ").concat(categoryBreakdown ? "<div class=\"cat-breakdown-bar\">".concat(categoryBreakdown, "</div>") : '', "\n                        </div>\n                        <div class=\"mini-progress-bar ").concat(barClass, "\">\n                          <div class=\"mini-progress-fill\" style=\"width: ").concat(Math.min(pct, 100), "%\"></div>\n                        </div>\n                      </div>\n                    </div>\n                    <div class=\"item-note-section\" data-country=\"").concat(country, "\" style=\"display: none\">\n                      <textarea class=\"item-note-input\"\n                                data-country=\"").concat(country, "\"\n                                placeholder=\"Add notes about this country budget...\"\n                                rows=\"2\">").concat(countryNote, "</textarea>\n                    </div>\n                    <div class=\"item-costs-section\" data-country=\"").concat(country, "\" style=\"display: none\">\n                      ").concat(_this.renderCostsTableForCountry(country), "\n                    </div>\n                  </div>\n                ");
+        }).join(''), "\n            </div>\n          </div>\n        ") : '', "\n\n        <!-- Budget by Category -->\n        <div class=\"budget-edit-section\">\n          <div class=\"section-header\">\n            <h4>\uD83D\uDCCA Budget by Category</h4>\n            <div class=\"mode-controls\">\n              <span class=\"mode-indicator\" id=\"category-mode-indicator\">Mode: Dollar Amounts</span>\n              <label class=\"toggle-switch\">\n                <input type=\"checkbox\" id=\"category-mode-toggle\">\n                <span class=\"toggle-slider\"></span>\n                <span class=\"toggle-label\">Use %</span>\n              </label>\n            </div>\n          </div>\n\n          <!-- Group note for categories -->\n          <div class=\"group-note-section\">\n            <label class=\"note-label\">\uD83D\uDCDD Category Budget Notes:</label>\n            <textarea class=\"group-note-input\"\n                      id=\"category-group-note\"\n                      placeholder=\"Add notes about category budgeting strategy...\"\n                      rows=\"2\">").concat(((_b = this.budget) === null || _b === void 0 ? void 0 : _b.category_group_note) || '', "</textarea>\n          </div>\n\n          <!-- Always-visible budget summary -->\n          <div class=\"budget-summary-box\">\n            <div class=\"summary-row\">\n              <span class=\"summary-label\">Total Budget:</span>\n              <span class=\"summary-value\" id=\"category-total-budget\">").concat(this.formatCurrency(currentBudget), "</span>\n            </div>\n            <div class=\"summary-row\">\n              <span class=\"summary-label\">Allocated to Categories:</span>\n              <span class=\"summary-value\" id=\"category-total-allocated\">").concat(this.formatCurrency(Array.from(categories).reduce(function (sum, cat) {
             var _a, _b;
-            return sum + (((_b = (_a = this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_category) === null || _b === void 0 ? void 0 : _b[cat]) || 0);
-        }, 0))}</span>
-              <span class="summary-percentage" id="category-total-pct">${currentBudget > 0 ?
-            ((Array.from(categories).reduce((sum, cat) => { var _a, _b; return sum + (((_b = (_a = this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_category) === null || _b === void 0 ? void 0 : _b[cat]) || 0); }, 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
-            </div>
-            <div class="summary-row">
-              <span class="summary-label">Unallocated:</span>
-              <span class="summary-value" id="category-unallocated">${this.formatCurrency(currentBudget - Array.from(categories).reduce((sum, cat) => { var _a, _b; return sum + (((_b = (_a = this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_category) === null || _b === void 0 ? void 0 : _b[cat]) || 0); }, 0))}</span>
-            </div>
-          </div>
-
-          <div id="allocation-status" style="display: none;" class="allocation-status">
-            <div class="allocation-info">
-              <strong>Total Allocated:</strong> <span id="total-allocated-pct">0</span>%
-            </div>
-            <div id="allocation-remainder" class="allocation-remainder"></div>
-          </div>
-
-          <div class="budget-items-edit">
-            ${Array.from(categories).map(cat => {
+            return sum + (((_b = (_a = _this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_category) === null || _b === void 0 ? void 0 : _b[cat]) || 0);
+        }, 0)), "</span>\n              <span class=\"summary-percentage\" id=\"category-total-pct\">").concat(currentBudget > 0 ?
+            ((Array.from(categories).reduce(function (sum, cat) { var _a, _b; return sum + (((_b = (_a = _this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_category) === null || _b === void 0 ? void 0 : _b[cat]) || 0); }, 0) / currentBudget) * 100).toFixed(1) : 0, "%</span>\n            </div>\n            <div class=\"summary-row\">\n              <span class=\"summary-label\">Unallocated:</span>\n              <span class=\"summary-value\" id=\"category-unallocated\">").concat(this.formatCurrency(currentBudget - Array.from(categories).reduce(function (sum, cat) { var _a, _b; return sum + (((_b = (_a = _this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_category) === null || _b === void 0 ? void 0 : _b[cat]) || 0); }, 0)), "</span>\n            </div>\n          </div>\n\n          <div id=\"allocation-status\" style=\"display: none;\" class=\"allocation-status\">\n            <div class=\"allocation-info\">\n              <strong>Total Allocated:</strong> <span id=\"total-allocated-pct\">0</span>%\n            </div>\n            <div id=\"allocation-remainder\" class=\"allocation-remainder\"></div>\n          </div>\n\n          <div class=\"budget-items-edit\">\n            ").concat(Array.from(categories).map(function (cat) {
             var _a, _b, _c, _d, _e;
-            const catCosts = (this.tripData.costs || [])
-                .filter(c => c.category === cat)
-                .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
-            const catBudget = ((_b = (_a = this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_category) === null || _b === void 0 ? void 0 : _b[cat]) || catCosts * 1.1;
-            const catPct = currentBudget > 0 ? (catBudget / currentBudget * 100) : 0;
-            const pct = ((_c = status.by_category[cat]) === null || _c === void 0 ? void 0 : _c.percentage) || 0;
-            const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
-            const catNote = ((_e = (_d = this.budget) === null || _d === void 0 ? void 0 : _d.category_notes) === null || _e === void 0 ? void 0 : _e[cat]) || '';
-            return `
-                <div class="budget-item-edit">
-                  <div class="item-header-row">
-                    <div class="item-label-with-note">
-                      <span class="item-label-text">${cat.replace(/_/g, ' ')}</span>
-                      <button class="note-toggle-btn" data-category="${cat}" title="${catNote ? 'Edit Note' : 'Add Note'}">
-                        ${catNote ? '📝' : '📄'}
-                      </button>
-                      ${catNote ? `<span class="inline-note">${catNote}</span>` : ''}
-                    </div>
-                  </div>
-                  <div class="item-input-row">
-                    <div class="input-with-unit">
-                      <input type="number"
-                             class="cat-input"
-                             data-category="${cat}"
-                             data-dollar-value="${Math.round(catBudget)}"
-                             value="${Math.round(catBudget)}"
-                             min="0"
-                             step="10">
-                      <span class="input-unit" data-category="${cat}">USD</span>
-                    </div>
-                    <span class="calc-arrow">→</span>
-                    <div class="calculated-display">
-                      <span class="calc-value" data-category="${cat}">${catPct.toFixed(1)}%</span>
-                    </div>
-                    <div class="item-status">
-                      <span class="current-spend">Est: ${this.formatCurrency(catCosts)}</span>
-                      <div class="mini-progress-bar ${barClass}">
-                        <div class="mini-progress-fill" style="width: ${Math.min(pct, 100)}%"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="item-note-section" data-category="${cat}" style="display: none">
-                    <textarea class="item-note-input"
-                              data-category="${cat}"
-                              placeholder="Add notes about this category budget..."
-                              rows="2">${catNote}</textarea>
-                  </div>
-                </div>
-              `;
-        }).join('')}
-          </div>
-        </div>
-
-        <div class="budget-footer">
-          <button class="btn-primary" id="save-budget-btn-footer">💾 Save Budget</button>
-        </div>
-      </div>
-    `;
-    }
-    attachEventListeners() {
+            var catCosts = (_this.tripData.costs || [])
+                .filter(function (c) { return c.category === cat; })
+                .reduce(function (sum, c) { return sum + (c.amount_usd || c.amount || 0); }, 0);
+            var catBudget = ((_b = (_a = _this.budget) === null || _a === void 0 ? void 0 : _a.budgets_by_category) === null || _b === void 0 ? void 0 : _b[cat]) || catCosts * 1.1;
+            var catPct = currentBudget > 0 ? (catBudget / currentBudget * 100) : 0;
+            var pct = ((_c = status.by_category[cat]) === null || _c === void 0 ? void 0 : _c.percentage) || 0;
+            var barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
+            var catNote = ((_e = (_d = _this.budget) === null || _d === void 0 ? void 0 : _d.category_notes) === null || _e === void 0 ? void 0 : _e[cat]) || '';
+            return "\n                <div class=\"budget-item-edit\">\n                  <div class=\"item-header-row\">\n                    <div class=\"item-label-with-note\">\n                      <span class=\"item-label-text\">".concat(cat.replace(/_/g, ' '), "</span>\n                      <button class=\"note-toggle-btn\" data-category=\"").concat(cat, "\" title=\"").concat(catNote ? 'Edit Note' : 'Add Note', "\">\n                        ").concat(catNote ? '📝' : '📄', "\n                      </button>\n                      ").concat(catNote ? "<span class=\"inline-note\">".concat(catNote, "</span>") : '', "\n                    </div>\n                  </div>\n                  <div class=\"item-input-row\">\n                    <div class=\"input-with-unit\">\n                      <input type=\"number\"\n                             class=\"cat-input\"\n                             data-category=\"").concat(cat, "\"\n                             data-dollar-value=\"").concat(Math.round(catBudget), "\"\n                             value=\"").concat(Math.round(catBudget), "\"\n                             min=\"0\"\n                             step=\"10\">\n                      <span class=\"input-unit\" data-category=\"").concat(cat, "\">USD</span>\n                    </div>\n                    <span class=\"calc-arrow\">\u2192</span>\n                    <div class=\"calculated-display\">\n                      <span class=\"calc-value\" data-category=\"").concat(cat, "\">").concat(catPct.toFixed(1), "%</span>\n                    </div>\n                    <div class=\"item-status\">\n                      <span class=\"current-spend\">Est: ").concat(_this.formatCurrency(catCosts), "</span>\n                      <div class=\"mini-progress-bar ").concat(barClass, "\">\n                        <div class=\"mini-progress-fill\" style=\"width: ").concat(Math.min(pct, 100), "%\"></div>\n                      </div>\n                    </div>\n                  </div>\n                  <div class=\"item-note-section\" data-category=\"").concat(cat, "\" style=\"display: none\">\n                    <textarea class=\"item-note-input\"\n                              data-category=\"").concat(cat, "\"\n                              placeholder=\"Add notes about this category budget...\"\n                              rows=\"2\">").concat(catNote, "</textarea>\n                  </div>\n                </div>\n              ");
+        }).join(''), "\n          </div>\n        </div>\n\n        <div class=\"budget-footer\">\n          <button class=\"btn-primary\" id=\"save-budget-btn-footer\">\uD83D\uDCBE Save Budget</button>\n        </div>\n      </div>\n    ");
+    };
+    BudgetManager.prototype.attachEventListeners = function () {
+        var _this = this;
         // Create budget button
-        const createBtn = this.container.querySelector('#create-budget-btn');
-        createBtn === null || createBtn === void 0 ? void 0 : createBtn.addEventListener('click', () => {
+        var createBtn = this.container.querySelector('#create-budget-btn');
+        createBtn === null || createBtn === void 0 ? void 0 : createBtn.addEventListener('click', function () {
             var _a;
-            const newBudget = createDefaultBudget(this.tripData, 10);
-            this.budget = newBudget;
-            (_a = this.onBudgetUpdate) === null || _a === void 0 ? void 0 : _a.call(this, newBudget);
-            this.render();
+            var newBudget = (0, budgetTracker_1.createDefaultBudget)(_this.tripData, 10);
+            _this.budget = newBudget;
+            (_a = _this.onBudgetUpdate) === null || _a === void 0 ? void 0 : _a.call(_this, newBudget);
+            _this.render();
         });
         // Custom budget button
-        const customBtn = this.container.querySelector('#custom-budget-btn');
-        customBtn === null || customBtn === void 0 ? void 0 : customBtn.addEventListener('click', () => {
+        var customBtn = this.container.querySelector('#custom-budget-btn');
+        customBtn === null || customBtn === void 0 ? void 0 : customBtn.addEventListener('click', function () {
             var _a;
-            const newBudget = createDefaultBudget(this.tripData, 10);
-            this.budget = newBudget;
-            (_a = this.onBudgetUpdate) === null || _a === void 0 ? void 0 : _a.call(this, newBudget);
-            this.render();
+            var newBudget = (0, budgetTracker_1.createDefaultBudget)(_this.tripData, 10);
+            _this.budget = newBudget;
+            (_a = _this.onBudgetUpdate) === null || _a === void 0 ? void 0 : _a.call(_this, newBudget);
+            _this.render();
         });
         // If budget exists, attach integrated edit listeners
         if (this.budget) {
             this.attachBudgetEditListeners();
         }
-    }
-    attachBudgetEditListeners() {
+    };
+    BudgetManager.prototype.attachBudgetEditListeners = function () {
+        var _this = this;
         var _a, _b;
-        const totalBudgetInput = this.container.querySelector('#total-budget');
-        const contingencyInput = this.container.querySelector('#contingency-pct');
+        var totalBudgetInput = this.container.querySelector('#total-budget');
+        var contingencyInput = this.container.querySelector('#contingency-pct');
         if (!totalBudgetInput)
             return;
         // Category mode toggle logic
-        const categoryModeToggle = this.container.querySelector('#category-mode-toggle');
-        const categoryModeIndicator = this.container.querySelector('#category-mode-indicator');
-        const allocationStatus = this.container.querySelector('#allocation-status');
-        const totalAllocatedSpan = this.container.querySelector('#total-allocated-pct');
-        const allocationRemainder = this.container.querySelector('#allocation-remainder');
-        let isPercentageMode = false;
+        var categoryModeToggle = this.container.querySelector('#category-mode-toggle');
+        var categoryModeIndicator = this.container.querySelector('#category-mode-indicator');
+        var allocationStatus = this.container.querySelector('#allocation-status');
+        var totalAllocatedSpan = this.container.querySelector('#total-allocated-pct');
+        var allocationRemainder = this.container.querySelector('#allocation-remainder');
+        var isPercentageMode = false;
         // Update budget summary for categories
-        const updateCategorySummary = () => {
-            const totalBudget = parseFloat(totalBudgetInput.value) || 0;
-            let totalAllocated = 0;
-            this.container.querySelectorAll('.cat-input').forEach(input => {
-                const el = input;
-                const dollarValue = parseFloat(el.dataset.dollarValue) || 0;
+        var updateCategorySummary = function () {
+            var totalBudget = parseFloat(totalBudgetInput.value) || 0;
+            var totalAllocated = 0;
+            _this.container.querySelectorAll('.cat-input').forEach(function (input) {
+                var el = input;
+                var dollarValue = parseFloat(el.dataset.dollarValue) || 0;
                 totalAllocated += dollarValue;
             });
-            const categoryTotalBudgetEl = this.container.querySelector('#category-total-budget');
-            const categoryTotalEl = this.container.querySelector('#category-total-allocated');
-            const categoryPctEl = this.container.querySelector('#category-total-pct');
-            const categoryUnallocatedEl = this.container.querySelector('#category-unallocated');
+            var categoryTotalBudgetEl = _this.container.querySelector('#category-total-budget');
+            var categoryTotalEl = _this.container.querySelector('#category-total-allocated');
+            var categoryPctEl = _this.container.querySelector('#category-total-pct');
+            var categoryUnallocatedEl = _this.container.querySelector('#category-unallocated');
             // Update total budget display
             if (categoryTotalBudgetEl) {
-                categoryTotalBudgetEl.textContent = `$${Math.round(totalBudget).toLocaleString()}`;
+                categoryTotalBudgetEl.textContent = "$".concat(Math.round(totalBudget).toLocaleString());
             }
             if (categoryTotalEl) {
-                categoryTotalEl.textContent = `$${totalAllocated.toLocaleString()}`;
+                categoryTotalEl.textContent = "$".concat(totalAllocated.toLocaleString());
             }
             if (categoryPctEl) {
-                const pct = totalBudget > 0 ? (totalAllocated / totalBudget * 100) : 0;
-                categoryPctEl.textContent = `${pct.toFixed(1)}%`;
+                var pct = totalBudget > 0 ? (totalAllocated / totalBudget * 100) : 0;
+                categoryPctEl.textContent = "".concat(pct.toFixed(1), "%");
                 // Color code based on allocation status
                 if (Math.abs(pct - 100) < 0.1) {
                     categoryPctEl.style.color = '#28a745'; // Green for fully allocated
@@ -964,8 +619,8 @@ export class BudgetManager {
                 }
             }
             if (categoryUnallocatedEl) {
-                const unallocated = totalBudget - totalAllocated;
-                categoryUnallocatedEl.textContent = `$${unallocated.toLocaleString()}`;
+                var unallocated = totalBudget - totalAllocated;
+                categoryUnallocatedEl.textContent = "$".concat(unallocated.toLocaleString());
                 // Color code the unallocated amount
                 if (Math.abs(unallocated) < 1) {
                     categoryUnallocatedEl.style.color = '#28a745';
@@ -979,22 +634,22 @@ export class BudgetManager {
             }
         };
         // Update calculated displays for categories
-        const updateCalculatedDisplays = () => {
-            const totalBudget = parseFloat(totalBudgetInput.value) || 0;
-            this.container.querySelectorAll('.cat-input').forEach(input => {
-                const el = input;
-                const category = el.dataset.category;
-                const calcValueSpan = this.container.querySelector(`.calc-value[data-category="${category}"]`);
+        var updateCalculatedDisplays = function () {
+            var totalBudget = parseFloat(totalBudgetInput.value) || 0;
+            _this.container.querySelectorAll('.cat-input').forEach(function (input) {
+                var el = input;
+                var category = el.dataset.category;
+                var calcValueSpan = _this.container.querySelector(".calc-value[data-category=\"".concat(category, "\"]"));
                 if (isPercentageMode) {
-                    const pct = parseFloat(el.value) || 0;
-                    const dollars = Math.round(totalBudget * pct / 100);
-                    calcValueSpan.textContent = `$${dollars.toLocaleString()}`;
+                    var pct = parseFloat(el.value) || 0;
+                    var dollars = Math.round(totalBudget * pct / 100);
+                    calcValueSpan.textContent = "$".concat(dollars.toLocaleString());
                     el.dataset.dollarValue = dollars.toString();
                 }
                 else {
-                    const dollars = parseFloat(el.value) || 0;
-                    const pct = totalBudget > 0 ? (dollars / totalBudget * 100) : 0;
-                    calcValueSpan.textContent = `${pct.toFixed(1)}%`;
+                    var dollars = parseFloat(el.value) || 0;
+                    var pct = totalBudget > 0 ? (dollars / totalBudget * 100) : 0;
+                    calcValueSpan.textContent = "".concat(pct.toFixed(1), "%");
                     el.dataset.dollarValue = dollars.toString();
                 }
             });
@@ -1004,41 +659,41 @@ export class BudgetManager {
             updateCategorySummary();
         };
         // Update allocation status for categories
-        const updateAllocationStatus = () => {
-            let totalPct = 0;
-            this.container.querySelectorAll('.cat-input').forEach(input => {
-                const el = input;
+        var updateAllocationStatus = function () {
+            var totalPct = 0;
+            _this.container.querySelectorAll('.cat-input').forEach(function (input) {
+                var el = input;
                 totalPct += parseFloat(el.value) || 0;
             });
             totalAllocatedSpan.textContent = totalPct.toFixed(1);
-            const remainder = 100 - totalPct;
-            const absRemainder = Math.abs(remainder);
+            var remainder = 100 - totalPct;
+            var absRemainder = Math.abs(remainder);
             if (Math.abs(remainder) < 0.1) {
                 allocationRemainder.textContent = '✓ Fully Allocated';
                 allocationRemainder.style.color = '#28a745';
             }
             else if (remainder > 0) {
-                allocationRemainder.textContent = `${absRemainder.toFixed(1)}% Unallocated`;
+                allocationRemainder.textContent = "".concat(absRemainder.toFixed(1), "% Unallocated");
                 allocationRemainder.style.color = '#ffc107';
             }
             else {
-                allocationRemainder.textContent = `${absRemainder.toFixed(1)}% Over-allocated`;
+                allocationRemainder.textContent = "".concat(absRemainder.toFixed(1), "% Over-allocated");
                 allocationRemainder.style.color = '#dc3545';
             }
         };
         // Category toggle between % and $
-        categoryModeToggle === null || categoryModeToggle === void 0 ? void 0 : categoryModeToggle.addEventListener('change', () => {
+        categoryModeToggle === null || categoryModeToggle === void 0 ? void 0 : categoryModeToggle.addEventListener('change', function () {
             isPercentageMode = categoryModeToggle.checked;
-            const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+            var totalBudget = parseFloat(totalBudgetInput.value) || 0;
             categoryModeIndicator.textContent = isPercentageMode ? 'Mode: Percentages' : 'Mode: Dollar Amounts';
             allocationStatus.style.display = isPercentageMode ? 'block' : 'none';
-            this.container.querySelectorAll('.cat-input').forEach(input => {
-                const el = input;
-                const category = el.dataset.category;
-                const unitSpan = this.container.querySelector(`.input-unit[data-category="${category}"]`);
-                const currentDollarValue = parseFloat(el.dataset.dollarValue) || parseFloat(el.value) || 0;
+            _this.container.querySelectorAll('.cat-input').forEach(function (input) {
+                var el = input;
+                var category = el.dataset.category;
+                var unitSpan = _this.container.querySelector(".input-unit[data-category=\"".concat(category, "\"]"));
+                var currentDollarValue = parseFloat(el.dataset.dollarValue) || parseFloat(el.value) || 0;
                 if (isPercentageMode) {
-                    const pct = totalBudget > 0 ? (currentDollarValue / totalBudget * 100) : 0;
+                    var pct = totalBudget > 0 ? (currentDollarValue / totalBudget * 100) : 0;
                     el.value = pct.toFixed(1);
                     el.step = '0.1';
                     el.max = '100';
@@ -1054,45 +709,45 @@ export class BudgetManager {
             updateCalculatedDisplays();
         });
         // Update category displays when inputs change
-        this.container.querySelectorAll('.cat-input').forEach(input => {
-            input.addEventListener('input', () => {
+        this.container.querySelectorAll('.cat-input').forEach(function (input) {
+            input.addEventListener('input', function () {
                 updateCalculatedDisplays();
             });
         });
         // Update when total budget changes
-        totalBudgetInput.addEventListener('input', () => {
+        totalBudgetInput.addEventListener('input', function () {
             updateCalculatedDisplays();
             updateCountryCalculatedDisplays();
         });
         // Country mode selector logic
-        const countryModeIndicator = this.container.querySelector('#country-mode-indicator');
-        const countryAllocationStatus = this.container.querySelector('#country-allocation-status');
-        const countryTotalAllocatedSpan = this.container.querySelector('#country-total-allocated-pct');
-        const countryAllocationRemainder = this.container.querySelector('#country-allocation-remainder');
-        let countryMode = 'dollars';
+        var countryModeIndicator = this.container.querySelector('#country-mode-indicator');
+        var countryAllocationStatus = this.container.querySelector('#country-allocation-status');
+        var countryTotalAllocatedSpan = this.container.querySelector('#country-total-allocated-pct');
+        var countryAllocationRemainder = this.container.querySelector('#country-allocation-remainder');
+        var countryMode = 'dollars';
         // Update budget summary for countries
-        const updateCountrySummary = () => {
-            const totalBudget = parseFloat(totalBudgetInput.value) || 0;
-            let totalAllocated = 0;
-            this.container.querySelectorAll('.country-input').forEach(input => {
-                const el = input;
-                const dollarValue = parseFloat(el.dataset.dollarValue) || 0;
+        var updateCountrySummary = function () {
+            var totalBudget = parseFloat(totalBudgetInput.value) || 0;
+            var totalAllocated = 0;
+            _this.container.querySelectorAll('.country-input').forEach(function (input) {
+                var el = input;
+                var dollarValue = parseFloat(el.dataset.dollarValue) || 0;
                 totalAllocated += dollarValue;
             });
-            const countryTotalBudgetEl = this.container.querySelector('#country-total-budget');
-            const countryTotalEl = this.container.querySelector('#country-total-allocated');
-            const countryPctEl = this.container.querySelector('#country-total-pct');
-            const countryUnallocatedEl = this.container.querySelector('#country-unallocated');
+            var countryTotalBudgetEl = _this.container.querySelector('#country-total-budget');
+            var countryTotalEl = _this.container.querySelector('#country-total-allocated');
+            var countryPctEl = _this.container.querySelector('#country-total-pct');
+            var countryUnallocatedEl = _this.container.querySelector('#country-unallocated');
             // Update total budget display
             if (countryTotalBudgetEl) {
-                countryTotalBudgetEl.textContent = `$${Math.round(totalBudget).toLocaleString()}`;
+                countryTotalBudgetEl.textContent = "$".concat(Math.round(totalBudget).toLocaleString());
             }
             if (countryTotalEl) {
-                countryTotalEl.textContent = `$${totalAllocated.toLocaleString()}`;
+                countryTotalEl.textContent = "$".concat(totalAllocated.toLocaleString());
             }
             if (countryPctEl) {
-                const pct = totalBudget > 0 ? (totalAllocated / totalBudget * 100) : 0;
-                countryPctEl.textContent = `${pct.toFixed(1)}%`;
+                var pct = totalBudget > 0 ? (totalAllocated / totalBudget * 100) : 0;
+                countryPctEl.textContent = "".concat(pct.toFixed(1), "%");
                 // Color code based on allocation status
                 if (Math.abs(pct - 100) < 0.1) {
                     countryPctEl.style.color = '#28a745'; // Green for fully allocated
@@ -1105,8 +760,8 @@ export class BudgetManager {
                 }
             }
             if (countryUnallocatedEl) {
-                const unallocated = totalBudget - totalAllocated;
-                countryUnallocatedEl.textContent = `$${unallocated.toLocaleString()}`;
+                var unallocated = totalBudget - totalAllocated;
+                countryUnallocatedEl.textContent = "$".concat(unallocated.toLocaleString());
                 // Color code the unallocated amount
                 if (Math.abs(unallocated) < 1) {
                     countryUnallocatedEl.style.color = '#28a745';
@@ -1120,36 +775,36 @@ export class BudgetManager {
             }
         };
         // Update calculated displays for countries
-        const updateCountryCalculatedDisplays = () => {
-            const totalBudget = parseFloat(totalBudgetInput.value) || 0;
-            this.container.querySelectorAll('.country-input').forEach(input => {
-                const el = input;
-                const country = el.dataset.country;
-                const days = parseFloat(el.dataset.days) || 1;
-                const calcValueSpan = this.container.querySelector(`.calc-value[data-country="${country}"]`);
-                const perDayDisplay = this.container.querySelector(`.country-per-day-display[data-country="${country}"]`);
+        var updateCountryCalculatedDisplays = function () {
+            var totalBudget = parseFloat(totalBudgetInput.value) || 0;
+            _this.container.querySelectorAll('.country-input').forEach(function (input) {
+                var el = input;
+                var country = el.dataset.country;
+                var days = parseFloat(el.dataset.days) || 1;
+                var calcValueSpan = _this.container.querySelector(".calc-value[data-country=\"".concat(country, "\"]"));
+                var perDayDisplay = _this.container.querySelector(".country-per-day-display[data-country=\"".concat(country, "\"]"));
                 if (countryMode === 'percent') {
-                    const pct = parseFloat(el.value) || 0;
-                    const dollars = Math.round(totalBudget * pct / 100);
-                    const perDay = days > 0 ? Math.round(dollars / days) : 0;
-                    calcValueSpan.textContent = `$${dollars.toLocaleString()}`;
-                    perDayDisplay.textContent = `$${perDay}/day`;
+                    var pct = parseFloat(el.value) || 0;
+                    var dollars = Math.round(totalBudget * pct / 100);
+                    var perDay = days > 0 ? Math.round(dollars / days) : 0;
+                    calcValueSpan.textContent = "$".concat(dollars.toLocaleString());
+                    perDayDisplay.textContent = "$".concat(perDay, "/day");
                     el.dataset.dollarValue = dollars.toString();
                 }
                 else if (countryMode === 'perday') {
-                    const perDay = parseFloat(el.value) || 0;
-                    const dollars = Math.round(perDay * days);
-                    const pct = totalBudget > 0 ? (dollars / totalBudget * 100) : 0;
-                    calcValueSpan.textContent = `$${dollars.toLocaleString()}`;
-                    perDayDisplay.textContent = `${pct.toFixed(1)}%`;
+                    var perDay = parseFloat(el.value) || 0;
+                    var dollars = Math.round(perDay * days);
+                    var pct = totalBudget > 0 ? (dollars / totalBudget * 100) : 0;
+                    calcValueSpan.textContent = "$".concat(dollars.toLocaleString());
+                    perDayDisplay.textContent = "".concat(pct.toFixed(1), "%");
                     el.dataset.dollarValue = dollars.toString();
                 }
                 else {
-                    const dollars = parseFloat(el.value) || 0;
-                    const pct = totalBudget > 0 ? (dollars / totalBudget * 100) : 0;
-                    const perDay = days > 0 ? Math.round(dollars / days) : 0;
-                    calcValueSpan.textContent = `${pct.toFixed(1)}%`;
-                    perDayDisplay.textContent = `$${perDay}/day`;
+                    var dollars = parseFloat(el.value) || 0;
+                    var pct = totalBudget > 0 ? (dollars / totalBudget * 100) : 0;
+                    var perDay = days > 0 ? Math.round(dollars / days) : 0;
+                    calcValueSpan.textContent = "".concat(pct.toFixed(1), "%");
+                    perDayDisplay.textContent = "$".concat(perDay, "/day");
                     el.dataset.dollarValue = dollars.toString();
                 }
             });
@@ -1159,58 +814,58 @@ export class BudgetManager {
             updateCountrySummary();
         };
         // Update allocation status for countries
-        const updateCountryAllocationStatus = () => {
-            let totalPct = 0;
-            this.container.querySelectorAll('.country-input').forEach(input => {
-                const el = input;
+        var updateCountryAllocationStatus = function () {
+            var totalPct = 0;
+            _this.container.querySelectorAll('.country-input').forEach(function (input) {
+                var el = input;
                 totalPct += parseFloat(el.value) || 0;
             });
             countryTotalAllocatedSpan.textContent = totalPct.toFixed(1);
-            const remainder = 100 - totalPct;
-            const absRemainder = Math.abs(remainder);
+            var remainder = 100 - totalPct;
+            var absRemainder = Math.abs(remainder);
             if (Math.abs(remainder) < 0.1) {
                 countryAllocationRemainder.textContent = '✓ Fully Allocated';
                 countryAllocationRemainder.style.color = '#28a745';
             }
             else if (remainder > 0) {
-                countryAllocationRemainder.textContent = `${absRemainder.toFixed(1)}% Unallocated`;
+                countryAllocationRemainder.textContent = "".concat(absRemainder.toFixed(1), "% Unallocated");
                 countryAllocationRemainder.style.color = '#ffc107';
             }
             else {
-                countryAllocationRemainder.textContent = `${absRemainder.toFixed(1)}% Over-allocated`;
+                countryAllocationRemainder.textContent = "".concat(absRemainder.toFixed(1), "% Over-allocated");
                 countryAllocationRemainder.style.color = '#dc3545';
             }
         };
         // Country mode selector buttons
-        const countryModeBtns = this.container.querySelectorAll('.country-mode-selector .mode-btn');
-        countryModeBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const newMode = btn.dataset.mode;
+        var countryModeBtns = this.container.querySelectorAll('.country-mode-selector .mode-btn');
+        countryModeBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var newMode = btn.dataset.mode;
                 countryMode = newMode;
-                const totalBudget = parseFloat(totalBudgetInput.value) || 0;
+                var totalBudget = parseFloat(totalBudgetInput.value) || 0;
                 // Update button states
-                countryModeBtns.forEach(b => b.classList.remove('active'));
+                countryModeBtns.forEach(function (b) { return b.classList.remove('active'); });
                 btn.classList.add('active');
                 // Update indicator
-                const modeText = newMode === 'dollars' ? 'Dollar Amounts' : newMode === 'percent' ? 'Percentages' : 'Per Day';
-                countryModeIndicator.textContent = `Mode: ${modeText}`;
+                var modeText = newMode === 'dollars' ? 'Dollar Amounts' : newMode === 'percent' ? 'Percentages' : 'Per Day';
+                countryModeIndicator.textContent = "Mode: ".concat(modeText);
                 countryAllocationStatus.style.display = newMode === 'percent' ? 'block' : 'none';
                 // Convert all inputs to new mode
-                this.container.querySelectorAll('.country-input').forEach(input => {
-                    const el = input;
-                    const country = el.dataset.country;
-                    const days = parseFloat(el.dataset.days) || 1;
-                    const unitSpan = this.container.querySelector(`.input-unit[data-country="${country}"]`);
-                    const currentDollarValue = parseFloat(el.dataset.dollarValue) || parseFloat(el.value) || 0;
+                _this.container.querySelectorAll('.country-input').forEach(function (input) {
+                    var el = input;
+                    var country = el.dataset.country;
+                    var days = parseFloat(el.dataset.days) || 1;
+                    var unitSpan = _this.container.querySelector(".input-unit[data-country=\"".concat(country, "\"]"));
+                    var currentDollarValue = parseFloat(el.dataset.dollarValue) || parseFloat(el.value) || 0;
                     if (newMode === 'percent') {
-                        const pct = totalBudget > 0 ? (currentDollarValue / totalBudget * 100) : 0;
+                        var pct = totalBudget > 0 ? (currentDollarValue / totalBudget * 100) : 0;
                         el.value = pct.toFixed(1);
                         el.step = '0.1';
                         el.max = '100';
                         unitSpan.textContent = '%';
                     }
                     else if (newMode === 'perday') {
-                        const perDay = days > 0 ? Math.round(currentDollarValue / days) : 0;
+                        var perDay = days > 0 ? Math.round(currentDollarValue / days) : 0;
                         el.value = perDay.toString();
                         el.step = '1';
                         el.removeAttribute('max');
@@ -1227,101 +882,109 @@ export class BudgetManager {
             });
         });
         // Update country displays when inputs change
-        this.container.querySelectorAll('.country-input').forEach(input => {
-            input.addEventListener('input', () => {
+        this.container.querySelectorAll('.country-input').forEach(function (input) {
+            input.addEventListener('input', function () {
                 updateCountryCalculatedDisplays();
             });
         });
         // Note toggle functionality for categories
-        this.container.querySelectorAll('.note-toggle-btn[data-category]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const category = btn.dataset.category;
-                const noteSection = this.container.querySelector(`.item-note-section[data-category="${category}"]`);
+        this.container.querySelectorAll('.note-toggle-btn[data-category]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var category = btn.dataset.category;
+                var noteSection = _this.container.querySelector(".item-note-section[data-category=\"".concat(category, "\"]"));
                 if (noteSection) {
-                    const isVisible = noteSection.style.display !== 'none';
+                    var isVisible = noteSection.style.display !== 'none';
                     noteSection.style.display = isVisible ? 'none' : 'block';
                 }
             });
         });
         // Note toggle functionality for countries
-        this.container.querySelectorAll('.note-toggle-btn[data-country]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const country = btn.dataset.country;
-                const noteSection = this.container.querySelector(`.item-note-section[data-country="${country}"]`);
+        this.container.querySelectorAll('.note-toggle-btn[data-country]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var country = btn.dataset.country;
+                var noteSection = _this.container.querySelector(".item-note-section[data-country=\"".concat(country, "\"]"));
                 if (noteSection) {
-                    const isVisible = noteSection.style.display !== 'none';
+                    var isVisible = noteSection.style.display !== 'none';
                     noteSection.style.display = isVisible ? 'none' : 'block';
                 }
             });
         });
         // Costs toggle functionality for countries
-        this.container.querySelectorAll('.costs-toggle-btn[data-country]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const country = btn.dataset.country;
-                const costsSection = this.container.querySelector(`.item-costs-section[data-country="${country}"]`);
+        this.container.querySelectorAll('.costs-toggle-btn[data-country]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var country = btn.dataset.country;
+                var costsSection = _this.container.querySelector(".item-costs-section[data-country=\"".concat(country, "\"]"));
                 if (costsSection) {
-                    const isVisible = costsSection.style.display !== 'none';
+                    var isVisible = costsSection.style.display !== 'none';
                     costsSection.style.display = isVisible ? 'none' : 'block';
                     // Update button text to indicate state
-                    const btnElement = btn;
+                    var btnElement = btn;
                     if (isVisible) {
                         btnElement.innerHTML = btnElement.innerHTML.replace('▼', '▶').replace('Hide', 'View');
                     }
                     else {
                         btnElement.innerHTML = btnElement.innerHTML.replace('▶', '▼').replace('View', 'Hide');
+                        // Auto-resize all textareas in this section when opening
+                        costsSection.querySelectorAll('textarea.auto-resize').forEach(function (textarea) {
+                            var el = textarea;
+                            requestAnimationFrame(function () {
+                                el.style.height = 'auto';
+                                el.style.height = el.scrollHeight + 'px';
+                            });
+                        });
                     }
                 }
             });
         });
         // Save budget functionality
-        const saveBudget = () => {
+        var saveBudget = function () {
             var _a, _b, _c;
-            const totalBudget = parseFloat(totalBudgetInput.value) || 0;
-            const contingency = parseFloat(contingencyInput.value) || 0;
+            var totalBudget = parseFloat(totalBudgetInput.value) || 0;
+            var contingency = parseFloat(contingencyInput.value) || 0;
             // Collect category budgets - use stored dollar values
-            const budgets_by_category = {};
-            this.container.querySelectorAll('.cat-input').forEach(input => {
-                const el = input;
-                const category = el.dataset.category;
-                const dollarValue = parseFloat(el.dataset.dollarValue) || 0;
+            var budgets_by_category = {};
+            _this.container.querySelectorAll('.cat-input').forEach(function (input) {
+                var el = input;
+                var category = el.dataset.category;
+                var dollarValue = parseFloat(el.dataset.dollarValue) || 0;
                 budgets_by_category[category] = dollarValue;
             });
             // Collect country budgets - use stored dollar values
-            const budgets_by_country = {};
-            this.container.querySelectorAll('.country-input').forEach(input => {
-                const el = input;
-                const country = el.dataset.country;
-                const dollarValue = parseFloat(el.dataset.dollarValue) || 0;
+            var budgets_by_country = {};
+            _this.container.querySelectorAll('.country-input').forEach(function (input) {
+                var el = input;
+                var country = el.dataset.country;
+                var dollarValue = parseFloat(el.dataset.dollarValue) || 0;
                 budgets_by_country[country] = dollarValue;
             });
             // Collect category notes
-            const category_notes = {};
-            this.container.querySelectorAll('.item-note-input[data-category]').forEach(textarea => {
-                const el = textarea;
-                const category = el.dataset.category;
-                const note = el.value.trim();
+            var category_notes = {};
+            _this.container.querySelectorAll('.item-note-input[data-category]').forEach(function (textarea) {
+                var el = textarea;
+                var category = el.dataset.category;
+                var note = el.value.trim();
                 if (note) {
                     category_notes[category] = note;
                 }
             });
             // Collect country notes
-            const country_notes = {};
-            this.container.querySelectorAll('.item-note-input[data-country]').forEach(textarea => {
-                const el = textarea;
-                const country = el.dataset.country;
-                const note = el.value.trim();
+            var country_notes = {};
+            _this.container.querySelectorAll('.item-note-input[data-country]').forEach(function (textarea) {
+                var el = textarea;
+                var country = el.dataset.country;
+                var note = el.value.trim();
                 if (note) {
                     country_notes[country] = note;
                 }
             });
             // Get group notes
-            const categoryGroupNote = (_a = this.container.querySelector('#category-group-note')) === null || _a === void 0 ? void 0 : _a.value.trim();
-            const countryGroupNote = (_b = this.container.querySelector('#country-group-note')) === null || _b === void 0 ? void 0 : _b.value.trim();
+            var categoryGroupNote = (_a = _this.container.querySelector('#category-group-note')) === null || _a === void 0 ? void 0 : _a.value.trim();
+            var countryGroupNote = (_b = _this.container.querySelector('#country-group-note')) === null || _b === void 0 ? void 0 : _b.value.trim();
             // Build budget object, only including note fields if they have values
-            const newBudget = {
+            var newBudget = {
                 total_budget_usd: totalBudget,
-                budgets_by_category,
-                budgets_by_country,
+                budgets_by_category: budgets_by_category,
+                budgets_by_country: budgets_by_country,
                 contingency_pct: contingency,
                 alerts: []
             };
@@ -1338,32 +1001,35 @@ export class BudgetManager {
             if (countryGroupNote) {
                 newBudget.country_group_note = countryGroupNote;
             }
-            this.budget = newBudget;
-            (_c = this.onBudgetUpdate) === null || _c === void 0 ? void 0 : _c.call(this, newBudget);
-            this.render();
+            _this.budget = newBudget;
+            (_c = _this.onBudgetUpdate) === null || _c === void 0 ? void 0 : _c.call(_this, newBudget);
+            _this.render();
         };
         // Attach save listeners to both buttons
         (_a = this.container.querySelector('#save-budget-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', saveBudget);
         (_b = this.container.querySelector('#save-budget-btn-footer')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', saveBudget);
         // Attach cost editing listeners
         this.attachCostEditingListeners();
-    }
-    attachCostEditingListeners() {
+    };
+    BudgetManager.prototype.attachCostEditingListeners = function () {
+        var _this = this;
         // Inline editing of cost fields - use 'input' for real-time updates
-        this.container.querySelectorAll('.cost-field-input, .cost-field-select').forEach(field => {
-            const inputEl = field;
-            const handleChange = () => {
-                const costId = inputEl.dataset.costId;
-                const fieldName = inputEl.dataset.field;
+        this.container.querySelectorAll('.cost-field-input, .cost-field-select').forEach(function (field) {
+            var inputEl = field;
+            var handleChange = function () {
+                var costId = inputEl.dataset.costId;
+                var fieldName = inputEl.dataset.field;
                 // Find the original cost
-                const originalCost = (this.tripData.costs || []).find(c => (c.id || `${c.destination_id}_${c.category}_${Date.now()}`) === costId);
+                var originalCost = (_this.tripData.costs || []).find(function (c) {
+                    return (c.id || "".concat(c.destination_id, "_").concat(c.category, "_").concat(Date.now())) === costId;
+                });
                 if (!originalCost)
                     return;
                 // Get or create edited cost entry
-                let editedCost = this.editedCosts.get(costId);
+                var editedCost = _this.editedCosts.get(costId);
                 if (!editedCost) {
-                    editedCost = Object.assign(Object.assign({}, originalCost), { id: costId });
-                    this.editedCosts.set(costId, editedCost);
+                    editedCost = __assign(__assign({}, originalCost), { id: costId });
+                    _this.editedCosts.set(costId, editedCost);
                 }
                 // Update the field
                 if (inputEl.type === 'number') {
@@ -1374,13 +1040,13 @@ export class BudgetManager {
                 }
                 // Special handling for currency changes
                 if (fieldName === 'currency') {
-                    const currency = inputEl.value;
-                    const row = inputEl.closest('tr');
-                    const amountInput = row === null || row === void 0 ? void 0 : row.querySelector('.amount-input');
-                    const usdInput = row === null || row === void 0 ? void 0 : row.querySelector('.usd-input');
-                    const currencySymbol = row === null || row === void 0 ? void 0 : row.querySelector('.currency-symbol');
+                    var currency = inputEl.value;
+                    var row = inputEl.closest('tr');
+                    var amountInput = row === null || row === void 0 ? void 0 : row.querySelector('.amount-input');
+                    var usdInput = row === null || row === void 0 ? void 0 : row.querySelector('.usd-input');
+                    var currencySymbol = row === null || row === void 0 ? void 0 : row.querySelector('.currency-symbol');
                     if (currencySymbol) {
-                        currencySymbol.textContent = this.getCurrencySymbol(currency);
+                        currencySymbol.textContent = _this.getCurrencySymbol(currency);
                     }
                     if (currency === 'USD') {
                         // Disable USD input and sync with amount
@@ -1394,18 +1060,18 @@ export class BudgetManager {
                         // Enable USD input and auto-convert
                         if (usdInput && amountInput) {
                             usdInput.disabled = false;
-                            const amount = parseFloat(amountInput.value) || 0;
-                            const convertedUsd = this.convertCurrency(amount, currency, 'USD');
+                            var amount = parseFloat(amountInput.value) || 0;
+                            var convertedUsd = _this.convertCurrency(amount, currency, 'USD');
                             usdInput.value = Math.round(convertedUsd).toString();
                             editedCost.amount_usd = Math.round(convertedUsd);
                         }
                     }
                     // Update exchange rate display without full re-render
-                    const rateInfo = row === null || row === void 0 ? void 0 : row.querySelector('.exchange-rate-info');
+                    var rateInfo = row === null || row === void 0 ? void 0 : row.querySelector('.exchange-rate-info');
                     if (rateInfo && currency !== 'USD') {
-                        const rate = this.exchangeRates[currency] || 1;
-                        rateInfo.textContent = `1 USD = ${this.getCurrencySymbol(currency)}${rate.toFixed(2)}`;
-                        rateInfo.setAttribute('title', `Rate as of ${this.ratesFetchDate}`);
+                        var rate = _this.exchangeRates[currency] || 1;
+                        rateInfo.textContent = "1 USD = ".concat(_this.getCurrencySymbol(currency)).concat(rate.toFixed(2));
+                        rateInfo.setAttribute('title', "Rate as of ".concat(_this.ratesFetchDate));
                     }
                     else if (rateInfo) {
                         rateInfo.textContent = '';
@@ -1413,18 +1079,18 @@ export class BudgetManager {
                 }
                 // If amount changes, auto-convert to USD
                 if (fieldName === 'amount') {
-                    const row = inputEl.closest('tr');
-                    const currencySelect = row === null || row === void 0 ? void 0 : row.querySelector('.currency-select');
-                    const usdInput = row === null || row === void 0 ? void 0 : row.querySelector('.usd-input');
-                    const currency = (currencySelect === null || currencySelect === void 0 ? void 0 : currencySelect.value) || 'USD';
-                    const amount = parseFloat(inputEl.value) || 0;
+                    var row = inputEl.closest('tr');
+                    var currencyField = row === null || row === void 0 ? void 0 : row.querySelector('.currency-field');
+                    var usdInput = row === null || row === void 0 ? void 0 : row.querySelector('.usd-input');
+                    var currency = (currencyField === null || currencyField === void 0 ? void 0 : currencyField.value) || editedCost.currency || 'USD';
+                    var amount = parseFloat(inputEl.value) || 0;
                     if (usdInput) {
                         if (currency === 'USD') {
                             usdInput.value = inputEl.value;
                             editedCost.amount_usd = amount;
                         }
                         else {
-                            const convertedUsd = this.convertCurrency(amount, currency, 'USD');
+                            var convertedUsd = _this.convertCurrency(amount, currency, 'USD');
                             usdInput.value = Math.round(convertedUsd).toString();
                             editedCost.amount_usd = Math.round(convertedUsd);
                         }
@@ -1432,19 +1098,19 @@ export class BudgetManager {
                 }
                 // If USD amount changes, reverse calculate original currency amount
                 if (fieldName === 'amount_usd') {
-                    const row = inputEl.closest('tr');
-                    const currencySelect = row === null || row === void 0 ? void 0 : row.querySelector('.currency-select');
-                    const amountInput = row === null || row === void 0 ? void 0 : row.querySelector('.amount-input');
-                    const currency = (currencySelect === null || currencySelect === void 0 ? void 0 : currencySelect.value) || 'USD';
-                    const usdAmount = parseFloat(inputEl.value) || 0;
+                    var row = inputEl.closest('tr');
+                    var currencyField = row === null || row === void 0 ? void 0 : row.querySelector('.currency-field');
+                    var amountInput = row === null || row === void 0 ? void 0 : row.querySelector('.amount-input');
+                    var currency = (currencyField === null || currencyField === void 0 ? void 0 : currencyField.value) || editedCost.currency || 'USD';
+                    var usdAmount = parseFloat(inputEl.value) || 0;
                     if (amountInput && currency !== 'USD') {
-                        const convertedAmount = this.convertCurrency(usdAmount, 'USD', currency);
+                        var convertedAmount = _this.convertCurrency(usdAmount, 'USD', currency);
                         amountInput.value = Math.round(convertedAmount).toString();
                         editedCost.amount = Math.round(convertedAmount);
                     }
                 }
                 // Schedule auto-save instead of immediate render
-                this.scheduleAutoSave();
+                _this.scheduleAutoSave();
             };
             // Use 'input' for text/number fields for real-time updates
             if (inputEl.type === 'number' || inputEl.type === 'text' || inputEl.type === 'date') {
@@ -1455,26 +1121,43 @@ export class BudgetManager {
                 inputEl.addEventListener('change', handleChange);
             }
         });
+        // Auto-resize textareas
+        this.setupAutoResizeTextareas();
         // Add cost button
-        this.container.querySelectorAll('.add-cost-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const country = btn.dataset.country;
-                const addSection = this.container.querySelector(`.add-cost-section[data-country="${country}"]`);
+        this.container.querySelectorAll('.add-cost-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var country = btn.dataset.country;
+                var addSection = _this.container.querySelector(".add-cost-section[data-country=\"".concat(country, "\"]"));
                 if (addSection) {
-                    addSection.style.display = addSection.style.display === 'none' ? 'block' : 'none';
+                    var isOpening = addSection.style.display === 'none';
+                    addSection.style.display = isOpening ? 'block' : 'none';
+                    // Set default currency to local currency when opening the form
+                    if (isOpening) {
+                        var currencySelect = addSection.querySelector('.new-cost-currency');
+                        if (currencySelect) {
+                            // Find the first destination in this country to get its currency
+                            var destinations = (_this.tripData.locations || []).filter(function (loc) { return loc.country === country; });
+                            if (destinations.length > 0) {
+                                var localCurrency = (0, currencyMapping_1.getCurrencyForDestination)(destinations[0].id, _this.tripData.locations || []);
+                                currencySelect.value = localCurrency;
+                                // Trigger change event to update USD field disabled state
+                                currencySelect.dispatchEvent(new Event('change'));
+                            }
+                        }
+                    }
                 }
             });
         });
         // Cancel new cost button
-        this.container.querySelectorAll('.cancel-new-cost-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const country = btn.dataset.country;
-                const addSection = this.container.querySelector(`.add-cost-section[data-country="${country}"]`);
+        this.container.querySelectorAll('.cancel-new-cost-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var country = btn.dataset.country;
+                var addSection = _this.container.querySelector(".add-cost-section[data-country=\"".concat(country, "\"]"));
                 if (addSection) {
                     addSection.style.display = 'none';
                     // Reset form
-                    addSection.querySelectorAll('.new-cost-field').forEach(field => {
-                        const input = field;
+                    addSection.querySelectorAll('.new-cost-field').forEach(function (field) {
+                        var input = field;
                         if (input.type === 'number') {
                             input.value = '0';
                         }
@@ -1486,11 +1169,11 @@ export class BudgetManager {
             });
         });
         // Currency sync for new cost form
-        this.container.querySelectorAll('.new-cost-currency').forEach(currencySelect => {
-            currencySelect.addEventListener('change', () => {
-                const form = currencySelect.closest('.add-cost-form');
-                const amountInput = form === null || form === void 0 ? void 0 : form.querySelector('.new-cost-amount');
-                const usdInput = form === null || form === void 0 ? void 0 : form.querySelector('.new-cost-usd');
+        this.container.querySelectorAll('.new-cost-currency').forEach(function (currencySelect) {
+            currencySelect.addEventListener('change', function () {
+                var form = currencySelect.closest('.add-cost-form');
+                var amountInput = form === null || form === void 0 ? void 0 : form.querySelector('.new-cost-amount');
+                var usdInput = form === null || form === void 0 ? void 0 : form.querySelector('.new-cost-usd');
                 if (currencySelect.value === 'USD') {
                     if (usdInput) {
                         usdInput.disabled = true;
@@ -1505,1439 +1188,232 @@ export class BudgetManager {
             });
         });
         // Amount sync when currency is USD for new cost form
-        this.container.querySelectorAll('.new-cost-amount').forEach(amountInput => {
-            amountInput.addEventListener('input', () => {
-                const form = amountInput.closest('.add-cost-form');
-                const currencySelect = form === null || form === void 0 ? void 0 : form.querySelector('.new-cost-currency');
-                const usdInput = form === null || form === void 0 ? void 0 : form.querySelector('.new-cost-usd');
+        this.container.querySelectorAll('.new-cost-amount').forEach(function (amountInput) {
+            amountInput.addEventListener('input', function () {
+                var form = amountInput.closest('.add-cost-form');
+                var currencySelect = form === null || form === void 0 ? void 0 : form.querySelector('.new-cost-currency');
+                var usdInput = form === null || form === void 0 ? void 0 : form.querySelector('.new-cost-usd');
                 if ((currencySelect === null || currencySelect === void 0 ? void 0 : currencySelect.value) === 'USD' && usdInput) {
                     usdInput.value = amountInput.value;
                 }
             });
         });
         // Save new cost button
-        this.container.querySelectorAll('.save-new-cost-btn').forEach(btn => {
-            btn.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
-                const country = btn.dataset.country;
-                const addSection = this.container.querySelector(`.add-cost-section[data-country="${country}"]`);
-                if (!addSection)
-                    return;
-                // Collect form data
-                const newCost = { status: 'estimated' };
-                addSection.querySelectorAll('.new-cost-field').forEach(field => {
-                    const input = field;
-                    const fieldName = input.dataset.field;
-                    if (input.type === 'number') {
-                        newCost[fieldName] = parseFloat(input.value) || 0;
+        this.container.querySelectorAll('.save-new-cost-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () { return __awaiter(_this, void 0, void 0, function () {
+                var country, addSection, newCost;
+                return __generator(this, function (_a) {
+                    country = btn.dataset.country;
+                    addSection = this.container.querySelector(".add-cost-section[data-country=\"".concat(country, "\"]"));
+                    if (!addSection)
+                        return [2 /*return*/];
+                    newCost = { status: 'estimated' };
+                    addSection.querySelectorAll('.new-cost-field').forEach(function (field) {
+                        var input = field;
+                        var fieldName = input.dataset.field;
+                        if (input.type === 'number') {
+                            newCost[fieldName] = parseFloat(input.value) || 0;
+                        }
+                        else {
+                            newCost[fieldName] = input.value;
+                        }
+                    });
+                    // Validate required fields
+                    if (!newCost.destination_id || !newCost.category) {
+                        alert('Please select a destination and category');
+                        return [2 /*return*/];
                     }
-                    else {
-                        newCost[fieldName] = input.value;
+                    // Generate ID for new cost
+                    newCost.id = "".concat(newCost.destination_id, "_").concat(newCost.category, "_").concat(Date.now());
+                    // If currency is USD, ensure amount_usd equals amount
+                    if (newCost.currency === 'USD') {
+                        newCost.amount_usd = newCost.amount;
                     }
+                    // Add to edited costs
+                    this.editedCosts.set(newCost.id, newCost);
+                    // Add to tripData temporarily for display
+                    if (!this.tripData.costs) {
+                        this.tripData.costs = [];
+                    }
+                    this.tripData.costs.push(newCost);
+                    // Hide form and re-render
+                    addSection.style.display = 'none';
+                    this.render();
+                    return [2 /*return*/];
                 });
-                // Validate required fields
-                if (!newCost.destination_id || !newCost.category) {
-                    alert('Please select a destination and category');
-                    return;
-                }
-                // Generate ID for new cost
-                newCost.id = `${newCost.destination_id}_${newCost.category}_${Date.now()}`;
-                // If currency is USD, ensure amount_usd equals amount
-                if (newCost.currency === 'USD') {
-                    newCost.amount_usd = newCost.amount;
-                }
-                // Add to edited costs
-                this.editedCosts.set(newCost.id, newCost);
-                // Add to tripData temporarily for display
-                if (!this.tripData.costs) {
-                    this.tripData.costs = [];
-                }
-                this.tripData.costs.push(newCost);
-                // Hide form and re-render
-                addSection.style.display = 'none';
-                this.render();
-            }));
+            }); });
         });
         // Delete cost button
-        this.container.querySelectorAll('.delete-cost-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+        this.container.querySelectorAll('.delete-cost-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
                 if (!confirm('Are you sure you want to delete this cost?'))
                     return;
-                const costId = btn.dataset.costId;
+                var costId = btn.dataset.costId;
                 // Mark for deletion by setting a special flag
-                const costIndex = (this.tripData.costs || []).findIndex(c => (c.id || `${c.destination_id}_${c.category}_${Date.now()}`) === costId);
+                var costIndex = (_this.tripData.costs || []).findIndex(function (c) {
+                    return (c.id || "".concat(c.destination_id, "_").concat(c.category, "_").concat(Date.now())) === costId;
+                });
                 if (costIndex !== -1) {
-                    const deletedCost = Object.assign(Object.assign({}, this.tripData.costs[costIndex]), { _deleted: true });
-                    this.editedCosts.set(costId, deletedCost);
-                    this.tripData.costs.splice(costIndex, 1);
-                    this.render();
+                    var deletedCost = __assign(__assign({}, _this.tripData.costs[costIndex]), { _deleted: true });
+                    _this.editedCosts.set(costId, deletedCost);
+                    _this.tripData.costs.splice(costIndex, 1);
+                    _this.render();
                 }
             });
         });
         // Refresh country rates button
-        this.container.querySelectorAll('.refresh-country-rates-btn').forEach(btn => {
-            btn.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
-                const country = btn.dataset.country;
-                const currencies = this.getCurrenciesForCountry(country);
-                if (currencies.length === 0)
-                    return;
-                // Show loading state
-                const originalText = btn.textContent;
-                btn.textContent = '⏳ Refreshing...';
-                btn.disabled = true;
-                try {
-                    yield this.refreshExchangeRates(currencies);
-                    alert(`✅ Exchange rates refreshed for ${currencies.join(', ')}\nRates as of: ${this.ratesFetchDate}`);
-                    this.render();
-                }
-                catch (error) {
-                    alert('❌ Failed to refresh exchange rates. Please try again.');
-                    console.error('Failed to refresh rates:', error);
-                }
-                finally {
-                    btn.textContent = originalText;
-                    btn.disabled = false;
-                }
-            }));
+        this.container.querySelectorAll('.refresh-country-rates-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () { return __awaiter(_this, void 0, void 0, function () {
+                var country, currencies, originalText, ratesDateEl, countrySection, error_4;
+                var _a;
+                return __generator(this, function (_b) {
+                    switch (_b.label) {
+                        case 0:
+                            country = btn.dataset.country;
+                            currencies = this.getCurrenciesForCountry(country);
+                            if (currencies.length === 0)
+                                return [2 /*return*/];
+                            originalText = btn.textContent;
+                            btn.textContent = '⏳ Refreshing...';
+                            btn.disabled = true;
+                            _b.label = 1;
+                        case 1:
+                            _b.trys.push([1, 3, 4, 5]);
+                            return [4 /*yield*/, this.refreshExchangeRates(currencies)];
+                        case 2:
+                            _b.sent();
+                            ratesDateEl = (_a = btn.closest('.costs-table-actions')) === null || _a === void 0 ? void 0 : _a.querySelector('.rates-fetch-date');
+                            if (ratesDateEl) {
+                                ratesDateEl.textContent = "Rates: ".concat(this.ratesFetchDate);
+                            }
+                            countrySection = this.container.querySelector(".item-costs-section[data-country=\"".concat(country, "\"]"));
+                            if (countrySection) {
+                                countrySection.querySelectorAll('.exchange-rate-info').forEach(function (rateInfo) {
+                                    var el = rateInfo;
+                                    el.style.transition = 'background-color 0.3s ease';
+                                    el.style.backgroundColor = '#d4edda';
+                                    el.style.padding = '4px 6px';
+                                    el.style.borderRadius = '3px';
+                                    // Remove highlight after 2 seconds
+                                    setTimeout(function () {
+                                        el.style.backgroundColor = '';
+                                        el.style.padding = '';
+                                        el.style.borderRadius = '';
+                                    }, 2000);
+                                });
+                            }
+                            // Update exchange rate displays without full re-render
+                            this.updateExchangeRateDisplays(country);
+                            // Show success message in button briefly
+                            btn.textContent = '✓ Refreshed';
+                            setTimeout(function () {
+                                btn.textContent = originalText;
+                            }, 1500);
+                            return [3 /*break*/, 5];
+                        case 3:
+                            error_4 = _b.sent();
+                            btn.textContent = '✗ Failed';
+                            setTimeout(function () {
+                                btn.textContent = originalText;
+                            }, 2000);
+                            console.error('Failed to refresh rates:', error_4);
+                            return [3 /*break*/, 5];
+                        case 4:
+                            btn.disabled = false;
+                            return [7 /*endfinally*/];
+                        case 5: return [2 /*return*/];
+                    }
+                });
+            }); });
         });
         // Refresh all rates button
-        const refreshAllBtn = this.container.querySelector('#refresh-all-rates-btn');
+        var refreshAllBtn = this.container.querySelector('#refresh-all-rates-btn');
         if (refreshAllBtn) {
-            refreshAllBtn.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
-                const allCurrencies = this.getAllCurrencies();
-                if (allCurrencies.length === 0)
-                    return;
-                // Show loading state
-                const originalText = refreshAllBtn.textContent;
-                refreshAllBtn.textContent = '⏳ Refreshing...';
-                refreshAllBtn.disabled = true;
-                try {
-                    yield this.refreshExchangeRates();
-                    alert(`✅ Exchange rates refreshed for all currencies\nRates as of: ${this.ratesFetchDate}\nCurrencies: ${allCurrencies.join(', ')}`);
-                    this.render();
-                }
-                catch (error) {
-                    alert('❌ Failed to refresh exchange rates. Please try again.');
-                    console.error('Failed to refresh rates:', error);
-                }
-                finally {
-                    refreshAllBtn.textContent = originalText;
-                    refreshAllBtn.disabled = false;
-                }
-            }));
+            refreshAllBtn.addEventListener('click', function () { return __awaiter(_this, void 0, void 0, function () {
+                var allCurrencies, originalText, error_5;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            allCurrencies = this.getAllCurrencies();
+                            if (allCurrencies.length === 0)
+                                return [2 /*return*/];
+                            originalText = refreshAllBtn.textContent;
+                            refreshAllBtn.textContent = '⏳ Refreshing...';
+                            refreshAllBtn.disabled = true;
+                            _a.label = 1;
+                        case 1:
+                            _a.trys.push([1, 3, 4, 5]);
+                            return [4 /*yield*/, this.refreshExchangeRates()];
+                        case 2:
+                            _a.sent();
+                            // Highlight all exchange rate displays
+                            this.container.querySelectorAll('.exchange-rate-info').forEach(function (rateInfo) {
+                                var el = rateInfo;
+                                el.style.transition = 'background-color 0.3s ease';
+                                el.style.backgroundColor = '#d4edda';
+                                el.style.padding = '4px 6px';
+                                el.style.borderRadius = '3px';
+                                // Remove highlight after 2 seconds
+                                setTimeout(function () {
+                                    el.style.backgroundColor = '';
+                                    el.style.padding = '';
+                                    el.style.borderRadius = '';
+                                }, 2000);
+                            });
+                            // Update all exchange rate displays without full re-render
+                            this.updateExchangeRateDisplays();
+                            // Show success message in button briefly
+                            refreshAllBtn.textContent = '✓ Refreshed';
+                            setTimeout(function () {
+                                refreshAllBtn.textContent = originalText;
+                            }, 1500);
+                            return [3 /*break*/, 5];
+                        case 3:
+                            error_5 = _a.sent();
+                            refreshAllBtn.textContent = '✗ Failed';
+                            setTimeout(function () {
+                                refreshAllBtn.textContent = originalText;
+                            }, 2000);
+                            console.error('Failed to refresh rates:', error_5);
+                            return [3 /*break*/, 5];
+                        case 4:
+                            refreshAllBtn.disabled = false;
+                            return [7 /*endfinally*/];
+                        case 5: return [2 /*return*/];
+                    }
+                });
+            }); });
         }
-    }
-    render() {
-        const html = this.renderBudgetStatus();
+    };
+    BudgetManager.prototype.setupAutoResizeTextareas = function () {
+        // Function to auto-resize a textarea based on its content
+        var autoResize = function (textarea) {
+            // Reset height to get accurate scrollHeight
+            textarea.style.height = 'auto';
+            // Set height to scrollHeight to fit content
+            textarea.style.height = textarea.scrollHeight + 'px';
+        };
+        // Setup auto-resize for all textareas with the auto-resize class
+        this.container.querySelectorAll('textarea.auto-resize').forEach(function (textarea) {
+            var el = textarea;
+            // Initial resize - use requestAnimationFrame to ensure DOM is ready
+            requestAnimationFrame(function () {
+                autoResize(el);
+            });
+            // Resize on input
+            el.addEventListener('input', function () { return autoResize(el); });
+            // Resize on focus (in case content was changed programmatically)
+            el.addEventListener('focus', function () { return autoResize(el); });
+        });
+    };
+    BudgetManager.prototype.render = function () {
+        var html = this.renderBudgetStatus();
         this.container.innerHTML = html;
         this.container.style.display = 'block';
         this.attachEventListeners();
-    }
-}
+    };
+    return BudgetManager;
+}());
+exports.BudgetManager = BudgetManager;
 // CSS styles for the budget manager
-export const budgetManagerStyles = `
-<style>
-.budget-manager {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  margin: 20px 0;
-}
-
-.budget-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.budget-header h3 {
-  margin: 0;
-  font-size: 20px;
-}
-
-.budget-subtitle {
-  color: #666;
-  margin: 5px 0 0 0;
-}
-
-/* Compact header styles */
-.budget-header-compact {
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  margin-bottom: 20px;
-}
-
-.header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.header-row h3 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.btn-primary-sm {
-  padding: 6px 16px;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-primary-sm:hover {
-  background: #0056b3;
-}
-
-.btn-secondary-sm {
-  padding: 6px 16px;
-  background: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-secondary-sm:hover {
-  background: #5a6268;
-}
-
-.btn-secondary-sm:disabled,
-.btn-primary-sm:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.rates-fetch-date {
-  font-size: 11px;
-  color: #666;
-  font-style: italic;
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.auto-save-indicator {
-  font-size: 12px;
-  font-weight: 600;
-  margin-left: 12px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: all 0.3s ease;
-}
-
-.auto-save-indicator.saving {
-  color: #0056b3;
-  background: #cfe2ff;
-}
-
-.auto-save-indicator.saved {
-  color: #155724;
-  background: #d4edda;
-}
-
-.auto-save-indicator.error {
-  color: #721c24;
-  background: #f8d7da;
-}
-
-.budget-overview-compact {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.budget-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.budget-field label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #555;
-}
-
-.budget-field input {
-  width: 90px;
-  padding: 4px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.budget-field span {
-  font-size: 12px;
-  color: #666;
-}
-
-.budget-stat {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #666;
-  font-weight: 500;
-}
-
-.stat-value {
-  font-size: 15px;
-  font-weight: 700;
-  color: #333;
-}
-
-.stat-value.positive {
-  color: #28a745;
-}
-
-.stat-value.negative {
-  color: #dc3545;
-}
-
-.stat-pct {
-  font-size: 13px;
-  font-weight: 500;
-  color: #666;
-  margin-left: 4px;
-}
-
-.budget-progress-compact {
-  margin-top: 8px;
-}
-
-.budget-progress-compact .progress-bar {
-  height: 6px;
-  border-radius: 3px;
-}
-
-.btn-icon {
-  background: none;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 5px 10px;
-}
-
-.btn-icon:hover {
-  background: #f0f0f0;
-  border-radius: 4px;
-}
-
-.budget-overview {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-.budget-total, .budget-spent, .budget-remaining {
-  padding: 15px;
-  border-radius: 6px;
-  background: #f8f9fa;
-}
-
-.budget-spent.over-budget {
-  background: #fee;
-}
-
-.budget-spent.warning {
-  background: #fff3cd;
-}
-
-.budget-label {
-  font-size: 12px;
-  color: #666;
-  text-transform: uppercase;
-  margin-bottom: 5px;
-}
-
-.budget-amount {
-  font-size: 24px;
-  font-weight: bold;
-}
-
-.budget-amount.negative {
-  color: #dc3545;
-}
-
-.budget-progress {
-  margin: 20px 0;
-}
-
-.progress-bar {
-  height: 30px;
-  background: #e9ecef;
-  border-radius: 15px;
-  overflow: hidden;
-  position: relative;
-}
-
-.progress-fill {
-  height: 100%;
-  background: #28a745;
-  transition: width 0.3s ease;
-}
-
-.progress-bar.caution .progress-fill {
-  background: #ffc107;
-}
-
-.progress-bar.warning .progress-fill {
-  background: #fd7e14;
-}
-
-.progress-bar.over-budget .progress-fill {
-  background: #dc3545;
-}
-
-.progress-label {
-  text-align: center;
-  margin-top: 5px;
-  font-weight: bold;
-}
-
-.budget-alerts {
-  margin: 20px 0;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 6px;
-}
-
-.budget-alerts h4 {
-  margin: 0 0 10px 0;
-  font-size: 16px;
-}
-
-.budget-alert {
-  padding: 10px;
-  margin: 5px 0;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.alert-info {
-  background: #d1ecf1;
-  border-left: 4px solid #0c5460;
-}
-
-.alert-warning {
-  background: #fff3cd;
-  border-left: 4px solid #856404;
-}
-
-.alert-exceeded {
-  background: #f8d7da;
-  border-left: 4px solid #721c24;
-}
-
-.budget-breakdown {
-  margin: 20px 0;
-}
-
-.budget-breakdown h4 {
-  margin: 0 0 15px 0;
-  font-size: 16px;
-}
-
-.budget-items {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.budget-item {
-  padding: 10px;
-  background: #f8f9fa;
-  border-radius: 4px;
-}
-
-.item-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 5px;
-}
-
-.item-name {
-  font-weight: 500;
-  text-transform: capitalize;
-}
-
-.item-amounts {
-  font-size: 14px;
-  color: #666;
-}
-
-.item-progress {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.mini-progress-bar {
-  flex: 1;
-  height: 8px;
-  background: #e9ecef;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.mini-progress-fill {
-  height: 100%;
-  background: #28a745;
-  transition: width 0.3s ease;
-}
-
-.mini-progress-bar.warning .mini-progress-fill {
-  background: #fd7e14;
-}
-
-.mini-progress-bar.over-budget .mini-progress-fill {
-  background: #dc3545;
-}
-
-.item-percentage {
-  font-size: 12px;
-  color: #666;
-  min-width: 40px;
-  text-align: right;
-}
-
-.budget-actions {
-  display: flex;
-  gap: 10px;
-  margin: 20px 0;
-}
-
-.btn-primary, .btn-secondary {
-  padding: 10px 20px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #0056b3;
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background: #545b62;
-}
-
-.budget-help {
-  margin-top: 20px;
-  padding: 15px;
-  background: #e7f3ff;
-  border-left: 4px solid #007bff;
-  border-radius: 4px;
-}
-
-.budget-help p {
-  margin: 0;
-  font-size: 14px;
-}
-
-.current-spending {
-  margin: 20px 0;
-}
-
-.spending-summary {
-  padding: 20px;
-  background: #f8f9fa;
-  border-radius: 6px;
-  text-align: center;
-}
-
-.spending-label {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 10px;
-}
-
-.spending-amount {
-  font-size: 32px;
-  font-weight: bold;
-  color: #007bff;
-}
-
-/* Integrated budget interface styles */
-.budget-manager.integrated {
-  max-width: 100%;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.budget-edit-section {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 20px;
-  margin: 20px 0;
-  border: 1px solid #e0e0e0;
-}
-
-.budget-edit-section h4 {
-  margin: 0 0 15px 0;
-  font-size: 16px;
-  color: #333;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.section-header h4 {
-  margin: 0;
-}
-
-.mode-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.mode-indicator {
-  font-size: 13px;
-  color: #666;
-  font-weight: 500;
-}
-
-.budget-overview-edit {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-
-.form-group-inline {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-width: 200px;
-}
-
-.form-group-inline label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-}
-
-.budget-status-display {
-  display: flex;
-  gap: 20px;
-  padding: 15px;
-  background: white;
-  border-radius: 6px;
-  margin: 15px 0;
-  flex-wrap: wrap;
-}
-
-.status-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.status-label {
-  font-size: 12px;
-  color: #666;
-  text-transform: uppercase;
-}
-
-.status-value {
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.status-value.positive {
-  color: #28a745;
-}
-
-.status-value.negative {
-  color: #dc3545;
-}
-
-.status-value.over-budget,
-.status-value.warning {
-  color: #dc3545;
-}
-
-.allocation-status {
-  padding: 12px;
-  background: white;
-  border-radius: 6px;
-  margin: 15px 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.allocation-info {
-  font-size: 14px;
-}
-
-.allocation-remainder {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.budget-summary-box {
-  padding: 15px;
-  background: white;
-  border-radius: 6px;
-  margin: 15px 0;
-  border: 1px solid #e0e0e0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.summary-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.summary-label {
-  font-weight: 600;
-  color: #333;
-  font-size: 14px;
-}
-
-.summary-value {
-  font-weight: 700;
-  color: #333;
-  font-size: 16px;
-  transition: color 0.2s;
-}
-
-.summary-percentage {
-  font-weight: 600;
-  font-size: 14px;
-  margin-left: 10px;
-  transition: color 0.2s;
-}
-
-.budget-items-edit {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.budget-item-edit {
-  background: white;
-  padding: 15px;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-}
-
-.item-label {
-  font-weight: 600;
-  margin-bottom: 10px;
-  color: #333;
-}
-
-.item-header-row {
-  margin-bottom: 10px;
-}
-
-.item-label-with-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.item-label-text {
-  font-weight: 600;
-  color: #333;
-}
-
-.inline-note {
-  flex: 1;
-  color: #666;
-  font-size: 13px;
-  font-style: italic;
-  padding: 4px 8px;
-  background: #fffbf0;
-  border-radius: 4px;
-  border: 1px solid #ffe4a3;
-  min-width: 200px;
-}
-
-.days-label {
-  font-weight: normal;
-  color: #666;
-  font-size: 13px;
-}
-
-.item-input-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.item-status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 300px;
-}
-
-.item-status .mini-progress-bar {
-  flex: 1;
-  min-width: 100px;
-}
-
-.budget-footer {
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 2px solid #e0e0e0;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.input-with-unit {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 0 0 180px;
-  gap: 8px;
-}
-
-.input-with-unit input {
-  width: 120px;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.input-with-unit input:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-}
-
-.input-unit {
-  font-size: 12px;
-  font-weight: 600;
-  color: #666;
-  min-width: 35px;
-  text-align: left;
-}
-
-.calc-arrow {
-  font-size: 16px;
-  color: #999;
-  flex-shrink: 0;
-}
-
-.calculated-display {
-  min-width: 80px;
-  padding: 8px 12px;
-  background: #f8f9fa;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #007bff;
-}
-
-.calc-value {
-  white-space: nowrap;
-}
-
-.current-spend {
-  font-size: 12px;
-  color: #666;
-  white-space: nowrap;
-}
-
-/* Toggle Switch */
-.toggle-switch {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.toggle-switch input[type="checkbox"] {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-slider {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-  background-color: #ccc;
-  border-radius: 24px;
-  transition: background-color 0.3s;
-}
-
-.toggle-slider::before {
-  content: "";
-  position: absolute;
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  border-radius: 50%;
-  transition: transform 0.3s;
-}
-
-.toggle-switch input:checked + .toggle-slider {
-  background-color: #007bff;
-}
-
-.toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(20px);
-}
-
-.toggle-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #666;
-}
-
-/* Allocation status colors */
-#allocation-status,
-#country-allocation-status {
-  border-left: 4px solid #007bff;
-}
-
-/* Country mode selector buttons */
-.country-mode-selector {
-  display: flex;
-  gap: 4px;
-  background: #f0f0f0;
-  padding: 4px;
-  border-radius: 6px;
-}
-
-.mode-btn {
-  padding: 6px 12px;
-  border: none;
-  background: transparent;
-  color: #666;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.mode-btn:hover {
-  background: #e0e0e0;
-}
-
-.mode-btn.active {
-  background: #007bff;
-  color: white;
-}
-
-/* Notes sections */
-.group-note-section {
-  margin: 15px 0;
-  padding: 12px;
-  background: #fffbf0;
-  border-radius: 6px;
-  border: 1px solid #ffe4a3;
-}
-
-.note-label {
-  display: block;
-  font-weight: 600;
-  font-size: 13px;
-  color: #333;
-  margin-bottom: 6px;
-}
-
-.group-note-input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 13px;
-  font-family: inherit;
-  resize: vertical;
-}
-
-.group-note-input:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-}
-
-.note-toggle-btn {
-  background: none;
-  border: none;
-  padding: 4px 8px;
-  font-size: 16px;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  margin-left: 8px;
-}
-
-.note-toggle-btn:hover {
-  opacity: 1;
-}
-
-.item-note-section {
-  margin-top: 10px;
-  padding: 10px;
-  background: #fffbf0;
-  border-radius: 4px;
-  border: 1px solid #ffe4a3;
-}
-
-.item-note-input {
-  width: 100%;
-  padding: 6px 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 12px;
-  font-family: inherit;
-  resize: vertical;
-}
-
-.item-note-input:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
-}
-
-/* Category breakdown visualization */
-.est-cost-with-breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.cat-breakdown-bar {
-  display: flex;
-  height: 8px;
-  gap: 1px;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.cat-breakdown-item {
-  flex: 1;
-  min-width: 3px;
-  transition: transform 0.2s;
-}
-
-.cat-breakdown-item:hover {
-  transform: scaleY(1.5);
-  cursor: help;
-}
-
-/* Costs toggle button */
-.costs-toggle-btn {
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  font-size: 13px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.2s;
-  margin-left: 8px;
-  font-weight: 500;
-}
-
-.costs-toggle-btn:hover {
-  background: #0056b3;
-}
-
-/* Costs section */
-.item-costs-section {
-  margin-top: 15px;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-}
-
-.country-costs-table {
-  background: white;
-  border-radius: 6px;
-  padding: 12px;
-}
-
-.destination-costs-section {
-  margin-bottom: 20px;
-}
-
-.destination-costs-section:last-child {
-  margin-bottom: 0;
-}
-
-.destination-header {
-  font-weight: 600;
-  font-size: 14px;
-  color: #333;
-  margin-bottom: 10px;
-  padding: 8px 12px;
-  background: #f0f7ff;
-  border-left: 4px solid #007bff;
-  border-radius: 4px;
-}
-
-.costs-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-
-.costs-table thead {
-  background: #f8f9fa;
-  border-bottom: 2px solid #dee2e6;
-}
-
-.costs-table th {
-  padding: 10px 12px;
-  text-align: left;
-  font-weight: 600;
-  color: #495057;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.costs-table th.text-right {
-  text-align: right;
-}
-
-.costs-table tbody tr {
-  border-bottom: 1px solid #f0f0f0;
-  transition: background 0.2s;
-}
-
-.costs-table tbody tr:hover {
-  background: #f8f9fa;
-}
-
-.costs-table td {
-  padding: 10px 12px;
-  color: #333;
-}
-
-.costs-table td.text-right {
-  text-align: right;
-}
-
-.costs-table td.amount-cell {
-  font-weight: 600;
-  color: #007bff;
-  white-space: nowrap;
-}
-
-.costs-table td.notes-cell {
-  color: #666;
-  font-size: 12px;
-  word-wrap: break-word;
-  max-width: 400px;
-}
-
-.category-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 4px;
-  color: white;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.status-estimated {
-  background: #fff3cd;
-  color: #856404;
-}
-
-.status-researched {
-  background: #d1ecf1;
-  color: #0c5460;
-}
-
-.status-booked {
-  background: #d4edda;
-  color: #155724;
-}
-
-.status-paid {
-  background: #c3e6cb;
-  color: #155724;
-}
-
-.costs-table tfoot .total-row {
-  background: #f8f9fa;
-  border-top: 2px solid #dee2e6;
-  font-weight: 600;
-}
-
-.costs-table tfoot .total-row td {
-  padding: 12px;
-}
-
-.country-total-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: #e7f3ff;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #007bff;
-  margin-top: 12px;
-  border: 1px solid #b8daff;
-}
-
-.no-costs-message {
-  padding: 20px;
-  text-align: center;
-  color: #666;
-  font-style: italic;
-  background: white;
-  border-radius: 6px;
-  border: 1px dashed #ddd;
-}
-
-/* Editable costs table styles */
-.costs-table-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 12px;
-  padding: 10px;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-}
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 13px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background 0.2s;
-}
-
-.btn-success {
-  background: #28a745;
-  color: white;
-}
-
-.btn-success:hover {
-  background: #218838;
-}
-
-.unsaved-indicator {
-  color: #dc3545;
-  font-size: 13px;
-  font-weight: 600;
-  margin-left: auto;
-}
-
-.editable-costs-table {
-  table-layout: fixed;
-}
-
-.cost-field-input,
-.cost-field-select {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-  font-size: 12px;
-  font-family: inherit;
-}
-
-.cost-field-input:focus,
-.cost-field-select:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
-}
-
-.cost-field-input:disabled {
-  background: #f8f9fa;
-  color: #999;
-}
-
-.btn-icon {
-  background: none;
-  border: none;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-.btn-icon:hover {
-  opacity: 1;
-}
-
-/* Add cost form */
-.add-cost-section {
-  margin-top: 15px;
-}
-
-.add-cost-form {
-  background: white;
-  padding: 20px;
-  border-radius: 6px;
-  border: 2px solid #28a745;
-}
-
-.add-cost-form h5 {
-  margin: 0 0 15px 0;
-  color: #28a745;
-  font-size: 16px;
-}
-
-.form-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.form-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.form-group label {
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: #333;
-}
-
-.new-cost-field {
-  padding: 8px 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 13px;
-  font-family: inherit;
-}
-
-.new-cost-field:focus {
-  outline: none;
-  border-color: #28a745;
-  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
-}
-
-.new-cost-field:disabled {
-  background: #f8f9fa;
-  color: #999;
-}
-
-.form-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px solid #e0e0e0;
-}
-
-/* Currency input with symbol */
-.currency-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.currency-symbol {
-  position: absolute;
-  left: 8px;
-  font-weight: 600;
-  color: #666;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.currency-input-wrapper .cost-field-input {
-  padding-left: 24px;
-}
-
-.exchange-rate-info {
-  font-size: 10px;
-  color: #666;
-  margin-top: 2px;
-  font-style: italic;
-  white-space: nowrap;
-}
-</style>
-`;
+exports.budgetManagerStyles = "\n<style>\n.budget-manager {\n  background: white;\n  border-radius: 8px;\n  padding: 20px;\n  box-shadow: 0 2px 8px rgba(0,0,0,0.1);\n  margin: 20px 0;\n}\n\n.budget-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin-bottom: 20px;\n}\n\n.budget-header h3 {\n  margin: 0;\n  font-size: 20px;\n}\n\n.budget-subtitle {\n  color: #666;\n  margin: 5px 0 0 0;\n}\n\n/* Compact header styles */\n.budget-header-compact {\n  padding: 15px;\n  background: #f8f9fa;\n  border-radius: 8px;\n  margin-bottom: 20px;\n}\n\n.header-row {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin-bottom: 12px;\n}\n\n.header-row h3 {\n  margin: 0;\n  font-size: 18px;\n}\n\n.header-actions {\n  display: flex;\n  gap: 10px;\n  align-items: center;\n}\n\n.btn-primary-sm {\n  padding: 6px 16px;\n  background: #007bff;\n  color: white;\n  border: none;\n  border-radius: 4px;\n  font-size: 14px;\n  font-weight: 600;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n\n.btn-primary-sm:hover {\n  background: #0056b3;\n}\n\n.btn-secondary-sm {\n  padding: 6px 16px;\n  background: #6c757d;\n  color: white;\n  border: none;\n  border-radius: 4px;\n  font-size: 14px;\n  font-weight: 600;\n  cursor: pointer;\n  transition: background 0.2s;\n}\n\n.btn-secondary-sm:hover {\n  background: #5a6268;\n}\n\n.btn-secondary-sm:disabled,\n.btn-primary-sm:disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n\n.rates-fetch-date {\n  font-size: 11px;\n  color: #666;\n  font-style: italic;\n  margin-left: auto;\n  white-space: nowrap;\n}\n\n.auto-save-indicator {\n  font-size: 12px;\n  font-weight: 600;\n  margin-left: 12px;\n  padding: 4px 8px;\n  border-radius: 4px;\n  transition: all 0.3s ease;\n}\n\n.auto-save-indicator.saving {\n  color: #0056b3;\n  background: #cfe2ff;\n}\n\n.auto-save-indicator.saved {\n  color: #155724;\n  background: #d4edda;\n}\n\n.auto-save-indicator.error {\n  color: #721c24;\n  background: #f8d7da;\n}\n\n.budget-overview-compact {\n  display: flex;\n  gap: 15px;\n  align-items: center;\n  flex-wrap: wrap;\n  margin-bottom: 10px;\n}\n\n.budget-field {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.budget-field label {\n  font-size: 13px;\n  font-weight: 600;\n  color: #555;\n}\n\n.budget-field input {\n  width: 90px;\n  padding: 4px 8px;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  font-size: 14px;\n}\n\n.budget-field span {\n  font-size: 12px;\n  color: #666;\n}\n\n.budget-stat {\n  display: flex;\n  align-items: baseline;\n  gap: 6px;\n}\n\n.stat-label {\n  font-size: 12px;\n  color: #666;\n  font-weight: 500;\n}\n\n.stat-value {\n  font-size: 15px;\n  font-weight: 700;\n  color: #333;\n}\n\n.stat-value.positive {\n  color: #28a745;\n}\n\n.stat-value.negative {\n  color: #dc3545;\n}\n\n.stat-pct {\n  font-size: 13px;\n  font-weight: 500;\n  color: #666;\n  margin-left: 4px;\n}\n\n.budget-progress-compact {\n  margin-top: 8px;\n}\n\n.budget-progress-compact .progress-bar {\n  height: 6px;\n  border-radius: 3px;\n}\n\n.btn-icon {\n  background: none;\n  border: none;\n  font-size: 18px;\n  cursor: pointer;\n  padding: 5px 10px;\n}\n\n.btn-icon:hover {\n  background: #f0f0f0;\n  border-radius: 4px;\n}\n\n.budget-overview {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));\n  gap: 15px;\n  margin-bottom: 20px;\n}\n\n.budget-total, .budget-spent, .budget-remaining {\n  padding: 15px;\n  border-radius: 6px;\n  background: #f8f9fa;\n}\n\n.budget-spent.over-budget {\n  background: #fee;\n}\n\n.budget-spent.warning {\n  background: #fff3cd;\n}\n\n.budget-label {\n  font-size: 12px;\n  color: #666;\n  text-transform: uppercase;\n  margin-bottom: 5px;\n}\n\n.budget-amount {\n  font-size: 24px;\n  font-weight: bold;\n}\n\n.budget-amount.negative {\n  color: #dc3545;\n}\n\n.budget-progress {\n  margin: 20px 0;\n}\n\n.progress-bar {\n  height: 30px;\n  background: #e9ecef;\n  border-radius: 15px;\n  overflow: hidden;\n  position: relative;\n}\n\n.progress-fill {\n  height: 100%;\n  background: #28a745;\n  transition: width 0.3s ease;\n}\n\n.progress-bar.caution .progress-fill {\n  background: #ffc107;\n}\n\n.progress-bar.warning .progress-fill {\n  background: #fd7e14;\n}\n\n.progress-bar.over-budget .progress-fill {\n  background: #dc3545;\n}\n\n.progress-label {\n  text-align: center;\n  margin-top: 5px;\n  font-weight: bold;\n}\n\n.budget-alerts {\n  margin: 20px 0;\n  padding: 15px;\n  background: #f8f9fa;\n  border-radius: 6px;\n}\n\n.budget-alerts h4 {\n  margin: 0 0 10px 0;\n  font-size: 16px;\n}\n\n.budget-alert {\n  padding: 10px;\n  margin: 5px 0;\n  border-radius: 4px;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n.alert-info {\n  background: #d1ecf1;\n  border-left: 4px solid #0c5460;\n}\n\n.alert-warning {\n  background: #fff3cd;\n  border-left: 4px solid #856404;\n}\n\n.alert-exceeded {\n  background: #f8d7da;\n  border-left: 4px solid #721c24;\n}\n\n.budget-breakdown {\n  margin: 20px 0;\n}\n\n.budget-breakdown h4 {\n  margin: 0 0 15px 0;\n  font-size: 16px;\n}\n\n.budget-items {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n}\n\n.budget-item {\n  padding: 10px;\n  background: #f8f9fa;\n  border-radius: 4px;\n}\n\n.item-header {\n  display: flex;\n  justify-content: space-between;\n  margin-bottom: 5px;\n}\n\n.item-name {\n  font-weight: 500;\n  text-transform: capitalize;\n}\n\n.item-amounts {\n  font-size: 14px;\n  color: #666;\n}\n\n.item-progress {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n.mini-progress-bar {\n  flex: 1;\n  height: 8px;\n  background: #e9ecef;\n  border-radius: 4px;\n  overflow: hidden;\n}\n\n.mini-progress-fill {\n  height: 100%;\n  background: #28a745;\n  transition: width 0.3s ease;\n}\n\n.mini-progress-bar.warning .mini-progress-fill {\n  background: #fd7e14;\n}\n\n.mini-progress-bar.over-budget .mini-progress-fill {\n  background: #dc3545;\n}\n\n.item-percentage {\n  font-size: 12px;\n  color: #666;\n  min-width: 40px;\n  text-align: right;\n}\n\n.budget-actions {\n  display: flex;\n  gap: 10px;\n  margin: 20px 0;\n}\n\n.btn-primary, .btn-secondary {\n  padding: 10px 20px;\n  border-radius: 6px;\n  border: none;\n  cursor: pointer;\n  font-size: 14px;\n  font-weight: 500;\n}\n\n.btn-primary {\n  background: #007bff;\n  color: white;\n}\n\n.btn-primary:hover {\n  background: #0056b3;\n}\n\n.btn-secondary {\n  background: #6c757d;\n  color: white;\n}\n\n.btn-secondary:hover {\n  background: #545b62;\n}\n\n.budget-help {\n  margin-top: 20px;\n  padding: 15px;\n  background: #e7f3ff;\n  border-left: 4px solid #007bff;\n  border-radius: 4px;\n}\n\n.budget-help p {\n  margin: 0;\n  font-size: 14px;\n}\n\n.current-spending {\n  margin: 20px 0;\n}\n\n.spending-summary {\n  padding: 20px;\n  background: #f8f9fa;\n  border-radius: 6px;\n  text-align: center;\n}\n\n.spending-label {\n  font-size: 14px;\n  color: #666;\n  margin-bottom: 10px;\n}\n\n.spending-amount {\n  font-size: 32px;\n  font-weight: bold;\n  color: #007bff;\n}\n\n/* Integrated budget interface styles */\n.budget-manager.integrated {\n  max-width: 100%;\n}\n\n.header-actions {\n  display: flex;\n  gap: 10px;\n  align-items: center;\n}\n\n.budget-edit-section {\n  background: #f8f9fa;\n  border-radius: 8px;\n  padding: 20px;\n  margin: 20px 0;\n  border: 1px solid #e0e0e0;\n}\n\n.budget-edit-section h4 {\n  margin: 0 0 15px 0;\n  font-size: 16px;\n  color: #333;\n}\n\n.section-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin-bottom: 15px;\n}\n\n.section-header h4 {\n  margin: 0;\n}\n\n.mode-controls {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n}\n\n.mode-indicator {\n  font-size: 13px;\n  color: #666;\n  font-weight: 500;\n}\n\n.budget-overview-edit {\n  display: flex;\n  gap: 20px;\n  flex-wrap: wrap;\n  margin-bottom: 20px;\n}\n\n.form-group-inline {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  flex: 1;\n  min-width: 200px;\n}\n\n.form-group-inline label {\n  font-size: 13px;\n  font-weight: 600;\n  color: #333;\n}\n\n.budget-status-display {\n  display: flex;\n  gap: 20px;\n  padding: 15px;\n  background: white;\n  border-radius: 6px;\n  margin: 15px 0;\n  flex-wrap: wrap;\n}\n\n.status-item {\n  display: flex;\n  flex-direction: column;\n  gap: 5px;\n}\n\n.status-label {\n  font-size: 12px;\n  color: #666;\n  text-transform: uppercase;\n}\n\n.status-value {\n  font-size: 18px;\n  font-weight: bold;\n}\n\n.status-value.positive {\n  color: #28a745;\n}\n\n.status-value.negative {\n  color: #dc3545;\n}\n\n.status-value.over-budget,\n.status-value.warning {\n  color: #dc3545;\n}\n\n.allocation-status {\n  padding: 12px;\n  background: white;\n  border-radius: 6px;\n  margin: 15px 0;\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\n\n.allocation-info {\n  font-size: 14px;\n}\n\n.allocation-remainder {\n  font-weight: 600;\n  font-size: 14px;\n}\n\n.budget-summary-box {\n  padding: 15px;\n  background: white;\n  border-radius: 6px;\n  margin: 15px 0;\n  border: 1px solid #e0e0e0;\n  box-shadow: 0 2px 4px rgba(0,0,0,0.05);\n}\n\n.summary-row {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 8px 0;\n  border-bottom: 1px solid #f0f0f0;\n}\n\n.summary-row:last-child {\n  border-bottom: none;\n  padding-bottom: 0;\n}\n\n.summary-label {\n  font-weight: 600;\n  color: #333;\n  font-size: 14px;\n}\n\n.summary-value {\n  font-weight: 700;\n  color: #333;\n  font-size: 16px;\n  transition: color 0.2s;\n}\n\n.summary-percentage {\n  font-weight: 600;\n  font-size: 14px;\n  margin-left: 10px;\n  transition: color 0.2s;\n}\n\n.budget-items-edit {\n  display: flex;\n  flex-direction: column;\n  gap: 15px;\n}\n\n.budget-item-edit {\n  background: white;\n  padding: 15px;\n  border-radius: 6px;\n  border: 1px solid #e0e0e0;\n}\n\n.item-label {\n  font-weight: 600;\n  margin-bottom: 10px;\n  color: #333;\n}\n\n.item-header-row {\n  margin-bottom: 10px;\n}\n\n.item-label-with-note {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-wrap: wrap;\n}\n\n.item-label-text {\n  font-weight: 600;\n  color: #333;\n}\n\n.inline-note {\n  flex: 1;\n  color: #666;\n  font-size: 13px;\n  font-style: italic;\n  padding: 4px 8px;\n  background: #fffbf0;\n  border-radius: 4px;\n  border: 1px solid #ffe4a3;\n  min-width: 200px;\n}\n\n.days-label {\n  font-weight: normal;\n  color: #666;\n  font-size: 13px;\n}\n\n.item-input-row {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  flex-wrap: wrap;\n}\n\n.item-status {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  flex: 1;\n  min-width: 300px;\n}\n\n.item-status .mini-progress-bar {\n  flex: 1;\n  min-width: 100px;\n}\n\n.budget-footer {\n  margin-top: 30px;\n  padding-top: 20px;\n  border-top: 2px solid #e0e0e0;\n  display: flex;\n  justify-content: flex-end;\n}\n\n.input-with-unit {\n  position: relative;\n  display: flex;\n  align-items: center;\n  flex: 0 0 180px;\n  gap: 8px;\n}\n\n.input-with-unit input {\n  width: 120px;\n  padding: 8px 12px;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  font-size: 14px;\n}\n\n.input-with-unit input:focus {\n  outline: none;\n  border-color: #007bff;\n  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);\n}\n\n.input-unit {\n  font-size: 12px;\n  font-weight: 600;\n  color: #666;\n  min-width: 35px;\n  text-align: left;\n}\n\n.calc-arrow {\n  font-size: 16px;\n  color: #999;\n  flex-shrink: 0;\n}\n\n.calculated-display {\n  min-width: 80px;\n  padding: 8px 12px;\n  background: #f8f9fa;\n  border-radius: 4px;\n  font-size: 14px;\n  font-weight: 500;\n  color: #007bff;\n}\n\n.calc-value {\n  white-space: nowrap;\n}\n\n.current-spend {\n  font-size: 12px;\n  color: #666;\n  white-space: nowrap;\n}\n\n/* Toggle Switch */\n.toggle-switch {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  cursor: pointer;\n  user-select: none;\n}\n\n.toggle-switch input[type=\"checkbox\"] {\n  position: absolute;\n  opacity: 0;\n  width: 0;\n  height: 0;\n}\n\n.toggle-slider {\n  position: relative;\n  display: inline-block;\n  width: 44px;\n  height: 24px;\n  background-color: #ccc;\n  border-radius: 24px;\n  transition: background-color 0.3s;\n}\n\n.toggle-slider::before {\n  content: \"\";\n  position: absolute;\n  height: 18px;\n  width: 18px;\n  left: 3px;\n  bottom: 3px;\n  background-color: white;\n  border-radius: 50%;\n  transition: transform 0.3s;\n}\n\n.toggle-switch input:checked + .toggle-slider {\n  background-color: #007bff;\n}\n\n.toggle-switch input:checked + .toggle-slider::before {\n  transform: translateX(20px);\n}\n\n.toggle-label {\n  font-size: 14px;\n  font-weight: 500;\n  color: #666;\n}\n\n/* Allocation status colors */\n#allocation-status,\n#country-allocation-status {\n  border-left: 4px solid #007bff;\n}\n\n/* Country mode selector buttons */\n.country-mode-selector {\n  display: flex;\n  gap: 4px;\n  background: #f0f0f0;\n  padding: 4px;\n  border-radius: 6px;\n}\n\n.mode-btn {\n  padding: 6px 12px;\n  border: none;\n  background: transparent;\n  color: #666;\n  font-weight: 600;\n  font-size: 13px;\n  cursor: pointer;\n  border-radius: 4px;\n  transition: all 0.2s;\n}\n\n.mode-btn:hover {\n  background: #e0e0e0;\n}\n\n.mode-btn.active {\n  background: #007bff;\n  color: white;\n}\n\n/* Notes sections */\n.group-note-section {\n  margin: 15px 0;\n  padding: 12px;\n  background: #fffbf0;\n  border-radius: 6px;\n  border: 1px solid #ffe4a3;\n}\n\n.note-label {\n  display: block;\n  font-weight: 600;\n  font-size: 13px;\n  color: #333;\n  margin-bottom: 6px;\n}\n\n.group-note-input {\n  width: 100%;\n  padding: 8px 12px;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  font-size: 13px;\n  font-family: inherit;\n  resize: vertical;\n  box-sizing: border-box;\n}\n\n.group-note-input:focus {\n  outline: none;\n  border-color: #007bff;\n  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);\n}\n\n.note-toggle-btn {\n  background: none;\n  border: none;\n  padding: 4px 8px;\n  font-size: 16px;\n  cursor: pointer;\n  opacity: 0.6;\n  transition: opacity 0.2s;\n  margin-left: 8px;\n}\n\n.note-toggle-btn:hover {\n  opacity: 1;\n}\n\n.item-note-section {\n  margin-top: 10px;\n  padding: 10px;\n  background: #fffbf0;\n  border-radius: 4px;\n  border: 1px solid #ffe4a3;\n}\n\n.item-note-input {\n  width: 100%;\n  padding: 6px 10px;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  font-size: 12px;\n  font-family: inherit;\n  resize: vertical;\n}\n\n.item-note-input:focus {\n  outline: none;\n  border-color: #007bff;\n  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);\n}\n\n/* Category breakdown visualization */\n.est-cost-with-breakdown {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.cat-breakdown-bar {\n  display: flex;\n  height: 8px;\n  gap: 1px;\n  border-radius: 4px;\n  overflow: hidden;\n}\n\n.cat-breakdown-item {\n  flex: 1;\n  min-width: 3px;\n  transition: transform 0.2s;\n}\n\n.cat-breakdown-item:hover {\n  transform: scaleY(1.5);\n  cursor: help;\n}\n\n/* Costs toggle button */\n.costs-toggle-btn {\n  background: #007bff;\n  color: white;\n  border: none;\n  padding: 6px 12px;\n  font-size: 13px;\n  cursor: pointer;\n  border-radius: 4px;\n  transition: background 0.2s;\n  margin-left: 8px;\n  font-weight: 500;\n}\n\n.costs-toggle-btn:hover {\n  background: #0056b3;\n}\n\n/* Costs section */\n.item-costs-section {\n  margin-top: 15px;\n  padding: 15px;\n  background: #f8f9fa;\n  border-radius: 6px;\n  border: 1px solid #e0e0e0;\n}\n\n.country-costs-table {\n  background: white;\n  border-radius: 6px;\n  padding: 12px;\n}\n\n.destination-costs-section {\n  margin-bottom: 20px;\n}\n\n.destination-costs-section:last-child {\n  margin-bottom: 0;\n}\n\n.destination-header {\n  font-weight: 600;\n  font-size: 14px;\n  color: #333;\n  margin-bottom: 10px;\n  padding: 8px 12px;\n  background: #f0f7ff;\n  border-left: 4px solid #007bff;\n  border-radius: 4px;\n}\n\n.costs-table {\n  width: 100%;\n  border-collapse: collapse;\n  font-size: 13px;\n  margin-bottom: 12px;\n}\n\n.costs-table thead {\n  background: #f8f9fa;\n  border-bottom: 2px solid #dee2e6;\n}\n\n.costs-table th {\n  padding: 10px 12px;\n  text-align: left;\n  font-weight: 600;\n  color: #495057;\n  font-size: 12px;\n  text-transform: uppercase;\n  letter-spacing: 0.5px;\n}\n\n.costs-table th.text-right {\n  text-align: right;\n}\n\n.costs-table tbody tr {\n  border-bottom: 1px solid #f0f0f0;\n  transition: background 0.2s;\n}\n\n.costs-table tbody tr:hover {\n  background: #f8f9fa;\n}\n\n.costs-table td {\n  padding: 10px 12px;\n  color: #333;\n}\n\n.costs-table td.text-right {\n  text-align: right;\n}\n\n.costs-table td.amount-cell {\n  font-weight: 600;\n  color: #007bff;\n  white-space: nowrap;\n}\n\n.costs-table td.notes-cell {\n  color: #666;\n  font-size: 12px;\n  word-wrap: break-word;\n  max-width: 400px;\n}\n\n.category-badge {\n  display: inline-block;\n  padding: 4px 10px;\n  border-radius: 4px;\n  color: white;\n  font-size: 12px;\n  font-weight: 500;\n  white-space: nowrap;\n}\n\n.status-badge {\n  display: inline-block;\n  padding: 4px 8px;\n  border-radius: 3px;\n  font-size: 11px;\n  font-weight: 600;\n  text-transform: uppercase;\n  letter-spacing: 0.3px;\n}\n\n.status-estimated {\n  background: #fff3cd;\n  color: #856404;\n}\n\n.status-researched {\n  background: #d1ecf1;\n  color: #0c5460;\n}\n\n.status-booked {\n  background: #d4edda;\n  color: #155724;\n}\n\n.status-paid {\n  background: #c3e6cb;\n  color: #155724;\n}\n\n.costs-table tfoot .total-row {\n  background: #f8f9fa;\n  border-top: 2px solid #dee2e6;\n  font-weight: 600;\n}\n\n.costs-table tfoot .total-row td {\n  padding: 12px;\n}\n\n.country-total-row {\n  display: flex;\n  justify-content: space-between;\n  padding: 12px 16px;\n  background: #e7f3ff;\n  border-radius: 6px;\n  font-size: 14px;\n  font-weight: 600;\n  color: #007bff;\n  margin-top: 12px;\n  border: 1px solid #b8daff;\n}\n\n.no-costs-message {\n  padding: 20px;\n  text-align: center;\n  color: #666;\n  font-style: italic;\n  background: white;\n  border-radius: 6px;\n  border: 1px dashed #ddd;\n}\n\n/* Editable costs table styles */\n.costs-table-actions {\n  display: flex;\n  gap: 10px;\n  align-items: center;\n  margin-bottom: 12px;\n  padding: 10px;\n  background: white;\n  border-radius: 6px;\n  border: 1px solid #e0e0e0;\n}\n\n.btn-sm {\n  padding: 6px 12px;\n  font-size: 13px;\n  border-radius: 4px;\n  border: none;\n  cursor: pointer;\n  font-weight: 500;\n  transition: background 0.2s;\n}\n\n.btn-success {\n  background: #28a745;\n  color: white;\n}\n\n.btn-success:hover {\n  background: #218838;\n}\n\n.unsaved-indicator {\n  color: #dc3545;\n  font-size: 13px;\n  font-weight: 600;\n  margin-left: auto;\n}\n\n.editable-costs-table {\n  table-layout: fixed;\n}\n\n.cost-field-input,\n.cost-field-select {\n  width: 100%;\n  padding: 6px 8px;\n  border: 1px solid #ddd;\n  border-radius: 3px;\n  font-size: 12px;\n  font-family: inherit;\n}\n\n.cost-field-input:focus,\n.cost-field-select:focus {\n  outline: none;\n  border-color: #007bff;\n  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);\n}\n\n.cost-field-input:disabled {\n  background: #f8f9fa;\n  color: #999;\n}\n\ntextarea.cost-field-input {\n  resize: none;\n  overflow: hidden;\n  min-height: 34px;\n  line-height: 1.4;\n}\n\ntextarea.auto-resize {\n  resize: none;\n  overflow: hidden;\n}\n\n.btn-icon {\n  background: none;\n  border: none;\n  font-size: 16px;\n  cursor: pointer;\n  padding: 4px;\n  opacity: 0.6;\n  transition: opacity 0.2s;\n}\n\n.btn-icon:hover {\n  opacity: 1;\n}\n\n/* Add cost form */\n.add-cost-section {\n  margin-top: 15px;\n}\n\n.add-cost-form {\n  background: white;\n  padding: 20px;\n  border-radius: 6px;\n  border: 2px solid #28a745;\n}\n\n.add-cost-form h5 {\n  margin: 0 0 15px 0;\n  color: #28a745;\n  font-size: 16px;\n}\n\n.form-row {\n  display: flex;\n  gap: 12px;\n  margin-bottom: 12px;\n  align-items: flex-start;\n}\n\n.form-group {\n  flex: 1;\n  display: flex;\n  flex-direction: column;\n}\n\n.form-group label {\n  font-size: 12px;\n  font-weight: 600;\n  margin-bottom: 4px;\n  color: #333;\n}\n\n.new-cost-field {\n  padding: 8px 10px;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  font-size: 13px;\n  font-family: inherit;\n}\n\n.new-cost-field:focus {\n  outline: none;\n  border-color: #28a745;\n  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);\n}\n\n.new-cost-field:disabled {\n  background: #f8f9fa;\n  color: #999;\n}\n\n.form-actions {\n  display: flex;\n  gap: 10px;\n  margin-top: 15px;\n  padding-top: 15px;\n  border-top: 1px solid #e0e0e0;\n}\n\n/* Currency input with symbol */\n.currency-input-wrapper {\n  position: relative;\n  display: flex;\n  align-items: center;\n}\n\n.currency-symbol {\n  position: absolute;\n  left: 8px;\n  font-weight: 600;\n  color: #666;\n  pointer-events: none;\n  z-index: 1;\n  font-size: 14px;\n}\n\n.currency-input-wrapper .cost-field-input {\n  padding-left: 36px;\n  text-align: right;\n}\n\n.currency-display-wrapper {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.currency-code-display {\n  font-weight: 600;\n  font-size: 14px;\n  color: #333;\n  padding: 4px 0;\n}\n\n.exchange-rate-info {\n  font-size: 10px;\n  color: #666;\n  font-style: italic;\n  white-space: nowrap;\n  line-height: 1.3;\n}\n\n.rate-date {\n  font-size: 9px;\n  color: #999;\n}\n</style>\n";
