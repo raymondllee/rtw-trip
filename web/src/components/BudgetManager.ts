@@ -2200,27 +2200,21 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
         const destNames = destinations.map(d => d.name || d.city).join(', ');
 
-        // Confirm with user
-        const confirmed = confirm(
-          `Generate AI cost estimates for ${destNames}?\n\n` +
-          `The AI will research and estimate costs for accommodation, activities, food, and transport.\n\n` +
-          `This may take 30-60 seconds. Continue?`
-        );
-
-        if (!confirmed) return;
-
         // Show progress UI
         const originalBtn = btn as HTMLButtonElement;
         const originalText = originalBtn.innerHTML;
         originalBtn.disabled = true;
         originalBtn.innerHTML = '⏳ Generating costs...';
 
-        // Find the costs section to show progress
+        // Find and open the costs section to show progress
         const costsSection = this.container.querySelector(
           `.item-costs-section[data-country="${country}"]`
         ) as HTMLElement;
 
+        // Open the costs section immediately to show progress
         if (costsSection) {
+          costsSection.style.display = 'block';
+
           // Show progress message
           const progressDiv = document.createElement('div');
           progressDiv.className = 'cost-generation-progress';

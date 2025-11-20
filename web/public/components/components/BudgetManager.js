@@ -1597,7 +1597,7 @@ var BudgetManager = /** @class */ (function () {
         // Generate costs button for countries without costs
         this.container.querySelectorAll('.generate-costs-btn').forEach(function (btn) {
             btn.addEventListener('click', function () { return __awaiter(_this, void 0, void 0, function () {
-                var country, destinationIds, destinations, destNames, confirmed, originalBtn, originalText, costsSection, progressDiv, generatedCosts, progressDiv, error_6, progressDiv;
+                var country, destinationIds, destinations, destNames, originalBtn, originalText, costsSection, progressDiv, generatedCosts, progressDiv, error_6, progressDiv;
                 var _a;
                 var _this = this;
                 var _b;
@@ -1610,17 +1610,14 @@ var BudgetManager = /** @class */ (function () {
                                 .map(function (id) { return (_this.tripData.locations || []).find(function (loc) { return String(loc.id) === id; }); })
                                 .filter(function (d) { return d; });
                             destNames = destinations.map(function (d) { return d.name || d.city; }).join(', ');
-                            confirmed = confirm("Generate AI cost estimates for ".concat(destNames, "?\n\n") +
-                                "The AI will research and estimate costs for accommodation, activities, food, and transport.\n\n" +
-                                "This may take 30-60 seconds. Continue?");
-                            if (!confirmed)
-                                return [2 /*return*/];
                             originalBtn = btn;
                             originalText = originalBtn.innerHTML;
                             originalBtn.disabled = true;
                             originalBtn.innerHTML = '⏳ Generating costs...';
                             costsSection = this.container.querySelector(".item-costs-section[data-country=\"".concat(country, "\"]"));
+                            // Open the costs section immediately to show progress
                             if (costsSection) {
+                                costsSection.style.display = 'block';
                                 progressDiv = document.createElement('div');
                                 progressDiv.className = 'cost-generation-progress';
                                 progressDiv.innerHTML = "\n            <div style=\"padding: 20px; text-align: center; background: #f0f8ff; border-radius: 6px; margin: 15px 0;\">\n              <div style=\"font-size: 16px; font-weight: 600; color: #1a73e8; margin-bottom: 8px;\">\n                \uD83E\uDD16 AI is generating cost estimates...\n              </div>\n              <div style=\"font-size: 14px; color: #666; margin-bottom: 12px;\">\n                Researching ".concat(destNames, "\n              </div>\n              <div style=\"width: 100%; height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden;\">\n                <div style=\"width: 100%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2, #667eea); background-size: 200% 100%; animation: shimmer 1.5s infinite;\"></div>\n              </div>\n            </div>\n            <style>\n              @keyframes shimmer {\n                0% { background-position: -200% 0; }\n                100% { background-position: 200% 0; }\n              }\n            </style>\n          ");
