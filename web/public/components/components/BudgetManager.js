@@ -57,6 +57,56 @@ export class BudgetManager {
             }
         });
     }
+    refreshExchangeRates(currencies) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const response = yield fetch('https://api.exchangerate-api.com/v4/latest/USD');
+                const data = yield response.json();
+                if (data && data.rates) {
+                    // Update specific currencies if provided, otherwise update all
+                    if (currencies && currencies.length > 0) {
+                        currencies.forEach(currency => {
+                            if (data.rates[currency]) {
+                                this.exchangeRates[currency] = data.rates[currency];
+                            }
+                        });
+                    }
+                    else {
+                        this.exchangeRates = data.rates;
+                    }
+                    this.ratesFetchDate = new Date(data.time_last_updated * 1000).toLocaleDateString();
+                    console.log('✅ Exchange rates refreshed:', currencies ? currencies.join(', ') : 'all');
+                }
+            }
+            catch (error) {
+                console.error('Failed to refresh exchange rates:', error);
+                throw error;
+            }
+        });
+    }
+    getCurrenciesForCountry(country) {
+        const countryCosts = (this.tripData.costs || [])
+            .filter(c => {
+            const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+            return (location === null || location === void 0 ? void 0 : location.country) === country;
+        });
+        const currencies = new Set();
+        countryCosts.forEach(cost => {
+            if (cost.currency && cost.currency !== 'USD') {
+                currencies.add(cost.currency);
+            }
+        });
+        return Array.from(currencies);
+    }
+    getAllCurrencies() {
+        const currencies = new Set();
+        (this.tripData.costs || []).forEach(cost => {
+            if (cost.currency && cost.currency !== 'USD') {
+                currencies.add(cost.currency);
+            }
+        });
+        return Array.from(currencies);
+    }
     convertCurrency(amount, fromCurrency, toCurrency) {
         if (fromCurrency === toCurrency)
             return amount;
@@ -164,15 +214,23 @@ export class BudgetManager {
             }
             costsByDestination[destName].push(cost);
         });
+        const countryCurrencies = this.getCurrenciesForCountry(country);
+        const hasCurrencies = countryCurrencies.length > 0;
         return `
       <div class="country-costs-table" data-country="${country}">
         <div class="costs-table-actions">
           <button class="btn-sm btn-success add-cost-btn" data-country="${country}">+ Add Cost</button>
+          ${hasCurrencies ? `
+            <button class="btn-sm btn-secondary refresh-country-rates-btn" data-country="${country}" title="Refresh exchange rates for ${countryCurrencies.join(', ')}">
+              🔄 Refresh Rates (${countryCurrencies.join(', ')})
+            </button>
+          ` : ''}
           ${hasChanges ? `
             <button class="btn-sm btn-primary save-costs-btn" data-country="${country}">💾 Save Changes</button>
             <button class="btn-sm btn-secondary cancel-costs-btn" data-country="${country}">Cancel</button>
             <span class="unsaved-indicator">● Unsaved changes</span>
           ` : ''}
+          <span class="rates-fetch-date">Rates: ${this.ratesFetchDate}</span>
         </div>
         ${Object.entries(costsByDestination).map(([destName, costs]) => `
           <div class="destination-costs-section">
@@ -464,12 +522,21 @@ export class BudgetManager {
                 countries.add(loc.country);
         });
         const currentBudget = this.budget.total_budget_usd || 0;
+        const allCurrencies = this.getAllCurrencies();
+        const hasAnyCurrencies = allCurrencies.length > 0;
         return `
       <div class="budget-manager integrated">
         <div class="budget-header-compact">
           <div class="header-row">
             <h3>💰 Budget Management</h3>
-            <button class="btn-primary-sm" id="save-budget-btn">💾 Save</button>
+            <div class="header-actions">
+              ${hasAnyCurrencies ? `
+                <button class="btn-secondary-sm" id="refresh-all-rates-btn" title="Refresh all exchange rates (${allCurrencies.join(', ')})">
+                  🔄 Refresh All Rates
+                </button>
+              ` : ''}
+              <button class="btn-primary-sm" id="save-budget-btn">💾 Save</button>
+            </div>
           </div>
           <div class="budget-overview-compact">
             <div class="budget-field">
@@ -1476,6 +1543,58 @@ export class BudgetManager {
                 this.render();
             });
         });
+        // Refresh country rates button
+        this.container.querySelectorAll('.refresh-country-rates-btn').forEach(btn => {
+            btn.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
+                const country = btn.dataset.country;
+                const currencies = this.getCurrenciesForCountry(country);
+                if (currencies.length === 0)
+                    return;
+                // Show loading state
+                const originalText = btn.textContent;
+                btn.textContent = '⏳ Refreshing...';
+                btn.disabled = true;
+                try {
+                    yield this.refreshExchangeRates(currencies);
+                    alert(`✅ Exchange rates refreshed for ${currencies.join(', ')}\nRates as of: ${this.ratesFetchDate}`);
+                    this.render();
+                }
+                catch (error) {
+                    alert('❌ Failed to refresh exchange rates. Please try again.');
+                    console.error('Failed to refresh rates:', error);
+                }
+                finally {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            }));
+        });
+        // Refresh all rates button
+        const refreshAllBtn = this.container.querySelector('#refresh-all-rates-btn');
+        if (refreshAllBtn) {
+            refreshAllBtn.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
+                const allCurrencies = this.getAllCurrencies();
+                if (allCurrencies.length === 0)
+                    return;
+                // Show loading state
+                const originalText = refreshAllBtn.textContent;
+                refreshAllBtn.textContent = '⏳ Refreshing...';
+                refreshAllBtn.disabled = true;
+                try {
+                    yield this.refreshExchangeRates();
+                    alert(`✅ Exchange rates refreshed for all currencies\nRates as of: ${this.ratesFetchDate}\nCurrencies: ${allCurrencies.join(', ')}`);
+                    this.render();
+                }
+                catch (error) {
+                    alert('❌ Failed to refresh exchange rates. Please try again.');
+                    console.error('Failed to refresh rates:', error);
+                }
+                finally {
+                    refreshAllBtn.textContent = originalText;
+                    refreshAllBtn.disabled = false;
+                }
+            }));
+        }
     }
     render() {
         const html = this.renderBudgetStatus();
@@ -1532,6 +1651,12 @@ export const budgetManagerStyles = `
   font-size: 18px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .btn-primary-sm {
   padding: 6px 16px;
   background: #007bff;
@@ -1546,6 +1671,36 @@ export const budgetManagerStyles = `
 
 .btn-primary-sm:hover {
   background: #0056b3;
+}
+
+.btn-secondary-sm {
+  padding: 6px 16px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-secondary-sm:hover {
+  background: #5a6268;
+}
+
+.btn-secondary-sm:disabled,
+.btn-primary-sm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rates-fetch-date {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .budget-overview-compact {
