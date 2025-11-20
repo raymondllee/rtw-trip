@@ -318,7 +318,10 @@ export class BudgetManager {
     const apiBaseUrl = config.endpoints.api || 'http://localhost:5001';
 
     // Get scenario ID from window
-    const scenarioId = (window as any).currentScenarioId || null;
+    const scenarioId = (window as any).currentScenarioId;
+    if (!scenarioId) {
+      throw new Error('No scenario ID found. Please make sure you have a scenario loaded.');
+    }
 
     // Get travel style and num travelers
     const numTravelers = this.tripData.num_travelers || 1;
@@ -338,14 +341,23 @@ export class BudgetManager {
       const previousDest = i > 0 ? destinations[i - 1] : null;
       const nextDest = i < destinations.length - 1 ? destinations[i + 1] : null;
 
+      // Generate default dates if not set (use current date + offset)
+      const today = new Date();
+      const defaultArrival = dest.arrival_date || today.toISOString().split('T')[0];
+      const arrivalDate = new Date(defaultArrival);
+      const durationDays = Math.max(1, Math.round(dest.duration_days || 7));
+      const departureDate = new Date(arrivalDate);
+      departureDate.setDate(departureDate.getDate() + durationDays);
+      const defaultDeparture = dest.departure_date || departureDate.toISOString().split('T')[0];
+
       const payload = {
         session_id: `budget_manager_${Date.now()}`,
         scenario_id: scenarioId,
         destination_name: destinationName,
         destination_id: String(dest.id),
-        duration_days: Math.max(1, Math.round(dest.duration_days || 1)),
-        arrival_date: dest.arrival_date || '',
-        departure_date: dest.departure_date || '',
+        duration_days: durationDays,
+        arrival_date: defaultArrival,
+        departure_date: defaultDeparture,
         num_travelers: numTravelers,
         travel_style: accommodationPref,
         previous_destination: previousDest ? `${previousDest.name || previousDest.city}, ${previousDest.country}` : undefined,
