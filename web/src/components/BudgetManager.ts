@@ -62,6 +62,105 @@ export class BudgetManager {
     return colors[category] || '#95a5a6';
   }
 
+  private getCategoryIcon(category: string): string {
+    const icons: Record<string, string> = {
+      'flight': '✈️',
+      'accommodation': '🏨',
+      'activity': '🎯',
+      'food': '🍽️',
+      'transport': '🚗',
+      'education': '📚',
+      'educational_materials': '📖',
+      'educational_activities': '🎓',
+      'other': '📦'
+    };
+    return icons[category] || '📦';
+  }
+
+  private renderCostsTableForCountry(country: string): string {
+    const countryCosts = (this.tripData.costs || [])
+      .filter(c => {
+        const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+        return location?.country === country;
+      });
+
+    if (countryCosts.length === 0) {
+      return '<div class="no-costs-message">No costs recorded for this country yet.</div>';
+    }
+
+    // Group costs by destination
+    const costsByDestination: Record<string, any[]> = {};
+    countryCosts.forEach(cost => {
+      const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
+      const destName = location?.name || location?.city || 'Unknown';
+      if (!costsByDestination[destName]) {
+        costsByDestination[destName] = [];
+      }
+      costsByDestination[destName].push(cost);
+    });
+
+    return `
+      <div class="country-costs-table">
+        ${Object.entries(costsByDestination).map(([destName, costs]) => `
+          <div class="destination-costs-section">
+            <div class="destination-header">${destName}</div>
+            <table class="costs-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Description</th>
+                  <th class="text-right">Amount</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${costs.map(cost => {
+                  const amount = cost.amount_usd || cost.amount || 0;
+                  const currency = cost.currency || 'USD';
+                  const displayAmount = currency === 'USD'
+                    ? this.formatCurrency(amount)
+                    : `${currency} ${cost.amount?.toFixed(2) || '0.00'} (${this.formatCurrency(amount)})`;
+
+                  return `
+                    <tr>
+                      <td>
+                        <span class="category-badge" style="background-color: ${this.getCategoryColor(cost.category || 'other')}">
+                          ${this.getCategoryIcon(cost.category || 'other')} ${(cost.category || 'other').replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td>${cost.description || '-'}</td>
+                      <td class="text-right amount-cell">${displayAmount}</td>
+                      <td><span class="status-badge status-${cost.status || 'estimated'}">${cost.status || 'estimated'}</span></td>
+                      <td>${cost.date || '-'}</td>
+                      <td class="notes-cell">${cost.notes || '-'}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+              <tfoot>
+                <tr class="total-row">
+                  <td colspan="2"><strong>Subtotal for ${destName}</strong></td>
+                  <td class="text-right"><strong>${this.formatCurrency(
+                    costs.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0)
+                  )}</strong></td>
+                  <td colspan="3"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        `).join('')}
+        <div class="country-total-row">
+          <strong>Total for ${country}:</strong>
+          <strong>${this.formatCurrency(
+            countryCosts.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0)
+          )}</strong>
+        </div>
+      </div>
+    `;
+  }
+
   private renderCategoryBreakdown(costs: Array<{category?: string, amount?: number, amount_usd?: number}>): string {
     const categoryTotals: Record<string, number> = {};
     let total = 0;
@@ -277,6 +376,9 @@ export class BudgetManager {
                           ${countryNote ? '📝' : '📄'}
                         </button>
                         ${countryNote ? `<span class="inline-note">${countryNote}</span>` : ''}
+                        <button class="costs-toggle-btn" data-country="${country}" title="View Costs">
+                          💰 View Costs (${countryCostsArray.length})
+                        </button>
                       </div>
                     </div>
                     <div class="item-input-row">
@@ -311,6 +413,9 @@ export class BudgetManager {
                                 data-country="${country}"
                                 placeholder="Add notes about this country budget..."
                                 rows="2">${countryNote}</textarea>
+                    </div>
+                    <div class="item-costs-section" data-country="${country}" style="display: none">
+                      ${this.renderCostsTableForCountry(country)}
                     </div>
                   </div>
                 `;
@@ -829,6 +934,25 @@ export class BudgetManager {
         if (noteSection) {
           const isVisible = noteSection.style.display !== 'none';
           noteSection.style.display = isVisible ? 'none' : 'block';
+        }
+      });
+    });
+
+    // Costs toggle functionality for countries
+    this.container.querySelectorAll('.costs-toggle-btn[data-country]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const country = (btn as HTMLElement).dataset.country!;
+        const costsSection = this.container.querySelector(`.item-costs-section[data-country="${country}"]`) as HTMLElement;
+        if (costsSection) {
+          const isVisible = costsSection.style.display !== 'none';
+          costsSection.style.display = isVisible ? 'none' : 'block';
+          // Update button text to indicate state
+          const btnElement = btn as HTMLElement;
+          if (isVisible) {
+            btnElement.innerHTML = btnElement.innerHTML.replace('▼', '▶').replace('Hide', 'View');
+          } else {
+            btnElement.innerHTML = btnElement.innerHTML.replace('▶', '▼').replace('View', 'Hide');
+          }
         }
       });
     });
@@ -1816,6 +1940,190 @@ export const budgetManagerStyles = `
 .cat-breakdown-item:hover {
   transform: scaleY(1.5);
   cursor: help;
+}
+
+/* Costs toggle button */
+.costs-toggle-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s;
+  margin-left: 8px;
+  font-weight: 500;
+}
+
+.costs-toggle-btn:hover {
+  background: #0056b3;
+}
+
+/* Costs section */
+.item-costs-section {
+  margin-top: 15px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.country-costs-table {
+  background: white;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.destination-costs-section {
+  margin-bottom: 20px;
+}
+
+.destination-costs-section:last-child {
+  margin-bottom: 0;
+}
+
+.destination-header {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: #f0f7ff;
+  border-left: 4px solid #007bff;
+  border-radius: 4px;
+}
+
+.costs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.costs-table thead {
+  background: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.costs-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.costs-table th.text-right {
+  text-align: right;
+}
+
+.costs-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.2s;
+}
+
+.costs-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.costs-table td {
+  padding: 10px 12px;
+  color: #333;
+}
+
+.costs-table td.text-right {
+  text-align: right;
+}
+
+.costs-table td.amount-cell {
+  font-weight: 600;
+  color: #007bff;
+  white-space: nowrap;
+}
+
+.costs-table td.notes-cell {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #666;
+  font-size: 12px;
+}
+
+.category-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.status-estimated {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-researched {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-booked {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-paid {
+  background: #c3e6cb;
+  color: #155724;
+}
+
+.costs-table tfoot .total-row {
+  background: #f8f9fa;
+  border-top: 2px solid #dee2e6;
+  font-weight: 600;
+}
+
+.costs-table tfoot .total-row td {
+  padding: 12px;
+}
+
+.country-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #e7f3ff;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #007bff;
+  margin-top: 12px;
+  border: 1px solid #b8daff;
+}
+
+.no-costs-message {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  background: white;
+  border-radius: 6px;
+  border: 1px dashed #ddd;
 }
 </style>
 `;
