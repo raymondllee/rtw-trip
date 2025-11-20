@@ -203,6 +203,12 @@ export interface TripData {
   costs: TripCost[];
   countryNotes?: Record<string, string>;
   budget?: TripBudget;
+  num_travelers?: number;  // Number of travelers (default: 1)
+  traveler_composition?: {  // Optional detailed breakdown
+    adults: number;
+    children: number;
+    ages?: number[];
+  };
 }
 
 export interface TripScenarioVersion {

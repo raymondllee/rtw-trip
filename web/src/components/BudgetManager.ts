@@ -289,6 +289,19 @@ export class BudgetManager {
   }
 
   private generateCostPrompt(destinations: any[], country: string): string {
+    const numTravelers = this.tripData.num_travelers || 1;
+    const travelerComposition = this.tripData.traveler_composition;
+
+    // Build traveler info string
+    let travelerInfo = `Number of travelers: ${numTravelers}`;
+    if (travelerComposition) {
+      travelerInfo += ` (${travelerComposition.adults} adult${travelerComposition.adults !== 1 ? 's' : ''}`;
+      if (travelerComposition.children > 0) {
+        travelerInfo += `, ${travelerComposition.children} child${travelerComposition.children !== 1 ? 'ren' : ''}`;
+      }
+      travelerInfo += ')';
+    }
+
     const destinationBlocks = destinations.map((dest, index) => {
       const lines = [];
       lines.push(`${index + 1}. ${dest.name}${dest.city ? ` (${dest.city})` : ''}, ${country}`);
@@ -325,7 +338,19 @@ export class BudgetManager {
 
     return `You are the RTW trip cost-planning assistant. Help estimate costs for the destinations below in ${country}.
 
-For each destination, produce 3-6 cost line items that cover major spend categories (accommodation, key activities, food, local transport, other notable expenses). Use realistic per-trip totals. Amounts should be in the local currency specified for each destination.
+TRAVELER INFORMATION:
+${travelerInfo}
+
+IMPORTANT PRICING GUIDELINES:
+- For PER-PERSON costs (meals, museum entries, individual transport tickets, per-person activity fees):
+  Set "scales_with_travelers": true
+  Amount should be the per-person rate
+
+- For SHARED/FIXED costs (hotel rooms, rental cars, private tours, taxis):
+  Set "scales_with_travelers": false
+  Amount should be the total for the entire group
+
+For each destination, produce 3-6 cost line items that cover major spend categories (accommodation, key activities, food, local transport, other notable expenses). Use realistic amounts appropriate for ${numTravelers} traveler${numTravelers !== 1 ? 's' : ''}. Amounts should be in the local currency specified for each destination.
 
 Return a single JSON array. Each element must follow exactly:
 {
@@ -340,10 +365,20 @@ Return a single JSON array. Each element must follow exactly:
       "date": "YYYY-MM-DD",
       "status": "estimated",
       "source": "ai_estimate",
-      "notes": "<optional detail>"
+      "notes": "<optional detail>",
+      "pricing_model": {
+        "type": "fixed|per_day|per_night|per_person_day|per_person_night",
+        "scales_with_travelers": true|false
+      }
     }
   ]
 }
+
+EXAMPLES:
+- Hotel room: amount=150, scales_with_travelers=false, type="per_night" (room rate for entire group)
+- Museum entry: amount=20, scales_with_travelers=true, type="fixed" (per-person admission)
+- Restaurant meal: amount=25, scales_with_travelers=true, type="per_day" (per-person cost)
+- Taxi ride: amount=30, scales_with_travelers=false, type="fixed" (shared ride for group)
 
 Destinations to cover:
 
@@ -422,7 +457,11 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           date: cost.date || new Date().toISOString().split('T')[0],
           status: cost.status || 'estimated',
           notes: cost.notes || destData.notes || '',
-          source: 'ai_estimate'
+          source: 'ai_estimate',
+          pricing_model: cost.pricing_model || {
+            type: 'fixed',
+            scales_with_travelers: false  // Default to fixed/shared if not specified
+          }
         });
       });
     });
