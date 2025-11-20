@@ -17,6 +17,8 @@ export class BudgetManager {
         this.editedCosts = new Map();
         this.exchangeRates = {};
         this.ratesFetchDate = '';
+        this.autoSaveTimer = null;
+        this.savingCosts = new Set();
         this.container = container;
         this.tripData = tripData;
         this.budget = budget || null;
@@ -25,6 +27,79 @@ export class BudgetManager {
         // Fetch exchange rates on initialization
         this.fetchExchangeRates();
         this.render();
+    }
+    scheduleAutoSave() {
+        // Clear existing timer
+        if (this.autoSaveTimer !== null) {
+            window.clearTimeout(this.autoSaveTimer);
+        }
+        // Schedule save for 2 seconds after last edit
+        this.autoSaveTimer = window.setTimeout(() => __awaiter(this, void 0, void 0, function* () {
+            yield this.saveAllCosts();
+        }), 2000);
+    }
+    saveAllCosts() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.editedCosts.size === 0 || !this.onCostsUpdate)
+                return;
+            try {
+                const costsToSave = Array.from(this.editedCosts.values());
+                // Show saving indicator
+                this.showSavingIndicator(true);
+                yield this.onCostsUpdate(costsToSave);
+                // Clear edited costs after successful save
+                this.editedCosts.clear();
+                // Update totals without full re-render
+                this.updateCostTotals();
+                // Show success indicator briefly
+                this.showSavingIndicator(false, true);
+            }
+            catch (error) {
+                console.error('Failed to auto-save costs:', error);
+                this.showSavingIndicator(false, false, 'Failed to save');
+            }
+        });
+    }
+    showSavingIndicator(saving, success, message) {
+        const indicators = this.container.querySelectorAll('.auto-save-indicator');
+        indicators.forEach(indicator => {
+            if (saving) {
+                indicator.textContent = '💾 Saving...';
+                indicator.className = 'auto-save-indicator saving';
+            }
+            else if (success) {
+                indicator.textContent = '✓ Saved';
+                indicator.className = 'auto-save-indicator saved';
+                setTimeout(() => {
+                    indicator.textContent = '';
+                    indicator.className = 'auto-save-indicator';
+                }, 2000);
+            }
+            else {
+                indicator.textContent = message || '✗ Save failed';
+                indicator.className = 'auto-save-indicator error';
+            }
+        });
+    }
+    updateCostTotals() {
+        // Update totals for each country without full re-render
+        const countries = new Set();
+        (this.tripData.locations || []).forEach(loc => {
+            if (loc.country)
+                countries.add(loc.country);
+        });
+        countries.forEach(country => {
+            const countryCosts = (this.tripData.costs || [])
+                .filter(c => {
+                const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+                return (location === null || location === void 0 ? void 0 : location.country) === country;
+            });
+            const total = countryCosts.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+            const totalElement = this.container.querySelector(`.country-total-row[data-country="${country}"] .country-total-amount`);
+            if (totalElement) {
+                totalElement.textContent = this.formatCurrency(total);
+            }
+        });
     }
     fetchExchangeRates() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -225,11 +300,7 @@ export class BudgetManager {
               🔄 Refresh Rates (${countryCurrencies.join(', ')})
             </button>
           ` : ''}
-          ${hasChanges ? `
-            <button class="btn-sm btn-primary save-costs-btn" data-country="${country}">💾 Save Changes</button>
-            <button class="btn-sm btn-secondary cancel-costs-btn" data-country="${country}">Cancel</button>
-            <span class="unsaved-indicator">● Unsaved changes</span>
-          ` : ''}
+          <span class="auto-save-indicator"></span>
           <span class="rates-fetch-date">Rates: ${this.ratesFetchDate}</span>
         </div>
         ${Object.entries(costsByDestination).map(([destName, costs]) => `
@@ -262,9 +333,9 @@ export class BudgetManager {
             </table>
           </div>
         `).join('')}
-        <div class="country-total-row">
+        <div class="country-total-row" data-country="${country}">
           <strong>Total for ${country}:</strong>
-          <strong>${this.formatCurrency(countryCosts.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0))}</strong>
+          <strong class="country-total-amount">${this.formatCurrency(countryCosts.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0))}</strong>
         </div>
         ${this.renderAddCostSection(country, countryDestinations)}
       </div>
@@ -1278,10 +1349,10 @@ export class BudgetManager {
         this.attachCostEditingListeners();
     }
     attachCostEditingListeners() {
-        // Inline editing of cost fields
+        // Inline editing of cost fields - use 'input' for real-time updates
         this.container.querySelectorAll('.cost-field-input, .cost-field-select').forEach(field => {
             const inputEl = field;
-            inputEl.addEventListener('change', () => {
+            const handleChange = () => {
                 const costId = inputEl.dataset.costId;
                 const fieldName = inputEl.dataset.field;
                 // Find the original cost
@@ -1329,9 +1400,16 @@ export class BudgetManager {
                             editedCost.amount_usd = Math.round(convertedUsd);
                         }
                     }
-                    // Re-render to show exchange rate
-                    this.render();
-                    return;
+                    // Update exchange rate display without full re-render
+                    const rateInfo = row === null || row === void 0 ? void 0 : row.querySelector('.exchange-rate-info');
+                    if (rateInfo && currency !== 'USD') {
+                        const rate = this.exchangeRates[currency] || 1;
+                        rateInfo.textContent = `1 USD = ${this.getCurrencySymbol(currency)}${rate.toFixed(2)}`;
+                        rateInfo.setAttribute('title', `Rate as of ${this.ratesFetchDate}`);
+                    }
+                    else if (rateInfo) {
+                        rateInfo.textContent = '';
+                    }
                 }
                 // If amount changes, auto-convert to USD
                 if (fieldName === 'amount') {
@@ -1365,9 +1443,17 @@ export class BudgetManager {
                         editedCost.amount = Math.round(convertedAmount);
                     }
                 }
-                // Re-render to show save buttons
-                this.render();
-            });
+                // Schedule auto-save instead of immediate render
+                this.scheduleAutoSave();
+            };
+            // Use 'input' for text/number fields for real-time updates
+            if (inputEl.type === 'number' || inputEl.type === 'text' || inputEl.type === 'date') {
+                inputEl.addEventListener('input', handleChange);
+            }
+            else {
+                // Use 'change' for selects
+                inputEl.addEventListener('change', handleChange);
+            }
         });
         // Add cost button
         this.container.querySelectorAll('.add-cost-btn').forEach(btn => {
@@ -1485,62 +1571,6 @@ export class BudgetManager {
                     this.tripData.costs.splice(costIndex, 1);
                     this.render();
                 }
-            });
-        });
-        // Save costs changes button
-        this.container.querySelectorAll('.save-costs-btn').forEach(btn => {
-            btn.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
-                const country = btn.dataset.country;
-                if (this.editedCosts.size === 0) {
-                    alert('No changes to save');
-                    return;
-                }
-                try {
-                    // Get all edited costs for this country
-                    const costsToSave = Array.from(this.editedCosts.values()).filter(cost => {
-                        const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
-                        return (location === null || location === void 0 ? void 0 : location.country) === country;
-                    });
-                    if (costsToSave.length === 0) {
-                        alert('No changes for this country');
-                        return;
-                    }
-                    // Call the update handler if provided
-                    if (this.onCostsUpdate) {
-                        yield this.onCostsUpdate(costsToSave);
-                        // Clear edited costs for this country
-                        costsToSave.forEach(cost => {
-                            this.editedCosts.delete(cost.id);
-                        });
-                        alert(`Saved ${costsToSave.length} cost change(s)`);
-                        this.render();
-                    }
-                    else {
-                        alert('Cost update handler not configured');
-                    }
-                }
-                catch (error) {
-                    console.error('Failed to save costs:', error);
-                    alert('Failed to save costs: ' + error.message);
-                }
-            }));
-        });
-        // Cancel costs changes button
-        this.container.querySelectorAll('.cancel-costs-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const country = btn.dataset.country;
-                // Remove edited costs for this country
-                const keysToDelete = [];
-                this.editedCosts.forEach((cost, id) => {
-                    const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
-                    if ((location === null || location === void 0 ? void 0 : location.country) === country) {
-                        keysToDelete.push(id);
-                    }
-                });
-                keysToDelete.forEach(key => this.editedCosts.delete(key));
-                // Reload original data - we'll need to refetch from parent
-                // For now, just re-render which will restore from tripData
-                this.render();
             });
         });
         // Refresh country rates button
@@ -1701,6 +1731,30 @@ export const budgetManagerStyles = `
   font-style: italic;
   margin-left: auto;
   white-space: nowrap;
+}
+
+.auto-save-indicator {
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.auto-save-indicator.saving {
+  color: #0056b3;
+  background: #cfe2ff;
+}
+
+.auto-save-indicator.saved {
+  color: #155724;
+  background: #d4edda;
+}
+
+.auto-save-indicator.error {
+  color: #721c24;
+  background: #f8d7da;
 }
 
 .budget-overview-compact {
