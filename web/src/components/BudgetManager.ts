@@ -317,10 +317,11 @@ export class BudgetManager {
     const config = getRuntimeConfig();
     const apiBaseUrl = config.endpoints.api || 'http://localhost:5001';
 
-    // Get scenario ID from window
-    const scenarioId = (window as any).currentScenarioId;
+    // Get scenario ID from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const scenarioId = urlParams.get('scenario');
     if (!scenarioId) {
-      throw new Error('No scenario ID found. Please make sure you have a scenario loaded.');
+      throw new Error('No scenario ID found in URL. Please make sure you have a scenario loaded.');
     }
 
     // Get travel style and num travelers
