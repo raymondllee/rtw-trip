@@ -384,6 +384,7 @@ export class BudgetManager {
   private generateCostPrompt(destinations: any[], country: string): string {
     const numTravelers = this.tripData.num_travelers || 1;
     const travelerComposition = this.tripData.traveler_composition;
+    const accommodationPref = this.tripData.accommodation_preference || 'mid-range';
 
     // Build traveler info string
     let travelerInfo = `Number of travelers: ${numTravelers}`;
@@ -394,6 +395,7 @@ export class BudgetManager {
       }
       travelerInfo += ')';
     }
+    travelerInfo += `\nAccommodation preference: ${accommodationPref}`;
 
     const destinationBlocks = destinations.map((dest, index) => {
       const lines = [];
@@ -443,7 +445,13 @@ IMPORTANT PRICING GUIDELINES:
   Set "scales_with_travelers": false
   Amount should be the total for the entire group
 
-For each destination, produce 3-6 cost line items that cover major spend categories (accommodation, key activities, food, local transport, other notable expenses). Use realistic amounts appropriate for ${numTravelers} traveler${numTravelers !== 1 ? 's' : ''}. Amounts should be in the local currency specified for each destination.
+- For ACCOMMODATION: Use ${accommodationPref} level pricing
+  * budget: hostels, basic guesthouses, shared accommodations
+  * mid-range: 3-star hotels, comfortable B&Bs, decent Airbnbs
+  * higher-end: 4-star hotels, upscale boutique properties
+  * luxurious: 5-star hotels, luxury resorts, premium accommodations
+
+For each destination, produce 3-6 cost line items that cover major spend categories (accommodation, key activities, food, local transport, other notable expenses). Use realistic amounts appropriate for ${numTravelers} traveler${numTravelers !== 1 ? 's' : ''} and ${accommodationPref} accommodation standards. Amounts should be in the local currency specified for each destination.
 
 Return a single JSON array. Each element must follow exactly:
 {
@@ -754,6 +762,55 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     return `$${Math.round(amount).toLocaleString()}`;
   }
 
+  private calculateTotalEstimatedCost(cost: any): { total: number; breakdown: string } {
+    const baseAmount = cost.amount || 0;
+    const currency = cost.currency || 'USD';
+    const pricingModel = cost.pricing_model;
+    const numTravelers = this.tripData.num_travelers || 1;
+
+    // Find the destination to get duration
+    const destination = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
+    const durationDays = destination?.duration_days || 1;
+
+    // Default to showing base amount if no pricing model
+    if (!pricingModel) {
+      return {
+        total: baseAmount,
+        breakdown: this.formatCurrencyAmount(baseAmount, currency)
+      };
+    }
+
+    let multiplier = 1;
+    let breakdownParts: string[] = [];
+    const formattedBase = this.formatCurrencyAmount(baseAmount, currency);
+
+    // Handle traveler scaling
+    if (pricingModel.scales_with_travelers) {
+      multiplier *= numTravelers;
+      breakdownParts.push(`${formattedBase} × ${numTravelers} traveler${numTravelers !== 1 ? 's' : ''}`);
+    } else {
+      breakdownParts.push(formattedBase);
+    }
+
+    // Handle duration scaling
+    const type = pricingModel.type || 'fixed';
+    if (type === 'per_day' || type === 'per_person_day') {
+      multiplier *= durationDays;
+      breakdownParts.push(`× ${durationDays} day${durationDays !== 1 ? 's' : ''}`);
+    } else if (type === 'per_night' || type === 'per_person_night') {
+      const nights = Math.max(1, durationDays - 1);
+      multiplier *= nights;
+      breakdownParts.push(`× ${nights} night${nights !== 1 ? 's' : ''}`);
+    }
+
+    const total = baseAmount * multiplier;
+    const breakdown = breakdownParts.length > 1
+      ? `${breakdownParts.join(' ')} = ${this.formatCurrencyAmount(total, currency)}`
+      : formattedBase;
+
+    return { total, breakdown };
+  }
+
   private getAlertIcon(type: string): string {
     switch (type) {
       case 'exceeded': return '🔴';
@@ -886,6 +943,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                   <th style="width: 80px;">Currency</th>
                   <th style="width: 100px;" class="text-right">Amount</th>
                   <th style="width: 100px;" class="text-right">USD</th>
+                  <th style="width: 180px;" title="Estimated total accounting for travelers and duration">Est. Total</th>
                   <th style="width: 120px;">Status</th>
                   <th style="width: 110px;">Date</th>
                   <th style="width: 200px;">Notes</th>
@@ -925,6 +983,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     const amountUsd = cost.amount_usd || amount;
     // Default to local currency if not set
     const currency = cost.currency || getCurrencyForDestination(cost.destination_id, this.tripData.locations || []);
+
+    // Calculate total estimated cost
+    const { total, breakdown } = this.calculateTotalEstimatedCost(cost);
 
     return `
       <tr class="editable-cost-row" data-cost-id="${costId}">
@@ -974,6 +1035,11 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                    step="1"
                    min="0"
                    ${currency === 'USD' ? 'disabled' : ''}>
+          </div>
+        </td>
+        <td>
+          <div class="estimated-total-display" title="${breakdown}">
+            ${breakdown}
           </div>
         </td>
         <td>
@@ -1122,11 +1188,12 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     const composition = this.tripData.traveler_composition;
     const adults = composition?.adults || numTravelers;
     const children = composition?.children || 0;
+    const accommodationPref = this.tripData.accommodation_preference || 'mid-range';
 
     return `
       <div class="traveler-section">
         <div class="traveler-header">
-          <h4>👥 Travelers</h4>
+          <h4>👥 Travelers & Preferences</h4>
           <div style="display: flex; align-items: center; gap: 10px;">
             <span class="traveler-count-badge">${numTravelers} total</span>
             <span id="traveler-save-indicator" class="auto-save-indicator-inline"></span>
@@ -1142,8 +1209,19 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <input type="number" id="children-count" value="${children}" min="0" max="20" step="1">
           </div>
         </div>
+        <div class="traveler-inputs" style="margin-top: 10px;">
+          <div class="traveler-input-group" style="flex: 1;">
+            <label for="accommodation-pref">Accommodation:</label>
+            <select id="accommodation-pref" class="accommodation-select">
+              <option value="budget" ${accommodationPref === 'budget' ? 'selected' : ''}>Budget</option>
+              <option value="mid-range" ${accommodationPref === 'mid-range' ? 'selected' : ''}>Mid-range</option>
+              <option value="higher-end" ${accommodationPref === 'higher-end' ? 'selected' : ''}>Higher-end</option>
+              <option value="luxurious" ${accommodationPref === 'luxurious' ? 'selected' : ''}>Luxurious</option>
+            </select>
+          </div>
+        </div>
         <div class="traveler-note">
-          <small>ℹ️ Changes save automatically. Regenerate existing costs to use updated traveler count.</small>
+          <small>ℹ️ Changes save automatically. Regenerate existing costs to apply updated preferences.</small>
         </div>
       </div>
     `;
@@ -1582,6 +1660,13 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
     adultsInput?.addEventListener('input', updateTravelerCount);
     childrenInput?.addEventListener('input', updateTravelerCount);
+
+    // Auto-save accommodation preference
+    const accommodationSelect = this.container.querySelector('#accommodation-pref') as HTMLSelectElement;
+    accommodationSelect?.addEventListener('change', () => {
+      this.tripData.accommodation_preference = accommodationSelect.value as any;
+      this.scheduleTripDataAutoSave();
+    });
 
     // If budget exists, attach integrated edit listeners
     if (this.budget) {
@@ -4619,6 +4704,27 @@ textarea.auto-resize {
 
 .auto-save-indicator-inline.error {
   color: #dc3545;
+}
+
+/* Estimated total display */
+.estimated-total-display {
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 500;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Accommodation select */
+.accommodation-select {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  min-width: 150px;
 }
 </style>
 `;

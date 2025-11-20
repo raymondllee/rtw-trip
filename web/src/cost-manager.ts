@@ -341,7 +341,8 @@ function initBudgetTab() {
     costs: currentVersionData.itineraryData.costs || [],
     budget: currentVersionData.itineraryData.budget || null,
     num_travelers: currentVersionData.itineraryData.num_travelers,
-    traveler_composition: currentVersionData.itineraryData.traveler_composition
+    traveler_composition: currentVersionData.itineraryData.traveler_composition,
+    accommodation_preference: currentVersionData.itineraryData.accommodation_preference
   };
 
   budgetManager = new BudgetManager(
@@ -425,12 +426,14 @@ function initBudgetTab() {
         // Update currentVersionData
         currentVersionData.itineraryData.num_travelers = updatedTripData.num_travelers;
         currentVersionData.itineraryData.traveler_composition = updatedTripData.traveler_composition;
+        currentVersionData.itineraryData.accommodation_preference = updatedTripData.accommodation_preference;
 
         // Save to Firestore
         const versionRef = doc(db, 'scenarios', scenarioId, 'versions', currentVersionData.id);
         await updateDoc(versionRef, {
           'itineraryData.num_travelers': updatedTripData.num_travelers,
           'itineraryData.traveler_composition': updatedTripData.traveler_composition,
+          'itineraryData.accommodation_preference': updatedTripData.accommodation_preference,
           updatedAt: Timestamp.now()
         });
 
