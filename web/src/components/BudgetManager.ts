@@ -2045,12 +2045,10 @@ export const budgetManagerStyles = `
 }
 
 .costs-table td.notes-cell {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: #666;
   font-size: 12px;
+  word-wrap: break-word;
+  max-width: 400px;
 }
 
 .category-badge {
