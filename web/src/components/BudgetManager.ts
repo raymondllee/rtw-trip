@@ -677,13 +677,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
       return `
         <div class="no-costs-container">
           <div class="no-costs-message">
-            <p style="margin: 0 0 12px 0;">No costs recorded for this country yet.</p>
-            <button class="btn-primary generate-costs-btn" data-country="${country}" data-destinations="${countryDestinations.map(d => d.id).join(',')}">
-              🤖 Generate AI Cost Estimates for ${destinationLabel}
-            </button>
-            <p style="margin: 12px 0 0 0; font-size: 13px; color: #666;">
-              Or add costs manually below
-            </p>
+            <p style="margin: 0; color: #666;">No costs recorded for this country yet. Add costs manually below.</p>
           </div>
           ${this.renderAddCostSection(country, countryDestinations)}
         </div>
