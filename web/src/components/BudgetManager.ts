@@ -11,17 +11,21 @@ export class BudgetManager {
   private tripData: TripData;
   private budget: TripBudget | null;
   private onBudgetUpdate?: (budget: TripBudget) => void;
+  private editedCosts: Map<string, any> = new Map();
+  private onCostsUpdate?: (costs: any[]) => Promise<void>;
 
   constructor(
     container: HTMLElement,
     tripData: TripData,
     budget?: TripBudget,
-    onBudgetUpdate?: (budget: TripBudget) => void
+    onBudgetUpdate?: (budget: TripBudget) => void,
+    onCostsUpdate?: (costs: any[]) => Promise<void>
   ) {
     this.container = container;
     this.tripData = tripData;
     this.budget = budget || null;
     this.onBudgetUpdate = onBudgetUpdate;
+    this.onCostsUpdate = onCostsUpdate;
 
     this.render();
   }
@@ -84,8 +88,20 @@ export class BudgetManager {
         return location?.country === country;
       });
 
+    // Get destinations for this country to allow adding new costs
+    const countryDestinations = (this.tripData.locations || [])
+      .filter(loc => loc.country === country);
+
+    const hasChanges = Array.from(this.editedCosts.values()).some(cost => {
+      const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
+      return location?.country === country;
+    });
+
     if (countryCosts.length === 0) {
-      return '<div class="no-costs-message">No costs recorded for this country yet.</div>';
+      return `
+        <div class="no-costs-message">No costs recorded for this country yet.</div>
+        ${this.renderAddCostSection(country, countryDestinations)}
+      `;
     }
 
     // Group costs by destination
@@ -100,52 +116,42 @@ export class BudgetManager {
     });
 
     return `
-      <div class="country-costs-table">
+      <div class="country-costs-table" data-country="${country}">
+        <div class="costs-table-actions">
+          <button class="btn-sm btn-success add-cost-btn" data-country="${country}">+ Add Cost</button>
+          ${hasChanges ? `
+            <button class="btn-sm btn-primary save-costs-btn" data-country="${country}">💾 Save Changes</button>
+            <button class="btn-sm btn-secondary cancel-costs-btn" data-country="${country}">Cancel</button>
+            <span class="unsaved-indicator">● Unsaved changes</span>
+          ` : ''}
+        </div>
         ${Object.entries(costsByDestination).map(([destName, costs]) => `
           <div class="destination-costs-section">
             <div class="destination-header">${destName}</div>
-            <table class="costs-table">
+            <table class="costs-table editable-costs-table">
               <thead>
                 <tr>
-                  <th>Category</th>
-                  <th>Description</th>
-                  <th class="text-right">Amount</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                  <th>Notes</th>
+                  <th style="width: 140px;">Category</th>
+                  <th style="width: 200px;">Description</th>
+                  <th style="width: 80px;">Currency</th>
+                  <th style="width: 100px;" class="text-right">Amount</th>
+                  <th style="width: 100px;" class="text-right">USD</th>
+                  <th style="width: 120px;">Status</th>
+                  <th style="width: 110px;">Date</th>
+                  <th style="width: 200px;">Notes</th>
+                  <th style="width: 60px;">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                ${costs.map(cost => {
-                  const amount = cost.amount_usd || cost.amount || 0;
-                  const currency = cost.currency || 'USD';
-                  const displayAmount = currency === 'USD'
-                    ? this.formatCurrency(amount)
-                    : `${currency} ${cost.amount?.toFixed(2) || '0.00'} (${this.formatCurrency(amount)})`;
-
-                  return `
-                    <tr>
-                      <td>
-                        <span class="category-badge" style="background-color: ${this.getCategoryColor(cost.category || 'other')}">
-                          ${this.getCategoryIcon(cost.category || 'other')} ${(cost.category || 'other').replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td>${cost.description || '-'}</td>
-                      <td class="text-right amount-cell">${displayAmount}</td>
-                      <td><span class="status-badge status-${cost.status || 'estimated'}">${cost.status || 'estimated'}</span></td>
-                      <td>${cost.date || '-'}</td>
-                      <td class="notes-cell">${cost.notes || '-'}</td>
-                    </tr>
-                  `;
-                }).join('')}
+                ${costs.map(cost => this.renderEditableCostRow(cost)).join('')}
               </tbody>
               <tfoot>
                 <tr class="total-row">
-                  <td colspan="2"><strong>Subtotal for ${destName}</strong></td>
+                  <td colspan="4"><strong>Subtotal for ${destName}</strong></td>
                   <td class="text-right"><strong>${this.formatCurrency(
                     costs.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0)
                   )}</strong></td>
-                  <td colspan="3"></td>
+                  <td colspan="4"></td>
                 </tr>
               </tfoot>
             </table>
@@ -156,6 +162,179 @@ export class BudgetManager {
           <strong>${this.formatCurrency(
             countryCosts.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0)
           )}</strong>
+        </div>
+        ${this.renderAddCostSection(country, countryDestinations)}
+      </div>
+    `;
+  }
+
+  private renderEditableCostRow(cost: any): string {
+    const costId = cost.id || `${cost.destination_id}_${cost.category}_${Date.now()}`;
+    const amount = cost.amount || 0;
+    const amountUsd = cost.amount_usd || amount;
+    const currency = cost.currency || 'USD';
+
+    return `
+      <tr class="editable-cost-row" data-cost-id="${costId}">
+        <td>
+          <span class="category-badge" style="background-color: ${this.getCategoryColor(cost.category || 'other')}">
+            ${this.getCategoryIcon(cost.category || 'other')} ${(cost.category || 'other').replace(/_/g, ' ')}
+          </span>
+        </td>
+        <td>
+          <input type="text"
+                 class="cost-field-input"
+                 data-cost-id="${costId}"
+                 data-field="description"
+                 value="${cost.description || ''}"
+                 placeholder="Description">
+        </td>
+        <td>
+          <select class="cost-field-select currency-select"
+                  data-cost-id="${costId}"
+                  data-field="currency">
+            <option value="USD" ${currency === 'USD' ? 'selected' : ''}>USD</option>
+            <option value="EUR" ${currency === 'EUR' ? 'selected' : ''}>EUR</option>
+            <option value="GBP" ${currency === 'GBP' ? 'selected' : ''}>GBP</option>
+            <option value="JPY" ${currency === 'JPY' ? 'selected' : ''}>JPY</option>
+            <option value="AUD" ${currency === 'AUD' ? 'selected' : ''}>AUD</option>
+            <option value="CAD" ${currency === 'CAD' ? 'selected' : ''}>CAD</option>
+            <option value="CNY" ${currency === 'CNY' ? 'selected' : ''}>CNY</option>
+            <option value="INR" ${currency === 'INR' ? 'selected' : ''}>INR</option>
+            <option value="THB" ${currency === 'THB' ? 'selected' : ''}>THB</option>
+            <option value="VND" ${currency === 'VND' ? 'selected' : ''}>VND</option>
+          </select>
+        </td>
+        <td class="text-right">
+          <input type="number"
+                 class="cost-field-input amount-input"
+                 data-cost-id="${costId}"
+                 data-field="amount"
+                 value="${amount}"
+                 step="0.01"
+                 min="0">
+        </td>
+        <td class="text-right">
+          <input type="number"
+                 class="cost-field-input usd-input"
+                 data-cost-id="${costId}"
+                 data-field="amount_usd"
+                 value="${amountUsd}"
+                 step="0.01"
+                 min="0"
+                 ${currency === 'USD' ? 'disabled' : ''}>
+        </td>
+        <td>
+          <select class="cost-field-select status-select"
+                  data-cost-id="${costId}"
+                  data-field="status">
+            <option value="estimated" ${(cost.status || 'estimated') === 'estimated' ? 'selected' : ''}>Estimated</option>
+            <option value="researched" ${cost.status === 'researched' ? 'selected' : ''}>Researched</option>
+            <option value="booked" ${cost.status === 'booked' ? 'selected' : ''}>Booked</option>
+            <option value="paid" ${cost.status === 'paid' ? 'selected' : ''}>Paid</option>
+          </select>
+        </td>
+        <td>
+          <input type="date"
+                 class="cost-field-input date-input"
+                 data-cost-id="${costId}"
+                 data-field="date"
+                 value="${cost.date || ''}">
+        </td>
+        <td>
+          <input type="text"
+                 class="cost-field-input notes-input"
+                 data-cost-id="${costId}"
+                 data-field="notes"
+                 value="${cost.notes || ''}"
+                 placeholder="Notes">
+        </td>
+        <td>
+          <button class="btn-icon delete-cost-btn" data-cost-id="${costId}" title="Delete cost">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }
+
+  private renderAddCostSection(country: string, destinations: any[]): string {
+    return `
+      <div class="add-cost-section" data-country="${country}" style="display: none;">
+        <div class="add-cost-form">
+          <h5>Add New Cost for ${country}</h5>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Destination</label>
+              <select class="new-cost-field" data-field="destination_id">
+                <option value="">Select destination...</option>
+                ${destinations.map(dest =>
+                  `<option value="${dest.id}">${dest.name || dest.city}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <select class="new-cost-field" data-field="category">
+                <option value="accommodation">🏨 Accommodation</option>
+                <option value="food">🍽️ Food</option>
+                <option value="transport">🚗 Transport</option>
+                <option value="activity">🎯 Activity</option>
+                <option value="flight">✈️ Flight</option>
+                <option value="other">📦 Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" class="new-cost-field" data-field="description" placeholder="Description">
+            </div>
+            <div class="form-group">
+              <label>Currency</label>
+              <select class="new-cost-field new-cost-currency" data-field="currency">
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="JPY">JPY</option>
+                <option value="AUD">AUD</option>
+                <option value="CAD">CAD</option>
+                <option value="CNY">CNY</option>
+                <option value="INR">INR</option>
+                <option value="THB">THB</option>
+                <option value="VND">VND</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Amount</label>
+              <input type="number" class="new-cost-field new-cost-amount" data-field="amount" step="0.01" min="0" value="0">
+            </div>
+            <div class="form-group">
+              <label>Amount (USD)</label>
+              <input type="number" class="new-cost-field new-cost-usd" data-field="amount_usd" step="0.01" min="0" value="0">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Status</label>
+              <select class="new-cost-field" data-field="status">
+                <option value="estimated">Estimated</option>
+                <option value="researched">Researched</option>
+                <option value="booked">Booked</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" class="new-cost-field" data-field="date">
+            </div>
+            <div class="form-group">
+              <label>Notes</label>
+              <input type="text" class="new-cost-field" data-field="notes" placeholder="Notes">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-sm btn-primary save-new-cost-btn" data-country="${country}">Save New Cost</button>
+            <button class="btn-sm btn-secondary cancel-new-cost-btn" data-country="${country}">Cancel</button>
+          </div>
         </div>
       </div>
     `;
@@ -1037,6 +1216,282 @@ export class BudgetManager {
     // Attach save listeners to both buttons
     this.container.querySelector('#save-budget-btn')?.addEventListener('click', saveBudget);
     this.container.querySelector('#save-budget-btn-footer')?.addEventListener('click', saveBudget);
+
+    // Attach cost editing listeners
+    this.attachCostEditingListeners();
+  }
+
+  private attachCostEditingListeners() {
+    // Inline editing of cost fields
+    this.container.querySelectorAll('.cost-field-input, .cost-field-select').forEach(field => {
+      const inputEl = field as HTMLInputElement | HTMLSelectElement;
+
+      inputEl.addEventListener('change', () => {
+        const costId = inputEl.dataset.costId!;
+        const fieldName = inputEl.dataset.field!;
+
+        // Find the original cost
+        const originalCost = (this.tripData.costs || []).find(c =>
+          (c.id || `${c.destination_id}_${c.category}_${Date.now()}`) === costId
+        );
+
+        if (!originalCost) return;
+
+        // Get or create edited cost entry
+        let editedCost = this.editedCosts.get(costId);
+        if (!editedCost) {
+          editedCost = { ...originalCost, id: costId };
+          this.editedCosts.set(costId, editedCost);
+        }
+
+        // Update the field
+        if (inputEl.type === 'number') {
+          editedCost[fieldName] = parseFloat(inputEl.value) || 0;
+        } else {
+          editedCost[fieldName] = inputEl.value;
+        }
+
+        // Special handling for currency changes
+        if (fieldName === 'currency') {
+          const currency = inputEl.value;
+          const row = inputEl.closest('tr');
+          const usdInput = row?.querySelector('.usd-input') as HTMLInputElement;
+
+          if (currency === 'USD') {
+            // Disable USD input and sync with amount
+            if (usdInput) {
+              usdInput.disabled = true;
+              const amountInput = row?.querySelector('.amount-input') as HTMLInputElement;
+              if (amountInput) {
+                usdInput.value = amountInput.value;
+                editedCost.amount_usd = parseFloat(amountInput.value) || 0;
+              }
+            }
+          } else {
+            // Enable USD input
+            if (usdInput) {
+              usdInput.disabled = false;
+            }
+          }
+        }
+
+        // If amount changes and currency is USD, sync amount_usd
+        if (fieldName === 'amount') {
+          const row = inputEl.closest('tr');
+          const currencySelect = row?.querySelector('.currency-select') as HTMLSelectElement;
+          if (currencySelect?.value === 'USD') {
+            const usdInput = row?.querySelector('.usd-input') as HTMLInputElement;
+            if (usdInput) {
+              usdInput.value = inputEl.value;
+              editedCost.amount_usd = parseFloat(inputEl.value) || 0;
+            }
+          }
+        }
+
+        // Re-render to show save buttons
+        this.render();
+      });
+    });
+
+    // Add cost button
+    this.container.querySelectorAll('.add-cost-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const country = (btn as HTMLElement).dataset.country!;
+        const addSection = this.container.querySelector(`.add-cost-section[data-country="${country}"]`) as HTMLElement;
+        if (addSection) {
+          addSection.style.display = addSection.style.display === 'none' ? 'block' : 'none';
+        }
+      });
+    });
+
+    // Cancel new cost button
+    this.container.querySelectorAll('.cancel-new-cost-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const country = (btn as HTMLElement).dataset.country!;
+        const addSection = this.container.querySelector(`.add-cost-section[data-country="${country}"]`) as HTMLElement;
+        if (addSection) {
+          addSection.style.display = 'none';
+          // Reset form
+          addSection.querySelectorAll('.new-cost-field').forEach(field => {
+            const input = field as HTMLInputElement | HTMLSelectElement;
+            if (input.type === 'number') {
+              input.value = '0';
+            } else {
+              input.value = '';
+            }
+          });
+        }
+      });
+    });
+
+    // Currency sync for new cost form
+    this.container.querySelectorAll('.new-cost-currency').forEach(currencySelect => {
+      currencySelect.addEventListener('change', () => {
+        const form = currencySelect.closest('.add-cost-form');
+        const amountInput = form?.querySelector('.new-cost-amount') as HTMLInputElement;
+        const usdInput = form?.querySelector('.new-cost-usd') as HTMLInputElement;
+
+        if ((currencySelect as HTMLSelectElement).value === 'USD') {
+          if (usdInput) {
+            usdInput.disabled = true;
+            usdInput.value = amountInput?.value || '0';
+          }
+        } else {
+          if (usdInput) {
+            usdInput.disabled = false;
+          }
+        }
+      });
+    });
+
+    // Amount sync when currency is USD for new cost form
+    this.container.querySelectorAll('.new-cost-amount').forEach(amountInput => {
+      amountInput.addEventListener('input', () => {
+        const form = amountInput.closest('.add-cost-form');
+        const currencySelect = form?.querySelector('.new-cost-currency') as HTMLSelectElement;
+        const usdInput = form?.querySelector('.new-cost-usd') as HTMLInputElement;
+
+        if (currencySelect?.value === 'USD' && usdInput) {
+          usdInput.value = (amountInput as HTMLInputElement).value;
+        }
+      });
+    });
+
+    // Save new cost button
+    this.container.querySelectorAll('.save-new-cost-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const country = (btn as HTMLElement).dataset.country!;
+        const addSection = this.container.querySelector(`.add-cost-section[data-country="${country}"]`) as HTMLElement;
+
+        if (!addSection) return;
+
+        // Collect form data
+        const newCost: any = { status: 'estimated' };
+        addSection.querySelectorAll('.new-cost-field').forEach(field => {
+          const input = field as HTMLInputElement | HTMLSelectElement;
+          const fieldName = input.dataset.field!;
+
+          if (input.type === 'number') {
+            newCost[fieldName] = parseFloat(input.value) || 0;
+          } else {
+            newCost[fieldName] = input.value;
+          }
+        });
+
+        // Validate required fields
+        if (!newCost.destination_id || !newCost.category) {
+          alert('Please select a destination and category');
+          return;
+        }
+
+        // Generate ID for new cost
+        newCost.id = `${newCost.destination_id}_${newCost.category}_${Date.now()}`;
+
+        // If currency is USD, ensure amount_usd equals amount
+        if (newCost.currency === 'USD') {
+          newCost.amount_usd = newCost.amount;
+        }
+
+        // Add to edited costs
+        this.editedCosts.set(newCost.id, newCost);
+
+        // Add to tripData temporarily for display
+        if (!this.tripData.costs) {
+          this.tripData.costs = [];
+        }
+        this.tripData.costs.push(newCost);
+
+        // Hide form and re-render
+        addSection.style.display = 'none';
+        this.render();
+      });
+    });
+
+    // Delete cost button
+    this.container.querySelectorAll('.delete-cost-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!confirm('Are you sure you want to delete this cost?')) return;
+
+        const costId = (btn as HTMLElement).dataset.costId!;
+
+        // Mark for deletion by setting a special flag
+        const costIndex = (this.tripData.costs || []).findIndex(c =>
+          (c.id || `${c.destination_id}_${c.category}_${Date.now()}`) === costId
+        );
+
+        if (costIndex !== -1) {
+          const deletedCost = { ...this.tripData.costs![costIndex], _deleted: true };
+          this.editedCosts.set(costId, deletedCost);
+          this.tripData.costs!.splice(costIndex, 1);
+          this.render();
+        }
+      });
+    });
+
+    // Save costs changes button
+    this.container.querySelectorAll('.save-costs-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const country = (btn as HTMLElement).dataset.country!;
+
+        if (this.editedCosts.size === 0) {
+          alert('No changes to save');
+          return;
+        }
+
+        try {
+          // Get all edited costs for this country
+          const costsToSave = Array.from(this.editedCosts.values()).filter(cost => {
+            const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
+            return location?.country === country;
+          });
+
+          if (costsToSave.length === 0) {
+            alert('No changes for this country');
+            return;
+          }
+
+          // Call the update handler if provided
+          if (this.onCostsUpdate) {
+            await this.onCostsUpdate(costsToSave);
+
+            // Clear edited costs for this country
+            costsToSave.forEach(cost => {
+              this.editedCosts.delete(cost.id);
+            });
+
+            alert(`Saved ${costsToSave.length} cost change(s)`);
+            this.render();
+          } else {
+            alert('Cost update handler not configured');
+          }
+        } catch (error) {
+          console.error('Failed to save costs:', error);
+          alert('Failed to save costs: ' + (error as Error).message);
+        }
+      });
+    });
+
+    // Cancel costs changes button
+    this.container.querySelectorAll('.cancel-costs-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const country = (btn as HTMLElement).dataset.country!;
+
+        // Remove edited costs for this country
+        const keysToDelete: string[] = [];
+        this.editedCosts.forEach((cost, id) => {
+          const location = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
+          if (location?.country === country) {
+            keysToDelete.push(id);
+          }
+        });
+
+        keysToDelete.forEach(key => this.editedCosts.delete(key));
+
+        // Reload original data - we'll need to refetch from parent
+        // For now, just re-render which will restore from tripData
+        this.render();
+      });
+    });
   }
 
   render() {
@@ -2122,6 +2577,148 @@ export const budgetManagerStyles = `
   background: white;
   border-radius: 6px;
   border: 1px dashed #ddd;
+}
+
+/* Editable costs table styles */
+.costs-table-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-success {
+  background: #28a745;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #218838;
+}
+
+.unsaved-indicator {
+  color: #dc3545;
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.editable-costs-table {
+  table-layout: fixed;
+}
+
+.cost-field-input,
+.cost-field-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.cost-field-input:focus,
+.cost-field-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.cost-field-input:disabled {
+  background: #f8f9fa;
+  color: #999;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.btn-icon:hover {
+  opacity: 1;
+}
+
+/* Add cost form */
+.add-cost-section {
+  margin-top: 15px;
+}
+
+.add-cost-form {
+  background: white;
+  padding: 20px;
+  border-radius: 6px;
+  border: 2px solid #28a745;
+}
+
+.add-cost-form h5 {
+  margin: 0 0 15px 0;
+  color: #28a745;
+  font-size: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #333;
+}
+
+.new-cost-field {
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.new-cost-field:focus {
+  outline: none;
+  border-color: #28a745;
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
+}
+
+.new-cost-field:disabled {
+  background: #f8f9fa;
+  color: #999;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e0e0e0;
 }
 </style>
 `;

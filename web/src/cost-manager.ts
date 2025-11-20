@@ -368,6 +368,50 @@ function initBudgetTab() {
         console.error('❌ Failed to save budget:', error);
         alert('Failed to save budget: ' + error.message);
       }
+    },
+    async (updatedCosts) => {
+      // Save costs to version document
+      try {
+        if (!currentVersionData.id) {
+          throw new Error('Version document ID not found');
+        }
+
+        // Update or add costs in the current version data
+        updatedCosts.forEach(updatedCost => {
+          if (updatedCost._deleted) {
+            // Remove deleted costs
+            currentVersionData.itineraryData.costs = (currentVersionData.itineraryData.costs || [])
+              .filter(c => c.id !== updatedCost.id);
+          } else {
+            // Update or add cost
+            const index = (currentVersionData.itineraryData.costs || []).findIndex(c => c.id === updatedCost.id);
+            if (index >= 0) {
+              currentVersionData.itineraryData.costs[index] = updatedCost;
+            } else {
+              if (!currentVersionData.itineraryData.costs) {
+                currentVersionData.itineraryData.costs = [];
+              }
+              currentVersionData.itineraryData.costs.push(updatedCost);
+            }
+          }
+        });
+
+        // Save to Firestore
+        const versionRef = doc(db, 'scenarios', scenarioId, 'versions', currentVersionData.id);
+        await updateDoc(versionRef, {
+          'itineraryData.costs': currentVersionData.itineraryData.costs,
+          updatedAt: Timestamp.now()
+        });
+
+        console.log('✅ Costs saved to Firestore');
+
+        // Update tripData and re-render budget manager
+        tripData.costs = currentVersionData.itineraryData.costs;
+        budgetManager.updateData(tripData, tripData.budget);
+      } catch (error) {
+        console.error('❌ Failed to save costs:', error);
+        throw error;
+      }
     }
   );
 
