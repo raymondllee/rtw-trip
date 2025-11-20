@@ -54,6 +54,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.budgetManagerStyles = exports.BudgetManager = void 0;
 var budgetTracker_1 = require("../utils/budgetTracker");
 var currencyMapping_1 = require("../utils/currencyMapping");
+var config_1 = require("../config");
 var BudgetManager = /** @class */ (function () {
     function BudgetManager(container, tripData, budget, onBudgetUpdate, onCostsUpdate) {
         this.editedCosts = new Map();
@@ -247,6 +248,169 @@ var BudgetManager = /** @class */ (function () {
                 }
             });
         });
+    };
+    BudgetManager.prototype.generateCostsForCountry = function (country, destinationIds) {
+        return __awaiter(this, void 0, void 0, function () {
+            var destinations, enrichedDestinations, prompt, config, chatApiUrl, scenarioId, response, errorText, data, responseText, costs;
+            var _this = this;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        destinations = destinationIds
+                            .map(function (id) { return (_this.tripData.locations || []).find(function (loc) { return String(loc.id) === id; }); })
+                            .filter(function (d) { return d; });
+                        if (destinations.length === 0) {
+                            throw new Error('No valid destinations found');
+                        }
+                        enrichedDestinations = destinations.map(function (dest) {
+                            var localCurrency = (0, currencyMapping_1.getCurrencyForDestination)(dest.id, _this.tripData.locations || []);
+                            return {
+                                id: dest.id,
+                                normalizedId: String(dest.id),
+                                name: dest.name || dest.city,
+                                city: dest.city,
+                                country: dest.country,
+                                region: dest.region,
+                                activityType: dest.activity_type,
+                                durationDays: dest.duration_days || 1,
+                                arrivalDate: dest.arrival_date,
+                                departureDate: dest.departure_date,
+                                highlights: Array.isArray(dest.highlights) ? dest.highlights : [],
+                                notes: dest.notes || '',
+                                localCurrency: localCurrency
+                            };
+                        });
+                        prompt = this.generateCostPrompt(enrichedDestinations, country);
+                        config = (0, config_1.getRuntimeConfig)();
+                        chatApiUrl = config.endpoints.chat;
+                        scenarioId = window.currentScenarioId || null;
+                        return [4 /*yield*/, fetch(chatApiUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    message: prompt,
+                                    context: {
+                                        destinations: enrichedDestinations.map(function (d) { return ({
+                                            id: d.id,
+                                            name: d.name,
+                                            country: d.country,
+                                            duration_days: d.durationDays
+                                        }); })
+                                    },
+                                    scenario_id: scenarioId,
+                                    session_id: null // New session for cost generation
+                                })
+                            })];
+                    case 1:
+                        response = _a.sent();
+                        if (!!response.ok) return [3 /*break*/, 3];
+                        return [4 /*yield*/, response.text()];
+                    case 2:
+                        errorText = _a.sent();
+                        throw new Error("API error: ".concat(response.status, " - ").concat(errorText));
+                    case 3: return [4 /*yield*/, response.json()];
+                    case 4:
+                        data = _a.sent();
+                        responseText = data.response || data.text || '';
+                        costs = this.parseAICostResponse(responseText, enrichedDestinations);
+                        return [2 /*return*/, costs];
+                }
+            });
+        });
+    };
+    BudgetManager.prototype.generateCostPrompt = function (destinations, country) {
+        var destinationBlocks = destinations.map(function (dest, index) {
+            var lines = [];
+            lines.push("".concat(index + 1, ". ").concat(dest.name).concat(dest.city ? " (".concat(dest.city, ")") : '', ", ").concat(country));
+            if (dest.region) {
+                lines.push("   Region: ".concat(dest.region));
+            }
+            if (dest.arrivalDate || dest.departureDate || dest.durationDays) {
+                var dateBits = [];
+                if (dest.arrivalDate)
+                    dateBits.push("Arrive ".concat(dest.arrivalDate));
+                if (dest.departureDate)
+                    dateBits.push("Depart ".concat(dest.departureDate));
+                dateBits.push("".concat(dest.durationDays, " days"));
+                lines.push("   Schedule: ".concat(dateBits.join(' • ')));
+            }
+            if (dest.activityType) {
+                lines.push("   Primary focus: ".concat(dest.activityType));
+            }
+            var highlights = (dest.highlights || []).slice(0, 5);
+            if (highlights.length) {
+                lines.push("   Highlights: ".concat(highlights.join(', ')));
+            }
+            if (dest.notes) {
+                lines.push("   Notes: ".concat(dest.notes));
+            }
+            lines.push("   Local Currency: ".concat(dest.localCurrency));
+            lines.push("   Destination ID: ".concat(dest.normalizedId));
+            return lines.join('\n');
+        }).join('\n\n');
+        return "You are the RTW trip cost-planning assistant. Help estimate costs for the destinations below in ".concat(country, ".\n\nFor each destination, produce 3-6 cost line items that cover major spend categories (accommodation, key activities, food, local transport, other notable expenses). Use realistic per-trip totals. Amounts should be in the local currency specified for each destination.\n\nReturn a single JSON array. Each element must follow exactly:\n{\n  \"destination_id\": \"<match the Destination ID>\",\n  \"notes\": \"<optional high-level notes>\",\n  \"costs\": [\n    {\n      \"category\": \"accommodation|activity|food|transport|other\",\n      \"description\": \"<short human-friendly label>\",\n      \"amount\": 0.0,\n      \"currency\": \"<local currency code>\",\n      \"date\": \"YYYY-MM-DD\",\n      \"status\": \"estimated\",\n      \"source\": \"ai_estimate\",\n      \"notes\": \"<optional detail>\"\n    }\n  ]\n}\n\nDestinations to cover:\n\n").concat(destinationBlocks, "\n\nIMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation text, no code fences. Just the raw JSON array starting with [ and ending with ].");
+    };
+    BudgetManager.prototype.parseAICostResponse = function (responseText, destinations) {
+        var _this = this;
+        // Try to extract JSON from the response
+        var jsonText = responseText.trim();
+        // Remove markdown code fences if present
+        jsonText = jsonText.replace(/^```json?\s*/i, '').replace(/```\s*$/, '');
+        // Try to find JSON array in the text
+        var jsonMatch = jsonText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            jsonText = jsonMatch[0];
+        }
+        var parsed;
+        try {
+            parsed = JSON.parse(jsonText);
+        }
+        catch (error) {
+            console.error('Failed to parse AI response:', error);
+            console.error('Response text:', responseText);
+            throw new Error('Failed to parse AI response as JSON');
+        }
+        if (!Array.isArray(parsed)) {
+            throw new Error('AI response is not an array');
+        }
+        // Transform the parsed data into costs format
+        var allCosts = [];
+        parsed.forEach(function (destData) {
+            var costs = destData.costs || [];
+            costs.forEach(function (cost) {
+                var destId = String(destData.destination_id);
+                var destination = destinations.find(function (d) { return String(d.id) === destId; });
+                if (!destination) {
+                    console.warn("Destination ".concat(destId, " not found in provided destinations"));
+                    return;
+                }
+                // Ensure currency is set properly
+                var currency = cost.currency || destination.localCurrency || 'USD';
+                // Generate cost ID
+                var costId = "".concat(destId, "_").concat(cost.category, "_").concat(Date.now(), "_").concat(Math.random().toString(36).substr(2, 9));
+                // Calculate amount_usd if currency is not USD
+                var amountUsd = cost.amount;
+                if (currency !== 'USD' && _this.exchangeRates[currency]) {
+                    amountUsd = cost.amount / _this.exchangeRates[currency];
+                }
+                allCosts.push({
+                    id: costId,
+                    destination_id: destData.destination_id,
+                    category: cost.category || 'other',
+                    description: cost.description || 'AI Generated Cost',
+                    amount: Math.round(cost.amount || 0),
+                    currency: currency,
+                    amount_usd: Math.round(amountUsd),
+                    date: cost.date || new Date().toISOString().split('T')[0],
+                    status: cost.status || 'estimated',
+                    notes: cost.notes || destData.notes || '',
+                    source: 'ai_estimate'
+                });
+            });
+        });
+        return allCosts;
     };
     BudgetManager.prototype.getCurrenciesForCountry = function (country) {
         var _this = this;
@@ -1388,32 +1552,118 @@ var BudgetManager = /** @class */ (function () {
         }
         // Generate costs button for countries without costs
         this.container.querySelectorAll('.generate-costs-btn').forEach(function (btn) {
-            btn.addEventListener('click', function () {
+            btn.addEventListener('click', function () { return __awaiter(_this, void 0, void 0, function () {
+                var country, destinationIds, destinations, destNames, confirmed, originalBtn, originalText, costsSection, progressDiv, generatedCosts, progressDiv, error_6, progressDiv;
                 var _a;
-                var country = btn.dataset.country;
-                var destinationIds = ((_a = btn.dataset.destinations) === null || _a === void 0 ? void 0 : _a.split(',')) || [];
-                var destinations = destinationIds
-                    .map(function (id) { return (_this.tripData.locations || []).find(function (loc) { return String(loc.id) === id; }); })
-                    .filter(function (d) { return d; });
-                var destNames = destinations.map(function (d) { return d.name || d.city; }).join(', ');
-                // Show information about AI generation
-                // Note: Actual AI generation would integrate with the existing chat/agent system
-                var message = "AI Cost Generation for ".concat(country, "\n\n") +
-                    "This feature will generate cost estimates for:\n".concat(destNames, "\n\n") +
-                    "The AI will research and estimate costs for:\n" +
-                    "\u2022 Accommodation (hotels, hostels, etc.)\n" +
-                    "\u2022 Activities (tours, attractions, etc.)\n" +
-                    "\u2022 Food (restaurants, markets, etc.)\n" +
-                    "\u2022 Local Transport (buses, trains, taxis, etc.)\n\n" +
-                    "Generated costs will automatically use the local currency for each destination based on country mappings.\n\n" +
-                    "Note: AI cost generation will be integrated with the existing agent system. " +
-                    "This feature will trigger the same AI research as \"Generate Costs\" tab.";
-                alert(message);
-                // Future implementation would:
-                // 1. Call AI agent to generate costs for these destinations
-                // 2. Use getCurrencyForDestination() to set proper currency
-                // 3. Save generated costs and trigger render
-            });
+                var _this = this;
+                var _b;
+                return __generator(this, function (_c) {
+                    switch (_c.label) {
+                        case 0:
+                            country = btn.dataset.country;
+                            destinationIds = ((_b = btn.dataset.destinations) === null || _b === void 0 ? void 0 : _b.split(',')) || [];
+                            destinations = destinationIds
+                                .map(function (id) { return (_this.tripData.locations || []).find(function (loc) { return String(loc.id) === id; }); })
+                                .filter(function (d) { return d; });
+                            destNames = destinations.map(function (d) { return d.name || d.city; }).join(', ');
+                            confirmed = confirm("Generate AI cost estimates for ".concat(destNames, "?\n\n") +
+                                "The AI will research and estimate costs for accommodation, activities, food, and transport.\n\n" +
+                                "This may take 30-60 seconds. Continue?");
+                            if (!confirmed)
+                                return [2 /*return*/];
+                            originalBtn = btn;
+                            originalText = originalBtn.innerHTML;
+                            originalBtn.disabled = true;
+                            originalBtn.innerHTML = '⏳ Generating costs...';
+                            costsSection = this.container.querySelector(".item-costs-section[data-country=\"".concat(country, "\"]"));
+                            if (costsSection) {
+                                progressDiv = document.createElement('div');
+                                progressDiv.className = 'cost-generation-progress';
+                                progressDiv.innerHTML = "\n            <div style=\"padding: 20px; text-align: center; background: #f0f8ff; border-radius: 6px; margin: 15px 0;\">\n              <div style=\"font-size: 16px; font-weight: 600; color: #1a73e8; margin-bottom: 8px;\">\n                \uD83E\uDD16 AI is generating cost estimates...\n              </div>\n              <div style=\"font-size: 14px; color: #666; margin-bottom: 12px;\">\n                Researching ".concat(destNames, "\n              </div>\n              <div style=\"width: 100%; height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden;\">\n                <div style=\"width: 100%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2, #667eea); background-size: 200% 100%; animation: shimmer 1.5s infinite;\"></div>\n              </div>\n            </div>\n            <style>\n              @keyframes shimmer {\n                0% { background-position: -200% 0; }\n                100% { background-position: 200% 0; }\n              }\n            </style>\n          ");
+                                costsSection.insertBefore(progressDiv, costsSection.firstChild);
+                            }
+                            _c.label = 1;
+                        case 1:
+                            _c.trys.push([1, 5, , 6]);
+                            return [4 /*yield*/, this.generateCostsForCountry(country, destinationIds)];
+                        case 2:
+                            generatedCosts = _c.sent();
+                            if (generatedCosts.length === 0) {
+                                throw new Error('No costs were generated');
+                            }
+                            // Add generated costs to tripData
+                            if (!this.tripData.costs) {
+                                this.tripData.costs = [];
+                            }
+                            (_a = this.tripData.costs).push.apply(_a, generatedCosts);
+                            if (!this.onCostsUpdate) return [3 /*break*/, 4];
+                            return [4 /*yield*/, this.onCostsUpdate(generatedCosts)];
+                        case 3:
+                            _c.sent();
+                            _c.label = 4;
+                        case 4:
+                            // Show success message
+                            originalBtn.innerHTML = "\u2713 Generated ".concat(generatedCosts.length, " costs");
+                            originalBtn.style.background = '#28a745';
+                            // Remove progress UI and refresh display
+                            if (costsSection) {
+                                progressDiv = costsSection.querySelector('.cost-generation-progress');
+                                if (progressDiv) {
+                                    progressDiv.remove();
+                                }
+                            }
+                            // Refresh the entire budget manager to show new costs
+                            this.render();
+                            // Automatically open the costs section for this country
+                            setTimeout(function () {
+                                var updatedCostsSection = _this.container.querySelector(".item-costs-section[data-country=\"".concat(country, "\"]"));
+                                if (updatedCostsSection) {
+                                    updatedCostsSection.style.display = 'block';
+                                }
+                                // Update the toggle button text
+                                var toggleBtn = _this.container.querySelector(".costs-toggle-btn[data-country=\"".concat(country, "\"]"));
+                                if (toggleBtn) {
+                                    var countryCurrentCosts = (_this.tripData.costs || []).filter(function (c) {
+                                        var location = (_this.tripData.locations || []).find(function (loc) { return loc.id === c.destination_id; });
+                                        return (location === null || location === void 0 ? void 0 : location.country) === country;
+                                    });
+                                    toggleBtn.innerHTML = "\uD83D\uDCB0 \u25BC Hide Costs (".concat(countryCurrentCosts.length, ")");
+                                }
+                                // Auto-resize textareas in the opened section
+                                _this.setupAutoResizeTextareas();
+                            }, 100);
+                            // Reset button after 3 seconds
+                            setTimeout(function () {
+                                originalBtn.innerHTML = originalText;
+                                originalBtn.style.background = '';
+                                originalBtn.disabled = false;
+                            }, 3000);
+                            return [3 /*break*/, 6];
+                        case 5:
+                            error_6 = _c.sent();
+                            console.error('Failed to generate costs:', error_6);
+                            // Remove progress UI
+                            if (costsSection) {
+                                progressDiv = costsSection.querySelector('.cost-generation-progress');
+                                if (progressDiv) {
+                                    progressDiv.remove();
+                                }
+                            }
+                            // Show error
+                            originalBtn.innerHTML = '✗ Generation failed';
+                            originalBtn.style.background = '#dc3545';
+                            alert("Failed to generate costs: ".concat(error_6 instanceof Error ? error_6.message : 'Unknown error'));
+                            // Reset button after 3 seconds
+                            setTimeout(function () {
+                                originalBtn.innerHTML = originalText;
+                                originalBtn.style.background = '';
+                                originalBtn.disabled = false;
+                            }, 3000);
+                            return [3 /*break*/, 6];
+                        case 6: return [2 /*return*/];
+                    }
+                });
+            }); });
         });
     };
     BudgetManager.prototype.setupAutoResizeTextareas = function () {
