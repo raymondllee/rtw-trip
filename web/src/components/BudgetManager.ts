@@ -13,6 +13,8 @@ export class BudgetManager {
   private onBudgetUpdate?: (budget: TripBudget) => void;
   private editedCosts: Map<string, any> = new Map();
   private onCostsUpdate?: (costs: any[]) => Promise<void>;
+  private exchangeRates: { [key: string]: number } = {};
+  private ratesFetchDate: string = '';
 
   constructor(
     container: HTMLElement,
@@ -27,7 +29,77 @@ export class BudgetManager {
     this.onBudgetUpdate = onBudgetUpdate;
     this.onCostsUpdate = onCostsUpdate;
 
+    // Fetch exchange rates on initialization
+    this.fetchExchangeRates();
+
     this.render();
+  }
+
+  private async fetchExchangeRates() {
+    try {
+      // Using exchangerate-api.io free tier (1500 requests/month)
+      const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+      const data = await response.json();
+
+      if (data && data.rates) {
+        this.exchangeRates = data.rates;
+        this.ratesFetchDate = new Date(data.time_last_updated * 1000).toLocaleDateString();
+        console.log('✅ Exchange rates fetched:', this.ratesFetchDate);
+      }
+    } catch (error) {
+      console.error('Failed to fetch exchange rates:', error);
+      // Set default rates if API fails
+      this.exchangeRates = {
+        USD: 1,
+        EUR: 0.92,
+        GBP: 0.79,
+        JPY: 149.50,
+        AUD: 1.52,
+        CAD: 1.36,
+        CNY: 7.24,
+        INR: 83.12,
+        THB: 34.50,
+        VND: 24450
+      };
+      this.ratesFetchDate = 'Using default rates';
+    }
+  }
+
+  private convertCurrency(amount: number, fromCurrency: string, toCurrency: string): number {
+    if (fromCurrency === toCurrency) return amount;
+
+    // Convert to USD first, then to target currency
+    const amountInUSD = fromCurrency === 'USD'
+      ? amount
+      : amount / (this.exchangeRates[fromCurrency] || 1);
+
+    const result = toCurrency === 'USD'
+      ? amountInUSD
+      : amountInUSD * (this.exchangeRates[toCurrency] || 1);
+
+    return result;
+  }
+
+  private getCurrencySymbol(currency: string): string {
+    const symbols: Record<string, string> = {
+      USD: '$',
+      EUR: '€',
+      GBP: '£',
+      JPY: '¥',
+      AUD: 'A$',
+      CAD: 'C$',
+      CNY: '¥',
+      INR: '₹',
+      THB: '฿',
+      VND: '₫'
+    };
+    return symbols[currency] || currency;
+  }
+
+  private formatCurrencyAmount(amount: number, currency: string): string {
+    const symbol = this.getCurrencySymbol(currency);
+    const rounded = Math.round(amount);
+    return `${symbol}${rounded.toLocaleString()}`;
   }
 
   updateData(tripData: TripData, budget?: TripBudget) {
@@ -174,6 +246,12 @@ export class BudgetManager {
     const amountUsd = cost.amount_usd || amount;
     const currency = cost.currency || 'USD';
 
+    // Get exchange rate for display
+    const rate = currency === 'USD' ? 1 : (this.exchangeRates[currency] || 1);
+    const rateDisplay = currency !== 'USD'
+      ? `<div class="exchange-rate-info" title="Rate as of ${this.ratesFetchDate}">1 USD = ${this.getCurrencySymbol(currency)}${rate.toFixed(2)}</div>`
+      : '';
+
     return `
       <tr class="editable-cost-row" data-cost-id="${costId}">
         <td>
@@ -204,25 +282,32 @@ export class BudgetManager {
             <option value="THB" ${currency === 'THB' ? 'selected' : ''}>THB</option>
             <option value="VND" ${currency === 'VND' ? 'selected' : ''}>VND</option>
           </select>
+          ${rateDisplay}
         </td>
         <td class="text-right">
-          <input type="number"
-                 class="cost-field-input amount-input"
-                 data-cost-id="${costId}"
-                 data-field="amount"
-                 value="${amount}"
-                 step="0.01"
-                 min="0">
+          <div class="currency-input-wrapper">
+            <span class="currency-symbol">${this.getCurrencySymbol(currency)}</span>
+            <input type="number"
+                   class="cost-field-input amount-input"
+                   data-cost-id="${costId}"
+                   data-field="amount"
+                   value="${Math.round(amount)}"
+                   step="1"
+                   min="0">
+          </div>
         </td>
         <td class="text-right">
-          <input type="number"
-                 class="cost-field-input usd-input"
-                 data-cost-id="${costId}"
-                 data-field="amount_usd"
-                 value="${amountUsd}"
-                 step="0.01"
-                 min="0"
-                 ${currency === 'USD' ? 'disabled' : ''}>
+          <div class="currency-input-wrapper">
+            <span class="currency-symbol">$</span>
+            <input type="number"
+                   class="cost-field-input usd-input"
+                   data-cost-id="${costId}"
+                   data-field="amount_usd"
+                   value="${Math.round(amountUsd)}"
+                   step="1"
+                   min="0"
+                   ${currency === 'USD' ? 'disabled' : ''}>
+          </div>
         </td>
         <td>
           <select class="cost-field-select status-select"
@@ -1255,36 +1340,69 @@ export class BudgetManager {
         if (fieldName === 'currency') {
           const currency = inputEl.value;
           const row = inputEl.closest('tr');
+          const amountInput = row?.querySelector('.amount-input') as HTMLInputElement;
           const usdInput = row?.querySelector('.usd-input') as HTMLInputElement;
+          const currencySymbol = row?.querySelector('.currency-symbol') as HTMLElement;
+
+          if (currencySymbol) {
+            currencySymbol.textContent = this.getCurrencySymbol(currency);
+          }
 
           if (currency === 'USD') {
             // Disable USD input and sync with amount
-            if (usdInput) {
+            if (usdInput && amountInput) {
               usdInput.disabled = true;
-              const amountInput = row?.querySelector('.amount-input') as HTMLInputElement;
-              if (amountInput) {
-                usdInput.value = amountInput.value;
-                editedCost.amount_usd = parseFloat(amountInput.value) || 0;
-              }
+              usdInput.value = amountInput.value;
+              editedCost.amount_usd = parseFloat(amountInput.value) || 0;
             }
           } else {
-            // Enable USD input
-            if (usdInput) {
+            // Enable USD input and auto-convert
+            if (usdInput && amountInput) {
               usdInput.disabled = false;
+              const amount = parseFloat(amountInput.value) || 0;
+              const convertedUsd = this.convertCurrency(amount, currency, 'USD');
+              usdInput.value = Math.round(convertedUsd).toString();
+              editedCost.amount_usd = Math.round(convertedUsd);
+            }
+          }
+
+          // Re-render to show exchange rate
+          this.render();
+          return;
+        }
+
+        // If amount changes, auto-convert to USD
+        if (fieldName === 'amount') {
+          const row = inputEl.closest('tr');
+          const currencySelect = row?.querySelector('.currency-select') as HTMLSelectElement;
+          const usdInput = row?.querySelector('.usd-input') as HTMLInputElement;
+          const currency = currencySelect?.value || 'USD';
+          const amount = parseFloat(inputEl.value) || 0;
+
+          if (usdInput) {
+            if (currency === 'USD') {
+              usdInput.value = inputEl.value;
+              editedCost.amount_usd = amount;
+            } else {
+              const convertedUsd = this.convertCurrency(amount, currency, 'USD');
+              usdInput.value = Math.round(convertedUsd).toString();
+              editedCost.amount_usd = Math.round(convertedUsd);
             }
           }
         }
 
-        // If amount changes and currency is USD, sync amount_usd
-        if (fieldName === 'amount') {
+        // If USD amount changes, reverse calculate original currency amount
+        if (fieldName === 'amount_usd') {
           const row = inputEl.closest('tr');
           const currencySelect = row?.querySelector('.currency-select') as HTMLSelectElement;
-          if (currencySelect?.value === 'USD') {
-            const usdInput = row?.querySelector('.usd-input') as HTMLInputElement;
-            if (usdInput) {
-              usdInput.value = inputEl.value;
-              editedCost.amount_usd = parseFloat(inputEl.value) || 0;
-            }
+          const amountInput = row?.querySelector('.amount-input') as HTMLInputElement;
+          const currency = currencySelect?.value || 'USD';
+          const usdAmount = parseFloat(inputEl.value) || 0;
+
+          if (amountInput && currency !== 'USD') {
+            const convertedAmount = this.convertCurrency(usdAmount, 'USD', currency);
+            amountInput.value = Math.round(convertedAmount).toString();
+            editedCost.amount = Math.round(convertedAmount);
           }
         }
 
@@ -2719,6 +2837,34 @@ export const budgetManagerStyles = `
   margin-top: 15px;
   padding-top: 15px;
   border-top: 1px solid #e0e0e0;
+}
+
+/* Currency input with symbol */
+.currency-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.currency-symbol {
+  position: absolute;
+  left: 8px;
+  font-weight: 600;
+  color: #666;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.currency-input-wrapper .cost-field-input {
+  padding-left: 24px;
+}
+
+.exchange-rate-info {
+  font-size: 10px;
+  color: #666;
+  margin-top: 2px;
+  font-style: italic;
+  white-space: nowrap;
 }
 </style>
 `;
