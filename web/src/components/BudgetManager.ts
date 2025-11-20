@@ -47,6 +47,44 @@ export class BudgetManager {
     }
   }
 
+  private getCategoryColor(category: string): string {
+    const colors: Record<string, string> = {
+      'flight': '#3498db',
+      'accommodation': '#e74c3c',
+      'activity': '#9b59b6',
+      'food': '#f39c12',
+      'transport': '#1abc9c',
+      'education': '#2ecc71',
+      'educational_materials': '#27ae60',
+      'educational_activities': '#16a085',
+      'other': '#95a5a6'
+    };
+    return colors[category] || '#95a5a6';
+  }
+
+  private renderCategoryBreakdown(costs: Array<{category?: string, amount?: number, amount_usd?: number}>): string {
+    const categoryTotals: Record<string, number> = {};
+    let total = 0;
+
+    costs.forEach(cost => {
+      const cat = cost.category || 'other';
+      const amount = cost.amount_usd || cost.amount || 0;
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + amount;
+      total += amount;
+    });
+
+    if (total === 0) return '';
+
+    return Object.entries(categoryTotals)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat, amount]) => {
+        const pct = (amount / total) * 100;
+        const color = this.getCategoryColor(cat);
+        return `<div class="cat-breakdown-item" style="background-color: ${color}" title="${cat.replace(/_/g, ' ')}: ${this.formatCurrency(amount)} (${pct.toFixed(0)}%)"></div>`;
+      })
+      .join('');
+  }
+
   private renderNoBudget(): string {
     const totalCosts = (this.tripData.costs || [])
       .reduce((sum, cost) => sum + (cost.amount_usd || cost.amount || 0), 0);
@@ -106,52 +144,34 @@ export class BudgetManager {
 
     return `
       <div class="budget-manager integrated">
-        <div class="budget-header">
-          <h3>💰 Budget Management</h3>
-          <div class="header-actions">
-            <button class="btn-primary" id="save-budget-btn">💾 Save Budget</button>
+        <div class="budget-header-compact">
+          <div class="header-row">
+            <h3>💰 Budget Management</h3>
+            <button class="btn-primary-sm" id="save-budget-btn">💾 Save</button>
           </div>
-        </div>
-
-        <!-- Overall Budget Section -->
-        <div class="budget-edit-section">
-          <h4>Overall Budget</h4>
-          <div class="budget-overview-edit">
-            <div class="form-group-inline">
-              <label for="total-budget">Total Budget</label>
-              <div class="input-with-unit">
-                <input type="number" id="total-budget" value="${currentBudget}" min="0" step="100">
-                <span class="input-unit">USD</span>
-              </div>
+          <div class="budget-overview-compact">
+            <div class="budget-field">
+              <label>Total:</label>
+              <input type="number" id="total-budget" value="${currentBudget}" min="0" step="100">
+              <span>USD</span>
             </div>
-            <div class="form-group-inline">
-              <label for="contingency-pct">Contingency</label>
-              <div class="input-with-unit">
-                <input type="number" id="contingency-pct" value="${this.budget.contingency_pct || 0}" min="0" max="100" step="1">
-                <span class="input-unit">%</span>
-              </div>
+            <div class="budget-field">
+              <label>Contingency:</label>
+              <input type="number" id="contingency-pct" value="${this.budget.contingency_pct || 0}" min="0" max="100" step="1">
+              <span>%</span>
             </div>
-          </div>
-
-          <!-- Budget Status Display -->
-          <div class="budget-status-display">
-            <div class="status-item">
-              <span class="status-label">Total Spent:</span>
-              <span class="status-value ${progressBarClass}">${this.formatCurrency(status.total_spent)}</span>
+            <div class="budget-stat">
+              <span class="stat-label">Estimated:</span>
+              <span class="stat-value ${progressBarClass}">${this.formatCurrency(status.total_spent)} <span class="stat-pct">(${status.percentage_used.toFixed(1)}%)</span></span>
             </div>
-            <div class="status-item">
-              <span class="status-label">Remaining:</span>
-              <span class="status-value ${status.total_remaining < 0 ? 'negative' : 'positive'}">
+            <div class="budget-stat">
+              <span class="stat-label">Remaining:</span>
+              <span class="stat-value ${status.total_remaining < 0 ? 'negative' : 'positive'}">
                 ${this.formatCurrency(status.total_remaining)}
               </span>
             </div>
-            <div class="status-item">
-              <span class="status-label">Used:</span>
-              <span class="status-value">${status.percentage_used.toFixed(1)}%</span>
-            </div>
           </div>
-
-          <div class="budget-progress">
+          <div class="budget-progress-compact">
             <div class="progress-bar ${progressBarClass}">
               <div class="progress-fill" style="width: ${progressWidth}%"></div>
             </div>
@@ -168,6 +188,134 @@ export class BudgetManager {
                 <span class="alert-message">${alert.message}</span>
               </div>
             `).join('')}
+          </div>
+        ` : ''}
+
+        <!-- Budget by Country -->
+        ${countries.size > 0 ? `
+          <div class="budget-edit-section">
+            <div class="section-header">
+              <h4>🌍 Budget by Country</h4>
+              <div class="mode-controls">
+                <span class="mode-indicator" id="country-mode-indicator">Mode: Dollar Amounts</span>
+                <div class="country-mode-selector">
+                  <button class="mode-btn active" data-mode="dollars" id="country-mode-dollars">$</button>
+                  <button class="mode-btn" data-mode="percent" id="country-mode-percent">%</button>
+                  <button class="mode-btn" data-mode="perday" id="country-mode-perday">$/day</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Group note for countries -->
+            <div class="group-note-section">
+              <label class="note-label">📝 Country Budget Notes:</label>
+              <textarea class="group-note-input"
+                        id="country-group-note"
+                        placeholder="Add notes about country budgeting strategy..."
+                        rows="2">${this.budget?.country_group_note || ''}</textarea>
+            </div>
+
+            <!-- Always-visible budget summary for countries -->
+            <div class="budget-summary-box">
+              <div class="summary-row">
+                <span class="summary-label">Total Budget:</span>
+                <span class="summary-value" id="country-total-budget">${this.formatCurrency(currentBudget)}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Allocated to Countries:</span>
+                <span class="summary-value" id="country-total-allocated">${this.formatCurrency(
+                  Array.from(countries).reduce((sum, country) => {
+                    return sum + (this.budget?.budgets_by_country?.[country] || 0);
+                  }, 0)
+                )}</span>
+                <span class="summary-percentage" id="country-total-pct">${currentBudget > 0 ?
+                  ((Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Unallocated:</span>
+                <span class="summary-value" id="country-unallocated">${this.formatCurrency(
+                  currentBudget - Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0)
+                )}</span>
+              </div>
+            </div>
+
+            <div id="country-allocation-status" style="display: none;" class="allocation-status">
+              <div class="allocation-info">
+                <strong>Total Allocated:</strong> <span id="country-total-allocated-pct">0</span>%
+              </div>
+              <div id="country-allocation-remainder" class="allocation-remainder"></div>
+            </div>
+
+            <div class="budget-items-edit">
+              ${Array.from(countries).map(country => {
+                const countryDays = (this.tripData.locations || [])
+                  .filter(loc => loc.country === country)
+                  .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
+
+                const countryCostsArray = (this.tripData.costs || [])
+                  .filter(c => {
+                    const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+                    return location?.country === country;
+                  });
+
+                const countryCosts = countryCostsArray.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+                const categoryBreakdown = this.renderCategoryBreakdown(countryCostsArray);
+
+                const countryBudget = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
+                const budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
+                const countryPct = currentBudget > 0 ? (countryBudget / currentBudget * 100) : 0;
+                const pct = status.by_country[country]?.percentage || 0;
+                const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
+                const countryNote = this.budget?.country_notes?.[country] || '';
+
+                return `
+                  <div class="budget-item-edit">
+                    <div class="item-header-row">
+                      <div class="item-label-with-note">
+                        <span class="item-label-text">${country} <span class="days-label">(${countryDays} day${countryDays !== 1 ? 's' : ''})</span></span>
+                        <button class="note-toggle-btn" data-country="${country}" title="${countryNote ? 'Edit Note' : 'Add Note'}">
+                          ${countryNote ? '📝' : '📄'}
+                        </button>
+                        ${countryNote ? `<span class="inline-note">${countryNote}</span>` : ''}
+                      </div>
+                    </div>
+                    <div class="item-input-row">
+                      <div class="input-with-unit">
+                        <input type="number"
+                               class="country-input"
+                               data-country="${country}"
+                               data-days="${countryDays}"
+                               data-dollar-value="${Math.round(countryBudget)}"
+                               value="${Math.round(countryBudget)}"
+                               min="0"
+                               step="10">
+                        <span class="input-unit" data-country="${country}">USD</span>
+                      </div>
+                      <span class="calc-arrow">→</span>
+                      <div class="calculated-display">
+                        <span class="calc-value" data-country="${country}">${countryPct.toFixed(1)}%</span>
+                      </div>
+                      <div class="item-status">
+                        <span class="country-per-day-display" data-country="${country}">$${Math.round(budgetPerDay)}/day</span>
+                        <div class="est-cost-with-breakdown">
+                          <span class="current-spend">Est: ${this.formatCurrency(countryCosts)}</span>
+                          ${categoryBreakdown ? `<div class="cat-breakdown-bar">${categoryBreakdown}</div>` : ''}
+                        </div>
+                        <div class="mini-progress-bar ${barClass}">
+                          <div class="mini-progress-fill" style="width: ${Math.min(pct, 100)}%"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="item-note-section" data-country="${country}" style="display: none">
+                      <textarea class="item-note-input"
+                                data-country="${country}"
+                                placeholder="Add notes about this country budget..."
+                                rows="2">${countryNote}</textarea>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
           </div>
         ` : ''}
 
@@ -198,7 +346,7 @@ export class BudgetManager {
           <div class="budget-summary-box">
             <div class="summary-row">
               <span class="summary-label">Total Budget:</span>
-              <span class="summary-value">${this.formatCurrency(currentBudget)}</span>
+              <span class="summary-value" id="category-total-budget">${this.formatCurrency(currentBudget)}</span>
             </div>
             <div class="summary-row">
               <span class="summary-label">Allocated to Categories:</span>
@@ -238,11 +386,14 @@ export class BudgetManager {
               const catNote = this.budget?.category_notes?.[cat] || '';
               return `
                 <div class="budget-item-edit">
-                  <div class="item-label">
-                    ${cat.replace(/_/g, ' ')}
-                    <button class="note-toggle-btn" data-category="${cat}" title="Add/Edit Note">
-                      ${catNote ? '📝' : '📄'}
-                    </button>
+                  <div class="item-header-row">
+                    <div class="item-label-with-note">
+                      <span class="item-label-text">${cat.replace(/_/g, ' ')}</span>
+                      <button class="note-toggle-btn" data-category="${cat}" title="${catNote ? 'Edit Note' : 'Add Note'}">
+                        ${catNote ? '📝' : '📄'}
+                      </button>
+                      ${catNote ? `<span class="inline-note">${catNote}</span>` : ''}
+                    </div>
                   </div>
                   <div class="item-input-row">
                     <div class="input-with-unit">
@@ -260,13 +411,13 @@ export class BudgetManager {
                       <span class="calc-value" data-category="${cat}">${catPct.toFixed(1)}%</span>
                     </div>
                     <div class="item-status">
-                      <span class="current-spend">Spent: ${this.formatCurrency(catCosts)}</span>
+                      <span class="current-spend">Est: ${this.formatCurrency(catCosts)}</span>
                       <div class="mini-progress-bar ${barClass}">
                         <div class="mini-progress-fill" style="width: ${Math.min(pct, 100)}%"></div>
                       </div>
                     </div>
                   </div>
-                  <div class="item-note-section" data-category="${cat}" style="display: ${catNote ? 'block' : 'none'}">
+                  <div class="item-note-section" data-category="${cat}" style="display: none">
                     <textarea class="item-note-input"
                               data-category="${cat}"
                               placeholder="Add notes about this category budget..."
@@ -277,126 +428,6 @@ export class BudgetManager {
             }).join('')}
           </div>
         </div>
-
-        <!-- Budget by Country -->
-        ${countries.size > 0 ? `
-          <div class="budget-edit-section">
-            <div class="section-header">
-              <h4>🌍 Budget by Country</h4>
-              <div class="mode-controls">
-                <span class="mode-indicator" id="country-mode-indicator">Mode: Dollar Amounts</span>
-                <div class="country-mode-selector">
-                  <button class="mode-btn active" data-mode="dollars" id="country-mode-dollars">$</button>
-                  <button class="mode-btn" data-mode="percent" id="country-mode-percent">%</button>
-                  <button class="mode-btn" data-mode="perday" id="country-mode-perday">$/day</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Group note for countries -->
-            <div class="group-note-section">
-              <label class="note-label">📝 Country Budget Notes:</label>
-              <textarea class="group-note-input"
-                        id="country-group-note"
-                        placeholder="Add notes about country budgeting strategy..."
-                        rows="2">${this.budget?.country_group_note || ''}</textarea>
-            </div>
-
-            <!-- Always-visible budget summary for countries -->
-            <div class="budget-summary-box">
-              <div class="summary-row">
-                <span class="summary-label">Total Budget:</span>
-                <span class="summary-value">${this.formatCurrency(currentBudget)}</span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Allocated to Countries:</span>
-                <span class="summary-value" id="country-total-allocated">${this.formatCurrency(
-                  Array.from(countries).reduce((sum, country) => {
-                    return sum + (this.budget?.budgets_by_country?.[country] || 0);
-                  }, 0)
-                )}</span>
-                <span class="summary-percentage" id="country-total-pct">${currentBudget > 0 ?
-                  ((Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Unallocated:</span>
-                <span class="summary-value" id="country-unallocated">${this.formatCurrency(
-                  currentBudget - Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0)
-                )}</span>
-              </div>
-            </div>
-
-            <div id="country-allocation-status" style="display: none;" class="allocation-status">
-              <div class="allocation-info">
-                <strong>Total Allocated:</strong> <span id="country-total-allocated-pct">0</span>%
-              </div>
-              <div id="country-allocation-remainder" class="allocation-remainder"></div>
-            </div>
-
-            <div class="budget-items-edit">
-              ${Array.from(countries).map(country => {
-                const countryDays = (this.tripData.locations || [])
-                  .filter(loc => loc.country === country)
-                  .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
-
-                const countryCosts = (this.tripData.costs || [])
-                  .filter(c => {
-                    const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
-                    return location?.country === country;
-                  })
-                  .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
-
-                const countryBudget = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
-                const budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
-                const countryPct = currentBudget > 0 ? (countryBudget / currentBudget * 100) : 0;
-                const pct = status.by_country[country]?.percentage || 0;
-                const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
-                const countryNote = this.budget?.country_notes?.[country] || '';
-
-                return `
-                  <div class="budget-item-edit">
-                    <div class="item-label">
-                      ${country} <span class="days-label">(${countryDays} day${countryDays !== 1 ? 's' : ''})</span>
-                      <button class="note-toggle-btn" data-country="${country}" title="Add/Edit Note">
-                        ${countryNote ? '📝' : '📄'}
-                      </button>
-                    </div>
-                    <div class="item-input-row">
-                      <div class="input-with-unit">
-                        <input type="number"
-                               class="country-input"
-                               data-country="${country}"
-                               data-days="${countryDays}"
-                               data-dollar-value="${Math.round(countryBudget)}"
-                               value="${Math.round(countryBudget)}"
-                               min="0"
-                               step="10">
-                        <span class="input-unit" data-country="${country}">USD</span>
-                      </div>
-                      <span class="calc-arrow">→</span>
-                      <div class="calculated-display">
-                        <span class="calc-value" data-country="${country}">${countryPct.toFixed(1)}%</span>
-                      </div>
-                      <div class="item-status">
-                        <span class="country-per-day-display" data-country="${country}">$${Math.round(budgetPerDay)}/day</span>
-                        <span class="current-spend">Spent: ${this.formatCurrency(countryCosts)}</span>
-                        <div class="mini-progress-bar ${barClass}">
-                          <div class="mini-progress-fill" style="width: ${Math.min(pct, 100)}%"></div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="item-note-section" data-country="${country}" style="display: ${countryNote ? 'block' : 'none'}">
-                      <textarea class="item-note-input"
-                                data-country="${country}"
-                                placeholder="Add notes about this country budget..."
-                                rows="2">${countryNote}</textarea>
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        ` : ''}
 
         <div class="budget-footer">
           <button class="btn-primary" id="save-budget-btn-footer">💾 Save Budget</button>
@@ -456,9 +487,15 @@ export class BudgetManager {
         totalAllocated += dollarValue;
       });
 
+      const categoryTotalBudgetEl = this.container.querySelector('#category-total-budget') as HTMLElement;
       const categoryTotalEl = this.container.querySelector('#category-total-allocated') as HTMLElement;
       const categoryPctEl = this.container.querySelector('#category-total-pct') as HTMLElement;
       const categoryUnallocatedEl = this.container.querySelector('#category-unallocated') as HTMLElement;
+
+      // Update total budget display
+      if (categoryTotalBudgetEl) {
+        categoryTotalBudgetEl.textContent = `$${Math.round(totalBudget).toLocaleString()}`;
+      }
 
       if (categoryTotalEl) {
         categoryTotalEl.textContent = `$${totalAllocated.toLocaleString()}`;
@@ -608,9 +645,15 @@ export class BudgetManager {
         totalAllocated += dollarValue;
       });
 
+      const countryTotalBudgetEl = this.container.querySelector('#country-total-budget') as HTMLElement;
       const countryTotalEl = this.container.querySelector('#country-total-allocated') as HTMLElement;
       const countryPctEl = this.container.querySelector('#country-total-pct') as HTMLElement;
       const countryUnallocatedEl = this.container.querySelector('#country-unallocated') as HTMLElement;
+
+      // Update total budget display
+      if (countryTotalBudgetEl) {
+        countryTotalBudgetEl.textContent = `$${Math.round(totalBudget).toLocaleString()}`;
+      }
 
       if (countryTotalEl) {
         countryTotalEl.textContent = `$${totalAllocated.toLocaleString()}`;
@@ -906,6 +949,117 @@ export const budgetManagerStyles = `
 .budget-subtitle {
   color: #666;
   margin: 5px 0 0 0;
+}
+
+/* Compact header styles */
+.budget-header-compact {
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.header-row h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.btn-primary-sm {
+  padding: 6px 16px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary-sm:hover {
+  background: #0056b3;
+}
+
+.budget-overview-compact {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.budget-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.budget-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+
+.budget-field input {
+  width: 90px;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.budget-field span {
+  font-size: 12px;
+  color: #666;
+}
+
+.budget-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+}
+
+.stat-value.positive {
+  color: #28a745;
+}
+
+.stat-value.negative {
+  color: #dc3545;
+}
+
+.stat-pct {
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  margin-left: 4px;
+}
+
+.budget-progress-compact {
+  margin-top: 8px;
+}
+
+.budget-progress-compact .progress-bar {
+  height: 6px;
+  border-radius: 3px;
 }
 
 .btn-icon {
@@ -1360,6 +1514,34 @@ export const budgetManagerStyles = `
   color: #333;
 }
 
+.item-header-row {
+  margin-bottom: 10px;
+}
+
+.item-label-with-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.item-label-text {
+  font-weight: 600;
+  color: #333;
+}
+
+.inline-note {
+  flex: 1;
+  color: #666;
+  font-size: 13px;
+  font-style: italic;
+  padding: 4px 8px;
+  background: #fffbf0;
+  border-radius: 4px;
+  border: 1px solid #ffe4a3;
+  min-width: 200px;
+}
+
 .days-label {
   font-weight: normal;
   color: #666;
@@ -1608,6 +1790,32 @@ export const budgetManagerStyles = `
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+/* Category breakdown visualization */
+.est-cost-with-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cat-breakdown-bar {
+  display: flex;
+  height: 8px;
+  gap: 1px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.cat-breakdown-item {
+  flex: 1;
+  min-width: 3px;
+  transition: transform 0.2s;
+}
+
+.cat-breakdown-item:hover {
+  transform: scaleY(1.5);
+  cursor: help;
 }
 </style>
 `;
