@@ -201,6 +201,7 @@ export interface TripData {
   locations: TripLocation[];
   legs: TripLeg[];
   costs: TripCost[];
+  transport_segments?: TransportSegment[];  // Inter-destination transport
   countryNotes?: Record<string, string>;
   budget?: TripBudget;
   num_travelers?: number;  // Number of travelers (default: 1)
@@ -224,11 +225,53 @@ export interface TripScenarioVersion {
 }
 
 export interface TransportSegment {
-  mode: string;
+  id?: string;
+  from_destination_id?: string | number;
+  from_destination_name?: string;
+  to_destination_id?: string | number;
+  to_destination_name?: string;
+  transport_mode?: string;
+  transport_mode_icon?: string;
+  distance_km?: number;
+  duration_hours?: number;
+
+  // Cost fields (prioritized: actual > researched_mid > estimated)
+  estimated_cost_usd?: number;
+  researched_cost_low?: number;
+  researched_cost_mid?: number;
+  researched_cost_high?: number;
+  actual_cost_usd?: number;
+  currency_local?: string;
+  amount_local?: number;
+
+  // Booking and research metadata
+  booking_status?: 'estimated' | 'researched' | 'booked' | 'paid' | 'completed';
+  research_sources?: string[];
+  research_notes?: string;
+  researched_at?: string;
+  confidence_level?: 'high' | 'medium' | 'low';
+
+  // Flight-specific details
+  researched_airlines?: string[];
+  researched_duration_hours?: number;
+  researched_stops?: number;
+  alternatives?: any[];
+  researched_alternatives?: any[];
+
+  // Additional fields
+  auto_updated?: boolean;
+  booking_link?: string;
+  booking_reference?: string;
+  notes?: string;
+  num_travelers?: number;
+  created_at?: string;
+  updated_at?: string;
+
+  // Legacy fields
+  mode?: string;
   cost?: number;
   researched_low?: number;
   researched_high?: number;
   vendor_name?: string;
   vendor_url?: string;
-  notes?: string;
 }

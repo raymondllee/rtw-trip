@@ -22,6 +22,7 @@ export class BudgetManager {
   private budgetAutoSaveTimer: number | null = null;
   private tripDataAutoSaveTimer: number | null = null;
   private savingCosts: Set<string> = new Set();
+  private transportSegments: any[] = [];
 
   constructor(
     container: HTMLElement,
@@ -303,6 +304,143 @@ export class BudgetManager {
     }
   }
 
+  /**
+   * Trigger AI research for a transport segment
+   */
+  private async researchTransportSegment(segmentId: string): Promise<void> {
+    try {
+      const segment = this.transportSegments.find(s => s.id === segmentId);
+      if (!segment) {
+        throw new Error('Transport segment not found');
+      }
+
+      // Show loading indicator
+      const btn = this.container.querySelector(`[data-segment-id="${segmentId}"]`) as HTMLButtonElement;
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '🔄 Researching...';
+      }
+
+      // Get API configuration
+      const config = getRuntimeConfig();
+      const apiBaseUrl = config.apiBaseUrl || 'http://localhost:5001';
+
+      // Get scenario ID from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const scenarioId = urlParams.get('scenario');
+      if (!scenarioId) {
+        throw new Error('No scenario ID found in URL');
+      }
+
+      // Call the transport research API
+      const response = await fetch(`${apiBaseUrl}/api/transport/research`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segment_id: segmentId,
+          scenario_id: scenarioId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Research failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      // Update segment with research results
+      if (result.researched_cost_mid) {
+        Object.assign(segment, {
+          researched_cost_low: result.researched_cost_low,
+          researched_cost_mid: result.researched_cost_mid,
+          researched_cost_high: result.researched_cost_high,
+          researched_airlines: result.researched_airlines,
+          researched_duration_hours: result.researched_duration_hours,
+          researched_stops: result.researched_stops,
+          researched_alternatives: result.alternatives,
+          booking_status: 'researched',
+          researched_at: new Date().toISOString()
+        });
+      }
+
+      // Re-render to show updated costs
+      this.render();
+
+      // Show success message
+      alert(`✅ Research complete! Found flights for ${this.formatCurrency(result.researched_cost_mid)}`);
+
+    } catch (error) {
+      console.error('Error researching transport segment:', error);
+      alert(`❌ Research failed: ${error.message}`);
+
+      // Re-enable button
+      const btn = this.container.querySelector(`[data-segment-id="${segmentId}"]`) as HTMLButtonElement;
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🤖 Research';
+      }
+    }
+  }
+
+  /**
+   * Load transport segments from tripData or API
+   */
+  private loadTransportSegments(): void {
+    // First check if transport_segments are already in tripData
+    if (this.tripData.transport_segments && this.tripData.transport_segments.length > 0) {
+      this.transportSegments = this.tripData.transport_segments;
+      console.log(`✅ Loaded ${this.transportSegments.length} transport segments from tripData`);
+      return;
+    }
+
+    // Otherwise, use the global transport segment manager if available
+    if (window.transportSegmentManager && window.transportSegmentManager.segments) {
+      this.transportSegments = window.transportSegmentManager.segments;
+      console.log(`✅ Loaded ${this.transportSegments.length} transport segments from manager`);
+    } else {
+      this.transportSegments = [];
+      console.log('ℹ️ No transport segments found');
+    }
+  }
+
+  /**
+   * Get the active cost for a transport segment (actual > researched_mid > estimated)
+   */
+  private getSegmentActiveCost(segment: any): number {
+    if (segment.actual_cost_usd && segment.actual_cost_usd > 0) {
+      return segment.actual_cost_usd;
+    }
+    if (segment.researched_cost_mid && segment.researched_cost_mid > 0) {
+      return segment.researched_cost_mid;
+    }
+    return segment.estimated_cost_usd || 0;
+  }
+
+  /**
+   * Calculate total transport costs
+   */
+  private calculateTransportTotal(): number {
+    return this.transportSegments.reduce((total, segment) => {
+      return total + this.getSegmentActiveCost(segment);
+    }, 0);
+  }
+
+  /**
+   * Get status badge for a transport segment
+   */
+  private getSegmentStatusBadge(segment: any): string {
+    const badges: Record<string, any> = {
+      'estimated': { color: '#999', text: 'Est', title: 'Estimated cost' },
+      'researched': { color: '#3498db', text: 'Researched', title: 'AI researched cost' },
+      'booked': { color: '#27ae60', text: 'Booked', title: 'Booked and confirmed' },
+      'paid': { color: '#27ae60', text: 'Paid', title: 'Paid in full' },
+      'completed': { color: '#27ae60', text: 'Completed', title: 'Travel completed' }
+    };
+
+    const badge = badges[segment.booking_status || 'estimated'] || badges['estimated'];
+    return `<span class="confidence-badge" style="background: ${badge.color}" title="${badge.title}">${badge.text}</span>`;
+  }
+
   private async generateCostsForCountry(country: string, destinationIds: string[]): Promise<any[]> {
     // Get destinations for this country
     const destinations = destinationIds
@@ -315,7 +453,7 @@ export class BudgetManager {
 
     // Get API configuration
     const config = getRuntimeConfig();
-    const apiBaseUrl = config.endpoints.api || 'http://localhost:5001';
+    const apiBaseUrl = config.apiBaseUrl || 'http://localhost:5001';
 
     // Get scenario ID from URL params
     const urlParams = new URLSearchParams(window.location.search);
@@ -1335,14 +1473,120 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     `;
   }
 
+  /**
+   * Render the transport costs section
+   */
+  private renderTransportSection(): string {
+    if (this.transportSegments.length === 0) {
+      return '';
+    }
+
+    const transportTotal = this.calculateTransportTotal();
+    const currentBudget = this.budget?.total_budget_usd || 0;
+    const transportPct = currentBudget > 0 ? (transportTotal / currentBudget * 100) : 0;
+
+    return `
+      <div class="budget-edit-section transport-section">
+        <div class="section-header">
+          <h4>✈️ Inter-Country Transport</h4>
+          <div class="transport-summary">
+            <span class="transport-total">Total: ${this.formatCurrency(transportTotal)}</span>
+            ${currentBudget > 0 ? `<span class="transport-pct">(${transportPct.toFixed(1)}% of budget)</span>` : ''}
+          </div>
+        </div>
+
+        <div class="transport-segments-list">
+          ${this.transportSegments.map(segment => {
+            const activeCost = this.getSegmentActiveCost(segment);
+            const icon = segment.transport_mode_icon || '✈️';
+            const fromName = segment.from_destination_name || 'Unknown';
+            const toName = segment.to_destination_name || 'Unknown';
+            const distance = segment.distance_km ? `${Math.round(segment.distance_km)} km` : '';
+            const duration = segment.duration_hours || segment.researched_duration_hours;
+            const durationStr = duration ? `${duration}h` : '';
+            const airlines = segment.researched_airlines && segment.researched_airlines.length > 0
+              ? segment.researched_airlines.join(', ')
+              : '';
+            const statusBadge = this.getSegmentStatusBadge(segment);
+            const researchedDate = segment.researched_at
+              ? new Date(segment.researched_at).toLocaleDateString()
+              : '';
+            const alternatives = segment.alternatives || segment.researched_alternatives;
+            const hasAlternatives = alternatives && alternatives.length > 0;
+
+            // Check if research is old (>30 days)
+            let researchAge = '';
+            if (segment.researched_at) {
+              const ageInDays = Math.floor((Date.now() - new Date(segment.researched_at).getTime()) / (1000 * 60 * 60 * 24));
+              if (ageInDays > 30) {
+                researchAge = `<span class="research-old" title="Research is ${ageInDays} days old">⚠️ Old</span>`;
+              } else if (ageInDays > 7) {
+                researchAge = `<span class="research-aging" title="Research is ${ageInDays} days old">⏰</span>`;
+              }
+            }
+
+            return `
+              <div class="transport-segment-item">
+                <div class="segment-header">
+                  <div class="segment-route">
+                    <span class="segment-icon">${icon}</span>
+                    <span class="segment-from">${fromName}</span>
+                    <span class="segment-arrow">→</span>
+                    <span class="segment-to">${toName}</span>
+                    ${distance ? `<span class="segment-distance">${distance}</span>` : ''}
+                    ${durationStr ? `<span class="segment-duration">${durationStr}</span>` : ''}
+                  </div>
+                  <div class="segment-actions">
+                    <button class="btn-xs btn-primary transport-research-btn"
+                            data-segment-id="${segment.id}"
+                            title="Research cost with AI">
+                      🤖 Research
+                    </button>
+                  </div>
+                </div>
+                <div class="segment-details">
+                  <div class="segment-cost">
+                    <span class="cost-value">${this.formatCurrency(activeCost)}</span>
+                    ${statusBadge}
+                    ${researchAge}
+                  </div>
+                  ${airlines ? `<div class="segment-airlines">✈️ ${airlines}</div>` : ''}
+                  ${segment.researched_cost_low && segment.researched_cost_high ? `
+                    <div class="segment-range">
+                      Range: ${this.formatCurrency(segment.researched_cost_low)} - ${this.formatCurrency(segment.researched_cost_high)}
+                    </div>
+                  ` : ''}
+                  ${hasAlternatives ? `
+                    <div class="segment-alternatives">
+                      <span class="alternatives-badge">💡 ${alternatives.length} alternative${alternatives.length > 1 ? 's' : ''} found</span>
+                    </div>
+                  ` : ''}
+                  ${segment.notes ? `<div class="segment-notes">📝 ${segment.notes}</div>` : ''}
+                  ${researchedDate ? `<div class="segment-researched">Last researched: ${researchedDate}</div>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
   private renderBudgetStatus(): string {
     if (!this.budget) return this.renderNoBudget();
 
     const status = calculateBudgetStatus(this.budget, this.tripData);
-    const progressBarClass = status.percentage_used > 100 ? 'over-budget' :
-                            status.percentage_used > 90 ? 'warning' :
-                            status.percentage_used > 80 ? 'caution' : '';
-    const progressWidth = Math.min(status.percentage_used, 100);
+
+    // Add transport costs to the total spent
+    const transportTotal = this.calculateTransportTotal();
+    const totalSpentWithTransport = status.total_spent + transportTotal;
+    const totalRemainingWithTransport = status.total_budget - totalSpentWithTransport;
+    const percentageUsedWithTransport = (totalSpentWithTransport / status.total_budget) * 100;
+
+    const progressBarClass = percentageUsedWithTransport > 100 ? 'over-budget' :
+                            percentageUsedWithTransport > 90 ? 'warning' :
+                            percentageUsedWithTransport > 80 ? 'caution' : '';
+    const progressWidth = Math.min(percentageUsedWithTransport, 100);
 
     // Get all categories and countries from trip data
     const categories = new Set<string>();
@@ -1387,12 +1631,13 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             </div>
             <div class="budget-stat">
               <span class="stat-label">Estimated:</span>
-              <span class="stat-value ${progressBarClass}">${this.formatCurrency(status.total_spent)} <span class="stat-pct">(${status.percentage_used.toFixed(1)}%)</span></span>
+              <span class="stat-value ${progressBarClass}">${this.formatCurrency(totalSpentWithTransport)} <span class="stat-pct">(${percentageUsedWithTransport.toFixed(1)}%)</span></span>
+              ${transportTotal > 0 ? `<div class="stat-breakdown">In-country: ${this.formatCurrency(status.total_spent)} | Transport: ${this.formatCurrency(transportTotal)}</div>` : ''}
             </div>
             <div class="budget-stat">
               <span class="stat-label">Remaining:</span>
-              <span class="stat-value ${status.total_remaining < 0 ? 'negative' : 'positive'}">
-                ${this.formatCurrency(status.total_remaining)}
+              <span class="stat-value ${totalRemainingWithTransport < 0 ? 'negative' : 'positive'}">
+                ${this.formatCurrency(totalRemainingWithTransport)}
               </span>
             </div>
           </div>
@@ -1418,6 +1663,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             `).join('')}
           </div>
         ` : ''}
+
+        <!-- Inter-Country Transport -->
+        ${this.renderTransportSection()}
 
         <!-- Budget by Country -->
         ${countries.size > 0 ? `
@@ -1766,6 +2014,17 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     accommodationSelect?.addEventListener('change', () => {
       this.tripData.accommodation_preference = accommodationSelect.value as any;
       this.scheduleTripDataAutoSave();
+    });
+
+    // Transport research buttons
+    this.container.querySelectorAll('.transport-research-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const target = e.target as HTMLButtonElement;
+        const segmentId = target.dataset.segmentId;
+        if (segmentId) {
+          await this.researchTransportSegment(segmentId);
+        }
+      });
     });
 
     // If budget exists, attach integrated edit listeners
@@ -3031,6 +3290,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
   }
 
   render() {
+    // Load transport segments before rendering
+    this.loadTransportSegments();
+
     const html = this.renderBudgetStatus();
     this.container.innerHTML = html;
     this.container.style.display = 'block';
@@ -4695,5 +4957,185 @@ textarea.auto-resize {
   color: #666;
   margin-left: 6px;
 }
+/* Transport section styles */
+.transport-section {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  border-top: 2px solid #e9ecef;
+  padding-top: 20px;
+}
+
+.transport-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.transport-section .section-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.transport-summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.transport-total {
+  font-weight: 700;
+  color: #007bff;
+}
+
+.transport-pct {
+  color: #666;
+  font-size: 13px;
+}
+
+.transport-segments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.transport-segment-item {
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 12px;
+  border: 1px solid #dee2e6;
+}
+
+.segment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.segment-route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.segment-icon {
+  font-size: 18px;
+}
+
+.segment-from,
+.segment-to {
+  font-weight: 600;
+  color: #333;
+}
+
+.segment-arrow {
+  color: #999;
+  font-weight: 400;
+}
+
+.segment-distance,
+.segment-duration {
+  color: #666;
+  font-size: 12px;
+  padding: 2px 6px;
+  background: white;
+  border-radius: 3px;
+  border: 1px solid #dee2e6;
+}
+
+.segment-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.segment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.segment-cost {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.segment-cost .cost-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #007bff;
+}
+
+.segment-airlines {
+  color: #666;
+  font-size: 12px;
+}
+
+.segment-range {
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.segment-alternatives {
+  margin-top: 4px;
+}
+
+.alternatives-badge {
+  background: #ffc107;
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.segment-notes {
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.segment-researched {
+  color: #999;
+  font-size: 11px;
+}
+
+.research-old {
+  background: #ffc107;
+  color: #000;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.research-aging {
+  font-size: 14px;
+}
+
+.confidence-badge {
+  color: white;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.stat-breakdown {
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+}
+
 </style>
 `;
