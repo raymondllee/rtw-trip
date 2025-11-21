@@ -57,6 +57,68 @@ def get_transport_icon(transport_mode: str) -> str:
     return icons.get(transport_mode, '✈️')
 
 
+def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate distance between two coordinates using Haversine formula."""
+    import math
+    R = 6371  # Earth's radius in km
+
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+
+    a = math.sin(delta_lat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+
+    return R * c
+
+
+def get_transport_mode_for_distance(distance_km: float, same_country: bool = True) -> str:
+    """Determine appropriate transport mode based on distance."""
+    if distance_km > 1000:
+        return 'plane'
+    elif distance_km > 500:
+        return 'plane' if not same_country else 'train'
+    elif distance_km > 100:
+        return 'train'
+    elif distance_km > 20:
+        return 'car'
+    else:
+        return 'walking'
+
+
+def estimate_transport_cost(distance_km: float, transport_mode: str, num_travelers: int = 3) -> float:
+    """Estimate transport cost based on distance and mode. Returns total for all travelers."""
+    cost_per_person = 0
+
+    if transport_mode == 'plane':
+        # Flight costs based on distance tiers
+        if distance_km < 500:
+            cost_per_person = 150
+        elif distance_km < 1500:
+            cost_per_person = 300
+        elif distance_km < 4000:
+            cost_per_person = 500
+        elif distance_km < 8000:
+            cost_per_person = 800
+        else:
+            cost_per_person = 1200
+    elif transport_mode == 'train':
+        cost_per_person = max(50, distance_km * 0.15)
+    elif transport_mode == 'bus':
+        cost_per_person = max(20, distance_km * 0.08)
+    elif transport_mode == 'car':
+        cost_per_person = max(30, distance_km * 0.12)
+    elif transport_mode == 'ferry':
+        cost_per_person = max(25, distance_km * 0.20)
+    elif transport_mode == 'walking':
+        cost_per_person = 0
+    else:
+        cost_per_person = max(50, distance_km * 0.10)
+
+    return round(cost_per_person * num_travelers, 2)
+
+
 class SessionStore:
     """Session and cost tracker persistence with Firestore fallback."""
 
@@ -3427,20 +3489,60 @@ def sync_transport_segments():
 
             # Use existing segment if found, otherwise create new
             if key in segment_map:
-                new_segments.append(segment_map[key])
+                existing_seg = segment_map[key]
+                # Update estimates if segment has no researched cost and (no estimate or force_recalculate)
+                force_recalculate = data.get('force_recalculate', False)
+                needs_estimate = (
+                    not existing_seg.get('researched_cost_mid') and
+                    (force_recalculate or not existing_seg.get('estimated_cost_usd') or existing_seg.get('estimated_cost_usd') == 0)
+                )
+                if needs_estimate:
+                    from_coords = from_loc.get('coordinates', {})
+                    to_coords = to_loc.get('coordinates', {})
+                    if from_coords and to_coords:
+                        distance = calculate_distance_km(
+                            from_coords.get('lat', 0), from_coords.get('lng', 0),
+                            to_coords.get('lat', 0), to_coords.get('lng', 0)
+                        )
+                        same_country = from_loc.get('country') == to_loc.get('country')
+                        mode = get_transport_mode_for_distance(distance, same_country)
+                        existing_seg['distance_km'] = round(distance, 1)
+                        existing_seg['transport_mode'] = mode
+                        existing_seg['transport_mode_icon'] = get_transport_icon(mode)
+                        existing_seg['estimated_cost_usd'] = estimate_transport_cost(distance, mode, 3)
+                new_segments.append(existing_seg)
             else:
-                # Create new segment with estimated cost
+                # Calculate distance and estimate cost for new segment
+                from_coords = from_loc.get('coordinates', {})
+                to_coords = to_loc.get('coordinates', {})
+                distance_km = 0
+                transport_mode = 'plane'
+                estimated_cost = 0
+
+                if from_coords and to_coords:
+                    from_lat = from_coords.get('lat', 0)
+                    from_lng = from_coords.get('lng', 0)
+                    to_lat = to_coords.get('lat', 0)
+                    to_lng = to_coords.get('lng', 0)
+
+                    if from_lat and from_lng and to_lat and to_lng:
+                        distance_km = round(calculate_distance_km(from_lat, from_lng, to_lat, to_lng), 1)
+                        same_country = from_loc.get('country') == to_loc.get('country')
+                        transport_mode = get_transport_mode_for_distance(distance_km, same_country)
+                        estimated_cost = estimate_transport_cost(distance_km, transport_mode, 3)
+
+                # Create new segment with calculated estimates
                 new_segment = {
                     'id': str(uuid.uuid4()),
                     'from_destination_id': from_loc.get('id'),
                     'from_destination_name': from_loc.get('name', ''),
                     'to_destination_id': to_loc.get('id'),
                     'to_destination_name': to_loc.get('name', ''),
-                    'transport_mode': 'plane',  # Default
-                    'transport_mode_icon': '✈️',
-                    'distance_km': 0,  # Will be calculated on frontend
+                    'transport_mode': transport_mode,
+                    'transport_mode_icon': get_transport_icon(transport_mode),
+                    'distance_km': distance_km,
                     'duration_hours': None,
-                    'estimated_cost_usd': 0,  # Will be calculated on frontend
+                    'estimated_cost_usd': estimated_cost,
                     'booking_status': 'estimated',
                     'confidence_level': 'low',
                     'research_sources': [],
@@ -3766,7 +3868,7 @@ def update_transport_research():
                 segment['researched_alternatives'] = research_data.get('alternatives', [])
                 segment['research_sources'] = research_data.get('sources', [])
                 segment['research_notes'] = research_data.get('booking_tips', '')
-                segment['researched_at'] = research_data.get('researched_at', datetime.utcnow().isoformat())
+                segment['researched_at'] = datetime.utcnow().isoformat()  # Always use current time, not AI's date
                 segment['booking_status'] = 'researched'
                 segment['confidence_level'] = research_data.get('confidence', 'medium')
                 segment['auto_updated'] = True

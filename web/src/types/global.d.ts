@@ -17,6 +17,13 @@ declare global {
       CHAT_ENDPOINT?: string;
       ITINERARY_CHANGES_ENDPOINT?: string;
     };
+    transportSegmentManager?: {
+      segments: any[];
+      loadSegments: (scenarioId: string) => Promise<any[]>;
+      syncSegments: (scenarioId: string, locations: any[]) => Promise<any>;
+      getActiveCost: (segment: any) => number;
+      getTotalCost: () => number;
+    };
   }
 }
 
