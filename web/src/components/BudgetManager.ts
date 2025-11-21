@@ -364,7 +364,7 @@ export class BudgetManager {
       }
 
       // Re-render to show updated costs
-      this.render();
+      await this.render();
 
       // Show success message
       alert(`✅ Research complete! Found flights for ${this.formatCurrency(result.researched_cost_mid)}`);
@@ -383,9 +383,9 @@ export class BudgetManager {
   }
 
   /**
-   * Load transport segments from tripData or API
+   * Load and auto-sync transport segments from tripData or API
    */
-  private loadTransportSegments(): void {
+  private async loadTransportSegments(): Promise<void> {
     // First check if transport_segments are already in tripData
     if (this.tripData.transport_segments && this.tripData.transport_segments.length > 0) {
       this.transportSegments = this.tripData.transport_segments;
@@ -393,13 +393,53 @@ export class BudgetManager {
       return;
     }
 
-    // Otherwise, use the global transport segment manager if available
-    if (window.transportSegmentManager && window.transportSegmentManager.segments) {
-      this.transportSegments = window.transportSegmentManager.segments;
-      console.log(`✅ Loaded ${this.transportSegments.length} transport segments from manager`);
-    } else {
+    // Otherwise, try to sync from API or use the global transport segment manager
+    try {
+      // Get scenario ID from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const scenarioId = urlParams.get('scenario');
+
+      if (scenarioId && this.tripData.locations && this.tripData.locations.length > 1) {
+        console.log(`🔄 Auto-syncing transport segments for scenario ${scenarioId}...`);
+
+        // Use the global transport segment manager if available
+        if (window.transportSegmentManager && window.transportSegmentManager.syncSegments) {
+          const result = await window.transportSegmentManager.syncSegments(scenarioId, this.tripData.locations);
+          this.transportSegments = window.transportSegmentManager.segments || [];
+          console.log(`✅ Auto-synced ${this.transportSegments.length} transport segments (${result.created} created, ${result.kept} kept, ${result.removed} removed)`);
+        } else {
+          // Fallback to direct API call
+          const config = getRuntimeConfig();
+          const apiBaseUrl = config.apiBaseUrl || 'http://localhost:5001';
+
+          const response = await fetch(`${apiBaseUrl}/api/transport-segments/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scenario_id: scenarioId })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            this.transportSegments = data.transport_segments || [];
+            console.log(`✅ Auto-synced ${this.transportSegments.length} transport segments via API (${data.created} created, ${data.kept} kept, ${data.removed} removed)`);
+          } else {
+            console.warn('Failed to sync transport segments via API');
+            this.transportSegments = [];
+          }
+        }
+      } else {
+        // No scenario or not enough locations
+        if (window.transportSegmentManager && window.transportSegmentManager.segments) {
+          this.transportSegments = window.transportSegmentManager.segments;
+          console.log(`✅ Loaded ${this.transportSegments.length} transport segments from manager`);
+        } else {
+          this.transportSegments = [];
+          console.log('ℹ️ No transport segments found (need 2+ destinations to create segments)');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading/syncing transport segments:', error);
       this.transportSegments = [];
-      console.log('ℹ️ No transport segments found');
     }
   }
 
@@ -882,7 +922,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     return `${symbol}${rounded.toLocaleString()}`;
   }
 
-  updateData(tripData: TripData, budget?: TripBudget) {
+  async updateData(tripData: TripData, budget?: TripBudget) {
     // Save the current open/closed state of country sections before re-rendering
     const openCountries = new Set<string>();
     this.container.querySelectorAll('.item-costs-section').forEach(section => {
@@ -897,7 +937,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     if (budget !== undefined) {
       this.budget = budget;
     }
-    this.render();
+    await this.render();
 
     // Restore the open/closed state after rendering
     openCountries.forEach(country => {
@@ -1962,20 +2002,20 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
   private attachEventListeners() {
     // Create budget button
     const createBtn = this.container.querySelector('#create-budget-btn');
-    createBtn?.addEventListener('click', () => {
+    createBtn?.addEventListener('click', async () => {
       const newBudget = createDefaultBudget(this.tripData, 10);
       this.budget = newBudget;
       this.onBudgetUpdate?.(newBudget);
-      this.render();
+      await this.render();
     });
 
     // Custom budget button
     const customBtn = this.container.querySelector('#custom-budget-btn');
-    customBtn?.addEventListener('click', () => {
+    customBtn?.addEventListener('click', async () => {
       const newBudget = createDefaultBudget(this.tripData, 10);
       this.budget = newBudget;
       this.onBudgetUpdate?.(newBudget);
-      this.render();
+      await this.render();
     });
 
     // Auto-save travelers on input change
@@ -2786,7 +2826,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
         // Hide form and re-render
         addSection.style.display = 'none';
-        this.render();
+        await this.render();
       });
     });
 
@@ -3002,7 +3042,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           }
 
           // Refresh the entire budget manager to show new costs
-          this.render();
+          await this.render();
 
           // Automatically open the costs section for this country
           setTimeout(() => {
@@ -3123,7 +3163,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           originalBtn.style.background = '#28a745';
 
           // Refresh the entire budget manager to show new costs
-          this.render();
+          await this.render();
 
           // Reset button after 3 seconds
           setTimeout(() => {
@@ -3214,7 +3254,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           originalBtn.style.background = '#28a745';
 
           // Refresh the entire budget manager to show new costs
-          this.render();
+          await this.render();
 
           // Reset button after 3 seconds
           setTimeout(() => {
@@ -3289,9 +3329,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     });
   }
 
-  render() {
-    // Load transport segments before rendering
-    this.loadTransportSegments();
+  async render() {
+    // Load and auto-sync transport segments before rendering
+    await this.loadTransportSegments();
 
     const html = this.renderBudgetStatus();
     this.container.innerHTML = html;
