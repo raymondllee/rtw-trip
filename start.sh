@@ -23,6 +23,17 @@ PYTHON_BIN="/usr/bin/python3"
 # Set Python path to include the travel-concierge module
 export PYTHONPATH="/app/python/agents:${PYTHONPATH}"
 
+# Setup Google Cloud credentials if GOOGLE_APPLICATION_CREDENTIALS_JSON is set
+if [ ! -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]; then
+    echo "🔑 Setting up Google Cloud credentials..."
+    CREDENTIALS_FILE="/tmp/gcp-credentials.json"
+    echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$CREDENTIALS_FILE"
+    export GOOGLE_APPLICATION_CREDENTIALS="$CREDENTIALS_FILE"
+    echo "✅ Google Cloud credentials configured"
+else
+    echo "⚠️  GOOGLE_APPLICATION_CREDENTIALS_JSON not set - AI features may not work"
+fi
+
 # Start ADK API server in the background
 echo "📡 Starting ADK API server on port 8000..."
 cd /app/python/agents
