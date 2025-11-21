@@ -3868,7 +3868,7 @@ def update_transport_research():
                 segment['researched_alternatives'] = research_data.get('alternatives', [])
                 segment['research_sources'] = research_data.get('sources', [])
                 segment['research_notes'] = research_data.get('booking_tips', '')
-                segment['researched_at'] = research_data.get('researched_at', datetime.utcnow().isoformat())
+                segment['researched_at'] = datetime.utcnow().isoformat()  # Always use current time, not AI's date
                 segment['booking_status'] = 'researched'
                 segment['confidence_level'] = research_data.get('confidence', 'medium')
                 segment['auto_updated'] = True

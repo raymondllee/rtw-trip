@@ -575,6 +575,10 @@ export class BudgetManager {
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary modal-close-btn">Close</button>
+            <a href="/?scenario=${new URLSearchParams(window.location.search).get('scenario')}#transport-${segmentId}"
+               class="btn btn-secondary" target="_blank" title="Open in main app for full editing">
+              ✏️ Edit in Main App
+            </a>
             <button class="btn btn-primary modal-research-btn" data-segment-id="${segmentId}">
               🤖 Re-research
             </button>
