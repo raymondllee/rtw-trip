@@ -2547,7 +2547,16 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           const deletedCost = { ...this.tripData.costs![costIndex], _deleted: true };
           this.editedCosts.set(costId, deletedCost);
           this.tripData.costs!.splice(costIndex, 1);
-          this.render();
+
+          // Remove the row inline without full refresh
+          const row = btn.closest('tr');
+          if (row) {
+            row.style.opacity = '0.5';
+            row.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => {
+              row.remove();
+            }, 300);
+          }
         }
       });
     });
