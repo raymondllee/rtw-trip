@@ -386,6 +386,13 @@ export class BudgetManager {
    * Load and auto-sync transport segments from tripData or API
    */
   private async loadTransportSegments(): Promise<void> {
+    console.log('🔍 loadTransportSegments called', {
+      hasTransportSegments: !!this.tripData.transport_segments,
+      transportSegmentsLength: this.tripData.transport_segments?.length || 0,
+      locationsLength: this.tripData.locations?.length || 0,
+      hasWindow: !!window.transportSegmentManager
+    });
+
     // First check if transport_segments are already in tripData
     if (this.tripData.transport_segments && this.tripData.transport_segments.length > 0) {
       this.transportSegments = this.tripData.transport_segments;
@@ -398,6 +405,7 @@ export class BudgetManager {
       // Get scenario ID from URL
       const urlParams = new URLSearchParams(window.location.search);
       const scenarioId = urlParams.get('scenario');
+      console.log('🔍 Auto-sync check:', { scenarioId, locationsCount: this.tripData.locations?.length || 0 });
 
       if (scenarioId && this.tripData.locations && this.tripData.locations.length > 1) {
         console.log(`🔄 Auto-syncing transport segments for scenario ${scenarioId}...`);
