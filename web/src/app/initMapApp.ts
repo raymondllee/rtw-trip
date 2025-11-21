@@ -617,10 +617,10 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
     const costs = workingData.costs || [];
     const destinationCosts = window.calculateDestinationCosts(location.id, costs, location, workingData.locations);
     const costSummaryHTML = destinationCosts.total > 0 ? `
-      <div style="background: #f8f9fa; padding: 10px; border-radius: 6px; margin: 8px 0; border: 1px solid #e0e0e0;">
-        <div style="font-weight: 600; color: #2563eb; margin-bottom: 4px;">${window.formatCurrency(destinationCosts.total)}</div>
-        ${duration ? `<div style="font-size: 12px; color: #666;">${window.formatCurrency(destinationCosts.total / location.duration_days)}/day</div>` : ''}
-        ${destinationCosts.count > 0 ? `<div style="font-size: 11px; color: #999;">${destinationCosts.count} cost items</div>` : ''}
+      <div class="map-info-cost-summary">
+        <div class="map-info-cost-total">${window.formatCurrency(destinationCosts.total)}</div>
+        ${duration ? `<div class="map-info-cost-detail">${window.formatCurrency(destinationCosts.total / location.duration_days)}/day</div>` : ''}
+        ${destinationCosts.count > 0 ? `<div class="map-info-cost-detail" style="color: #999;">${destinationCosts.count} cost items</div>` : ''}
       </div>
     ` : '';
 
@@ -645,20 +645,20 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
 
     // Check if destination is locked
     const isLocked = location.is_date_locked || false;
-    const lockBadge = isLocked ? `<div style="display: inline-block; background: #ffc107; color: #333; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-bottom: 8px;">🔒 DATES LOCKED</div>` : '';
+    const lockBadge = isLocked ? `<div class="lock-badge">🔒 DATES LOCKED</div>` : '';
 
     const content = `
-      <div style="min-width: 260px; padding: 12px 14px;">
-        <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">${name}</div>
+      <div class="map-info-window">
+        <div class="map-info-title">${name}</div>
         ${lockBadge}
-        ${subtitle ? `<div style="color: #666; margin-bottom: 4px;">${subtitle}</div>` : ''}
-        ${meta ? `<div style="color: #444; margin-bottom: 8px;">${meta}</div>` : ''}
-        ${activity ? `<div style="display: inline-block; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 12px; margin-bottom: 8px; background: ${activityColor}">${activity}</div>` : ''}
+        ${subtitle ? `<div class="map-info-subtitle">${subtitle}</div>` : ''}
+        ${meta ? `<div class="map-info-meta">${meta}</div>` : ''}
+        ${activity ? `<div class="map-info-badge" style="background: ${activityColor}">${activity}</div>` : ''}
         ${costSummaryHTML}
         ${costBreakdownHTML}
-        ${notes ? `<div style="background: #f8f9fa; padding: 8px; border-radius: 4px; margin: 8px 0; border-left: 3px solid ${activityColor}; font-size: 13px; color: #555;"><strong style="color: #333;">Notes:</strong><br>${notes.replace(/\n/g, '<br>')}</div>` : ''}
-        ${highlights.length ? `<ul style="margin: 8px 0 0 18px; padding: 0;">${highlights.map(h => `<li style="margin: 2px 0;">${h}</li>`).join('')}</ul>` : ''}
-        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
+        ${notes ? `<div class="map-info-notes"><strong style="color: #333;">Notes:</strong><br>${notes.replace(/\n/g, '<br>')}</div>` : ''}
+        ${highlights.length ? `<ul class="map-info-highlights">${highlights.map(h => `<li style="margin: 2px 0;">${h}</li>`).join('')}</ul>` : ''}
+        <div class="map-info-footer">
           <a href="#" class="view-json-link" data-location-index="${index}" style="font-size: 12px; color: #1e88e5; text-decoration: none;">View JSON</a>
         </div>
       </div>
@@ -2253,22 +2253,24 @@ export async function initMapApp() {
 
       // Add the destination item
       sidebarItems.push(`
-        <div class="destination-item ${lockedClass}" data-index="${idx}" data-location-id="${loc.id}" draggable="true" style="display: flex; align-items: flex-start;">
+        <div class="destination-item ${lockedClass}" data-index="${idx}" data-location-id="${loc.id}" draggable="true">
           <div class="drag-handle">⋮⋮</div>
           <div class="destination-number" style="background: ${getActivityColor(loc.activity_type)}">${idx + 1}</div>
           <div class="destination-info">
             <div class="destination-name">
-              ${loc.name}
-              <button class="date-lock-toggle" data-location-id="${loc.id}" title="${isDateLocked ? 'Unlock dates' : 'Lock dates'}" style="margin-left: 8px; background: none; border: none; cursor: pointer; font-size: 16px; padding: 0;">${lockIcon}</button>
+              <span>${loc.name}</span>
+              <button class="date-lock-toggle" data-location-id="${loc.id}" title="${isDateLocked ? 'Unlock dates' : 'Lock dates'}" style="background: none; border: none; cursor: pointer; font-size: 16px; padding: 0;">${lockIcon}</button>
             </div>
-            <div class="destination-location">
-              <span>${[loc.city, loc.country].filter(Boolean).join(', ')}</span>
+            <div class="destination-meta">
+              ${[loc.city, loc.country].filter(Boolean).join(', ')}
+            </div>
+            <div class="destination-badges">
               ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
             </div>
-              <div class="destination-dates">
-                ${dateRange ? `${dateRange} • ` : ''}
-                <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}" ${isDateLocked ? 'disabled' : ''}> days
-              </div>
+            <div class="destination-dates">
+              ${dateRange ? `${dateRange} • ` : ''}
+              <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}" ${isDateLocked ? 'disabled' : ''}> days
+            </div>
             ${datePickerHTML}
             ${costSummaryHTML}
             <div class="destination-cost-details" id="cost-details-${loc.id}">

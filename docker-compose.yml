@@ -20,11 +20,14 @@ services:
     build:
       context: .
       dockerfile: python/agents/travel-concierge/Dockerfile
-    command: adk api_server travel_concierge --port 8000 --host 0.0.0.0
+    command: python -m google.adk.cli api_server travel-concierge --port 8000 --host 0.0.0.0
     ports:
       - "${ADK_PORT:-8000}:8000"
     environment:
       - PYTHONPATH=/app/python/agents
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=${GOOGLE_APPLICATION_CREDENTIALS_JSON}
     volumes:
       - ./python:/app/python
       - ./logs:/app/logs

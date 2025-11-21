@@ -146,6 +146,9 @@ html, body {
   opacity: 0.5;
   transform: rotate(2deg);
   cursor: grabbing;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 100;
 }
 
 .destination-item.drag-over {
@@ -179,42 +182,52 @@ html, body {
 
 .destination-info {
   flex: 1;
+  min-width: 0; /* Allow text truncation */
 }
 
 .destination-name {
   font-weight: 600;
-  color: #333;
-  margin-bottom: 3px;
-  font-size: 13px;
-  line-height: 1.2;
-}
-
-.destination-location {
-  font-size: 11px;
-  color: #666;
+  color: #2c3e50;
   margin-bottom: 4px;
-  line-height: 1.2;
+  font-size: 14px;
+  line-height: 1.3;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+}
+
+.destination-meta {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.destination-badges {
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+  margin-bottom: 8px;
 }
 
 .destination-dates {
-  font-size: 10px;
-  color: #888;
+  font-size: 11px;
+  color: #7f8c8d;
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-top: 4px;
 }
 
 .destination-activity {
-  display: inline-block;
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
   color: white;
-  margin: 0;
-  white-space: nowrap;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .editable-duration {
@@ -346,39 +359,46 @@ html, body {
 
 /* Compact Mode Styles */
 .destination-list.compact-mode .destination-item {
-  padding: 4px 8px;
-  gap: 4px;
+  padding: 6px 12px;
+  gap: 8px;
+  align-items: center;
 }
 
 .destination-list.compact-mode .destination-number {
-  width: 16px;
-  height: 16px;
-  line-height: 16px;
-  font-size: 9px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  font-size: 11px;
 }
 
 .destination-list.compact-mode .drag-handle {
-  font-size: 12px;
+  font-size: 14px;
   margin-right: 4px;
 }
 
 .destination-list.compact-mode .destination-name {
-  font-size: 12px;
-  margin-bottom: 2px;
+  font-size: 13px;
+  margin-bottom: 0;
 }
 
-.destination-list.compact-mode .destination-location {
-  font-size: 10px;
-  margin-bottom: 2px;
-}
-
-.destination-list.compact-mode .destination-dates {
-  font-size: 9px;
+.destination-list.compact-mode .destination-meta,
+.destination-list.compact-mode .destination-badges,
+.destination-list.compact-mode .destination-dates,
+.destination-list.compact-mode .destination-notes,
+.destination-list.compact-mode .destination-cost-summary,
+.destination-list.compact-mode .destination-cost-details,
+.destination-list.compact-mode .destination-cost-missing,
+.destination-list.compact-mode .update-costs-btn,
+.destination-list.compact-mode .cost-category,
+.destination-list.compact-mode .education-section-placeholder,
+.destination-list.compact-mode .locked-date-pickers {
+  display: none !important;
 }
 
 .destination-list.compact-mode .destination-activity {
-  font-size: 9px;
-  padding: 1px 4px;
+  font-size: 10px;
+  padding: 1px 6px;
+  margin-left: 8px;
 }
 
 .destination-list.compact-mode .editable-duration {
@@ -2797,6 +2817,153 @@ textarea.form-input {
 /* View preferences: Education visibility */
 .education-hidden .education-section,
 .education-hidden .education-section-placeholder,
+.education-hidden .education-loading,
+.education-hidden .education-error {
+  display: none !important;
+}
+
+/* Map Info Window Styles */
+.map-info-window {
+  min-width: 280px;
+  padding: 12px 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.map-info-title {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 6px;
+  color: #2c3e50;
+}
+
+.map-info-subtitle {
+  color: #666;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.map-info-meta {
+  color: #7f8c8d;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.map-info-badge {
+  display: inline-block;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.map-info-cost-summary {
+  background: #f8f9fa;
+  padding: 10px;
+  border-radius: 6px;
+  margin: 8px 0;
+  border: 1px solid #e0e0e0;
+}
+
+.map-info-cost-total {
+  font-weight: 600;
+  color: #2563eb;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.map-info-cost-detail {
+  font-size: 12px;
+  color: #666;
+}
+
+.map-info-notes {
+  background: #fff9c4;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 8px 0;
+  font-size: 12px;
+  color: #555;
+  border-left: 3px solid #fbc02d;
+}
+
+.map-info-highlights {
+  margin: 8px 0 0 18px;
+  padding: 0;
+  font-size: 12px;
+  color: #444;
+}
+
+.map-info-footer {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+}
+
+/* Cost Display Styles */
+.cost-summary-box {
+  background: #f8f9fa;
+  padding: 10px;
+  border-radius: 6px;
+  margin: 8px 0;
+  border: 1px solid #e0e0e0;
+}
+
+.cost-total-row {
+  font-weight: 600;
+  color: #2563eb;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.cost-sub-row {
+  font-size: 12px;
+  color: #666;
+}
+
+.cost-breakdown-list {
+  margin-top: 8px;
+}
+
+.cost-breakdown-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.cost-breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+  font-size: 11px;
+}
+
+.cost-breakdown-label {
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cost-breakdown-value {
+  font-weight: 600;
+  color: #333;
+}
+
+.lock-badge {
+  display: inline-block;
+  background: #ffc107;
+  color: #333;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
 .education-hidden #curriculum-generation-modal,
 .education-hidden #curriculum-viewer-modal {
   display: none !important;
