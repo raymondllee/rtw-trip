@@ -17,6 +17,7 @@
 from datetime import datetime
 import json
 import os
+from pathlib import Path
 from typing import Dict, Any
 
 from google.adk.agents.callback_context import CallbackContext
@@ -25,8 +26,12 @@ from google.adk.tools import ToolContext
 
 from travel_concierge.shared_libraries import constants
 
+# Get the directory containing this module to construct relative paths
+MODULE_DIR = Path(__file__).parent.parent  # Goes up to travel_concierge/
+
 SAMPLE_SCENARIO_PATH = os.getenv(
-    "TRAVEL_CONCIERGE_SCENARIO", "travel_concierge/profiles/itinerary_empty_default.json"
+    "TRAVEL_CONCIERGE_SCENARIO",
+    str(MODULE_DIR / "profiles" / "itinerary_empty_default.json")
 )
 
 SESSION_STATE_FILE = "session_state.json"

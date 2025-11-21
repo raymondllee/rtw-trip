@@ -2339,6 +2339,253 @@ textarea.form-input {
 }
 
 /* ============================================
+   Bulk Research Modal Styles
+   ============================================ */
+
+.bulk-research-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+  padding: 20px;
+}
+
+.bulk-research-modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 700px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.bulk-research-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.bulk-research-modal .modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.bulk-research-modal .modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.bulk-research-modal .modal-description {
+  color: #666;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.bulk-research-options {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.segments-checklist {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.segment-checkbox-item {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.segment-checkbox-item:hover {
+  background: #e9ecef;
+}
+
+.segment-checkbox-item:last-child {
+  margin-bottom: 0;
+}
+
+.segment-checkbox-item label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.segment-checkbox-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.segment-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.segment-checkbox-label .segment-icon {
+  font-size: 20px;
+}
+
+.segment-checkbox-label .segment-route {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.segment-checkbox-label .segment-mode-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #3498db;
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.no-research-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #dc3545;
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.old-research-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #ffc107;
+  color: #333;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.bulk-research-modal .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* Bulk Research Progress Modal */
+.bulk-research-progress-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100001;
+  padding: 20px;
+}
+
+.bulk-research-progress-modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 100%;
+  padding: 32px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.bulk-research-progress-modal h3 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: center;
+}
+
+.progress-info {
+  margin-bottom: 20px;
+}
+
+.progress-info p {
+  margin: 0 0 12px 0;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3498db, #2ecc71);
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.progress-details {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  min-height: 50px;
+}
+
+.current-research {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 14px;
+  text-align: center;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-header-left {
+  flex: 1;
+}
+
+.section-header-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ============================================
    Markdown Styling for Chat Messages
    ============================================ */
 

@@ -424,7 +424,8 @@ export class BudgetManager {
 
     } catch (error) {
       console.error('Error researching transport segment:', error);
-      alert(`❌ Research failed: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`❌ Research failed: ${errorMessage}`);
 
       // Re-enable button
       const btn = this.container.querySelector(`[data-segment-id="${segmentId}"]`) as HTMLButtonElement;
@@ -433,6 +434,281 @@ export class BudgetManager {
         btn.textContent = '🤖 Research';
       }
     }
+  }
+
+  /**
+   * Identify transport segments that need research
+   * @param maxAgeDays - Maximum age in days before research is considered stale (default: 30)
+   * @returns Array of segments needing research
+   */
+  private getSegmentsNeedingResearch(maxAgeDays: number = 30): any[] {
+    return this.transportSegments.filter(segment => {
+      // Check if segment has no researched data
+      const hasNoResearch = !segment.researched_cost_mid &&
+                           segment.booking_status !== 'researched' &&
+                           segment.booking_status !== 'booked' &&
+                           segment.booking_status !== 'paid';
+
+      // Check if research is old
+      let isOldResearch = false;
+      if (segment.researched_at) {
+        const ageInDays = Math.floor(
+          (Date.now() - new Date(segment.researched_at).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        isOldResearch = ageInDays > maxAgeDays;
+      }
+
+      return hasNoResearch || isOldResearch;
+    });
+  }
+
+  /**
+   * Show bulk research modal to select segments for research
+   */
+  private showBulkResearchModal(): void {
+    const needsResearch = this.getSegmentsNeedingResearch(30);
+
+    if (needsResearch.length === 0) {
+      alert('✅ All transport segments have recent research data!');
+      return;
+    }
+
+    // Create modal HTML
+    const modalHtml = `
+      <div class="bulk-research-modal-overlay" id="bulk-research-modal">
+        <div class="bulk-research-modal">
+          <div class="modal-header">
+            <h3>🔍 Bulk Transport Research</h3>
+            <button class="close-modal-btn" id="close-bulk-research-modal">×</button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-description">
+              The following transport segments need research (no data or data older than 30 days).
+              Select segments to research:
+            </p>
+            <div class="bulk-research-options">
+              <button class="btn-xs btn-secondary" id="select-all-segments">Select All</button>
+              <button class="btn-xs btn-secondary" id="deselect-all-segments">Deselect All</button>
+            </div>
+            <div class="segments-checklist">
+              ${needsResearch.map((segment, index) => {
+                const icon = segment.transport_mode_icon || this.getTransportIcon(segment.transport_mode);
+                const fromName = segment.from_destination_name || 'Unknown';
+                const toName = segment.to_destination_name || 'Unknown';
+                const mode = segment.transport_mode || 'plane';
+
+                // Calculate research age
+                let ageInfo = '<span class="no-research-badge">No research</span>';
+                if (segment.researched_at) {
+                  const ageInDays = Math.floor(
+                    (Date.now() - new Date(segment.researched_at).getTime()) / (1000 * 60 * 60 * 24)
+                  );
+                  ageInfo = `<span class="old-research-badge">${ageInDays} days old</span>`;
+                }
+
+                return `
+                  <div class="segment-checkbox-item">
+                    <label>
+                      <input type="checkbox"
+                             class="segment-checkbox"
+                             data-segment-id="${segment.id}"
+                             data-segment-index="${index}"
+                             checked>
+                      <span class="segment-checkbox-label">
+                        <span class="segment-icon">${icon}</span>
+                        <span class="segment-route">${fromName} → ${toName}</span>
+                        <span class="segment-mode-badge">${mode}</span>
+                        ${ageInfo}
+                      </span>
+                    </label>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary" id="cancel-bulk-research">Cancel</button>
+            <button class="btn-primary" id="start-bulk-research">
+              Research Selected (${needsResearch.length})
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Insert modal into DOM
+    const modalContainer = document.createElement('div');
+    modalContainer.innerHTML = modalHtml;
+    document.body.appendChild(modalContainer.firstElementChild!);
+
+    // Attach event listeners
+    this.attachBulkResearchModalListeners(needsResearch);
+  }
+
+  /**
+   * Attach event listeners for bulk research modal
+   */
+  private attachBulkResearchModalListeners(segments: any[]): void {
+    const modal = document.getElementById('bulk-research-modal');
+    if (!modal) return;
+
+    // Close modal handlers
+    const closeBtn = modal.querySelector('#close-bulk-research-modal');
+    const cancelBtn = modal.querySelector('#cancel-bulk-research');
+    const closeModal = () => modal.remove();
+
+    closeBtn?.addEventListener('click', closeModal);
+    cancelBtn?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    // Select/Deselect all handlers
+    const selectAllBtn = modal.querySelector('#select-all-segments');
+    const deselectAllBtn = modal.querySelector('#deselect-all-segments');
+
+    selectAllBtn?.addEventListener('click', () => {
+      modal.querySelectorAll('.segment-checkbox').forEach((checkbox: any) => {
+        checkbox.checked = true;
+      });
+      this.updateBulkResearchCount();
+    });
+
+    deselectAllBtn?.addEventListener('click', () => {
+      modal.querySelectorAll('.segment-checkbox').forEach((checkbox: any) => {
+        checkbox.checked = false;
+      });
+      this.updateBulkResearchCount();
+    });
+
+    // Update count when checkboxes change
+    modal.querySelectorAll('.segment-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', () => this.updateBulkResearchCount());
+    });
+
+    // Start research button
+    const startBtn = modal.querySelector('#start-bulk-research');
+    startBtn?.addEventListener('click', async () => {
+      const selectedCheckboxes = Array.from(
+        modal.querySelectorAll('.segment-checkbox:checked')
+      ) as HTMLInputElement[];
+
+      const selectedSegmentIds = selectedCheckboxes.map(cb => cb.dataset.segmentId!);
+
+      if (selectedSegmentIds.length === 0) {
+        alert('Please select at least one segment to research.');
+        return;
+      }
+
+      modal.remove();
+      await this.bulkResearchSegments(selectedSegmentIds);
+    });
+  }
+
+  /**
+   * Update the count of selected segments in bulk research modal
+   */
+  private updateBulkResearchCount(): void {
+    const modal = document.getElementById('bulk-research-modal');
+    if (!modal) return;
+
+    const selectedCount = modal.querySelectorAll('.segment-checkbox:checked').length;
+    const startBtn = modal.querySelector('#start-bulk-research');
+    if (startBtn) {
+      startBtn.textContent = `Research Selected (${selectedCount})`;
+    }
+  }
+
+  /**
+   * Research multiple transport segments sequentially
+   */
+  private async bulkResearchSegments(segmentIds: string[]): Promise<void> {
+    let successCount = 0;
+    let failureCount = 0;
+    const errors: string[] = [];
+
+    // Show progress indicator
+    const progressHtml = `
+      <div class="bulk-research-progress-overlay" id="bulk-research-progress">
+        <div class="bulk-research-progress-modal">
+          <h3>🔄 Researching Transport Segments</h3>
+          <div class="progress-info">
+            <p>Processing <span id="current-segment">0</span> of ${segmentIds.length} segments...</p>
+            <div class="progress-bar-container">
+              <div class="progress-bar" id="research-progress-bar" style="width: 0%"></div>
+            </div>
+          </div>
+          <div class="progress-details" id="progress-details"></div>
+        </div>
+      </div>
+    `;
+
+    const progressContainer = document.createElement('div');
+    progressContainer.innerHTML = progressHtml;
+    document.body.appendChild(progressContainer.firstElementChild!);
+
+    // Research each segment sequentially
+    for (let i = 0; i < segmentIds.length; i++) {
+      const segmentId = segmentIds[i];
+      const segment = this.transportSegments.find(s => s.id === segmentId);
+
+      // Update progress
+      const currentEl = document.getElementById('current-segment');
+      const progressBar = document.getElementById('research-progress-bar');
+      const detailsEl = document.getElementById('progress-details');
+
+      if (currentEl) currentEl.textContent = String(i + 1);
+      if (progressBar) {
+        const percent = ((i + 1) / segmentIds.length) * 100;
+        progressBar.style.width = `${percent}%`;
+      }
+
+      if (detailsEl && segment) {
+        const fromName = segment.from_destination_name || 'Unknown';
+        const toName = segment.to_destination_name || 'Unknown';
+        detailsEl.innerHTML = `
+          <p class="current-research">
+            Researching: ${fromName} → ${toName}
+          </p>
+        `;
+      }
+
+      try {
+        await this.researchTransportSegment(segmentId);
+        successCount++;
+
+        // Add small delay between requests to avoid overwhelming the API
+        if (i < segmentIds.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        failureCount++;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMsg = segment
+          ? `${segment.from_destination_name} → ${segment.to_destination_name}: ${errorMessage}`
+          : `Segment ${segmentId}: ${errorMessage}`;
+        errors.push(errorMsg);
+        console.error('Bulk research error:', error);
+      }
+    }
+
+    // Remove progress modal
+    document.getElementById('bulk-research-progress')?.remove();
+
+    // Show results
+    let resultMessage = `Bulk Research Complete!\n\n`;
+    resultMessage += `✅ Successful: ${successCount}\n`;
+    if (failureCount > 0) {
+      resultMessage += `❌ Failed: ${failureCount}\n\n`;
+      if (errors.length > 0) {
+        resultMessage += `Errors:\n${errors.slice(0, 5).join('\n')}`;
+        if (errors.length > 5) {
+          resultMessage += `\n... and ${errors.length - 5} more errors`;
+        }
+      }
+    }
+
+    alert(resultMessage);
   }
 
   /**
@@ -1758,13 +2034,25 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     const currentBudget = this.budget?.total_budget_usd || 0;
     const transportPct = currentBudget > 0 ? (transportTotal / currentBudget * 100) : 0;
 
+    // Count segments that need research
+    const needsResearchCount = this.getSegmentsNeedingResearch(30).length;
+
     return `
       <div class="budget-edit-section transport-section">
         <div class="section-header">
-          <h4>✈️ Inter-Country Transport</h4>
-          <div class="transport-summary">
-            <span class="transport-total">Total: ${this.formatCurrency(transportTotal)}</span>
-            ${currentBudget > 0 ? `<span class="transport-pct">(${transportPct.toFixed(1)}% of budget)</span>` : ''}
+          <div class="section-header-left">
+            <h4>✈️ Inter-Country Transport</h4>
+            <div class="transport-summary">
+              <span class="transport-total">Total: ${this.formatCurrency(transportTotal)}</span>
+              ${currentBudget > 0 ? `<span class="transport-pct">(${transportPct.toFixed(1)}% of budget)</span>` : ''}
+            </div>
+          </div>
+          <div class="section-header-right">
+            ${needsResearchCount > 0 ? `
+              <button class="btn-sm btn-primary" id="bulk-research-btn" title="Research multiple segments at once">
+                🔍 Bulk Research (${needsResearchCount})
+              </button>
+            ` : ''}
           </div>
         </div>
 
@@ -2320,6 +2608,12 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           this.showTransportDetailsModal(segmentId);
         }
       });
+    });
+
+    // Bulk research button
+    const bulkResearchBtn = this.container.querySelector('#bulk-research-btn');
+    bulkResearchBtn?.addEventListener('click', () => {
+      this.showBulkResearchModal();
     });
 
     // If budget exists, attach integrated edit listeners
