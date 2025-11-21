@@ -1574,3 +1574,281 @@ textarea.inline-edit.auto-resize {
     justify-content: space-between;
   }
 }
+
+/* ============================================================================
+   Transport Details Modal
+   ============================================================================ */
+
+.transport-details-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.transport-details-modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.transport-details-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.transport-details-modal .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.transport-details-modal .modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  line-height: 1;
+}
+
+.transport-details-modal .modal-close-btn:hover {
+  color: #333;
+}
+
+.transport-details-modal .modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.transport-details-modal .details-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.transport-details-modal .details-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.transport-details-modal .details-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.transport-details-modal .details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.transport-details-modal .detail-item {
+  background: #f8f9fa;
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.transport-details-modal .detail-item.highlight {
+  background: #e8f4fd;
+  border: 1px solid #b8daff;
+}
+
+.transport-details-modal .detail-item label {
+  display: block;
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.transport-details-modal .detail-item span {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.transport-details-modal .booking-tips {
+  background: #fff8e6;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 3px solid #ffc107;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #666;
+  margin: 0;
+}
+
+.transport-details-modal .alternatives-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.transport-details-modal .alternative-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.transport-details-modal .alt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.transport-details-modal .alt-header strong {
+  font-size: 14px;
+  color: #333;
+}
+
+.transport-details-modal .savings-badge {
+  background: #d4edda;
+  color: #155724;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.transport-details-modal .alt-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: #666;
+}
+
+.transport-details-modal .alt-details span {
+  background: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.transport-details-modal .alt-notes {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}
+
+.transport-details-modal .sources-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.transport-details-modal .sources-list li {
+  padding: 4px 0;
+}
+
+.transport-details-modal .sources-list a {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.transport-details-modal .sources-list a:hover {
+  text-decoration: underline;
+}
+
+.transport-details-modal .details-footer {
+  text-align: right;
+  padding-top: 12px;
+  color: #888;
+}
+
+.transport-details-modal .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.transport-details-modal .btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+}
+
+.transport-details-modal .btn-secondary {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.transport-details-modal .btn-secondary:hover {
+  background: #d0d0d0;
+}
+
+.transport-details-modal .btn-primary {
+  background: #2563eb;
+  color: white;
+}
+
+.transport-details-modal .btn-primary:hover {
+  background: #1d4ed8;
+}
+
+/* Transport segment mode label */
+.segment-mode {
+  font-size: 12px;
+  color: #666;
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+/* Details button styling */
+.btn-xs.btn-secondary {
+  background: #e0e0e0;
+  color: #333;
+  border: none;
+}
+
+.btn-xs.btn-secondary:hover {
+  background: #d0d0d0;
+}
+
+@media (max-width: 600px) {
+  .transport-details-modal .details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .transport-details-modal .alt-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
