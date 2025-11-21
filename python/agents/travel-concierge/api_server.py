@@ -2527,6 +2527,7 @@ For each category, provide low/mid/high estimates with sources.
         research_result = None
         response_text = ""
         save_tool_called = False
+        cost_items_created = []  # Track cost items for response
 
         def _coerce_json(value):
             """Convert ADK tool payloads that may arrive as JSON strings into dicts."""
@@ -2756,6 +2757,9 @@ For each category, provide low/mid/high estimates with sources.
                         'researched_at': cat_data.get('researched_at', datetime.now().isoformat()),
                     })
 
+                # Store cost_items for response
+                cost_items_created = cost_items
+
                 # Save to Firestore via our own endpoint (Flask runs on port 5001)
                 try:
                     save_resp = requests.post(
@@ -2821,13 +2825,15 @@ For each category, provide low/mid/high estimates with sources.
             except Exception as e:
                 print(f"Error during server-side save of research JSON: {e}")
 
-        if research_result or save_tool_called or saved_via_server:
+        if research_result or save_tool_called or saved_via_server or cost_items_created:
             print(f"✅ Cost research completed for {destination_name}")
             return jsonify({
                 'status': 'success',
-                'research': research_result,
+                'research': cost_items_created,  # Return cost items array for frontend
+                'research_data': research_result,  # Original research JSON for reference
                 'response_text': summary_text or response_text,
-                'saved_to_firestore': save_tool_called or saved_via_server
+                'saved_to_firestore': save_tool_called or saved_via_server,
+                'costs_saved': len(cost_items_created)
             })
         else:
             print(f"⚠️ Cost research returned no structured data")

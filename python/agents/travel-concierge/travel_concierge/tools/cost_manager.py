@@ -127,12 +127,12 @@ def save_researched_costs(
 
         cat_data = research_data[research_cat] or {}
 
-        # Research agent returns TOTAL amounts already calculated for the full stay
-        # and all travelers. The agent tries to convert to USD but doesn't have access
-        # to reliable exchange rates, so we re-convert using our CurrencyConverter.
+        # Research agent returns different semantics per category:
+        # - accommodation, activities: TOTAL for full stay (already includes all travelers)
+        # - food_daily, transport_daily: PER DAY PER PERSON (needs scaling)
 
-        # Get local currency amount (this is the source of truth)
-        amount_local = _to_float(cat_data.get('amount_local', 0))
+        # Get base amount in local currency (this is the source of truth)
+        base_local = _to_float(cat_data.get('amount_local', 0))
         currency_local = cat_data.get('currency_local', 'USD')
 
         # Validate and fix currency code using currency validator
@@ -140,14 +140,25 @@ def save_researched_costs(
         country = destination_name.split(',')[-1].strip() if ',' in destination_name else None
         currency_local = validate_currency(currency_local, country=country, default='USD')
 
-        # Convert to USD using proper exchange rates (ignore agent's USD conversion)
-        # NOTE: If amount_local is 0 or missing, fallback to agent's amount_mid
-        if amount_local > 0:
-            amount_usd = _currency_converter.convert_to_usd(amount_local, currency_local)
+        # Convert base amount to USD using proper exchange rates
+        # (ignore agent's USD conversion which may use incorrect rates)
+        if base_local > 0:
+            base_usd = _currency_converter.convert_to_usd(base_local, currency_local)
         else:
             # Fallback: use agent's USD estimate if local amount not provided
-            amount_usd = _to_float(cat_data.get('amount_mid', 0))
-            amount_local = amount_usd  # Set local to match USD if no local provided
+            base_usd = _to_float(cat_data.get('amount_mid', 0))
+            base_local = base_usd
+
+        # Scale per-day categories by duration and travelers
+        # accommodation and activities are already totals, don't scale
+        if research_cat in ('food_daily', 'transport_daily'):
+            multiplier = duration_days * num_travelers
+            amount_usd = base_usd * multiplier
+            amount_local = base_local * multiplier
+        else:
+            # accommodation, activities are already totals
+            amount_usd = base_usd
+            amount_local = base_local
 
         # Build deterministic id for upsert behavior per destination/category
         stable_dest = (
