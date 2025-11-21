@@ -313,77 +313,99 @@ export class BudgetManager {
       throw new Error('No valid destinations found');
     }
 
-    // Build enriched destination data for the prompt
-    const enrichedDestinations = destinations.map(dest => {
-      const localCurrency = getCurrencyForDestination(dest.id, this.tripData.locations || []);
-
-      return {
-        id: dest.id,
-        normalizedId: String(dest.id),
-        name: dest.name || dest.city,
-        city: dest.city,
-        country: dest.country,
-        region: dest.region,
-        activityType: dest.activity_type,
-        durationDays: dest.duration_days || 1,
-        arrivalDate: dest.arrival_date,
-        departureDate: dest.departure_date,
-        highlights: Array.isArray(dest.highlights) ? dest.highlights : [],
-        notes: dest.notes || '',
-        localCurrency: localCurrency
-      };
-    });
-
-    // Generate prompt
-    const prompt = this.generateCostPrompt(enrichedDestinations, country);
-
     // Get API configuration
     const config = getRuntimeConfig();
-    const chatApiUrl = config.endpoints.chat;
+    const apiBaseUrl = config.endpoints.api || 'http://localhost:5001';
 
-    // Get scenario ID from window
-    const scenarioId = (window as any).currentScenarioId || null;
-
-    // Call the chat API
-    const response = await fetch(chatApiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: prompt,
-        context: {
-          destinations: enrichedDestinations.map(d => ({
-            id: d.id,
-            name: d.name,
-            country: d.country,
-            duration_days: d.durationDays
-          }))
-        },
-        scenario_id: scenarioId,
-        session_id: null // New session for cost generation
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API error: ${response.status} - ${errorText}`);
+    // Get scenario ID from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const scenarioId = urlParams.get('scenario');
+    if (!scenarioId) {
+      throw new Error('No scenario ID found in URL. Please make sure you have a scenario loaded.');
     }
 
-    const data = await response.json();
+    // Get travel style and num travelers
+    const numTravelers = this.tripData.num_travelers || 1;
+    const accommodationPref = this.tripData.accommodation_preference || 'mid-range';
 
-    // Extract the response text
-    const responseText = data.response || data.text || '';
+    // Generate costs for each destination by calling backend cost research API
+    const allCosts: any[] = [];
 
-    // Try to parse JSON from the response
-    let costs = this.parseAICostResponse(responseText, enrichedDestinations);
+    for (let i = 0; i < destinations.length; i++) {
+      const dest = destinations[i];
+      const localCurrency = getCurrencyForDestination(dest.id, this.tripData.locations || []);
 
-    return costs;
+      // Build destination name
+      const destinationName = `${dest.name || dest.city}, ${dest.country}`;
+
+      // Get previous and next destinations for context
+      const previousDest = i > 0 ? destinations[i - 1] : null;
+      const nextDest = i < destinations.length - 1 ? destinations[i + 1] : null;
+
+      // Generate default dates if not set (use current date + offset)
+      const today = new Date();
+      const defaultArrival = dest.arrival_date || today.toISOString().split('T')[0];
+      const arrivalDate = new Date(defaultArrival);
+      const durationDays = Math.max(1, Math.round(dest.duration_days || 7));
+      const departureDate = new Date(arrivalDate);
+      departureDate.setDate(departureDate.getDate() + durationDays);
+      const defaultDeparture = dest.departure_date || departureDate.toISOString().split('T')[0];
+
+      const payload = {
+        session_id: `budget_manager_${Date.now()}`,
+        scenario_id: scenarioId,
+        destination_name: destinationName,
+        destination_id: String(dest.id),
+        duration_days: durationDays,
+        arrival_date: defaultArrival,
+        departure_date: defaultDeparture,
+        num_travelers: numTravelers,
+        travel_style: accommodationPref,
+        previous_destination: previousDest ? `${previousDest.name || previousDest.city}, ${previousDest.country}` : undefined,
+        next_destination: nextDest ? `${nextDest.name || nextDest.city}, ${nextDest.country}` : undefined
+      };
+
+      // Call backend cost research API
+      const response = await fetch(`${apiBaseUrl}/api/costs/research`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || `Request failed with status ${response.status}`;
+        throw new Error(`Failed to research costs for ${destinationName}: ${errorMessage}`);
+      }
+
+      const data = await response.json();
+
+      // Check if research returned partial results
+      if (data.status === 'partial') {
+        console.warn(`Partial result for ${destinationName}:`, data);
+        continue; // Skip this destination
+      }
+
+      // The backend saves costs directly to Firestore, but also returns them
+      // Extract costs from the response if available
+      if (data.research && Array.isArray(data.research)) {
+        allCosts.push(...data.research);
+      } else if (data.costs_saved) {
+        // Costs were saved but not returned - we'll need to fetch them
+        // For now, just log success
+        console.log(`✓ Generated ${data.costs_saved} costs for ${destinationName}`);
+      }
+    }
+
+    return allCosts;
   }
 
   private generateCostPrompt(destinations: any[], country: string): string {
     const numTravelers = this.tripData.num_travelers || 1;
     const travelerComposition = this.tripData.traveler_composition;
+    const accommodationPref = this.tripData.accommodation_preference || 'mid-range';
 
     // Build traveler info string
     let travelerInfo = `Number of travelers: ${numTravelers}`;
@@ -394,6 +416,7 @@ export class BudgetManager {
       }
       travelerInfo += ')';
     }
+    travelerInfo += `\nAccommodation preference: ${accommodationPref}`;
 
     const destinationBlocks = destinations.map((dest, index) => {
       const lines = [];
@@ -443,7 +466,13 @@ IMPORTANT PRICING GUIDELINES:
   Set "scales_with_travelers": false
   Amount should be the total for the entire group
 
-For each destination, produce 3-6 cost line items that cover major spend categories (accommodation, key activities, food, local transport, other notable expenses). Use realistic amounts appropriate for ${numTravelers} traveler${numTravelers !== 1 ? 's' : ''}. Amounts should be in the local currency specified for each destination.
+- For ACCOMMODATION: Use ${accommodationPref} level pricing
+  * budget: hostels, basic guesthouses, shared accommodations
+  * mid-range: 3-star hotels, comfortable B&Bs, decent Airbnbs
+  * higher-end: 4-star hotels, upscale boutique properties
+  * luxurious: 5-star hotels, luxury resorts, premium accommodations
+
+For each destination, produce 3-6 cost line items that cover major spend categories (accommodation, key activities, food, local transport, other notable expenses). Use realistic amounts appropriate for ${numTravelers} traveler${numTravelers !== 1 ? 's' : ''} and ${accommodationPref} accommodation standards. Amounts should be in the local currency specified for each destination.
 
 Return a single JSON array. Each element must follow exactly:
 {
@@ -754,6 +783,55 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     return `$${Math.round(amount).toLocaleString()}`;
   }
 
+  private calculateTotalEstimatedCost(cost: any): { total: number; breakdown: string } {
+    const baseAmount = cost.amount || 0;
+    const currency = cost.currency || 'USD';
+    const pricingModel = cost.pricing_model;
+    const numTravelers = this.tripData.num_travelers || 1;
+
+    // Find the destination to get duration
+    const destination = (this.tripData.locations || []).find(loc => loc.id === cost.destination_id);
+    const durationDays = destination?.duration_days || 1;
+
+    // Default to showing base amount if no pricing model
+    if (!pricingModel) {
+      return {
+        total: baseAmount,
+        breakdown: this.formatCurrencyAmount(baseAmount, currency)
+      };
+    }
+
+    let multiplier = 1;
+    let breakdownParts: string[] = [];
+    const formattedBase = this.formatCurrencyAmount(baseAmount, currency);
+
+    // Handle traveler scaling
+    if (pricingModel.scales_with_travelers) {
+      multiplier *= numTravelers;
+      breakdownParts.push(`${formattedBase} × ${numTravelers} traveler${numTravelers !== 1 ? 's' : ''}`);
+    } else {
+      breakdownParts.push(formattedBase);
+    }
+
+    // Handle duration scaling
+    const type = pricingModel.type || 'fixed';
+    if (type === 'per_day' || type === 'per_person_day') {
+      multiplier *= durationDays;
+      breakdownParts.push(`× ${durationDays} day${durationDays !== 1 ? 's' : ''}`);
+    } else if (type === 'per_night' || type === 'per_person_night') {
+      const nights = Math.max(1, durationDays - 1);
+      multiplier *= nights;
+      breakdownParts.push(`× ${nights} night${nights !== 1 ? 's' : ''}`);
+    }
+
+    const total = baseAmount * multiplier;
+    const breakdown = breakdownParts.length > 1
+      ? `${breakdownParts.join(' ')} = ${this.formatCurrencyAmount(total, currency)}`
+      : formattedBase;
+
+    return { total, breakdown };
+  }
+
   private getAlertIcon(type: string): string {
     switch (type) {
       case 'exceeded': return '🔴';
@@ -867,10 +945,18 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         ${Object.entries(costsByDestination).map(([destName, costs]) => {
           const firstCost = costs[0];
           const destinationId = firstCost?.destination_id;
+          const destLocation = (this.tripData.locations || []).find(loc => loc.id === destinationId);
+          const destDays = destLocation?.duration_days || 0;
+          const destDateRange = destLocation?.arrival_date && destLocation?.departure_date
+            ? `${new Date(destLocation.arrival_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(destLocation.departure_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+            : '';
           return `
           <div class="destination-costs-section" data-destination-id="${destinationId}">
             <div class="destination-header">
-              <span>${destName}</span>
+              <span>
+                ${destName}
+                ${destDays || destDateRange ? `<span class="dest-meta">(${destDays ? `${destDays} day${destDays !== 1 ? 's' : ''}` : ''}${destDays && destDateRange ? ' • ' : ''}${destDateRange})</span>` : ''}
+              </span>
               <button class="btn-xs btn-secondary regenerate-destination-costs-btn"
                       data-destination-id="${destinationId}"
                       data-destination-name="${destName}"
@@ -886,6 +972,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                   <th style="width: 80px;">Currency</th>
                   <th style="width: 100px;" class="text-right">Amount</th>
                   <th style="width: 100px;" class="text-right">USD</th>
+                  <th style="width: 180px;" title="Estimated total accounting for travelers and duration">Est. Total</th>
                   <th style="width: 120px;">Status</th>
                   <th style="width: 110px;">Date</th>
                   <th style="width: 200px;">Notes</th>
@@ -926,12 +1013,58 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     // Default to local currency if not set
     const currency = cost.currency || getCurrencyForDestination(cost.destination_id, this.tripData.locations || []);
 
+    // Calculate total estimated cost
+    const { total, breakdown } = this.calculateTotalEstimatedCost(cost);
+
+    // Get research metadata if available
+    const confidence = cost.confidence || '';
+    const sources = cost.sources || [];
+    const amountLow = cost.amount_low;
+    const amountMid = cost.amount_mid || amountUsd;
+    const amountHigh = cost.amount_high;
+    const hasResearchData = confidence || sources.length > 0 || (amountLow && amountHigh);
+
+    // Build confidence indicator
+    let confidenceIndicator = '';
+    if (confidence) {
+      const confidenceColors: Record<string, string> = {
+        'high': '#28a745',
+        'medium': '#ffc107',
+        'low': '#dc3545'
+      };
+      const confidenceColor = confidenceColors[confidence.toLowerCase()] || '#6c757d';
+      confidenceIndicator = `<span class="confidence-badge" style="background-color: ${confidenceColor}" title="Confidence: ${confidence}">${confidence.charAt(0).toUpperCase()}</span>`;
+    }
+
+    // Build estimate range display
+    let estimateRange = '';
+    if (amountLow && amountHigh) {
+      estimateRange = `<div class="estimate-range" title="Low: $${Math.round(amountLow)} | Mid: $${Math.round(amountMid)} | High: $${Math.round(amountHigh)}">
+        $${Math.round(amountLow)}-$${Math.round(amountHigh)}
+      </div>`;
+    }
+
+    // Build sources list
+    let sourcesHtml = '';
+    if (sources.length > 0) {
+      sourcesHtml = `<div class="cost-sources">
+        ${sources.slice(0, 2).map((url: string) => {
+          const domain = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+          return `<a href="${url}" target="_blank" class="source-link" title="${url}">${domain}</a>`;
+        }).join(', ')}
+        ${sources.length > 2 ? `<span class="more-sources" title="${sources.slice(2).join('\n')}">+${sources.length - 2} more</span>` : ''}
+      </div>`;
+    }
+
     return `
       <tr class="editable-cost-row" data-cost-id="${costId}">
         <td>
-          <span class="category-badge" style="background-color: ${this.getCategoryColor(cost.category || 'other')}">
-            ${this.getCategoryIcon(cost.category || 'other')} ${(cost.category || 'other').replace(/_/g, ' ')}
-          </span>
+          <div class="category-cell">
+            <span class="category-badge" style="background-color: ${this.getCategoryColor(cost.category || 'other')}">
+              ${this.getCategoryIcon(cost.category || 'other')} ${(cost.category || 'other').replace(/_/g, ' ')}
+            </span>
+            ${confidenceIndicator}
+          </div>
         </td>
         <td>
           <input type="text"
@@ -940,6 +1073,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                  data-field="description"
                  value="${cost.description || ''}"
                  placeholder="Description">
+          ${sourcesHtml}
         </td>
         <td>
           <div class="currency-display-wrapper">
@@ -962,6 +1096,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                    step="1"
                    min="0">
           </div>
+          ${estimateRange}
         </td>
         <td class="text-right">
           <div class="currency-input-wrapper">
@@ -974,6 +1109,11 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                    step="1"
                    min="0"
                    ${currency === 'USD' ? 'disabled' : ''}>
+          </div>
+        </td>
+        <td>
+          <div class="estimated-total-display" title="${breakdown}">
+            ${breakdown}
           </div>
         </td>
         <td>
@@ -1122,11 +1262,12 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     const composition = this.tripData.traveler_composition;
     const adults = composition?.adults || numTravelers;
     const children = composition?.children || 0;
+    const accommodationPref = this.tripData.accommodation_preference || 'mid-range';
 
     return `
       <div class="traveler-section">
         <div class="traveler-header">
-          <h4>👥 Travelers</h4>
+          <h4>👥 Travelers & Preferences</h4>
           <div style="display: flex; align-items: center; gap: 10px;">
             <span class="traveler-count-badge">${numTravelers} total</span>
             <span id="traveler-save-indicator" class="auto-save-indicator-inline"></span>
@@ -1142,8 +1283,19 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <input type="number" id="children-count" value="${children}" min="0" max="20" step="1">
           </div>
         </div>
+        <div class="traveler-inputs" style="margin-top: 10px;">
+          <div class="traveler-input-group" style="flex: 1;">
+            <label for="accommodation-pref">Accommodation:</label>
+            <select id="accommodation-pref" class="accommodation-select">
+              <option value="budget" ${accommodationPref === 'budget' ? 'selected' : ''}>Budget</option>
+              <option value="mid-range" ${accommodationPref === 'mid-range' ? 'selected' : ''}>Mid-range</option>
+              <option value="higher-end" ${accommodationPref === 'higher-end' ? 'selected' : ''}>Higher-end</option>
+              <option value="luxurious" ${accommodationPref === 'luxurious' ? 'selected' : ''}>Luxurious</option>
+            </select>
+          </div>
+        </div>
         <div class="traveler-note">
-          <small>ℹ️ Changes save automatically. Regenerate existing costs to use updated traveler count.</small>
+          <small>ℹ️ Changes save automatically. Regenerate existing costs to apply updated preferences.</small>
         </div>
       </div>
     `;
@@ -1273,6 +1425,8 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <div class="section-header">
               <h4>🌍 Budget by Country</h4>
               <div class="mode-controls">
+                <button class="btn-xs btn-secondary" id="show-all-costs-btn" title="Expand all cost sections">📂 Show All Costs</button>
+                <button class="btn-xs btn-secondary" id="hide-all-costs-btn" title="Collapse all cost sections" style="display: none;">📁 Hide All Costs</button>
                 <span class="mode-indicator" id="country-mode-indicator">Mode: Dollar Amounts</span>
                 <div class="country-mode-selector">
                   <button class="mode-btn active" data-mode="dollars" id="country-mode-dollars">$</button>
@@ -1338,6 +1492,27 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                 const countryDestinations = (this.tripData.locations || [])
                   .filter(loc => loc.country === country);
 
+                // Calculate date range for country
+                const countryDates = countryDestinations
+                  .filter(loc => loc.arrival_date || loc.departure_date)
+                  .map(loc => ({
+                    arrival: loc.arrival_date ? new Date(loc.arrival_date) : null,
+                    departure: loc.departure_date ? new Date(loc.departure_date) : null
+                  }))
+                  .filter(d => d.arrival || d.departure);
+
+                let countryDateRange = '';
+                if (countryDates.length > 0) {
+                  const validArrivals = countryDates.filter(d => d.arrival).map(d => d.arrival!);
+                  const validDepartures = countryDates.filter(d => d.departure).map(d => d.departure!);
+
+                  if (validArrivals.length > 0 && validDepartures.length > 0) {
+                    const earliestArrival = new Date(Math.min(...validArrivals.map(d => d.getTime())));
+                    const latestDeparture = new Date(Math.max(...validDepartures.map(d => d.getTime())));
+                    countryDateRange = `${earliestArrival.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${latestDeparture.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+                  }
+                }
+
                 const countryCosts = countryCostsArray.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
                 const categoryBreakdown = this.renderCategoryBreakdown(countryCostsArray);
 
@@ -1369,7 +1544,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                   <div class="budget-item-edit">
                     <div class="item-header-row">
                       <div class="item-label-with-note">
-                        <span class="item-label-text">${country} <span class="days-label">(${countryDays} day${countryDays !== 1 ? 's' : ''})</span></span>
+                        <span class="item-label-text">
+                          ${country}
+                          <span class="days-label">(${countryDays} day${countryDays !== 1 ? 's' : ''}${countryDateRange ? ` • ${countryDateRange}` : ''})</span>
+                        </span>
                         <button class="note-toggle-btn" data-country="${country}" title="${countryNote ? 'Edit Note' : 'Add Note'}">
                           ${countryNote ? '📝' : '📄'}
                         </button>
@@ -1582,6 +1760,13 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
     adultsInput?.addEventListener('input', updateTravelerCount);
     childrenInput?.addEventListener('input', updateTravelerCount);
+
+    // Auto-save accommodation preference
+    const accommodationSelect = this.container.querySelector('#accommodation-pref') as HTMLSelectElement;
+    accommodationSelect?.addEventListener('change', () => {
+      this.tripData.accommodation_preference = accommodationSelect.value as any;
+      this.scheduleTripDataAutoSave();
+    });
 
     // If budget exists, attach integrated edit listeners
     if (this.budget) {
@@ -2362,7 +2547,16 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           const deletedCost = { ...this.tripData.costs![costIndex], _deleted: true };
           this.editedCosts.set(costId, deletedCost);
           this.tripData.costs!.splice(costIndex, 1);
-          this.render();
+
+          // Remove the row inline without full refresh
+          const row = btn.closest('tr');
+          if (row) {
+            row.style.opacity = '0.5';
+            row.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => {
+              row.remove();
+            }, 300);
+          }
         }
       });
     });
@@ -2492,43 +2686,11 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
         const destNames = destinations.map(d => d.name || d.city).join(', ');
 
-        // Build enriched destination data for prompt
-        const enrichedDestinations = destinations.map(dest => {
-          const localCurrency = getCurrencyForDestination(dest.id, this.tripData.locations || []);
-          return {
-            id: dest.id,
-            normalizedId: String(dest.id),
-            name: dest.name || dest.city,
-            city: dest.city,
-            country: dest.country,
-            region: dest.region,
-            activityType: dest.activity_type,
-            durationDays: dest.duration_days || 1,
-            arrivalDate: dest.arrival_date,
-            departureDate: dest.departure_date,
-            highlights: Array.isArray(dest.highlights) ? dest.highlights : [],
-            notes: dest.notes || '',
-            localCurrency: localCurrency
-          };
-        });
-
-        // Generate initial prompt
-        const initialPrompt = this.generateCostPrompt(enrichedDestinations, country);
-
-        // Show prompt editing modal
-        const editedPrompt = await this.showPromptEditModal(
-          initialPrompt,
-          `Generate Costs for ${country}`
-        );
-
-        // If user cancelled, exit
-        if (!editedPrompt) return;
-
         // Show progress UI
         const originalBtn = btn as HTMLButtonElement;
         const originalText = originalBtn.innerHTML;
         originalBtn.disabled = true;
-        originalBtn.innerHTML = '⏳ Generating costs...';
+        originalBtn.innerHTML = '⏳ Researching costs...';
 
         // Find and open the costs section to show progress
         const costsSection = this.container.querySelector(
@@ -2545,10 +2707,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           progressDiv.innerHTML = `
             <div style="padding: 20px; text-align: center; background: #f0f8ff; border-radius: 6px; margin: 15px 0;">
               <div style="font-size: 16px; font-weight: 600; color: #1a73e8; margin-bottom: 8px;">
-                🤖 AI is generating cost estimates...
+                🔍 Researching current prices from the web...
               </div>
               <div style="font-size: 14px; color: #666; margin-bottom: 12px;">
-                Researching ${destNames}
+                Analyzing costs for ${destNames}
               </div>
               <div style="width: 100%; height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden;">
                 <div style="width: 100%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2, #667eea); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></div>
@@ -2565,57 +2727,11 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         }
 
         try {
-          // Call generation with edited prompt
-          const config = getRuntimeConfig();
-          const chatApiUrl = config.endpoints.chat;
-          const scenarioId = (window as any).currentScenarioId || null;
-
-          const response = await fetch(chatApiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: editedPrompt,
-              context: {
-                destinations: enrichedDestinations.map(d => ({
-                  id: d.id,
-                  name: d.name,
-                  country: d.country,
-                  duration_days: d.durationDays
-                }))
-              },
-              scenario_id: scenarioId,
-              session_id: null
-            })
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API error: ${response.status} - ${errorText}`);
-          }
-
-          const data = await response.json();
-          const responseText = data.response || data.text || '';
-          const generatedCosts = this.parseAICostResponse(responseText, enrichedDestinations);
-
-          if (generatedCosts.length === 0) {
-            throw new Error('No costs were generated');
-          }
-
-          // Add generated costs to tripData
-          if (!this.tripData.costs) {
-            this.tripData.costs = [];
-          }
-          this.tripData.costs.push(...generatedCosts);
-
-          // Save costs via callback
-          if (this.onCostsUpdate) {
-            await this.onCostsUpdate(generatedCosts);
-          }
+          // Call backend cost research API for each destination
+          await this.generateCostsForCountry(country, destinationIds);
 
           // Show success message
-          originalBtn.innerHTML = `✓ Generated ${generatedCosts.length} costs`;
+          originalBtn.innerHTML = `✓ Costs researched`;
           originalBtn.style.background = '#28a745';
 
           // Remove progress UI and refresh display
@@ -2673,10 +2789,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           }
 
           // Show error
-          originalBtn.innerHTML = '✗ Generation failed';
+          originalBtn.innerHTML = '✗ Research failed';
           originalBtn.style.background = '#dc3545';
 
-          alert(`Failed to generate costs: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          alert(`Failed to research costs: ${error instanceof Error ? error.message : 'Unknown error'}`);
 
           // Reset button after 3 seconds
           setTimeout(() => {
@@ -2703,45 +2819,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         const originalText = originalBtn.innerHTML;
 
         try {
-          // Get destinations for this country
-          const destinations = (this.tripData.locations || [])
-            .filter(loc => destinationIds.includes(String(loc.id)))
-            .map(loc => ({
-              id: loc.id,
-              name: loc.name || '',
-              arrival_date: loc.arrival_date || '',
-              departure_date: loc.departure_date || '',
-              country: loc.country || ''
-            }));
-
-          // Build enriched destinations with local currency
-          const enrichedDestinations = destinations.map(dest => {
-            const localCurrency = getCurrencyForDestination(dest.id, this.tripData.locations || []);
-            return {
-              id: dest.id,
-              name: dest.name,
-              arrival_date: dest.arrival_date,
-              departure_date: dest.departure_date,
-              country: dest.country,
-              localCurrency: localCurrency
-            };
-          });
-
-          // Generate initial prompt
-          const initialPrompt = this.generateCostPrompt(enrichedDestinations, country);
-
-          // Show prompt editing modal
-          const editedPrompt = await this.showPromptEditModal(
-            initialPrompt,
-            `Regenerate Costs for ${country}`
-          );
-
-          // If user cancelled, exit
-          if (!editedPrompt) return;
-
           // Disable button and show progress
           originalBtn.disabled = true;
-          originalBtn.innerHTML = '🔄 Regenerating...';
+          originalBtn.innerHTML = '🔄 Researching...';
 
           // Delete existing costs for this country
           const existingCosts = (this.tripData.costs || []).filter(c => {
@@ -2764,59 +2844,23 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             });
           }
 
-          // Call API with edited prompt
-          const config = getRuntimeConfig();
-          const chatApiUrl = config.endpoints.chat;
-          const scenarioId = (window as any).currentScenarioId || null;
+          // Call backend cost research API
+          const newCosts = await this.generateCostsForCountry(country, destinationIds);
 
-          const response = await fetch(chatApiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: editedPrompt,
-              context: {
-                destinations: enrichedDestinations.map(d => ({
-                  id: d.id,
-                  name: d.name,
-                  arrival_date: d.arrival_date,
-                  departure_date: d.departure_date,
-                  country: d.country
-                }))
-              },
-              scenario_id: scenarioId,
-              session_id: null
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`API request failed: ${response.statusText}`);
-          }
-
-          const responseData = await response.json();
-          const responseText = responseData.response || '';
-
-          // Parse the AI response
-          const generatedCosts = this.parseAICostResponse(responseText, enrichedDestinations);
-
-          if (generatedCosts.length === 0) {
-            throw new Error('No costs were generated');
-          }
-
-          // Add generated costs to tripData
+          // Add new costs to tripData
           if (!this.tripData.costs) {
             this.tripData.costs = [];
           }
-          this.tripData.costs.push(...generatedCosts);
+          this.tripData.costs.push(...newCosts);
 
-          // Save costs via callback
-          if (this.onCostsUpdate) {
-            await this.onCostsUpdate(generatedCosts);
+          // If costs were saved but not returned, we need to reload from Firestore
+          // For now, show a message and suggest refreshing
+          if (newCosts.length === 0) {
+            console.warn('Backend saved costs but did not return them. Costs will appear after page refresh.');
           }
 
           // Show success message
-          originalBtn.innerHTML = `✓ Regenerated ${generatedCosts.length} costs`;
+          originalBtn.innerHTML = `✓ Costs researched`;
           originalBtn.style.background = '#28a745';
 
           // Refresh the entire budget manager to show new costs
@@ -2833,7 +2877,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           console.error('Failed to regenerate costs:', error);
 
           // Show error
-          originalBtn.innerHTML = '✗ Regeneration failed';
+          originalBtn.innerHTML = '✗ Research failed';
           originalBtn.style.background = '#dc3545';
 
           alert(`Failed to regenerate costs: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -2869,36 +2913,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             throw new Error('Destination not found');
           }
 
-          const destination = {
-            id: location.id,
-            name: location.name || '',
-            arrival_date: location.arrival_date || '',
-            departure_date: location.departure_date || '',
-            country: location.country || ''
-          };
-
-          // Build enriched destination with local currency
-          const localCurrency = getCurrencyForDestination(destination.id, this.tripData.locations || []);
-          const enrichedDestination = {
-            ...destination,
-            localCurrency: localCurrency
-          };
-
-          // Generate initial prompt for single destination
-          const initialPrompt = this.generateCostPrompt([enrichedDestination], destination.country);
-
-          // Show prompt editing modal
-          const editedPrompt = await this.showPromptEditModal(
-            initialPrompt,
-            `Regenerate Costs for ${destinationName || destination.name}`
-          );
-
-          // If user cancelled, exit
-          if (!editedPrompt) return;
-
           // Disable button and show progress
           originalBtn.disabled = true;
-          originalBtn.innerHTML = '🔄 Regenerating...';
+          originalBtn.innerHTML = '🔄 Researching...';
 
           // Delete existing costs for this destination
           const existingCosts = (this.tripData.costs || []).filter(c =>
@@ -2919,59 +2936,22 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             );
           }
 
-          // Call API with edited prompt
-          const config = getRuntimeConfig();
-          const chatApiUrl = config.endpoints.chat;
-          const scenarioId = (window as any).currentScenarioId || null;
+          // Call backend cost research API for this single destination
+          const newCosts = await this.generateCostsForCountry(location.country || '', [destinationId]);
 
-          const response = await fetch(chatApiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: editedPrompt,
-              context: {
-                destinations: [{
-                  id: enrichedDestination.id,
-                  name: enrichedDestination.name,
-                  arrival_date: enrichedDestination.arrival_date,
-                  departure_date: enrichedDestination.departure_date,
-                  country: enrichedDestination.country
-                }]
-              },
-              scenario_id: scenarioId,
-              session_id: null
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`API request failed: ${response.statusText}`);
-          }
-
-          const responseData = await response.json();
-          const responseText = responseData.response || '';
-
-          // Parse the AI response
-          const generatedCosts = this.parseAICostResponse(responseText, [enrichedDestination]);
-
-          if (generatedCosts.length === 0) {
-            throw new Error('No costs were generated');
-          }
-
-          // Add generated costs to tripData
+          // Add new costs to tripData
           if (!this.tripData.costs) {
             this.tripData.costs = [];
           }
-          this.tripData.costs.push(...generatedCosts);
+          this.tripData.costs.push(...newCosts);
 
-          // Save costs via callback
-          if (this.onCostsUpdate) {
-            await this.onCostsUpdate(generatedCosts);
+          // If costs were saved but not returned, we need to reload from Firestore
+          if (newCosts.length === 0) {
+            console.warn('Backend saved costs but did not return them. Costs will appear after page refresh.');
           }
 
           // Show success message
-          originalBtn.innerHTML = `✓ Regenerated ${generatedCosts.length} costs`;
+          originalBtn.innerHTML = `✓ Costs researched`;
           originalBtn.style.background = '#28a745';
 
           // Refresh the entire budget manager to show new costs
@@ -2988,7 +2968,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           console.error('Failed to regenerate costs:', error);
 
           // Show error
-          originalBtn.innerHTML = '✗ Regeneration failed';
+          originalBtn.innerHTML = '✗ Research failed';
           originalBtn.style.background = '#dc3545';
 
           alert(`Failed to regenerate costs: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -3001,6 +2981,26 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           }, 3000);
         }
       });
+    });
+
+    // Setup show all costs button
+    const showAllBtn = this.container.querySelector('#show-all-costs-btn');
+    const hideAllBtn = this.container.querySelector('#hide-all-costs-btn');
+
+    showAllBtn?.addEventListener('click', () => {
+      this.container.querySelectorAll('.item-costs-section[data-country]').forEach(section => {
+        (section as HTMLElement).style.display = 'block';
+      });
+      if (showAllBtn) (showAllBtn as HTMLElement).style.display = 'none';
+      if (hideAllBtn) (hideAllBtn as HTMLElement).style.display = 'inline-block';
+    });
+
+    hideAllBtn?.addEventListener('click', () => {
+      this.container.querySelectorAll('.item-costs-section[data-country]').forEach(section => {
+        (section as HTMLElement).style.display = 'none';
+      });
+      if (hideAllBtn) (hideAllBtn as HTMLElement).style.display = 'none';
+      if (showAllBtn) (showAllBtn as HTMLElement).style.display = 'inline-block';
     });
   }
 
@@ -4148,6 +4148,52 @@ export const budgetManagerStyles = `
   white-space: nowrap;
 }
 
+.category-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.confidence-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cost-sources {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #6c757d;
+}
+
+.source-link {
+  color: #007bff;
+  text-decoration: none;
+  margin-right: 4px;
+}
+
+.source-link:hover {
+  text-decoration: underline;
+}
+
+.more-sources {
+  color: #6c757d;
+  font-style: italic;
+  cursor: help;
+}
+
+.estimate-range {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #6c757d;
+  font-style: italic;
+}
+
 .status-badge {
   display: inline-block;
   padding: 4px 8px;
@@ -4619,6 +4665,35 @@ textarea.auto-resize {
 
 .auto-save-indicator-inline.error {
   color: #dc3545;
+}
+
+/* Estimated total display */
+.estimated-total-display {
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 500;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Accommodation select */
+.accommodation-select {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  min-width: 150px;
+}
+
+/* Destination meta info */
+.dest-meta {
+  font-weight: 400;
+  font-size: 12px;
+  color: #666;
+  margin-left: 6px;
 }
 </style>
 `;

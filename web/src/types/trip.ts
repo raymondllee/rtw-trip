@@ -209,6 +209,7 @@ export interface TripData {
     children: number;
     ages?: number[];
   };
+  accommodation_preference?: 'budget' | 'mid-range' | 'higher-end' | 'luxurious';  // Accommodation preference for cost estimation
 }
 
 export interface TripScenarioVersion {

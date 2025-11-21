@@ -23,9 +23,13 @@ from google.genai.types import Tool, FunctionDeclaration
 from google.adk.tools import ToolContext
 
 from travel_concierge.tools.currency_validator import validate_currency
+from travel_concierge.tools.cost_tracker import CurrencyConverter
 
 logger = logging.getLogger(__name__)
 FLASK_API_URL = os.getenv("FLASK_API_URL", "http://127.0.0.1:5001")
+
+# Currency converter for accurate exchange rates
+_currency_converter = CurrencyConverter()
 
 
 def _to_float(value) -> float:
@@ -123,8 +127,11 @@ def save_researched_costs(
 
         cat_data = research_data[research_cat] or {}
 
-        # Base values from research output (mid is the primary estimate)
-        base_usd = _to_float(cat_data.get('amount_mid', 0))
+        # Research agent returns different semantics per category:
+        # - accommodation, activities: TOTAL for full stay (already includes all travelers)
+        # - food_daily, transport_daily: PER DAY PER PERSON (needs scaling)
+
+        # Get base amount in local currency (this is the source of truth)
         base_local = _to_float(cat_data.get('amount_local', 0))
         currency_local = cat_data.get('currency_local', 'USD')
 
@@ -133,16 +140,25 @@ def save_researched_costs(
         country = destination_name.split(',')[-1].strip() if ',' in destination_name else None
         currency_local = validate_currency(currency_local, country=country, default='USD')
 
-        # Scale per category semantics:
-        # - food_daily, transport_daily: per-day per-person → scale by duration_days * num_travelers
-        # - accommodation, activities: totals for stay → no scaling
-        # NOTE: flights removed - tracked separately via TransportSegment objects
-        multiplier = 1
-        if research_cat in ('food_daily', 'transport_daily'):
-            multiplier = max(1, int(duration_days)) * max(1, int(num_travelers))
+        # Convert base amount to USD using proper exchange rates
+        # (ignore agent's USD conversion which may use incorrect rates)
+        if base_local > 0:
+            base_usd = _currency_converter.convert_to_usd(base_local, currency_local)
+        else:
+            # Fallback: use agent's USD estimate if local amount not provided
+            base_usd = _to_float(cat_data.get('amount_mid', 0))
+            base_local = base_usd
 
-        amount_usd = base_usd * multiplier
-        amount_local = base_local * multiplier if base_local else amount_usd  # fallback if local not provided
+        # Scale per-day categories by duration and travelers
+        # accommodation and activities are already totals, don't scale
+        if research_cat in ('food_daily', 'transport_daily'):
+            multiplier = duration_days * num_travelers
+            amount_usd = base_usd * multiplier
+            amount_local = base_local * multiplier
+        else:
+            # accommodation, activities are already totals
+            amount_usd = base_usd
+            amount_local = base_local
 
         # Build deterministic id for upsert behavior per destination/category
         stable_dest = (
@@ -167,6 +183,8 @@ def save_researched_costs(
             "destination_id": destination_id,
             "booking_status": "researched",
             "source": "web_research",
+            "status": "estimated",
+            # Rich research metadata
             "notes": cat_data.get('notes', ''),
             "confidence": cat_data.get('confidence', 'medium'),
             "sources": cat_data.get('sources', []),
@@ -196,10 +214,12 @@ def save_researched_costs(
         )
 
         if response.status_code == 200:
+            # Calculate total - amounts are already totals for full stay
             total = sum(item['amount_usd'] for item in cost_items)
+
             return {
                 "status": "success",
-                "message": f"Saved {len(cost_items)} cost items for {destination_name} (${total:.2f} total)",
+                "message": f"Saved {len(cost_items)} cost items for {destination_name} (${total:.2f} estimated total for {num_travelers} traveler(s), {duration_days} days)",
                 "total_usd": total,
                 "items_saved": len(cost_items)
             }
