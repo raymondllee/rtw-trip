@@ -339,6 +339,7 @@ function initBudgetTab() {
     locations: currentVersionData.itineraryData.locations || [],
     legs: currentVersionData.itineraryData.legs || [],
     costs: currentVersionData.itineraryData.costs || [],
+    transport_segments: currentVersionData.itineraryData.transport_segments || [],
     budget: currentVersionData.itineraryData.budget || null,
     num_travelers: currentVersionData.itineraryData.num_travelers,
     traveler_composition: currentVersionData.itineraryData.traveler_composition,
