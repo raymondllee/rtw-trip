@@ -123,10 +123,9 @@ def save_researched_costs(
 
         cat_data = research_data[research_cat] or {}
 
-        # Base values from research output (mid is the primary estimate)
-        base_usd_mid = _to_float(cat_data.get('amount_mid', 0))
-        base_usd_low = _to_float(cat_data.get('amount_low', 0))
-        base_usd_high = _to_float(cat_data.get('amount_high', 0))
+        # Research agent returns TOTAL amounts already calculated for the full stay
+        # and all travelers. Save these totals as-is without additional scaling.
+        base_usd = _to_float(cat_data.get('amount_mid', 0))
         base_local = _to_float(cat_data.get('amount_local', 0))
         currency_local = cat_data.get('currency_local', 'USD')
 
@@ -135,24 +134,9 @@ def save_researched_costs(
         country = destination_name.split(',')[-1].strip() if ',' in destination_name else None
         currency_local = validate_currency(currency_local, country=country, default='USD')
 
-        # Determine pricing model based on category semantics:
-        # - food_daily, transport_daily: per-person per-day costs
-        # - accommodation: per-night for entire group (doesn't scale with travelers)
-        # - activities: total for stay (doesn't scale with travelers)
         # NOTE: flights removed - tracked separately via TransportSegment objects
-
-        if research_cat in ('food_daily', 'transport_daily'):
-            # Per-person per-day costs
-            pricing_type = 'per_person_day'
-            scales_with_travelers = True
-        elif research_cat == 'accommodation':
-            # Hotel room is per-night but for entire group
-            pricing_type = 'per_night'
-            scales_with_travelers = False
-        else:  # activities
-            # Activities are usually total cost for the stay
-            pricing_type = 'fixed'
-            scales_with_travelers = False
+        amount_usd = base_usd
+        amount_local = base_local if base_local else amount_usd  # fallback if local not provided
 
         # Build deterministic id for upsert behavior per destination/category
         stable_dest = (
@@ -170,19 +154,9 @@ def save_researched_costs(
             "id": f"{destination_id}_{stable_dest}_{itinerary_cat}",
             "category": itinerary_cat,
             "description": f"{cat_data.get('category', research_cat).title()} in {destination_name}",
-            # Store per-unit amounts (not pre-calculated totals)
-            "amount": base_local,
+            "amount": amount_local,
             "currency": currency_local,
-            "amount_usd": base_usd_mid,
-            # Include low/mid/high estimates for frontend display
-            "amount_low": base_usd_low,
-            "amount_mid": base_usd_mid,
-            "amount_high": base_usd_high,
-            # Pricing model for dynamic calculation
-            "pricing_model": {
-                "type": pricing_type,
-                "scales_with_travelers": scales_with_travelers
-            },
+            "amount_usd": amount_usd,
             "date": datetime.now().strftime("%Y-%m-%d"),
             "destination_id": destination_id,
             "booking_status": "researched",
@@ -218,24 +192,8 @@ def save_researched_costs(
         )
 
         if response.status_code == 200:
-            # Calculate estimated total based on pricing models
-            total = 0
-            for item in cost_items:
-                base_amount = item['amount_usd']
-                pricing_model = item.get('pricing_model', {})
-                pricing_type = pricing_model.get('type', 'fixed')
-                scales_with_travelers = pricing_model.get('scales_with_travelers', False)
-
-                # Apply scaling based on pricing model
-                multiplier = 1
-                if pricing_type == 'per_person_day':
-                    multiplier = num_travelers * duration_days
-                elif pricing_type == 'per_night':
-                    nights = max(1, duration_days - 1)
-                    multiplier = nights
-                # 'fixed' costs don't multiply
-
-                total += base_amount * multiplier
+            # Calculate total - amounts are already totals for full stay
+            total = sum(item['amount_usd'] for item in cost_items)
 
             return {
                 "status": "success",
