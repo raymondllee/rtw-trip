@@ -307,7 +307,7 @@ export class BudgetManager {
   /**
    * Trigger AI research for a transport segment
    */
-  private async researchTransportSegment(segmentId: string): Promise<void> {
+  private async researchTransportSegment(segmentId: string, isBulkOperation: boolean = false): Promise<void> {
     try {
       const segment = this.transportSegments.find(s => s.id === segmentId);
       if (!segment) {
@@ -412,26 +412,38 @@ export class BudgetManager {
         // Re-render to show updated costs
         await this.render();
 
-        // Show detailed success message like main app
-        const airlines = (researchData.airlines || []).slice(0, 3).join(', ') || 'various carriers';
-        const alternatives = researchData.alternatives?.length || 0;
-        alert(`✅ Research complete! ${this.formatCurrency(costMid)} estimated (${airlines}). Found ${alternatives} alternative routes.`);
+        // Show detailed success message like main app (only for individual research, not bulk)
+        if (!isBulkOperation) {
+          const airlines = (researchData.airlines || []).slice(0, 3).join(', ') || 'various carriers';
+          const alternatives = researchData.alternatives?.length || 0;
+          alert(`✅ Research complete! ${this.formatCurrency(costMid)} estimated (${airlines}). Found ${alternatives} alternative routes.`);
+        }
       } else {
         // Research completed but no structured pricing data
         console.warn('Research completed but no pricing data returned:', result);
-        alert(`⚠️ Research completed but no pricing data was found. Check console for details.`);
+        if (!isBulkOperation) {
+          alert(`⚠️ Research completed but no pricing data was found. Check console for details.`);
+        }
       }
 
     } catch (error) {
       console.error('Error researching transport segment:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      alert(`❌ Research failed: ${errorMessage}`);
+
+      if (!isBulkOperation) {
+        alert(`❌ Research failed: ${errorMessage}`);
+      }
 
       // Re-enable button
       const btn = this.container.querySelector(`[data-segment-id="${segmentId}"]`) as HTMLButtonElement;
       if (btn) {
         btn.disabled = false;
         btn.textContent = '🤖 Research';
+      }
+
+      // Re-throw error for bulk operation to handle
+      if (isBulkOperation) {
+        throw error;
       }
     }
   }
@@ -674,7 +686,7 @@ export class BudgetManager {
       }
 
       try {
-        await this.researchTransportSegment(segmentId);
+        await this.researchTransportSegment(segmentId, true);
         successCount++;
 
         // Add small delay between requests to avoid overwhelming the API
