@@ -1257,6 +1257,147 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
       .join('');
   }
 
+  private getTransportSegments(): any[] {
+    // Get segments from the global transport segment manager
+    const manager = (window as any).transportSegmentManager;
+    if (!manager) return [];
+    return manager.getAllSegments() || [];
+  }
+
+  private renderTransportSegmentsSection(): string {
+    const segments = this.getTransportSegments();
+    if (segments.length === 0) {
+      return '';
+    }
+
+    // Calculate totals
+    const manager = (window as any).transportSegmentManager;
+    const totalCost = manager ? manager.getTotalCost() : 0;
+    const researchedCount = segments.filter((s: any) => s.booking_status === 'researched' || s.researched_cost_mid).length;
+    const needsResearchCount = segments.length - researchedCount;
+
+    const getTransportIcon = (mode: string) => {
+      const icons: Record<string, string> = {
+        'plane': '✈️',
+        'train': '🚂',
+        'car': '🚗',
+        'bus': '🚌',
+        'ferry': '🚢',
+        'walking': '🚶'
+      };
+      return icons[mode] || '✈️';
+    };
+
+    const getStatusBadge = (segment: any) => {
+      if (segment.booking_status === 'paid' || segment.booking_status === 'booked') {
+        return `<span class="segment-status-badge status-booked">${segment.booking_status}</span>`;
+      } else if (segment.booking_status === 'researched' || segment.researched_cost_mid) {
+        return `<span class="segment-status-badge status-researched">researched</span>`;
+      } else {
+        return `<span class="segment-status-badge status-estimated">estimated</span>`;
+      }
+    };
+
+    const getActiveCost = (segment: any) => {
+      if (segment.actual_cost_usd && segment.actual_cost_usd > 0) {
+        return segment.actual_cost_usd;
+      }
+      if (segment.researched_cost_mid && segment.researched_cost_mid > 0) {
+        return segment.researched_cost_mid;
+      }
+      return segment.estimated_cost_usd || 0;
+    };
+
+    const needsResearch = (segment: any) => {
+      return !segment.researched_cost_mid && segment.booking_status !== 'booked' && segment.booking_status !== 'paid';
+    };
+
+    return `
+      <div class="budget-edit-section transport-segments-section">
+        <div class="section-header">
+          <h4>🚀 Transportation Segments</h4>
+          <div class="header-actions">
+            <span class="segment-summary">
+              ${segments.length} segment${segments.length !== 1 ? 's' : ''} •
+              ${researchedCount} researched •
+              ${needsResearchCount > 0 ? `<span class="needs-research">${needsResearchCount} need research</span>` : '<span class="all-researched">all researched</span>'}
+            </span>
+          </div>
+        </div>
+
+        <div class="transport-segment-controls">
+          <div class="selection-controls">
+            <label class="checkbox-label">
+              <input type="checkbox" id="select-all-segments" />
+              <span>Select All</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="select-needs-research" />
+              <span>Select Needing Research (${needsResearchCount})</span>
+            </label>
+          </div>
+          <div class="action-controls">
+            <button class="btn-sm btn-primary" id="research-selected-segments-btn" disabled>
+              🔍 Research Selected (<span id="selected-count">0</span>)
+            </button>
+            <span id="transport-research-status" class="research-status"></span>
+          </div>
+        </div>
+
+        <div class="transport-segments-list">
+          <div class="segments-header">
+            <span class="col-select"></span>
+            <span class="col-route">Route</span>
+            <span class="col-mode">Mode</span>
+            <span class="col-cost">Cost</span>
+            <span class="col-status">Status</span>
+          </div>
+          ${segments.map((segment: any, index: number) => {
+            const cost = getActiveCost(segment);
+            const icon = getTransportIcon(segment.transport_mode);
+            const canResearch = needsResearch(segment);
+            const fromName = segment.from_name || `Location ${index}`;
+            const toName = segment.to_name || `Location ${index + 1}`;
+
+            return `
+              <div class="segment-row ${canResearch ? 'needs-research' : ''}" data-segment-id="${segment.id}">
+                <span class="col-select">
+                  <input type="checkbox"
+                         class="segment-checkbox"
+                         data-segment-id="${segment.id}"
+                         data-from="${fromName}"
+                         data-to="${toName}"
+                         ${!canResearch ? 'disabled title="Already researched or booked"' : ''} />
+                </span>
+                <span class="col-route">
+                  <span class="route-text">${fromName} → ${toName}</span>
+                  ${segment.distance_km ? `<span class="route-distance">${Math.round(segment.distance_km)} km</span>` : ''}
+                </span>
+                <span class="col-mode">
+                  <span class="mode-icon">${icon}</span>
+                  <span class="mode-text">${segment.transport_mode || 'plane'}</span>
+                </span>
+                <span class="col-cost">
+                  <span class="cost-value">${this.formatCurrency(cost)}</span>
+                  ${segment.researched_cost_low && segment.researched_cost_high ?
+                    `<span class="cost-range">${this.formatCurrency(segment.researched_cost_low)} - ${this.formatCurrency(segment.researched_cost_high)}</span>` : ''}
+                </span>
+                <span class="col-status">
+                  ${getStatusBadge(segment)}
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <div class="transport-total">
+          <span class="total-label">Total Transportation Cost:</span>
+          <span class="total-value">${this.formatCurrency(totalCost)}</span>
+        </div>
+      </div>
+    `;
+  }
+
   private renderTravelerSection(): string {
     const numTravelers = this.tripData.num_travelers || 1;
     const composition = this.tripData.traveler_composition;
@@ -1707,6 +1848,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             }).join('')}
           </div>
         </div>
+
+        <!-- Transportation Segments -->
+        ${this.renderTransportSegmentsSection()}
       </div>
     `;
   }
@@ -3002,6 +3146,198 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
       if (hideAllBtn) (hideAllBtn as HTMLElement).style.display = 'none';
       if (showAllBtn) (showAllBtn as HTMLElement).style.display = 'inline-block';
     });
+
+    // Transport segment event listeners
+    this.setupTransportSegmentListeners();
+  }
+
+  private setupTransportSegmentListeners() {
+    const updateSelectedCount = () => {
+      const checkboxes = this.container.querySelectorAll('.segment-checkbox:checked:not(:disabled)');
+      const count = checkboxes.length;
+      const countSpan = this.container.querySelector('#selected-count');
+      const researchBtn = this.container.querySelector('#research-selected-segments-btn') as HTMLButtonElement;
+
+      if (countSpan) countSpan.textContent = String(count);
+      if (researchBtn) researchBtn.disabled = count === 0;
+    };
+
+    // Individual segment checkboxes
+    this.container.querySelectorAll('.segment-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', () => {
+        updateSelectedCount();
+
+        // Update "Select All" checkbox state
+        const allCheckboxes = this.container.querySelectorAll('.segment-checkbox:not(:disabled)');
+        const checkedCheckboxes = this.container.querySelectorAll('.segment-checkbox:checked:not(:disabled)');
+        const selectAllCheckbox = this.container.querySelector('#select-all-segments') as HTMLInputElement;
+        if (selectAllCheckbox) {
+          selectAllCheckbox.checked = allCheckboxes.length > 0 && allCheckboxes.length === checkedCheckboxes.length;
+          selectAllCheckbox.indeterminate = checkedCheckboxes.length > 0 && checkedCheckboxes.length < allCheckboxes.length;
+        }
+      });
+    });
+
+    // Select All checkbox
+    const selectAllCheckbox = this.container.querySelector('#select-all-segments');
+    selectAllCheckbox?.addEventListener('change', (e) => {
+      const checked = (e.target as HTMLInputElement).checked;
+      this.container.querySelectorAll('.segment-checkbox:not(:disabled)').forEach(checkbox => {
+        (checkbox as HTMLInputElement).checked = checked;
+      });
+      updateSelectedCount();
+    });
+
+    // Select Needing Research checkbox
+    const selectNeedsResearchCheckbox = this.container.querySelector('#select-needs-research');
+    selectNeedsResearchCheckbox?.addEventListener('change', (e) => {
+      const checked = (e.target as HTMLInputElement).checked;
+      // First uncheck all
+      this.container.querySelectorAll('.segment-checkbox:not(:disabled)').forEach(checkbox => {
+        (checkbox as HTMLInputElement).checked = false;
+      });
+      // Then check only those needing research
+      if (checked) {
+        this.container.querySelectorAll('.segment-row.needs-research .segment-checkbox:not(:disabled)').forEach(checkbox => {
+          (checkbox as HTMLInputElement).checked = true;
+        });
+      }
+      updateSelectedCount();
+    });
+
+    // Research Selected button
+    const researchBtn = this.container.querySelector('#research-selected-segments-btn');
+    researchBtn?.addEventListener('click', () => this.researchSelectedSegments());
+  }
+
+  private async researchSelectedSegments() {
+    const selectedCheckboxes = this.container.querySelectorAll('.segment-checkbox:checked:not(:disabled)');
+    if (selectedCheckboxes.length === 0) return;
+
+    const segments = this.getTransportSegments();
+    const selectedSegments: any[] = [];
+
+    selectedCheckboxes.forEach(checkbox => {
+      const segmentId = (checkbox as HTMLElement).dataset.segmentId;
+      const segment = segments.find((s: any) => s.id === segmentId);
+      if (segment) {
+        selectedSegments.push(segment);
+      }
+    });
+
+    const statusEl = this.container.querySelector('#transport-research-status');
+    const researchBtn = this.container.querySelector('#research-selected-segments-btn') as HTMLButtonElement;
+    const originalBtnText = researchBtn?.innerHTML || '';
+
+    // Disable button and show progress
+    if (researchBtn) {
+      researchBtn.disabled = true;
+      researchBtn.innerHTML = '⏳ Researching...';
+    }
+
+    const config = getRuntimeConfig();
+    const apiBaseUrl = config.apiBaseUrl || 'http://localhost:5001';
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < selectedSegments.length; i++) {
+      const segment = selectedSegments[i];
+      const fromName = segment.from_name || 'Unknown';
+      const toName = segment.to_name || 'Unknown';
+
+      if (statusEl) {
+        statusEl.textContent = `Researching ${i + 1}/${selectedSegments.length}: ${fromName} → ${toName}...`;
+        statusEl.className = 'research-status researching';
+      }
+
+      // Update row to show researching state
+      const row = this.container.querySelector(`.segment-row[data-segment-id="${segment.id}"]`);
+      if (row) {
+        row.classList.add('researching');
+      }
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/transport/research`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: `transport_research_${Date.now()}`,
+            segment_id: segment.id,
+            from_destination_name: fromName,
+            from_country: segment.from_country || '',
+            to_destination_name: toName,
+            to_country: segment.to_country || '',
+            departure_date: segment.departure_date || null
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success' && result.research_data) {
+          // Update the segment with research results via the update endpoint
+          await fetch(`${apiBaseUrl}/api/transport/update-research`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_id: `transport_update_${Date.now()}`,
+              segment_id: segment.id,
+              scenario_id: segment.scenario_id,
+              research_data: result.research_data
+            })
+          });
+
+          successCount++;
+
+          // Mark row as researched
+          if (row) {
+            row.classList.remove('researching', 'needs-research');
+            row.classList.add('research-complete');
+          }
+        } else {
+          errorCount++;
+          console.error(`Research failed for ${fromName} → ${toName}:`, result);
+          if (row) {
+            row.classList.remove('researching');
+            row.classList.add('research-error');
+          }
+        }
+      } catch (error) {
+        errorCount++;
+        console.error(`Error researching ${fromName} → ${toName}:`, error);
+        if (row) {
+          row.classList.remove('researching');
+          row.classList.add('research-error');
+        }
+      }
+    }
+
+    // Show final status
+    if (statusEl) {
+      if (errorCount === 0) {
+        statusEl.textContent = `✓ Researched ${successCount} segment${successCount !== 1 ? 's' : ''} successfully`;
+        statusEl.className = 'research-status success';
+      } else {
+        statusEl.textContent = `Completed: ${successCount} success, ${errorCount} failed`;
+        statusEl.className = 'research-status partial';
+      }
+    }
+
+    // Reset button
+    if (researchBtn) {
+      researchBtn.innerHTML = originalBtnText;
+      researchBtn.disabled = false;
+    }
+
+    // Refresh the transport segment manager and re-render after a short delay
+    const scenarioId = selectedSegments[0]?.scenario_id;
+    setTimeout(async () => {
+      const manager = (window as any).transportSegmentManager;
+      if (manager && scenarioId) {
+        await manager.loadSegments(scenarioId);
+      }
+      this.render();
+    }, 1500);
   }
 
   private setupAutoResizeTextareas() {
@@ -4694,6 +5030,254 @@ textarea.auto-resize {
   font-size: 12px;
   color: #666;
   margin-left: 6px;
+}
+
+/* Transport Segments Section */
+.transport-segments-section {
+  margin-top: 20px;
+}
+
+.transport-segments-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.transport-segments-section .segment-summary {
+  font-size: 13px;
+  color: #666;
+}
+
+.transport-segments-section .needs-research {
+  color: #e67e22;
+  font-weight: 500;
+}
+
+.transport-segments-section .all-researched {
+  color: #27ae60;
+  font-weight: 500;
+}
+
+.transport-segment-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.selection-controls {
+  display: flex;
+  gap: 16px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.action-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.research-status {
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.research-status.researching {
+  color: #2980b9;
+  background: #ebf5fb;
+}
+
+.research-status.success {
+  color: #27ae60;
+  background: #e8f8f0;
+}
+
+.research-status.partial {
+  color: #e67e22;
+  background: #fef5e7;
+}
+
+.transport-segments-list {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segments-header {
+  display: grid;
+  grid-template-columns: 40px 1fr 100px 120px 100px;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f1f3f5;
+  font-weight: 600;
+  font-size: 12px;
+  color: #495057;
+  text-transform: uppercase;
+}
+
+.segment-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 100px 120px 100px;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid #e9ecef;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.segment-row:last-child {
+  border-bottom: none;
+}
+
+.segment-row:hover {
+  background: #f8f9fa;
+}
+
+.segment-row.needs-research {
+  background: #fffbf0;
+}
+
+.segment-row.researching {
+  background: #ebf5fb;
+  animation: pulse 1.5s infinite;
+}
+
+.segment-row.research-complete {
+  background: #e8f8f0;
+}
+
+.segment-row.research-error {
+  background: #fdf0ef;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.col-select {
+  display: flex;
+  justify-content: center;
+}
+
+.col-route {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.route-text {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.route-distance {
+  font-size: 11px;
+  color: #888;
+}
+
+.col-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mode-icon {
+  font-size: 16px;
+}
+
+.mode-text {
+  font-size: 12px;
+  color: #666;
+  text-transform: capitalize;
+}
+
+.col-cost {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cost-value {
+  font-weight: 600;
+  font-size: 14px;
+  color: #2c3e50;
+}
+
+.cost-range {
+  font-size: 10px;
+  color: #888;
+}
+
+.col-status {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.segment-status-badge {
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.segment-status-badge.status-estimated {
+  background: #f1f3f5;
+  color: #868e96;
+}
+
+.segment-status-badge.status-researched {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.segment-status-badge.status-booked {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.transport-total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  margin-top: 12px;
+}
+
+.transport-total .total-label {
+  font-weight: 500;
+  color: #495057;
+}
+
+.transport-total .total-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.segment-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
 `;
