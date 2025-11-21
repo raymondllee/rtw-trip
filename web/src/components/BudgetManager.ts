@@ -1265,13 +1265,37 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
   }
 
   private renderTransportSegmentsSection(): string {
+    const manager = (window as any).transportSegmentManager;
     const segments = this.getTransportSegments();
+
+    // Always show section header, but with appropriate content based on state
+    if (!manager) {
+      return `
+        <div class="budget-edit-section transport-segments-section">
+          <div class="section-header">
+            <h4>🚀 Transportation Segments</h4>
+          </div>
+          <div class="transport-segments-empty">
+            <p>Transport segment manager not available. Please refresh the page.</p>
+          </div>
+        </div>
+      `;
+    }
+
     if (segments.length === 0) {
-      return '';
+      return `
+        <div class="budget-edit-section transport-segments-section">
+          <div class="section-header">
+            <h4>🚀 Transportation Segments</h4>
+          </div>
+          <div class="transport-segments-empty">
+            <p>No transportation segments found. Segments are created automatically when you have 2+ destinations.</p>
+          </div>
+        </div>
+      `;
     }
 
     // Calculate totals
-    const manager = (window as any).transportSegmentManager;
     const totalCost = manager ? manager.getTotalCost() : 0;
     const researchedCount = segments.filter((s: any) => s.booking_status === 'researched' || s.researched_cost_mid).length;
     const needsResearchCount = segments.length - researchedCount;
@@ -5037,6 +5061,15 @@ textarea.auto-resize {
   margin-top: 20px;
 }
 
+.transport-segments-empty {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  background: #f8f9fa;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
 .transport-segments-section .section-header {
   display: flex;
   justify-content: space-between;
@@ -5278,6 +5311,84 @@ textarea.auto-resize {
 .segment-checkbox:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Mobile responsive styles for transport segments */
+@media (max-width: 768px) {
+  .transport-segment-controls {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .selection-controls {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .action-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .action-controls #research-selected-segments-btn {
+    width: 100%;
+  }
+
+  .segments-header {
+    display: none;
+  }
+
+  .segment-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    position: relative;
+  }
+
+  .segment-row .col-select {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+  }
+
+  .segment-row .col-route {
+    padding-right: 40px;
+  }
+
+  .segment-row .col-route .route-text {
+    font-size: 14px;
+  }
+
+  .segment-row .col-mode,
+  .segment-row .col-cost,
+  .segment-row .col-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .segment-row .col-mode::before {
+    content: 'Mode: ';
+    font-size: 11px;
+    color: #888;
+    font-weight: 500;
+  }
+
+  .segment-row .col-cost::before {
+    content: 'Cost: ';
+    font-size: 11px;
+    color: #888;
+    font-weight: 500;
+  }
+
+  .transport-total {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
 }
 </style>
 `;
