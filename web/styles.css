@@ -2931,17 +2931,16 @@ textarea.form-input {
   transform: rotate(180deg);
 }
 
-/* Education section - collapsed by default */
+/* Education section - now handled by education-styles.css */
 .education-section {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease;
+  /* Removed max-height: 0 - new design is visible by default */
   width: 100%;
   order: 20;
 }
 
 .education-section.expanded {
-  max-height: 1000px;
+  /* Legacy - no longer needed with new design */
+  max-height: none;
 }
 
 /* Education section placeholder styles */

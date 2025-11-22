@@ -12,16 +12,15 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
 
   if (!hasCurricula) {
     return `
-      <div class="education-section expanded" data-location-id="${location.id}">
+      <div class="education-section" data-location-id="${location.id}">
         <div class="education-header">
           <span class="education-icon">📚</span>
           <span>Education</span>
         </div>
-        <div class="education-content" style="display: block;">
+        <div class="education-summary">
           <button class="btn-generate-curriculum" data-location-id="${location.id}">
             <span>✨ Generate Curriculum</span>
           </button>
-          <p class="education-hint">Create learning activities for this destination</p>
         </div>
       </div>
     `;
@@ -29,46 +28,311 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
 
   // Show existing curricula
   const mostRecent = curricula[0]; // Assuming sorted by created_at DESC
-  const totalActivities = Object.values(mostRecent.location_lessons || {})
-    .reduce((sum: number, lesson: any) => {
-      const expCount = lesson?.on_location?.experiential_activities?.length || 0;
-      const structCount = lesson?.on_location?.structured_lessons?.length || 0;
-      return sum + expCount + structCount;
-    }, 0);
+  const destinationName = location?.name || location?.city || (mostRecent.semester?.title?.replace('Learning Journey: ', '') || 'Destination');
+
+  // Calculate overview stats from location lessons
+  let totalActivities = 0;
+  let totalLessons = 0;
+  let totalReadings = 0;
+
+  const locationLesson = mostRecent.location_lessons?.[location.id];
+  if (locationLesson) {
+    totalActivities = (locationLesson.on_location?.experiential_activities?.length || 0);
+    totalLessons = (locationLesson.on_location?.structured_lessons?.length || 0) +
+                   (locationLesson.pre_trip?.lessons?.length || 0);
+    totalReadings = (locationLesson.pre_trip?.readings?.length || 0);
+  }
+
+  // Count items per section for badges
+  const preTripCount = (locationLesson?.pre_trip?.lessons?.length || 0) +
+                       (locationLesson?.pre_trip?.readings?.length || 0) +
+                       (locationLesson?.pre_trip?.videos?.length || 0) +
+                       (locationLesson?.pre_trip?.preparation_tasks?.length || 0);
+
+  const onLocationCount = totalActivities + totalLessons;
+
+  const postTripCount = (locationLesson?.post_trip?.reflection_prompts?.length || 0) +
+                        (locationLesson?.post_trip?.synthesis_activities?.length || 0) +
+                        (locationLesson?.post_trip?.assessment_tasks?.length || 0);
+
+  // Build compact summary for collapsed state
+  const summaryParts = [];
+  if (totalActivities > 0) summaryParts.push(`${totalActivities} ${totalActivities === 1 ? 'activity' : 'activities'}`);
+  if (totalReadings > 0) summaryParts.push(`${totalReadings} ${totalReadings === 1 ? 'reading' : 'readings'}`);
+  const summaryText = summaryParts.join(' • ');
 
   return `
-    <div class="education-section expanded" data-location-id="${location.id}">
-      <div class="education-header" data-toggle="education-${location.id}">
-        <span class="education-icon">📚</span>
-        <span>Education</span>
-        <span class="education-badge">${curricula.length}</span>
-        <span class="education-toggle">▼</span>
-      </div>
-      <div class="education-content" id="education-${location.id}">
-        <div class="curriculum-summary">
-          <div class="curriculum-title">${mostRecent.semester.title}</div>
-          <div class="curriculum-meta">
-            <span>📅 ${mostRecent.semester.total_weeks} weeks</span>
-            <span>📝 ${totalActivities} activities</span>
-            <span class="curriculum-status status-${mostRecent.status}">${mostRecent.status}</span>
-          </div>
+    <div class="education-section" data-location-id="${location.id}">
+      <div class="education-summary-compact" data-toggle="education-details-${location.id}">
+        <div class="education-summary-left">
+          <span class="education-icon">📚</span>
+          <span class="education-title">${destinationName}</span>
+          ${summaryText ? `<span class="education-meta-compact"> • ${summaryText}</span>` : ''}
         </div>
-        ${curricula.length > 1 ? `
-          <div class="curriculum-count">
-            +${curricula.length - 1} more curriculum${curricula.length > 2 ? 's' : ''}
-          </div>
-        ` : ''}
+        <div class="education-summary-right">
+          <span class="education-toggle-text">▾ Details</span>
+        </div>
+      </div>
+      <div class="education-details" id="education-details-${location.id}">
+        <div class="curriculum-status-row">
+          <span class="curriculum-status-compact status-${mostRecent.status}">${mostRecent.status.toUpperCase()}</span>
+          ${mostRecent.semester?.title ? `<span class="curriculum-semester-label">${mostRecent.semester.title}</span>` : ''}
+        </div>
+        ${locationLesson ? generateLocationDetailsHTML(locationLesson, location.id, preTripCount, onLocationCount, postTripCount) : '<p class="education-hint">No curriculum content for this location yet.</p>'}
         <div class="education-actions">
           <button class="btn-view-curriculum" data-curriculum-id="${mostRecent.id}">
-            <span>👁️ View</span>
-          </button>
-          <button class="btn-generate-curriculum" data-location-id="${location.id}">
-            <span>✨ Generate New</span>
+            <span>👁️ View Full Details</span>
           </button>
         </div>
       </div>
     </div>
   `;
+}
+
+/**
+ * Generate nested expandable sections for Pre-Trip, On-Location, Post-Trip
+ */
+function generateLocationDetailsHTML(
+  locationLesson: any,
+  locationId: string,
+  preCount: number,
+  onCount: number,
+  postCount: number
+): string {
+  return `
+    ${preCount > 0 ? `
+      <div class="education-subsection">
+        <div class="education-subsection-header" data-toggle="pre-trip-${locationId}">
+          <span class="subsection-icon">📖</span>
+          <span>Pre-Trip</span>
+          <span class="subsection-count">${preCount}</span>
+          <span class="subsection-toggle">▶</span>
+        </div>
+        <div class="education-subsection-content" id="pre-trip-${locationId}">
+          ${generatePreTripContentHTML(locationLesson.pre_trip)}
+        </div>
+      </div>
+    ` : ''}
+
+    ${onCount > 0 ? `
+      <div class="education-subsection">
+        <div class="education-subsection-header" data-toggle="on-location-${locationId}">
+          <span class="subsection-icon">📍</span>
+          <span>On-Location</span>
+          <span class="subsection-count">${onCount}</span>
+          <span class="subsection-toggle">▶</span>
+        </div>
+        <div class="education-subsection-content" id="on-location-${locationId}">
+          ${generateOnLocationContentHTML(locationLesson.on_location)}
+        </div>
+      </div>
+    ` : ''}
+
+    ${postCount > 0 ? `
+      <div class="education-subsection">
+        <div class="education-subsection-header" data-toggle="post-trip-${locationId}">
+          <span class="subsection-icon">✈️</span>
+          <span>Post-Trip</span>
+          <span class="subsection-count">${postCount}</span>
+          <span class="subsection-toggle">▶</span>
+        </div>
+        <div class="education-subsection-content" id="post-trip-${locationId}">
+          ${generatePostTripContentHTML(locationLesson.post_trip)}
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
+/**
+ * Generate Pre-Trip content list with full details
+ */
+function generatePreTripContentHTML(preTrip: any): string {
+  if (!preTrip) return '<p class="education-empty">No pre-trip content</p>';
+
+  let html = '';
+
+  // Readings
+  if (preTrip.readings?.length > 0) {
+    html += '<div style="margin-bottom: 16px;"><strong style="font-size: 13px; color: #333;">📚 Readings</strong>';
+    preTrip.readings.forEach((reading: any) => {
+      html += `
+        <div style="margin: 8px 0; padding: 12px; background: white; border-left: 3px solid #1e88e5; border-radius: 4px;">
+          <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${reading.title}</div>
+          <div style="font-size: 12px; color: #999; margin-bottom: 6px;">${reading.source || ''} ${reading.reading_time_minutes ? `• ${reading.reading_time_minutes} min` : ''}</div>
+          ${reading.description ? `<div style="font-size: 13px; color: #666; line-height: 1.5;">${reading.description}</div>` : ''}
+          ${reading.url ? `<a href="${reading.url}" target="_blank" style="font-size: 12px; color: #1e88e5; text-decoration: none; margin-top: 6px; display: inline-block;">Read →</a>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Videos
+  if (preTrip.videos?.length > 0) {
+    html += '<div style="margin-bottom: 16px;"><strong style="font-size: 13px; color: #333;">🎥 Videos</strong>';
+    preTrip.videos.forEach((video: any) => {
+      html += `
+        <div style="margin: 8px 0; padding: 12px; background: white; border-left: 3px solid #1e88e5; border-radius: 4px;">
+          <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${video.title}</div>
+          <div style="font-size: 12px; color: #999; margin-bottom: 6px;">${video.source || ''} ${video.duration_minutes ? `• ${video.duration_minutes} min` : ''}</div>
+          ${video.description ? `<div style="font-size: 13px; color: #666; line-height: 1.5;">${video.description}</div>` : ''}
+          ${video.url ? `<a href="${video.url}" target="_blank" style="font-size: 12px; color: #1e88e5; text-decoration: none; margin-top: 6px; display: inline-block;">Watch →</a>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Lessons
+  if (preTrip.lessons?.length > 0) {
+    html += '<div style="margin-bottom: 16px;"><strong style="font-size: 13px; color: #333;">📖 Lessons</strong>';
+    preTrip.lessons.forEach((lesson: any) => {
+      html += `
+        <div style="margin: 8px 0; padding: 12px; background: white; border-left: 3px solid #1e88e5; border-radius: 4px;">
+          <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${lesson.title}</div>
+          ${lesson.description ? `<div style="font-size: 13px; color: #666; line-height: 1.5;">${lesson.description}</div>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Preparation Tasks
+  if (preTrip.preparation_tasks?.length > 0) {
+    html += '<div style="margin-bottom: 16px;"><strong style="font-size: 13px; color: #333;">✅ Preparation Tasks</strong>';
+    preTrip.preparation_tasks.forEach((task: any) => {
+      html += `
+        <div style="margin: 8px 0; padding: 12px; background: white; border-left: 3px solid #1e88e5; border-radius: 4px;">
+          <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${task.title}</div>
+          ${task.description ? `<div style="font-size: 13px; color: #666; line-height: 1.5;">${task.description}</div>` : ''}
+          ${task.estimated_duration_minutes ? `<div style="font-size: 12px; color: #999; margin-top: 4px;">${task.estimated_duration_minutes} minutes</div>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  return html || '<p class="education-empty">No pre-trip content</p>';
+}
+
+/**
+ * Generate On-Location content list with full activity details
+ */
+function generateOnLocationContentHTML(onLocation: any): string {
+  if (!onLocation) return '<p class="education-empty">No on-location content</p>';
+
+  let html = '';
+
+  // Experiential Activities
+  if (onLocation.experiential_activities?.length > 0) {
+    html += '<div style="margin-bottom: 16px;"><strong style="font-size: 13px; color: #333;">🌍 Experiential Activities</strong>';
+    onLocation.experiential_activities.forEach((activity: any) => {
+      html += `
+        <div style="margin: 8px 0; padding: 12px; background: white; border-left: 3px solid #1e88e5; border-radius: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <div style="font-weight: 600; font-size: 14px;">${activity.title}</div>
+            <div style="display: flex; gap: 8px; align-items: center; font-size: 11px;">
+              ${activity.subject ? `<span style="background: #e3f2fd; color: #1e88e5; padding: 3px 8px; border-radius: 10px; font-weight: 600;">${activity.subject}</span>` : ''}
+              ${activity.estimated_duration_minutes ? `<span style="color: #999;">${activity.estimated_duration_minutes} min</span>` : ''}
+            </div>
+          </div>
+          ${activity.description ? `<div style="font-size: 13px; color: #666; line-height: 1.6; margin-bottom: 8px;">${activity.description}</div>` : ''}
+          ${activity.site_details ? `
+            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; border-radius: 4px; font-size: 12px; margin-top: 8px;">
+              <strong style="color: #856404;">📍 ${activity.site_details.name}</strong>
+              ${activity.site_details.address ? `<div style="color: #856404; margin-top: 4px;">${activity.site_details.address}</div>` : ''}
+            </div>
+          ` : ''}
+          ${activity.external_links && activity.external_links.length > 0 ? `
+            <div style="margin-top: 8px;">
+              ${activity.external_links.map((link: string) => `<a href="${link}" target="_blank" style="font-size: 12px; color: #1e88e5; text-decoration: none; margin-right: 12px;">🔗 Link</a>`).join('')}
+            </div>
+          ` : ''}
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Structured Lessons
+  if (onLocation.structured_lessons?.length > 0) {
+    html += '<div style="margin-bottom: 16px;"><strong style="font-size: 13px; color: #333;">📝 Structured Lessons</strong>';
+    onLocation.structured_lessons.forEach((lesson: any) => {
+      html += `
+        <div style="margin: 8px 0; padding: 12px; background: white; border-left: 3px solid #1e88e5; border-radius: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <div style="font-weight: 600; font-size: 14px;">${lesson.title}</div>
+            <div style="display: flex; gap: 8px; align-items: center; font-size: 11px;">
+              ${lesson.subject ? `<span style="background: #e3f2fd; color: #1e88e5; padding: 3px 8px; border-radius: 10px; font-weight: 600;">${lesson.subject}</span>` : ''}
+              ${lesson.estimated_duration_minutes ? `<span style="color: #999;">${lesson.estimated_duration_minutes} min</span>` : ''}
+            </div>
+          </div>
+          ${lesson.description ? `<div style="font-size: 13px; color: #666; line-height: 1.6;">${lesson.description}</div>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Field Trip Guides
+  if (onLocation.field_trip_guides?.length > 0) {
+    html += '<div style="margin-bottom: 16px;"><strong style="font-size: 13px; color: #333;">🗺️ Field Trip Guides</strong>';
+    onLocation.field_trip_guides.forEach((guide: any) => {
+      html += `
+        <div style="margin: 8px 0; padding: 12px; background: white; border-left: 3px solid #1e88e5; border-radius: 4px;">
+          <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${guide.site_name}</div>
+          ${guide.description ? `<div style="font-size: 13px; color: #666; line-height: 1.5;">${guide.description}</div>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  return html || '<p class="education-empty">No on-location content</p>';
+}
+
+/**
+ * Generate Post-Trip content list with full details
+ */
+function generatePostTripContentHTML(postTrip: any): string {
+  if (!postTrip) return '<p class="education-empty">No post-trip content</p>';
+
+  let html = '';
+
+  // Reflection Prompts
+  if (postTrip.reflection_prompts?.length > 0) {
+    html += '<div style="margin-bottom: 16px;"><strong style="font-size: 13px; color: #333;">💭 Reflection Prompts</strong>';
+    postTrip.reflection_prompts.forEach((prompt: any) => {
+      html += `
+        <div style="margin: 8px 0; padding: 12px; background: white; border-left: 3px solid #1e88e5; border-radius: 4px;">
+          <div style="font-size: 13px; color: #666; line-height: 1.6;">${prompt.text || prompt.prompt || prompt.question}</div>
+          <div style="font-size: 12px; color: #999; margin-top: 6px;">${prompt.type || 'journal'} • ${prompt.word_count_target || prompt.word_count || 300} words</div>
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Synthesis Activities
+  if (postTrip.synthesis_activities?.length > 0) {
+    html += '<div style="margin-bottom: 16px;"><strong style="font-size: 13px; color: #333;">🎨 Synthesis Activities</strong>';
+    postTrip.synthesis_activities.forEach((activity: any) => {
+      html += `
+        <div style="margin: 8px 0; padding: 12px; background: white; border-left: 3px solid #1e88e5; border-radius: 4px;">
+          <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${activity.title}</div>
+          ${activity.description ? `<div style="font-size: 13px; color: #666; line-height: 1.5;">${activity.description}</div>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Assessment Tasks
+  if (postTrip.assessment_tasks?.length > 0) {
+    html += '<div style="margin-bottom: 16px;"><strong style="font-size: 13px; color: #333;">✅ Assessment Tasks</strong>';
+    postTrip.assessment_tasks.forEach((task: any) => {
+      html += `
+        <div style="margin: 8px 0; padding: 12px; background: white; border-left: 3px solid #1e88e5; border-radius: 4px;">
+          <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${task.title}</div>
+          ${task.description ? `<div style="font-size: 13px; color: #666; line-height: 1.5;">${task.description}</div>` : ''}
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  return html || '<p class="education-empty">No post-trip content</p>';
 }
 
 /**
@@ -713,21 +977,41 @@ export function initializeEducationUI(scenarioId?: string, versionId?: string) {
       }
     }
 
-    // Toggle education section
-    if (target.closest('.education-header')) {
+    // Toggle education details (main expand/collapse) - compact design
+    if (target.closest('.education-summary-compact')) {
       e.stopPropagation(); // Prevent destination card click
-      const header = target.closest('.education-header') as HTMLElement;
+      const summary = target.closest('.education-summary-compact') as HTMLElement;
+      const toggleId = summary.dataset.toggle;
+
+      if (toggleId) {
+        const detailsSection = document.getElementById(toggleId);
+        const toggleText = summary.querySelector('.education-toggle-text');
+
+        if (detailsSection) {
+          detailsSection.classList.toggle('visible');
+          summary.classList.toggle('expanded');
+          if (toggleText) {
+            toggleText.textContent = detailsSection.classList.contains('visible') ? '▴ Details' : '▾ Details';
+          }
+        }
+      }
+    }
+
+    // Toggle education subsections (Pre-Trip, On-Location, Post-Trip)
+    if (target.closest('.education-subsection-header')) {
+      e.stopPropagation(); // Prevent destination card click
+      const header = target.closest('.education-subsection-header') as HTMLElement;
       const toggleId = header.dataset.toggle;
 
       if (toggleId) {
         const content = document.getElementById(toggleId);
-        const section = header.closest('.education-section');
-        const toggleIcon = header.querySelector('.education-toggle');
+        const toggleIcon = header.querySelector('.subsection-toggle');
 
-        if (content && section) {
-          section.classList.toggle('expanded');
+        if (content) {
+          content.classList.toggle('visible');
+          header.classList.toggle('expanded');
           if (toggleIcon) {
-            toggleIcon.textContent = section.classList.contains('expanded') ? '▼' : '▶';
+            toggleIcon.textContent = content.classList.contains('visible') ? '▼' : '▶';
           }
         }
       }
