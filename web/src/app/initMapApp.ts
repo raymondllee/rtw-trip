@@ -1358,6 +1358,9 @@ export async function initMapApp() {
     // Get the state of the "Show Transport" checkbox
     const includeTransport = routingToggle ? routingToggle.checked : true;
 
+    // Check if costs should be shown
+    const showCosts = !document.body.classList.contains('costs-hidden');
+
     if (legName === 'all') {
       const totalCost = calculateTotalCost(filtered, includeTransport);
       const totalDays = calculateTotalDuration(filtered);
@@ -1365,11 +1368,12 @@ export async function initMapApp() {
       const continentCount = countUniqueContinents(filtered);
       const countryCount = countUniqueCountries(filtered);
       const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+      const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
 
-      // Format: stops • continents • countries • duration • dates • cost
+      // Format: stops • continents • countries • duration • dates • cost (if visible)
       summaryText = dateRange
-        ? `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
-        : `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
+        ? `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
+        : `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days${costText}`;
     } else if (subLegName) {
       const leg = workingData.legs?.find(l => l.name === legName);
       const subLeg = leg?.sub_legs?.find(sl => sl.name === subLegName);
@@ -1380,11 +1384,12 @@ export async function initMapApp() {
         const continentCount = countUniqueContinents(filtered);
         const countryCount = countUniqueCountries(filtered);
         const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+        const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
 
-        // Format: leg name • stops • continents • countries • duration • dates • cost
+        // Format: leg name • stops • continents • countries • duration • dates • cost (if visible)
         summaryText = dateRange
-          ? `${subLegName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
-          : `${subLegName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
+          ? `${subLegName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
+          : `${subLegName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days${costText}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
@@ -1397,11 +1402,12 @@ export async function initMapApp() {
         const continentCount = countUniqueContinents(filtered);
         const countryCount = countUniqueCountries(filtered);
         const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+        const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
 
-        // Format: leg name • stops • continents • countries • duration • dates • cost
+        // Format: leg name • stops • continents • countries • duration • dates • cost (if visible)
         summaryText = dateRange
-          ? `${legName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
-          : `${legName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
+          ? `${legName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
+          : `${legName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days${costText}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
@@ -4758,6 +4764,26 @@ export async function initMapApp() {
     });
   }
 
+  // Toggle costs visibility
+  const costsVisibilityToggle = document.getElementById('costs-visibility-toggle');
+  if (costsVisibilityToggle) {
+    costsVisibilityToggle.addEventListener('change', (e) => {
+      const body = document.body;
+      const isChecked = e.target.checked;
+
+      if (isChecked) {
+        body.classList.remove('costs-hidden');
+        localStorage.setItem('rtw-costs-visible', 'true');
+      } else {
+        body.classList.add('costs-hidden');
+        localStorage.setItem('rtw-costs-visible', 'false');
+      }
+
+      // Re-render to update the summary with/without costs
+      render(legFilter.value, subLegFilter.value, routingToggle.checked, false);
+    });
+  }
+
   // Update itinerary data and cost summary when costs change
   window.addEventListener('costs-updated', async () => {
     console.log('🔄 costs-updated event received, refreshing costs...');
@@ -5521,6 +5547,51 @@ export async function initMapApp() {
     }
   }
 
+  // Restore view preferences from localStorage (must happen before initial render)
+  const mapVisible = localStorage.getItem('rtw-map-visible');
+  const educationVisible = localStorage.getItem('rtw-education-visible');
+  const costsVisible = localStorage.getItem('rtw-costs-visible');
+
+  // Map visibility (default: true/shown)
+  if (mapVisible === null) {
+    localStorage.setItem('rtw-map-visible', 'true');
+  } else if (mapVisible === 'false') {
+    const mainContent = document.querySelector('.main-content');
+    const sidebar = document.querySelector('.sidebar');
+    const toggle = document.getElementById('map-visibility-toggle');
+    mainContent.classList.add('map-hidden');
+    // Clear inline width so CSS can take over
+    sidebar.style.width = '';
+    if (toggle) toggle.checked = false;
+  }
+
+  // Education visibility (default: false/hidden)
+  if (educationVisible === null) {
+    localStorage.setItem('rtw-education-visible', 'false');
+    const body = document.body;
+    const toggle = document.getElementById('education-visibility-toggle');
+    body.classList.add('education-hidden');
+    if (toggle) toggle.checked = false;
+  } else if (educationVisible === 'false') {
+    const body = document.body;
+    const toggle = document.getElementById('education-visibility-toggle');
+    body.classList.add('education-hidden');
+    if (toggle) toggle.checked = false;
+  }
+
+  // Costs visibility (default: true/shown)
+  if (costsVisible === null) {
+    localStorage.setItem('rtw-costs-visible', 'true');
+    document.body.classList.remove('costs-hidden');
+  } else if (costsVisible === 'false') {
+    const body = document.body;
+    const toggle = document.getElementById('costs-visibility-toggle');
+    body.classList.add('costs-hidden');
+    if (toggle) toggle.checked = false;
+  } else if (costsVisible === 'true') {
+    document.body.classList.remove('costs-hidden');
+  }
+
   // Initial render with restored state
   render(initialLeg, initialSubLeg, routingToggle.checked);
   if (chatInstance) {
@@ -5591,37 +5662,6 @@ export async function initMapApp() {
 
   // Initialize education UI
   initializeEducationUI(currentScenarioId, currentScenarioName);
-
-  // Restore view preferences from localStorage
-  const mapVisible = localStorage.getItem('rtw-map-visible');
-  const educationVisible = localStorage.getItem('rtw-education-visible');
-
-  // Map visibility (default: true/shown)
-  if (mapVisible === null) {
-    localStorage.setItem('rtw-map-visible', 'true');
-  } else if (mapVisible === 'false') {
-    const mainContent = document.querySelector('.main-content');
-    const sidebar = document.querySelector('.sidebar');
-    const toggle = document.getElementById('map-visibility-toggle');
-    mainContent.classList.add('map-hidden');
-    // Clear inline width so CSS can take over
-    sidebar.style.width = '';
-    if (toggle) toggle.checked = false;
-  }
-
-  // Education visibility (default: false/hidden)
-  if (educationVisible === null) {
-    localStorage.setItem('rtw-education-visible', 'false');
-    const body = document.body;
-    const toggle = document.getElementById('education-visibility-toggle');
-    body.classList.add('education-hidden');
-    if (toggle) toggle.checked = false;
-  } else if (educationVisible === 'false') {
-    const body = document.body;
-    const toggle = document.getElementById('education-visibility-toggle');
-    body.classList.add('education-hidden');
-    if (toggle) toggle.checked = false;
-  }
 
   console.log('✅ App initialized with state:', {
     scenarioId: currentScenarioId,
