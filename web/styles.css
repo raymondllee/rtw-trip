@@ -217,7 +217,7 @@ body {
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 0;
-  flex: 0 0 auto;
+  flex: 0 0 100%;
   order: 4;
 }
 
@@ -559,8 +559,8 @@ body {
   border-radius: 4px;
   background: #1e88e5;
   color: white;
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 12px;
+  font-weight: normal;
   cursor: pointer;
   transition: all 0.2s;
   line-height: 1;
@@ -2031,13 +2031,7 @@ input[type="checkbox"] {
 }
 
 .transport-segment-line {
-  position: absolute;
-  left: 42px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: linear-gradient(to bottom, #ddd 0%, #ddd 50%, transparent 50%, transparent 100%);
-  background-size: 4px 8px;
+  display: none;
 }
 
 .transport-segment-content {
@@ -2937,17 +2931,16 @@ textarea.form-input {
   transform: rotate(180deg);
 }
 
-/* Education section - collapsed by default */
+/* Education section - now handled by education-styles.css */
 .education-section {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease;
+  /* Removed max-height: 0 - new design is visible by default */
   width: 100%;
   order: 20;
 }
 
 .education-section.expanded {
-  max-height: 1000px;
+  /* Legacy - no longer needed with new design */
+  max-height: none;
 }
 
 /* Education section placeholder styles */
@@ -2962,6 +2955,32 @@ textarea.form-input {
 .education-hidden .education-section-placeholder,
 .education-hidden .education-loading,
 .education-hidden .education-error {
+  display: none !important;
+}
+
+/* View preferences: Costs visibility */
+.costs-hidden .cost-summary-widget,
+.costs-hidden .cost-summary-section,
+.costs-hidden .destination-cost-breakdown,
+.costs-hidden .destination-cost-summary,
+.costs-hidden .destination-cost-details,
+.costs-hidden .destination-cost-missing,
+.costs-hidden .cost-breakdown,
+.costs-hidden .cost-summary,
+.costs-hidden .update-costs-btn,
+.costs-hidden .map-info-cost-summary,
+.costs-hidden .map-info-cost-total,
+.costs-hidden .map-info-cost-detail,
+.costs-hidden .transport-segment-cost {
+  display: none !important;
+}
+
+/* View preferences: Compact mode transport legs */
+.destination-list.compact-mode .transport-airlines,
+.destination-list.compact-mode .transport-edit-btn,
+.destination-list.compact-mode .transport-research-btn,
+.destination-list.compact-mode .alternatives-indicator,
+.destination-list.compact-mode .status-badge {
   display: none !important;
 }
 

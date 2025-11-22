@@ -65,7 +65,7 @@ async function initEditCostsTab() {
     }
 
     // Create instance
-    bulkEditor = new window.CostBulkEdit('http://localhost:5001');
+    bulkEditor = new window.CostBulkEdit('');
     bulkEditor.setSessionId(scenarioId);
     bulkEditor.setDestinations(currentVersionData.itineraryData.locations || []);
 

@@ -6,7 +6,7 @@ import { doc, updateDoc, getDoc, Timestamp } from 'https://www.gstatic.com/fireb
 import { prepareSummaryData, DEFAULT_SUMMARY_OPTIONS } from './utils/summaryGenerator';
 import { generateSummaryHTML } from './utils/summaryTemplates';
 
-const API_URL = 'http://localhost:5001';
+const API_URL = '';
 
 // Get summary data from URL params or sessionStorage
 const urlParams = new URLSearchParams(window.location.search);

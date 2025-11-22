@@ -4,7 +4,7 @@
  */
 
 class CostComparison {
-  constructor(apiBaseUrl = 'http://localhost:5001') {
+  constructor(apiBaseUrl = '') {
     this.apiBaseUrl = apiBaseUrl;
     this.scenarios = [];
   }

@@ -65,6 +65,7 @@ echo ""
 echo "🐍 Starting Flask API Server (Port $FLASK_PORT)..."
 cd "$SCRIPT_DIR/python/agents/travel-concierge"
 export PORT=$FLASK_PORT
+export ADK_API_PORT=$ADK_PORT
 poetry run python api_server.py > "$SCRIPT_DIR/logs/flask-api-$OFFSET.log" 2>&1 &
 FLASK_PID=$!
 echo "✅ Flask API Server started (PID: $FLASK_PID)"

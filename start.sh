@@ -36,6 +36,7 @@ fi
 
 # Start ADK API server in the background
 echo "📡 Starting ADK API server on port 8000..."
+export ADK_API_PORT=8000
 cd /app/python/agents
 $PYTHON_BIN -m google.adk.cli api_server travel-concierge --port 8000 --host 0.0.0.0 &
 ADK_PID=$!

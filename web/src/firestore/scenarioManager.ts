@@ -17,6 +17,7 @@ import {
 
 import type { TripData, TripScenarioVersion } from '../types/trip';
 import { db } from '../firebase/config';
+import { queryCache, CacheKeys, CacheInvalidators } from './queryCache';
 
 export class FirestoreScenarioManager {
   constructor() {
@@ -171,6 +172,11 @@ export class FirestoreScenarioManager {
       await this.cleanupOldVersions(scenarioId);
     }
 
+    // Invalidate caches affected by this mutation
+    CacheInvalidators.scenarioVersion(scenarioId);
+    CacheInvalidators.scenario(scenarioId);
+    CacheInvalidators.scenarioList();
+
     return { id: versionRef.id, ...versionData };
   }
 
@@ -178,57 +184,122 @@ export class FirestoreScenarioManager {
    * Get the latest version of a scenario
    */
   async getLatestVersion(scenarioId) {
-    const versionsRef = collection(db, 'scenarios', scenarioId, 'versions');
-    const versionsQuery = query(
-      versionsRef,
-      orderBy('versionNumber', 'desc'),
-      limit(1)
+    return queryCache.get(
+      CacheKeys.scenarioLatest(scenarioId),
+      async () => {
+        const versionsRef = collection(db, 'scenarios', scenarioId, 'versions');
+        const versionsQuery = query(
+          versionsRef,
+          orderBy('versionNumber', 'desc'),
+          limit(1)
+        );
+
+        const snapshot = await getDocs(versionsQuery);
+
+        if (snapshot.empty) {
+          return null;
+        }
+
+        const versionDoc = snapshot.docs[0];
+        return { id: versionDoc.id, ...versionDoc.data() };
+      },
+      { ttl: queryCache.getTTL('document') }
     );
+  }
 
-    const snapshot = await getDocs(versionsQuery);
+  /**
+   * Batch fetch latest versions for multiple scenarios
+   * This method optimizes the N+1 query pattern by leveraging cache
+   */
+  async getLatestVersionsBatch(scenarioIds) {
+    return queryCache.getBatch(
+      scenarioIds.map(id => CacheKeys.scenarioLatest(id)),
+      async (missingKeys) => {
+        // Extract scenario IDs from missing cache keys
+        const missingScenarioIds = missingKeys.map(key => key.split(':')[1]);
 
-    if (snapshot.empty) {
-      return null;
-    }
+        // Fetch all missing versions in parallel
+        const results = await Promise.all(
+          missingScenarioIds.map(async (scenarioId) => {
+            const versionsRef = collection(db, 'scenarios', scenarioId, 'versions');
+            const versionsQuery = query(
+              versionsRef,
+              orderBy('versionNumber', 'desc'),
+              limit(1)
+            );
 
-    const versionDoc = snapshot.docs[0];
-    return { id: versionDoc.id, ...versionDoc.data() };
+            const snapshot = await getDocs(versionsQuery);
+
+            if (snapshot.empty) {
+              return { scenarioId, version: null };
+            }
+
+            const versionDoc = snapshot.docs[0];
+            return {
+              scenarioId,
+              version: { id: versionDoc.id, ...versionDoc.data() }
+            };
+          })
+        );
+
+        // Convert to Map with cache keys
+        const resultMap = new Map();
+        results.forEach(({ scenarioId, version }) => {
+          resultMap.set(CacheKeys.scenarioLatest(scenarioId), version);
+        });
+
+        return resultMap;
+      },
+      { ttl: queryCache.getTTL('document') }
+    );
   }
 
   /**
    * Get all versions for a scenario
    */
   async getVersionHistory(scenarioId, limitCount = 50) {
-    const versionsRef = collection(db, 'scenarios', scenarioId, 'versions');
-    const versionsQuery = query(
-      versionsRef,
-      orderBy('versionNumber', 'desc'),
-      limit(limitCount)
-    );
+    return queryCache.get(
+      CacheKeys.scenarioVersionHistory(scenarioId),
+      async () => {
+        const versionsRef = collection(db, 'scenarios', scenarioId, 'versions');
+        const versionsQuery = query(
+          versionsRef,
+          orderBy('versionNumber', 'desc'),
+          limit(limitCount)
+        );
 
-    const snapshot = await getDocs(versionsQuery);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const snapshot = await getDocs(versionsQuery);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      },
+      { ttl: queryCache.getTTL('document') }
+    );
   }
 
   /**
    * Get a specific version by version number
    */
   async getVersion(scenarioId, versionNumber) {
-    const versionsRef = collection(db, 'scenarios', scenarioId, 'versions');
-    const versionsQuery = query(
-      versionsRef,
-      where('versionNumber', '==', versionNumber),
-      limit(1)
+    return queryCache.get(
+      CacheKeys.scenarioVersion(scenarioId, versionNumber),
+      async () => {
+        const versionsRef = collection(db, 'scenarios', scenarioId, 'versions');
+        const versionsQuery = query(
+          versionsRef,
+          where('versionNumber', '==', versionNumber),
+          limit(1)
+        );
+
+        const snapshot = await getDocs(versionsQuery);
+
+        if (snapshot.empty) {
+          return null;
+        }
+
+        const versionDoc = snapshot.docs[0];
+        return { id: versionDoc.id, ...versionDoc.data() };
+      },
+      { ttl: queryCache.getTTL('session') }
     );
-
-    const snapshot = await getDocs(versionsQuery);
-
-    if (snapshot.empty) {
-      return null;
-    }
-
-    const versionDoc = snapshot.docs[0];
-    return { id: versionDoc.id, ...versionDoc.data() };
   }
 
   /**
@@ -251,6 +322,10 @@ export class FirestoreScenarioManager {
     } else {
       await updateDoc(scenarioRef, { currentVersion: 0, updatedAt: Timestamp.now() });
     }
+
+    // Invalidate caches affected by this mutation
+    CacheInvalidators.scenarioVersion(scenarioId, versionNumber);
+    CacheInvalidators.scenario(scenarioId);
 
     return { deleted: 1 };
   }
@@ -283,6 +358,9 @@ export class FirestoreScenarioManager {
     } else {
       await updateDoc(scenarioRef, { currentVersion: 0, updatedAt: Timestamp.now() });
     }
+
+    // Invalidate caches affected by this mutation
+    CacheInvalidators.scenario(scenarioId);
 
     return { deleted: toDelete.length };
   }
@@ -329,6 +407,9 @@ export class FirestoreScenarioManager {
       isNamed: true
     });
 
+    // Invalidate caches affected by this mutation
+    CacheInvalidators.scenarioVersion(scenarioId, versionNumber);
+
     return { id: versionDoc.id, ...versionDoc.data(), versionName, isNamed: true };
   }
 
@@ -336,29 +417,41 @@ export class FirestoreScenarioManager {
    * Get all scenarios for current user
    */
   async listScenarios() {
-    const scenariosRef = collection(db, 'scenarios');
-    const scenariosQuery = query(
-      scenariosRef,
-      where('userId', '==', this.userId),
-      orderBy('updatedAt', 'desc')
-    );
+    return queryCache.get(
+      CacheKeys.scenarioList(),
+      async () => {
+        const scenariosRef = collection(db, 'scenarios');
+        const scenariosQuery = query(
+          scenariosRef,
+          where('userId', '==', this.userId),
+          orderBy('updatedAt', 'desc')
+        );
 
-    const snapshot = await getDocs(scenariosQuery);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const snapshot = await getDocs(scenariosQuery);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      },
+      { ttl: queryCache.getTTL('list') }
+    );
   }
 
   /**
    * Get a specific scenario by ID
    */
   async getScenario(scenarioId) {
-    const scenarioRef = doc(db, 'scenarios', scenarioId);
-    const scenarioDoc = await getDoc(scenarioRef);
+    return queryCache.get(
+      CacheKeys.scenario(scenarioId),
+      async () => {
+        const scenarioRef = doc(db, 'scenarios', scenarioId);
+        const scenarioDoc = await getDoc(scenarioRef);
 
-    if (!scenarioDoc.exists()) {
-      return null;
-    }
+        if (!scenarioDoc.exists()) {
+          return null;
+        }
 
-    return { id: scenarioDoc.id, ...scenarioDoc.data() };
+        return { id: scenarioDoc.id, ...scenarioDoc.data() };
+      },
+      { ttl: queryCache.getTTL('session') }
+    );
   }
 
   /**
@@ -386,6 +479,10 @@ export class FirestoreScenarioManager {
       updatedAt: Timestamp.now()
     });
 
+    // Invalidate caches affected by this mutation
+    CacheInvalidators.scenario(scenarioId);
+    CacheInvalidators.scenarioList();
+
     return { id: scenarioId, name: newName.trim() };
   }
 
@@ -405,6 +502,10 @@ export class FirestoreScenarioManager {
 
     // Delete the scenario document
     await deleteDoc(doc(db, 'scenarios', scenarioId));
+
+    // Invalidate caches affected by this mutation
+    CacheInvalidators.scenario(scenarioId);
+    CacheInvalidators.scenarioList();
   }
 
   /**
@@ -541,6 +642,9 @@ export class FirestoreScenarioManager {
       updatedAt: Timestamp.now()
     });
 
+    // Invalidate scenario cache
+    CacheInvalidators.scenario(scenarioId);
+
     console.log(`Summary saved to scenario ${scenarioId}`);
   }
 
@@ -581,6 +685,9 @@ export class FirestoreScenarioManager {
       summaryGeneratedAt: null,
       updatedAt: Timestamp.now()
     });
+
+    // Invalidate scenario cache
+    CacheInvalidators.scenario(scenarioId);
 
     console.log(`Summary deleted from scenario ${scenarioId}`);
   }
@@ -623,6 +730,7 @@ export class FirestoreScenarioManager {
           `Imported on ${new Date().toLocaleDateString()}`
         );
         console.log(`✅ Scenario ${this.currentScenarioId} updated with imported data`);
+        // Cache invalidation is handled by saveVersion
       } else {
         // Create a new scenario
         const scenarioName = data.scenarioName || `Imported Scenario ${new Date().toLocaleDateString()}`;
@@ -636,6 +744,9 @@ export class FirestoreScenarioManager {
 
         this.currentScenarioId = scenarioId;
         console.log(`✅ New scenario created: ${scenarioId}`);
+
+        // Invalidate scenario list cache
+        CacheInvalidators.scenarioList();
       }
 
       return true;

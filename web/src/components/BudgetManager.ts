@@ -323,7 +323,7 @@ export class BudgetManager {
 
       // Get API configuration
       const config = getRuntimeConfig();
-      const apiBaseUrl = config.apiBaseUrl || 'http://localhost:5001';
+      const apiBaseUrl = config.apiBaseUrl || '';
 
       // Get scenario ID from URL
       const urlParams = new URLSearchParams(window.location.search);
@@ -938,7 +938,7 @@ export class BudgetManager {
         const scenarioId = urlParams.get('scenario');
         if (scenarioId) {
           const config = getRuntimeConfig();
-          const apiBaseUrl = config.apiBaseUrl || 'http://localhost:5001';
+          const apiBaseUrl = config.apiBaseUrl || '';
           try {
             const response = await fetch(`${apiBaseUrl}/api/transport-segments/sync`, {
               method: 'POST',
@@ -976,7 +976,7 @@ export class BudgetManager {
         } else {
           // Fallback to direct API call
           const config = getRuntimeConfig();
-          const apiBaseUrl = config.apiBaseUrl || 'http://localhost:5001';
+          const apiBaseUrl = config.apiBaseUrl || '';
 
           const response = await fetch(`${apiBaseUrl}/api/transport-segments/sync`, {
             method: 'POST',
@@ -1075,7 +1075,7 @@ export class BudgetManager {
 
     // Get API configuration
     const config = getRuntimeConfig();
-    const apiBaseUrl = config.apiBaseUrl || 'http://localhost:5001';
+    const apiBaseUrl = config.apiBaseUrl || '';
 
     // Get scenario ID from URL params
     const urlParams = new URLSearchParams(window.location.search);

@@ -4,6 +4,8 @@
  */
 
 import { educationService } from './educationService';
+import { cachedEducationAPI } from '../utils/cachedFetch';
+import { CacheInvalidators } from '../firestore/queryCache';
 import type { CurriculumPlan, StudentProfile } from '../types/education';
 
 // State
@@ -108,15 +110,8 @@ async function loadStudents() {
     try {
         showLoading('Loading students...');
 
-        // Load students from Firestore
-        const response = await fetch('http://localhost:5001/api/education/students', {
-            cache: 'no-store'
-        });
-        if (!response.ok) {
-            throw new Error('Failed to load students');
-        }
-
-        students = await response.json();
+        // Load students from API (cached)
+        students = await cachedEducationAPI.getStudents();
 
         // For each student, count their curricula
         const studentsWithStats = await Promise.all(
@@ -157,11 +152,7 @@ async function loadStudents() {
 
 async function loadDestinations() {
     try {
-        const response = await fetch('http://localhost:5001/api/education/destinations');
-        if (!response.ok) {
-            throw new Error('Failed to fetch destinations');
-        }
-        const data = await response.json();
+        const data = await cachedEducationAPI.getDestinations();
         destinations = data.destinations || [];
         updateDestinationSelector();
     } catch (error) {
@@ -298,7 +289,7 @@ function initializeStudentForm() {
         try {
             showLoading('Creating student profile...');
 
-            const response = await fetch('http://localhost:5001/api/education/students', {
+            const response = await fetch('/api/education/students', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -318,6 +309,11 @@ function initializeStudentForm() {
             if (!response.ok) {
                 throw new Error('Failed to create student');
             }
+
+            const newStudent = await response.json();
+
+            // Invalidate students list cache
+            CacheInvalidators.education();
 
             closeModal('new-student-modal');
             form.reset();
@@ -354,7 +350,7 @@ function initializeStudentForm() {
         try {
             showLoading('Updating student profile...');
 
-            const response = await fetch(`http://localhost:5001/api/education/students/${studentId}`, {
+            const response = await fetch(`/api/education/students/${studentId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -374,6 +370,9 @@ function initializeStudentForm() {
             if (!response.ok) {
                 throw new Error('Failed to update student');
             }
+
+            // Invalidate student cache
+            CacheInvalidators.educationStudent(studentId);
 
             closeModal('edit-student-modal');
             await loadStudents();
@@ -423,13 +422,16 @@ function initializeStudentForm() {
     try {
         showLoading('Deleting student...');
 
-        const response = await fetch(`http://localhost:5001/api/education/students/${studentId}`, {
+        const response = await fetch(`/api/education/students/${studentId}`, {
             method: 'DELETE',
         });
 
         if (!response.ok) {
             throw new Error('Failed to delete student');
         }
+
+        // Invalidate student cache
+        CacheInvalidators.educationStudent(studentId);
 
         await loadStudents();
         showSuccess('Student deleted successfully');

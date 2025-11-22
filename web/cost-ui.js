@@ -4,7 +4,7 @@
  */
 
 class CostUI {
-  constructor(costTracker, apiBaseUrl = 'http://localhost:5001') {
+  constructor(costTracker, apiBaseUrl = '') {
     this.costTracker = costTracker;
     this.apiBaseUrl = apiBaseUrl;
     this.sessionId = null;

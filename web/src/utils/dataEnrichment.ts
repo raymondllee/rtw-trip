@@ -12,6 +12,7 @@
 import type { TripLocation, TripData } from '../types/trip';
 import { getRegionForCountry, hasRegionMapping } from '../data/regionMappings';
 import { getRuntimeConfig } from '../config';
+import { cachedPlaceAPI } from './cachedFetch';
 
 export interface EnrichmentReport {
   total: number;
@@ -42,19 +43,13 @@ export interface ValidationResult {
 }
 
 /**
- * Fetch place details from backend API
+ * Fetch place details from backend API (cached)
  */
 async function fetchPlaceDetails(placeId: string): Promise<any | null> {
   try {
     const config = getRuntimeConfig();
-    const response = await fetch(`${config.apiBaseUrl}/api/places/details/${encodeURIComponent(placeId)}`);
+    const data = await cachedPlaceAPI.getPlaceDetails(placeId, config.apiBaseUrl);
 
-    if (!response.ok) {
-      console.warn(`Failed to fetch place details for ${placeId}: ${response.status}`);
-      return null;
-    }
-
-    const data = await response.json();
     if (data.status === 'success') {
       return data;
     }

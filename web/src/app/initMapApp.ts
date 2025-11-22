@@ -472,6 +472,9 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
           costText = cost > 0 ? `$${cost.toLocaleString()}` : 'Free';
         }
 
+        // Check if costs should be shown
+        const showCosts = !document.body.classList.contains('costs-hidden');
+
         const midpoint = google.maps.geometry.spherical.interpolate(
           pathCoords[i],
           pathCoords[i + 1],
@@ -485,14 +488,14 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
             url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
               <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="16" cy="16" r="14" fill="white" stroke="#1e88e5" stroke-width="2"/>
-                <text x="16" y="14" text-anchor="middle" font-size="12">${transportIcon}</text>
-                <text x="16" y="26" text-anchor="middle" font-size="8" fill="#1e88e5" font-weight="bold">${costText}</text>
+                <text x="16" y="${showCosts ? '14' : '19'}" text-anchor="middle" font-size="12">${transportIcon}</text>
+                ${showCosts ? `<text x="16" y="26" text-anchor="middle" font-size="8" fill="#1e88e5" font-weight="bold">${costText}</text>` : ''}
               </svg>
             `)}`,
             scaledSize: new google.maps.Size(32, 32),
             anchor: new google.maps.Point(16, 16)
           },
-          title: `${fromLocation.name} → ${toLocation.name}\nTravel by ${transportMode}\nCost: ${costText}\nDistance: ${Math.round(distance / 1000)}km`,
+          title: `${fromLocation.name} → ${toLocation.name}\nTravel by ${transportMode}${showCosts ? `\nCost: ${costText}` : ''}\nDistance: ${Math.round(distance / 1609.34)}mi`,
           zIndex: 1000
         });
 
@@ -531,7 +534,7 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
                   <strong style="color: #34495e;">Transport:</strong> ${transportMode.charAt(0).toUpperCase() + transportMode.slice(1)} ${statusBadge}
                 </p>
                 <p style="margin: 0; font-size: 13px; line-height: 1.5;">
-                  <strong style="color: #34495e;">Distance:</strong> ${Math.round(distance / 1000)}km
+                  <strong style="color: #34495e;">Distance:</strong> ${Math.round(distance / 1609.34)}mi
                 </p>
                 ${segment && segment.duration_hours ? `
                   <p style="margin: 0; font-size: 13px; line-height: 1.5;">
@@ -1358,6 +1361,9 @@ export async function initMapApp() {
     // Get the state of the "Show Transport" checkbox
     const includeTransport = routingToggle ? routingToggle.checked : true;
 
+    // Check if costs should be shown
+    const showCosts = !document.body.classList.contains('costs-hidden');
+
     if (legName === 'all') {
       const totalCost = calculateTotalCost(filtered, includeTransport);
       const totalDays = calculateTotalDuration(filtered);
@@ -1365,46 +1371,37 @@ export async function initMapApp() {
       const continentCount = countUniqueContinents(filtered);
       const countryCount = countUniqueCountries(filtered);
       const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+      const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
 
-      // Format: stops • continents • countries • duration • dates • cost
+      // Format: stops • continents • countries • duration • dates • cost (if visible)
       summaryText = dateRange
-        ? `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
-        : `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
+        ? `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
+        : `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days${costText}`;
     } else if (subLegName) {
-      const leg = workingData.legs?.find(l => l.name === legName);
-      const subLeg = leg?.sub_legs?.find(sl => sl.name === subLegName);
-      if (subLeg) {
-        const totalCost = calculateTotalCost(filtered, includeTransport);
-        const totalDays = calculateTotalDuration(filtered);
-        const dateRange = calculateDateRange(filtered);
-        const continentCount = countUniqueContinents(filtered);
-        const countryCount = countUniqueCountries(filtered);
-        const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+      // Show rich summary for filtered country view
+      const totalCost = calculateTotalCost(filtered, includeTransport);
+      const totalDays = calculateTotalDuration(filtered);
+      const dateRange = calculateDateRange(filtered);
+      const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+      const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
 
-        // Format: leg name • stops • continents • countries • duration • dates • cost
-        summaryText = dateRange
-          ? `${subLegName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
-          : `${subLegName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
-      } else {
-        summaryText = `${filtered.length} stops`;
-      }
+      // Format: country name • stops • duration • dates • cost (if visible)
+      summaryText = dateRange
+        ? `${subLegName} • ${filtered.length} stops • ${totalDays} days • ${dateRange}${costText}`
+        : `${subLegName} • ${filtered.length} stops • ${totalDays} days${costText}`;
     } else {
-      const leg = workingData.legs?.find(l => l.name === legName);
-      if (leg) {
-        const totalCost = calculateTotalCost(filtered, includeTransport);
-        const totalDays = calculateTotalDuration(filtered);
-        const dateRange = calculateDateRange(filtered);
-        const continentCount = countUniqueContinents(filtered);
-        const countryCount = countUniqueCountries(filtered);
-        const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+      // Show rich summary for filtered leg view
+      const totalCost = calculateTotalCost(filtered, includeTransport);
+      const totalDays = calculateTotalDuration(filtered);
+      const dateRange = calculateDateRange(filtered);
+      const countryCount = countUniqueCountries(filtered);
+      const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+      const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
 
-        // Format: leg name • stops • continents • countries • duration • dates • cost
-        summaryText = dateRange
-          ? `${legName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange} • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`
-          : `${legName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}`;
-      } else {
-        summaryText = `${filtered.length} stops`;
-      }
+      // Format: leg name • stops • countries • duration • dates • cost (if visible)
+      summaryText = dateRange
+        ? `${legName} • ${filtered.length} stops • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
+        : `${legName} • ${filtered.length} stops • ${countryCount} countries • ${totalDays} days${costText}`;
     }
 
     if (summary) {
@@ -2274,32 +2271,19 @@ export async function initMapApp() {
         });
 
         // Simple HTML generation without external dependencies
-        if (totalCost > 0) {
-          costSummaryHTML = `
-            <div class="destination-cost-summary">
-              <div class="cost-total">
-                <span class="cost-amount">$${totalCost.toLocaleString()}</span>
-                ${duration > 0 ? `<span class="cost-per-day">$${Math.round(totalCost / duration)}/day</span>` : ''}
-              </div>
-              <div class="cost-breakdown-toggle">
-                <span class="toggle-icon">▼</span>
-                <span class="toggle-text">Details</span>
-              </div>
+        costSummaryHTML = totalCost > 0 ? `
+          <div class="destination-cost-summary">
+            <div class="cost-total">
+              <span class="cost-icon">💰</span>
+              <span class="cost-amount">$${totalCost.toLocaleString()}</span>
+              ${duration > 0 ? `<span class="cost-per-day">$${Math.round(totalCost / duration)}/day</span>` : ''}
             </div>
-          `;
-        } else {
-          costSummaryHTML = `
-            <div class="destination-cost-missing">
-              <button
-                class="update-costs-btn"
-                data-destination-name="${loc.name}"
-                title="Ask AI to research costs"
-              >
-                💰 Update costs for ${loc.name}
-              </button>
+            <div class="cost-breakdown-toggle">
+              <span class="toggle-icon">▼</span>
+              <span class="toggle-text">Details</span>
             </div>
-          `;
-        }
+          </div>
+        ` : '';
 
         costBreakdownHTML = totalCost > 0 ? `
           <div class="cost-breakdown">
@@ -2381,13 +2365,13 @@ export async function initMapApp() {
             <div class="destination-meta">
               ${[loc.city, loc.country].filter(Boolean).join(', ')}
             </div>
-            <div class="destination-badges">
-              ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
-            </div>
             <div class="destination-dates">
-              <button class="date-lock-toggle" data-location-id="${loc.id}" title="${isDateLocked ? 'Unlock dates (return to auto-calculated)' : 'Lock dates (set specific dates)'}" style="background: none; border: none; cursor: pointer; font-size: 12px; padding: 0; margin-right: 6px; opacity: 0.7;">${lockIcon}</button>
+              <button class="date-lock-toggle" data-location-id="${loc.id}" title="${isDateLocked ? 'Unlock dates (return to auto-calculated)' : 'Lock dates (set specific dates)'}" style="background: none; border: none; cursor: pointer; font-size: 12px; padding: 0; margin-right: 6px;">${lockIcon}</button>
               ${dateRange ? `${dateRange} • ` : ''}
               <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}" ${isDateLocked ? 'disabled' : ''}> days
+            </div>
+            <div class="destination-badges">
+              ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
             </div>
             ${datePickerHTML}
             ${costSummaryHTML}
@@ -2398,6 +2382,17 @@ export async function initMapApp() {
             <div class="destination-notes">
               <textarea class="editable-notes" placeholder="Add notes..." data-location-id="${loc.id}">${notes}</textarea>
             </div>
+            ${!destinationCosts?.total || destinationCosts.total === 0 ? `
+            <div class="destination-cost-missing">
+              <button
+                class="update-costs-btn"
+                data-destination-name="${loc.name}"
+                title="Ask AI to research costs"
+              >
+                💰 Update costs for ${loc.name}
+              </button>
+            </div>
+            ` : ''}
             <div class="education-section-placeholder" data-location-id="${loc.id}">
               <div class="education-loading">Loading education...</div>
             </div>
@@ -2447,7 +2442,7 @@ export async function initMapApp() {
                   <div class="transport-segment-route">${loc.name} → ${nextLoc.name}</div>
                   <div class="transport-segment-details">
                     <span class="transport-mode">${segment.transport_mode}</span>
-                    ${segment.distance_km ? `<span class="transport-distance">${Math.round(segment.distance_km)}km</span>` : ''}
+                    ${segment.distance_km ? `<span class="transport-distance">${Math.round(segment.distance_km * 0.621371)}mi</span>` : ''}
                     ${segment.duration_hours ? `<span class="transport-duration">${Math.round(segment.duration_hours)}h</span>` : ''}
                   </div>
                   <div class="transport-segment-cost">
@@ -2574,24 +2569,40 @@ export async function initMapApp() {
     loadEducationSections(locations);
   }
 
+  let educationLoadingInProgress = false;
+
   async function loadEducationSections(locations) {
+    // Prevent concurrent loading
+    if (educationLoadingInProgress) {
+      return;
+    }
+
+    educationLoadingInProgress = true;
+
     // Load education data for each location
     for (const location of locations) {
       try {
         const placeholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
         if (placeholder) {
           const educationHTML = await loadEducationSection(location);
-          placeholder.outerHTML = educationHTML;
+
+          // Re-query for placeholder after async operation, as DOM might have changed
+          const currentPlaceholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
+
+          if (currentPlaceholder && currentPlaceholder.parentNode) {
+            currentPlaceholder.outerHTML = educationHTML;
+          }
         }
       } catch (error) {
         console.error(`Failed to load education for ${location.name}:`, error);
         // Keep the placeholder with error message
         const placeholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
-        if (placeholder) {
+        if (placeholder && placeholder.parentNode) {
           placeholder.innerHTML = '<div class="education-error">Unable to load education</div>';
         }
       }
     }
+    educationLoadingInProgress = false;
   }
 
   function setupDragAndDrop(container, filteredLocations) {
@@ -3444,7 +3455,7 @@ export async function initMapApp() {
                 <div><strong>Stops:</strong> ${alt.typical_stops === 0 ? 'Direct' : alt.typical_stops}</div>
               ` : ''}
               ${alt.distance_from_original_km > 0 ? `
-                <div style="grid-column: 1 / -1;"><strong>Distance from original:</strong> ${alt.distance_from_original_km.toFixed(0)} km</div>
+                <div style="grid-column: 1 / -1;"><strong>Distance from original:</strong> ${Math.round(alt.distance_from_original_km * 0.621371)} mi</div>
               ` : ''}
             </div>
 
@@ -3593,7 +3604,7 @@ export async function initMapApp() {
       console.log('📤 Sending transport research request:', researchRequest);
 
       // Call the research API
-      const response = await fetch('http://localhost:5001/api/transport/research', {
+      const response = await fetch('/api/transport/research', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -3608,7 +3619,7 @@ export async function initMapApp() {
 
         // Save the research results to Firestore
         try {
-          const updateResponse = await fetch('http://localhost:5001/api/transport/update-research', {
+          const updateResponse = await fetch('/api/transport/update-research', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -3666,29 +3677,33 @@ export async function initMapApp() {
         return;
       }
 
-      const scenarioItems = await Promise.all(
-        scenarios.map(async (scenario) => {
-          const createdDate = scenario.createdAt?.toDate ? scenario.createdAt.toDate().toLocaleDateString() : 'Unknown';
-          const latestVersion = await scenarioManager.getLatestVersion(scenario.id);
-          const locationCount = latestVersion?.itineraryData?.locations?.length || 0;
-
-          return `
-            <div class="scenario-item">
-              <div class="scenario-info">
-                <div class="scenario-name">${scenario.name}</div>
-                <div class="scenario-meta">${locationCount} destinations • v${scenario.currentVersion || 1} • Created ${createdDate}</div>
-                ${scenario.description ? `<div class="scenario-description">${scenario.description}</div>` : ''}
-              </div>
-              <div class="scenario-actions-btn">
-                <button class="btn-load" onclick="loadScenarioById('${scenario.id}')">Load</button>
-                <button class="btn-versions" onclick="showVersionHistory('${scenario.id}')">History</button>
-                <button class="btn-rename" onclick="renameScenarioById('${scenario.id}', '${scenario.name.replace(/'/g, "\\'")}')">Rename</button>
-                <button class="btn-delete" onclick="deleteScenarioById('${scenario.id}')">Delete</button>
-              </div>
-            </div>
-          `;
-        })
+      // Batch fetch all latest versions to avoid N+1 query pattern
+      const latestVersionsMap = await scenarioManager.getLatestVersionsBatch(
+        scenarios.map(s => s.id)
       );
+
+      const scenarioItems = scenarios.map((scenario) => {
+        const createdDate = scenario.createdAt?.toDate ? scenario.createdAt.toDate().toLocaleDateString() : 'Unknown';
+        const cacheKey = `scenario:${scenario.id}:latest`;
+        const latestVersion = latestVersionsMap.get(cacheKey);
+        const locationCount = latestVersion?.itineraryData?.locations?.length || 0;
+
+        return `
+          <div class="scenario-item">
+            <div class="scenario-info">
+              <div class="scenario-name">${scenario.name}</div>
+              <div class="scenario-meta">${locationCount} destinations • v${scenario.currentVersion || 1} • Created ${createdDate}</div>
+              ${scenario.description ? `<div class="scenario-description">${scenario.description}</div>` : ''}
+            </div>
+            <div class="scenario-actions-btn">
+              <button class="btn-load" onclick="loadScenarioById('${scenario.id}')">Load</button>
+              <button class="btn-versions" onclick="showVersionHistory('${scenario.id}')">History</button>
+              <button class="btn-rename" onclick="renameScenarioById('${scenario.id}', '${scenario.name.replace(/'/g, "\\'")}')">Rename</button>
+              <button class="btn-delete" onclick="deleteScenarioById('${scenario.id}')">Delete</button>
+            </div>
+          </div>
+        `;
+      });
 
       scenarioList.innerHTML = scenarioItems.join('');
     } catch (error) {
@@ -4022,6 +4037,13 @@ export async function initMapApp() {
       }
       entry.resolve(result);
     };
+
+    // Add unhandled rejection handler to prevent crashes
+    promise.catch((error) => {
+      // This catch prevents unhandled promise rejections
+      // Actual error handling should be done by the caller via try-catch
+      console.warn('⚠️ Cost update wait promise rejected:', error.message);
+    });
 
     return { promise, cancel, resolve };
   }
@@ -4452,31 +4474,35 @@ export async function initMapApp() {
       // Fetch scenarios and latest metadata
       const scenarios = await scenarioManager.listScenarios();
 
-      // Build list items similar to updateScenarioList()
-      const scenarioItems = await Promise.all(
-        scenarios.map(async (scenario) => {
-          const createdDate = scenario.createdAt?.toDate ? scenario.createdAt.toDate().toLocaleDateString() : 'Unknown';
-          const latestVersion = await scenarioManager.getLatestVersion(scenario.id);
-          const locationCount = latestVersion?.itineraryData?.locations?.length || 0;
-
-          return `
-            <div class="scenario-item" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #eee;">
-              <div class="scenario-info">
-                <div class="scenario-name" style="font-weight:600;">${scenario.name}</div>
-                <div class="scenario-meta" style="font-size:12px; color:#666;">${locationCount} destinations • v${scenario.currentVersion || 1} • Created ${createdDate}</div>
-                ${scenario.description ? `<div class="scenario-description" style="margin-top:4px; color:#555; font-size:12px;">${scenario.description}</div>` : ''}
-              </div>
-              <div class="scenario-actions-btn" style="display:flex; gap:8px;">
-                <button onclick="loadScenarioById('${scenario.id}')" style="padding:6px 10px; background:#0070f3; color:#fff; border:none; border-radius:4px; cursor:pointer;">Load</button>
-                <button onclick="showVersionHistory('${scenario.id}')" style="padding:6px 10px; background:#666; color:#fff; border:none; border-radius:4px; cursor:pointer;">History</button>
-                <button onclick="duplicateScenario('${scenario.id}')" style="padding:6px 10px; background:#fff; color:#333; border:1px solid #eee; border-radius:4px; cursor:pointer;">Duplicate</button>
-                <button onclick="renameScenarioById('${scenario.id}', '${scenario.name.replace(/'/g, "\\'")}', true)" style="padding:6px 10px; background:#ff9800; color:#fff; border:none; border-radius:4px; cursor:pointer;">Rename</button>
-                <button onclick="deleteScenarioById('${scenario.id}')" style="padding:6px 10px; background:#fff; color:#d32f2f; border:1px solid #eee; border-radius:4px; cursor:pointer;">Delete</button>
-              </div>
-            </div>
-          `;
-        })
+      // Batch fetch all latest versions to avoid N+1 query pattern
+      const latestVersionsMap = await scenarioManager.getLatestVersionsBatch(
+        scenarios.map(s => s.id)
       );
+
+      // Build list items similar to updateScenarioList()
+      const scenarioItems = scenarios.map((scenario) => {
+        const createdDate = scenario.createdAt?.toDate ? scenario.createdAt.toDate().toLocaleDateString() : 'Unknown';
+        const cacheKey = `scenario:${scenario.id}:latest`;
+        const latestVersion = latestVersionsMap.get(cacheKey);
+        const locationCount = latestVersion?.itineraryData?.locations?.length || 0;
+
+        return `
+          <div class="scenario-item" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #eee;">
+            <div class="scenario-info">
+              <div class="scenario-name" style="font-weight:600;">${scenario.name}</div>
+              <div class="scenario-meta" style="font-size:12px; color:#666;">${locationCount} destinations • v${scenario.currentVersion || 1} • Created ${createdDate}</div>
+              ${scenario.description ? `<div class="scenario-description" style="margin-top:4px; color:#555; font-size:12px;">${scenario.description}</div>` : ''}
+            </div>
+            <div class="scenario-actions-btn" style="display:flex; gap:8px;">
+              <button onclick="loadScenarioById('${scenario.id}')" style="padding:6px 10px; background:#0070f3; color:#fff; border:none; border-radius:4px; cursor:pointer;">Load</button>
+              <button onclick="showVersionHistory('${scenario.id}')" style="padding:6px 10px; background:#666; color:#fff; border:none; border-radius:4px; cursor:pointer;">History</button>
+              <button onclick="duplicateScenario('${scenario.id}')" style="padding:6px 10px; background:#fff; color:#333; border:1px solid #eee; border-radius:4px; cursor:pointer;">Duplicate</button>
+              <button onclick="renameScenarioById('${scenario.id}', '${scenario.name.replace(/'/g, "\\'")}', true)" style="padding:6px 10px; background:#ff9800; color:#fff; border:none; border-radius:4px; cursor:pointer;">Rename</button>
+              <button onclick="deleteScenarioById('${scenario.id}')" style="padding:6px 10px; background:#fff; color:#d32f2f; border:1px solid #eee; border-radius:4px; cursor:pointer;">Delete</button>
+            </div>
+          </div>
+        `;
+      });
 
       const listHtml = scenarioItems.join('') || '<div class="empty-scenarios">No saved scenarios yet.</div>';
 
@@ -4687,17 +4713,21 @@ export async function initMapApp() {
           return;
         }
 
-        // Load scenario data with itineraries
-        const scenariosWithData = await Promise.all(
-          scenarios.map(async (scenario) => {
-            const latestVersion = await scenarioManager.getLatestVersion(scenario.id);
-            return {
-              id: scenario.id,
-              name: scenario.name,
-              itinerary: latestVersion?.itineraryData || null
-            };
-          })
+        // Batch fetch all latest versions to avoid N+1 query pattern
+        const latestVersionsMap = await scenarioManager.getLatestVersionsBatch(
+          scenarios.map(s => s.id)
         );
+
+        // Load scenario data with itineraries
+        const scenariosWithData = scenarios.map((scenario) => {
+          const cacheKey = `scenario:${scenario.id}:latest`;
+          const latestVersion = latestVersionsMap.get(cacheKey);
+          return {
+            id: scenario.id,
+            name: scenario.name,
+            itinerary: latestVersion?.itineraryData || null
+          };
+        });
 
         await costComparison.showComparisonModal(scenariosWithData.filter(s => s.itinerary));
       } catch (error) {
@@ -4751,6 +4781,26 @@ export async function initMapApp() {
         body.classList.add('education-hidden');
         localStorage.setItem('rtw-education-visible', 'false');
       }
+    });
+  }
+
+  // Toggle costs visibility
+  const costsVisibilityToggle = document.getElementById('costs-visibility-toggle');
+  if (costsVisibilityToggle) {
+    costsVisibilityToggle.addEventListener('change', (e) => {
+      const body = document.body;
+      const isChecked = e.target.checked;
+
+      if (isChecked) {
+        body.classList.remove('costs-hidden');
+        localStorage.setItem('rtw-costs-visible', 'true');
+      } else {
+        body.classList.add('costs-hidden');
+        localStorage.setItem('rtw-costs-visible', 'false');
+      }
+
+      // Re-render to update the summary with/without costs
+      render(legFilter.value, subLegFilter.value, routingToggle.checked, false);
     });
   }
 
@@ -5517,6 +5567,56 @@ export async function initMapApp() {
     }
   }
 
+  // Restore view preferences from localStorage (must happen before initial render)
+  const mapVisible = localStorage.getItem('rtw-map-visible');
+  const educationVisible = localStorage.getItem('rtw-education-visible');
+  const costsVisible = localStorage.getItem('rtw-costs-visible');
+
+  // Map visibility (default: true/shown)
+  if (mapVisible === null) {
+    localStorage.setItem('rtw-map-visible', 'true');
+  } else if (mapVisible === 'false') {
+    const mainContent = document.querySelector('.main-content');
+    const sidebar = document.querySelector('.sidebar');
+    const toggle = document.getElementById('map-visibility-toggle');
+    mainContent.classList.add('map-hidden');
+    // Clear inline width so CSS can take over
+    sidebar.style.width = '';
+    if (toggle) toggle.checked = false;
+  }
+
+  // Education visibility (default: false/hidden)
+  if (educationVisible === null) {
+    localStorage.setItem('rtw-education-visible', 'false');
+    const body = document.body;
+    const toggle = document.getElementById('education-visibility-toggle');
+    body.classList.add('education-hidden');
+    if (toggle) toggle.checked = false;
+  } else if (educationVisible === 'false') {
+    const body = document.body;
+    const toggle = document.getElementById('education-visibility-toggle');
+    body.classList.add('education-hidden');
+    if (toggle) toggle.checked = false;
+  } else if (educationVisible === 'true') {
+    const body = document.body;
+    const toggle = document.getElementById('education-visibility-toggle');
+    body.classList.remove('education-hidden');
+    if (toggle) toggle.checked = true;
+  }
+
+  // Costs visibility (default: true/shown)
+  if (costsVisible === null) {
+    localStorage.setItem('rtw-costs-visible', 'true');
+    document.body.classList.remove('costs-hidden');
+  } else if (costsVisible === 'false') {
+    const body = document.body;
+    const toggle = document.getElementById('costs-visibility-toggle');
+    body.classList.add('costs-hidden');
+    if (toggle) toggle.checked = false;
+  } else if (costsVisible === 'true') {
+    document.body.classList.remove('costs-hidden');
+  }
+
   // Initial render with restored state
   render(initialLeg, initialSubLeg, routingToggle.checked);
   if (chatInstance) {
@@ -5587,37 +5687,6 @@ export async function initMapApp() {
 
   // Initialize education UI
   initializeEducationUI(currentScenarioId, currentScenarioName);
-
-  // Restore view preferences from localStorage
-  const mapVisible = localStorage.getItem('rtw-map-visible');
-  const educationVisible = localStorage.getItem('rtw-education-visible');
-
-  // Map visibility (default: true/shown)
-  if (mapVisible === null) {
-    localStorage.setItem('rtw-map-visible', 'true');
-  } else if (mapVisible === 'false') {
-    const mainContent = document.querySelector('.main-content');
-    const sidebar = document.querySelector('.sidebar');
-    const toggle = document.getElementById('map-visibility-toggle');
-    mainContent.classList.add('map-hidden');
-    // Clear inline width so CSS can take over
-    sidebar.style.width = '';
-    if (toggle) toggle.checked = false;
-  }
-
-  // Education visibility (default: false/hidden)
-  if (educationVisible === null) {
-    localStorage.setItem('rtw-education-visible', 'false');
-    const body = document.body;
-    const toggle = document.getElementById('education-visibility-toggle');
-    body.classList.add('education-hidden');
-    if (toggle) toggle.checked = false;
-  } else if (educationVisible === 'false') {
-    const body = document.body;
-    const toggle = document.getElementById('education-visibility-toggle');
-    body.classList.add('education-hidden');
-    if (toggle) toggle.checked = false;
-  }
 
   console.log('✅ App initialized with state:', {
     scenarioId: currentScenarioId,

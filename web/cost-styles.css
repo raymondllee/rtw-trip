@@ -645,6 +645,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cost-total {
@@ -652,6 +654,12 @@
   align-items: center;
   gap: 8px;
   flex: 1;
+  min-width: 0;
+}
+
+.cost-icon {
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 .cost-amount {
@@ -695,17 +703,17 @@
 }
 
 .destination-cost-missing {
-  margin-top: 6px;
-  padding: 8px 10px;
-  border: 1px dashed #d4d4d8;
-  border-radius: 4px;
-  background: #f9fafb;
+  margin-top: 12px;
+  flex: 1 1 100%;
+  order: 6;
 }
 
 .update-costs-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
   font-size: 12px;
   font-weight: 600;
   color: #2563eb;
