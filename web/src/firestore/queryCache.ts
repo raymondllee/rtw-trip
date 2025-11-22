@@ -310,6 +310,7 @@ export const queryCache = new QueryCache();
  * Cache key builders for consistent naming
  */
 export const CacheKeys = {
+  // Scenario keys
   scenario: (id: string) => `scenario:${id}`,
   scenarioLatest: (id: string) => `scenario:${id}:latest`,
   scenarioVersion: (scenarioId: string, versionNumber: number) =>
@@ -318,17 +319,34 @@ export const CacheKeys = {
   scenarioList: () => 'scenarios:list',
   scenarioSummary: (scenarioId: string, versionNumber: number) =>
     `scenario:${scenarioId}:version:${versionNumber}:summary`,
+
+  // Education keys
   educationStudent: (studentId: string) => `education:student:${studentId}`,
   educationStudents: () => 'education:students:list',
   educationCurriculum: (id: string) => `education:curriculum:${id}`,
-  educationLocation: (locationId: string) => `education:location:${locationId}`,
+  educationCurriculaByLocation: (locationId: string) => `education:location:${locationId}:curricula`,
+  educationStudentCurricula: (studentId: string) => `education:student:${studentId}:curricula`,
+  educationDestinations: () => 'education:destinations:list',
+  educationStudentDashboard: (studentId: string) => `education:student:${studentId}:dashboard`,
+
+  // Place keys
   placeDetails: (placeId: string) => `place:${placeId}:details`,
+
+  // Cost keys
+  costResearch: (origin: string, destination: string, dateStr: string) =>
+    `cost:research:${origin}:${destination}:${dateStr}`,
+
+  // Transport keys
+  transportResearch: (origin: string, destination: string, dateStr: string) =>
+    `transport:research:${origin}:${destination}:${dateStr}`,
+  transportSegmentsSync: (scenarioId: string) => `transport:segments:${scenarioId}`,
 };
 
 /**
  * Cache invalidation helpers
  */
 export const CacheInvalidators = {
+  // Scenario invalidators
   scenario: (id: string) => {
     queryCache.invalidatePattern(`scenario:${id}*`);
     // Also invalidate the scenarios list since it contains summary info
@@ -351,7 +369,39 @@ export const CacheInvalidators = {
     queryCache.invalidatePattern('scenario:*');
   },
 
+  // Education invalidators
   education: () => {
     queryCache.invalidatePattern('education:*');
+  },
+
+  educationStudent: (studentId: string) => {
+    queryCache.invalidatePattern(`education:student:${studentId}*`);
+    queryCache.invalidate(CacheKeys.educationStudents());
+  },
+
+  educationCurriculum: (curriculumId: string) => {
+    queryCache.invalidatePattern(`education:curriculum:${curriculumId}*`);
+  },
+
+  educationLocation: (locationId: string) => {
+    queryCache.invalidate(CacheKeys.educationCurriculaByLocation(locationId));
+  },
+
+  // Cost/Transport invalidators
+  costs: () => {
+    queryCache.invalidatePattern('cost:*');
+  },
+
+  transport: () => {
+    queryCache.invalidatePattern('transport:*');
+  },
+
+  transportSegments: (scenarioId: string) => {
+    queryCache.invalidate(CacheKeys.transportSegmentsSync(scenarioId));
+  },
+
+  // Place invalidators (rarely needed as place data is mostly static)
+  place: (placeId: string) => {
+    queryCache.invalidate(CacheKeys.placeDetails(placeId));
   }
 };

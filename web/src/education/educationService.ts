@@ -2,6 +2,8 @@
  * Education Service - API client for curriculum and education features
  */
 
+import { queryCache, CacheKeys, CacheInvalidators } from '../firestore/queryCache';
+
 // Get API base URL from config without requiring Google Maps API key
 function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
@@ -118,31 +120,43 @@ export class EducationService {
   }
 
   /**
-   * Get all curricula for a specific location
+   * Get all curricula for a specific location (cached)
    */
   async getCurriculaByLocation(locationId: string): Promise<ListCurriculaResponse> {
-    const response = await fetch(`${this.baseUrl}/api/education/curricula/by-location/${locationId}`);
+    return queryCache.get(
+      CacheKeys.educationCurriculaByLocation(locationId),
+      async () => {
+        const response = await fetch(`${this.baseUrl}/api/education/curricula/by-location/${locationId}`);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch curricula');
-    }
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to fetch curricula');
+        }
 
-    return await response.json();
+        return await response.json();
+      },
+      { ttl: queryCache.getTTL('document') } // 5 minutes
+    );
   }
 
   /**
-   * Get a specific curriculum by ID
+   * Get a specific curriculum by ID (cached)
    */
   async getCurriculum(planId: string): Promise<{ status: 'success'; curriculum: CurriculumPlan }> {
-    const response = await fetch(`${this.baseUrl}/api/education/curricula/${planId}`);
+    return queryCache.get(
+      CacheKeys.educationCurriculum(planId),
+      async () => {
+        const response = await fetch(`${this.baseUrl}/api/education/curricula/${planId}`);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch curriculum');
-    }
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to fetch curriculum');
+        }
 
-    return await response.json();
+        return await response.json();
+      },
+      { ttl: queryCache.getTTL('document') } // 5 minutes
+    );
   }
 
   /**
@@ -174,17 +188,23 @@ export class EducationService {
   }
 
   /**
-   * Get all curricula for a specific student
+   * Get all curricula for a specific student (cached)
    */
   async getStudentCurricula(studentId: string): Promise<ListCurriculaResponse> {
-    const response = await fetch(`${this.baseUrl}/api/education/students/${studentId}/curricula`);
+    return queryCache.get(
+      CacheKeys.educationStudentCurricula(studentId),
+      async () => {
+        const response = await fetch(`${this.baseUrl}/api/education/students/${studentId}/curricula`);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch student curricula');
-    }
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to fetch student curricula');
+        }
 
-    return await response.json();
+        return await response.json();
+      },
+      { ttl: queryCache.getTTL('list') } // 10 seconds - frequently updated
+    );
   }
 
   /**
@@ -202,7 +222,12 @@ export class EducationService {
       throw new Error(error.error || 'Failed to update curriculum');
     }
 
-    return await response.json();
+    const result = await response.json();
+
+    // Invalidate affected caches
+    CacheInvalidators.educationCurriculum(planId);
+
+    return result;
   }
 
   /**
@@ -220,7 +245,12 @@ export class EducationService {
       throw new Error(error.error || 'Failed to add custom activity');
     }
 
-    return await response.json();
+    const result = await response.json();
+
+    // Invalidate affected caches
+    CacheInvalidators.educationCurriculum(planId);
+
+    return result;
   }
 }
 
