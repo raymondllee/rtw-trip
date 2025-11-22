@@ -217,7 +217,7 @@ body {
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 0;
-  flex: 0 0 auto;
+  flex: 0 0 100%;
   order: 4;
 }
 

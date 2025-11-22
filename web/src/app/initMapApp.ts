@@ -2373,13 +2373,13 @@ export async function initMapApp() {
             <div class="destination-meta">
               ${[loc.city, loc.country].filter(Boolean).join(', ')}
             </div>
-            <div class="destination-badges">
-              ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
-            </div>
             <div class="destination-dates">
-              <button class="date-lock-toggle" data-location-id="${loc.id}" title="${isDateLocked ? 'Unlock dates (return to auto-calculated)' : 'Lock dates (set specific dates)'}" style="background: none; border: none; cursor: pointer; font-size: 12px; padding: 0; margin-right: 6px; opacity: 0.7;">${lockIcon}</button>
+              <button class="date-lock-toggle" data-location-id="${loc.id}" title="${isDateLocked ? 'Unlock dates (return to auto-calculated)' : 'Lock dates (set specific dates)'}" style="background: none; border: none; cursor: pointer; font-size: 12px; padding: 0; margin-right: 6px;">${lockIcon}</button>
               ${dateRange ? `${dateRange} • ` : ''}
               <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}" ${isDateLocked ? 'disabled' : ''}> days
+            </div>
+            <div class="destination-badges">
+              ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
             </div>
             ${datePickerHTML}
             ${costSummaryHTML}
