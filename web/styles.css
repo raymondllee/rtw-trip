@@ -2977,7 +2977,8 @@ textarea.form-input {
 .costs-hidden .update-costs-btn,
 .costs-hidden .map-info-cost-summary,
 .costs-hidden .map-info-cost-total,
-.costs-hidden .map-info-cost-detail {
+.costs-hidden .map-info-cost-detail,
+.costs-hidden .transport-segment-cost {
   display: none !important;
 }
 

@@ -472,6 +472,9 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
           costText = cost > 0 ? `$${cost.toLocaleString()}` : 'Free';
         }
 
+        // Check if costs should be shown
+        const showCosts = !document.body.classList.contains('costs-hidden');
+
         const midpoint = google.maps.geometry.spherical.interpolate(
           pathCoords[i],
           pathCoords[i + 1],
@@ -485,14 +488,14 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
             url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
               <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="16" cy="16" r="14" fill="white" stroke="#1e88e5" stroke-width="2"/>
-                <text x="16" y="14" text-anchor="middle" font-size="12">${transportIcon}</text>
-                <text x="16" y="26" text-anchor="middle" font-size="8" fill="#1e88e5" font-weight="bold">${costText}</text>
+                <text x="16" y="${showCosts ? '14' : '19'}" text-anchor="middle" font-size="12">${transportIcon}</text>
+                ${showCosts ? `<text x="16" y="26" text-anchor="middle" font-size="8" fill="#1e88e5" font-weight="bold">${costText}</text>` : ''}
               </svg>
             `)}`,
             scaledSize: new google.maps.Size(32, 32),
             anchor: new google.maps.Point(16, 16)
           },
-          title: `${fromLocation.name} → ${toLocation.name}\nTravel by ${transportMode}\nCost: ${costText}\nDistance: ${Math.round(distance / 1000)}km`,
+          title: `${fromLocation.name} → ${toLocation.name}\nTravel by ${transportMode}${showCosts ? `\nCost: ${costText}` : ''}\nDistance: ${Math.round(distance / 1609.34)}mi`,
           zIndex: 1000
         });
 
@@ -531,7 +534,7 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
                   <strong style="color: #34495e;">Transport:</strong> ${transportMode.charAt(0).toUpperCase() + transportMode.slice(1)} ${statusBadge}
                 </p>
                 <p style="margin: 0; font-size: 13px; line-height: 1.5;">
-                  <strong style="color: #34495e;">Distance:</strong> ${Math.round(distance / 1000)}km
+                  <strong style="color: #34495e;">Distance:</strong> ${Math.round(distance / 1609.34)}mi
                 </p>
                 ${segment && segment.duration_hours ? `
                   <p style="margin: 0; font-size: 13px; line-height: 1.5;">
@@ -2444,7 +2447,7 @@ export async function initMapApp() {
                   <div class="transport-segment-route">${loc.name} → ${nextLoc.name}</div>
                   <div class="transport-segment-details">
                     <span class="transport-mode">${segment.transport_mode}</span>
-                    ${segment.distance_km ? `<span class="transport-distance">${Math.round(segment.distance_km)}km</span>` : ''}
+                    ${segment.distance_km ? `<span class="transport-distance">${Math.round(segment.distance_km * 0.621371)}mi</span>` : ''}
                     ${segment.duration_hours ? `<span class="transport-duration">${Math.round(segment.duration_hours)}h</span>` : ''}
                   </div>
                   <div class="transport-segment-cost">
@@ -3441,7 +3444,7 @@ export async function initMapApp() {
                 <div><strong>Stops:</strong> ${alt.typical_stops === 0 ? 'Direct' : alt.typical_stops}</div>
               ` : ''}
               ${alt.distance_from_original_km > 0 ? `
-                <div style="grid-column: 1 / -1;"><strong>Distance from original:</strong> ${alt.distance_from_original_km.toFixed(0)} km</div>
+                <div style="grid-column: 1 / -1;"><strong>Distance from original:</strong> ${Math.round(alt.distance_from_original_km * 0.621371)} mi</div>
               ` : ''}
             </div>
 
