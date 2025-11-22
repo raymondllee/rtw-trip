@@ -1381,36 +1381,30 @@ export async function initMapApp() {
         const totalCost = calculateTotalCost(filtered, includeTransport);
         const totalDays = calculateTotalDuration(filtered);
         const dateRange = calculateDateRange(filtered);
-        const continentCount = countUniqueContinents(filtered);
         const countryCount = countUniqueCountries(filtered);
         const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
         const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
 
-        // Format: leg name • stops • continents • countries • duration • dates • cost (if visible)
+        // Format: leg name • stops • countries • duration • dates • cost (if visible)
         summaryText = dateRange
-          ? `${subLegName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
-          : `${subLegName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days${costText}`;
+          ? `${subLegName} • ${filtered.length} stops • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
+          : `${subLegName} • ${filtered.length} stops • ${countryCount} countries • ${totalDays} days${costText}`;
       } else {
         summaryText = `${filtered.length} stops`;
       }
     } else {
-      const leg = workingData.legs?.find(l => l.name === legName);
-      if (leg) {
-        const totalCost = calculateTotalCost(filtered, includeTransport);
-        const totalDays = calculateTotalDuration(filtered);
-        const dateRange = calculateDateRange(filtered);
-        const continentCount = countUniqueContinents(filtered);
-        const countryCount = countUniqueCountries(filtered);
-        const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
-        const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
+      // Show rich summary for filtered leg view
+      const totalCost = calculateTotalCost(filtered, includeTransport);
+      const totalDays = calculateTotalDuration(filtered);
+      const dateRange = calculateDateRange(filtered);
+      const countryCount = countUniqueCountries(filtered);
+      const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+      const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
 
-        // Format: leg name • stops • continents • countries • duration • dates • cost (if visible)
-        summaryText = dateRange
-          ? `${legName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
-          : `${legName} • ${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days${costText}`;
-      } else {
-        summaryText = `${filtered.length} stops`;
-      }
+      // Format: leg name • stops • countries • duration • dates • cost (if visible)
+      summaryText = dateRange
+        ? `${legName} • ${filtered.length} stops • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
+        : `${legName} • ${filtered.length} stops • ${countryCount} countries • ${totalDays} days${costText}`;
     }
 
     if (summary) {
