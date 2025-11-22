@@ -51,10 +51,10 @@ function buildConfig() {
   console.log('  FIREBASE_PROJECT_ID:', env.FIREBASE_PROJECT_ID || 'NOT SET');
   console.log('  RAILWAY_PUBLIC_DOMAIN:', env.RAILWAY_PUBLIC_DOMAIN || 'NOT SET');
 
-  // Determine API base URL (use RAILWAY_PUBLIC_DOMAIN if available, otherwise localhost)
+  // Determine API base URL (use RAILWAY_PUBLIC_DOMAIN if available, otherwise empty for dev proxy)
   const apiBaseUrl = env.RAILWAY_PUBLIC_DOMAIN
     ? `https://${env.RAILWAY_PUBLIC_DOMAIN}`
-    : (env.API_BASE_URL || 'http://localhost:5001');
+    : (env.API_BASE_URL || '');
 
   const configTemplate = `// Configuration generated during build from environment variables
 // This file is loaded as a regular script (not a module)

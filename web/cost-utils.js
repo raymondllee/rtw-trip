@@ -555,6 +555,7 @@ export function generateSidebarCostSummary(costs, durationDays = 0, destinationN
   return `
     <div class="destination-cost-summary">
       <div class="cost-total">
+        <span class="cost-icon">💰</span>
         <span class="cost-amount">${formatCurrency(total)}</span>
         ${durationDays > 0 ? `<span class="cost-per-day">${formatCurrency(costPerDay)}/day</span>` : ''}
       </div>

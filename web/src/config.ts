@@ -1,6 +1,7 @@
 import type { ApiConfig, FirebaseConfig, RuntimeConfig } from './types/config';
 
-const DEFAULT_API_BASE = 'http://localhost:5001';
+// Use empty string as default to make relative URLs (goes through Vite proxy in dev)
+const DEFAULT_API_BASE = '';
 
 function resolveApiConfig(): ApiConfig {
   const apiConfig = window.API_CONFIG ?? {};

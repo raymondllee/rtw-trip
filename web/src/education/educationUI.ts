@@ -11,17 +11,12 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
   const hasCurricula = curricula.length > 0;
 
   if (!hasCurricula) {
+    const destinationName = location?.name || location?.city || 'this destination';
     return `
       <div class="education-section" data-location-id="${location.id}">
-        <div class="education-header">
-          <span class="education-icon">📚</span>
-          <span>Education</span>
-        </div>
-        <div class="education-summary">
-          <button class="btn-generate-curriculum" data-location-id="${location.id}">
-            <span>✨ Generate Curriculum</span>
-          </button>
-        </div>
+        <button class="btn-generate-curriculum" data-location-id="${location.id}">
+          📚 Update education for ${destinationName}
+        </button>
       </div>
     `;
   }
@@ -70,7 +65,8 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
           ${summaryText ? `<span class="education-meta-compact"> • ${summaryText}</span>` : ''}
         </div>
         <div class="education-summary-right">
-          <span class="education-toggle-text">▾ Details</span>
+          <span class="toggle-icon">▼</span>
+          <span class="toggle-text">Details</span>
         </div>
       </div>
       <div class="education-details" id="education-details-${location.id}">
@@ -985,14 +981,10 @@ export function initializeEducationUI(scenarioId?: string, versionId?: string) {
 
       if (toggleId) {
         const detailsSection = document.getElementById(toggleId);
-        const toggleText = summary.querySelector('.education-toggle-text');
 
         if (detailsSection) {
           detailsSection.classList.toggle('visible');
           summary.classList.toggle('expanded');
-          if (toggleText) {
-            toggleText.textContent = detailsSection.classList.contains('visible') ? '▴ Details' : '▾ Details';
-          }
         }
       }
     }

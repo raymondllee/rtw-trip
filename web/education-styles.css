@@ -1,59 +1,61 @@
-/* Education UI Styles - Redesigned to match cost section patterns */
+/* Education UI Styles - Matches cost section patterns */
 
 /* Education Section in Destination Card */
 .education-section {
-  margin-top: 12px;
+  margin-top: 3px;
+  width: 100%;
 }
 
-/* Compact Summary Row (matches cost section style) */
+/* Compact Summary Row (matches destination-cost-summary style) */
 .education-summary-compact {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  background: white;
-  border: 2px solid #4A90E2;
-  border-radius: 6px;
+  padding: 4px 8px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   cursor: pointer;
   user-select: none;
   transition: all 0.2s;
-  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .education-summary-compact:hover {
-  background: #f8fbff;
-  border-color: #2962ff;
+  background: #e8f4f8;
 }
 
 .education-summary-compact.expanded {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
-  border-bottom-color: #e0e0e0;
 }
 
 .education-summary-left {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex: 1;
   min-width: 0;
 }
 
 .education-icon {
-  font-size: 16px;
+  font-size: 13px;
   flex-shrink: 0;
 }
 
 .education-title {
-  font-weight: 600;
-  color: #333;
+  font-weight: 700;
+  color: #2563eb;
+  font-size: 13px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .education-meta-compact {
   color: #666;
-  font-size: 12px;
+  font-size: 10px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -87,28 +89,29 @@
 .education-summary-right {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: #666;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
   font-size: 12px;
+  color: #666;
+  white-space: nowrap;
   flex-shrink: 0;
-  margin-left: 12px;
 }
 
-.education-toggle-text {
-  font-weight: 500;
-  transition: color 0.2s;
+.education-summary-right:hover {
+  background: #e8f4f8;
+  color: #2563eb;
 }
 
-.education-summary-compact:hover .education-toggle-text {
-  color: #2962ff;
+.education-summary-right .toggle-icon {
+  font-size: 12px;
+  transition: transform 0.2s;
 }
 
-.education-summary-compact.expanded .education-toggle-text::before {
-  content: '▴ ';
-}
-
-.education-summary-compact:not(.expanded) .education-toggle-text::before {
-  content: '';
+.education-summary-compact.expanded .toggle-icon {
+  transform: rotate(180deg);
 }
 
 .education-loading,
@@ -303,33 +306,38 @@
 
 .btn-generate-curriculum,
 .btn-view-curriculum {
-  border: none;
   border-radius: 4px;
-  padding: 6px 12px;
   font-size: 12px;
-  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
 }
 
 .btn-generate-curriculum {
-  background: #1e88e5;
-  color: white;
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  padding: 6px 10px;
 }
 
 .btn-generate-curriculum:hover {
-  background: #1565c0;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(30, 136, 229, 0.3);
+  background: #dbe3ff;
+  color: #1d4ed8;
 }
 
 .btn-view-curriculum {
   background: #f8f9fa;
   color: #666;
   border: 1px solid #ddd;
+  padding: 6px 12px;
+  font-weight: 500;
+  gap: 4px;
+  display: inline-flex;
 }
 
 .btn-view-curriculum:hover {

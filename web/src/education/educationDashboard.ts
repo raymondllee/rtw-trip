@@ -109,7 +109,7 @@ async function loadStudents() {
         showLoading('Loading students...');
 
         // Load students from Firestore
-        const response = await fetch('http://localhost:5001/api/education/students', {
+        const response = await fetch('/api/education/students', {
             cache: 'no-store'
         });
         if (!response.ok) {
@@ -157,7 +157,7 @@ async function loadStudents() {
 
 async function loadDestinations() {
     try {
-        const response = await fetch('http://localhost:5001/api/education/destinations');
+        const response = await fetch('/api/education/destinations');
         if (!response.ok) {
             throw new Error('Failed to fetch destinations');
         }
@@ -298,7 +298,7 @@ function initializeStudentForm() {
         try {
             showLoading('Creating student profile...');
 
-            const response = await fetch('http://localhost:5001/api/education/students', {
+            const response = await fetch('/api/education/students', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -354,7 +354,7 @@ function initializeStudentForm() {
         try {
             showLoading('Updating student profile...');
 
-            const response = await fetch(`http://localhost:5001/api/education/students/${studentId}`, {
+            const response = await fetch(`/api/education/students/${studentId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -423,7 +423,7 @@ function initializeStudentForm() {
     try {
         showLoading('Deleting student...');
 
-        const response = await fetch(`http://localhost:5001/api/education/students/${studentId}`, {
+        const response = await fetch(`/api/education/students/${studentId}`, {
             method: 'DELETE',
         });
 

@@ -6,7 +6,7 @@
 class TransportSegmentManager {
   constructor() {
     this.segments = [];
-    this.apiBaseUrl = window.RTW_CONFIG?.apiBaseUrl || 'http://localhost:5001';
+    this.apiBaseUrl = window.RTW_CONFIG?.apiBaseUrl || '';
   }
 
   /**
