@@ -63,6 +63,11 @@ from google.genai.types import (
 from travel_concierge.shared_libraries import types
 from travel_concierge.sub_agents.cost_research import prompt
 from travel_concierge.tools.search import google_search_grounding, get_cache_stats
+from travel_concierge.tools.token_tracker import (
+    TokenUsage,
+    InteractionMetrics,
+    get_tracker,
+)
 from google.adk.tools.base_tool import BaseTool
 
 logger = logging.getLogger(__name__)
@@ -70,6 +75,8 @@ logger = logging.getLogger(__name__)
 # Performance tracking
 _research_times = []
 _PERF_STATE_KEY = "cost_research_start_time"
+_TOKEN_STATE_KEY = "cost_research_token_usage"
+_SEARCH_COUNT_KEY = "cost_research_search_count"
 
 
 class DestinationCostResearchOutputTool(BaseTool):
@@ -115,7 +122,7 @@ class DestinationCostResearchOutputTool(BaseTool):
             validated = types.DestinationCostResearch.model_validate(args)
             payload = validated.model_dump()
 
-            # Log performance metrics
+            # Log performance and cost metrics
             state = getattr(tool_context, 'state', {})
             start_time = state.get(_PERF_STATE_KEY)
             if start_time:
@@ -125,23 +132,37 @@ class DestinationCostResearchOutputTool(BaseTool):
                 # Get cache stats
                 cache_stats = get_cache_stats()
 
-                logger.info(
-                    f"Cost research completed in {duration_s:.1f}s "
-                    f"for {validated.destination_name}. "
-                    f"Cache stats: {cache_stats['cache_hits']} hits, "
-                    f"{cache_stats['cache_misses']} misses "
-                    f"({cache_stats['hit_rate']:.1%} hit rate)"
+                # Get token usage from state (tracked in callback)
+                token_usage = state.get(_TOKEN_STATE_KEY, TokenUsage())
+                search_count = state.get(_SEARCH_COUNT_KEY, 0)
+
+                # Track interaction metrics
+                metrics = InteractionMetrics(
+                    destination_name=validated.destination_name,
+                    duration_seconds=duration_s,
+                    token_usage=token_usage,
+                    search_count=search_count,
+                    cache_hits=cache_stats.get('cache_hits', 0),
+                    cache_misses=cache_stats.get('cache_misses', 0),
                 )
+
+                # Add to global tracker
+                tracker = get_tracker()
+                tracker.add_interaction(metrics)
 
                 # Log aggregate performance stats
                 if len(_research_times) > 0:
                     avg_time = sum(_research_times) / len(_research_times)
                     logger.info(
-                        f"Performance: avg={avg_time:.1f}s, "
+                        f"⚡ Performance Stats: avg={avg_time:.1f}s, "
                         f"min={min(_research_times):.1f}s, "
                         f"max={max(_research_times):.1f}s "
                         f"(n={len(_research_times)})"
                     )
+
+                # Log aggregate cost stats every 5 interactions
+                if len(tracker.interactions) % 5 == 0:
+                    tracker.log_aggregate_stats()
 
             return {
                 "status": "received",
@@ -201,6 +222,8 @@ def structured_output_callback(
     # Track start time on first invocation
     if _PERF_STATE_KEY not in state:
         state[_PERF_STATE_KEY] = time.time()
+        state[_TOKEN_STATE_KEY] = TokenUsage()
+        state[_SEARCH_COUNT_KEY] = 0
         logger.info("Starting cost research timer")
 
     tool_response_count = 0
@@ -212,9 +235,32 @@ def structured_output_callback(
             state[_STRUCTURED_OUTPUT_STATE_KEY] = False
             continue
 
+        # Try to extract token usage from usage_metadata if available
+        usage_metadata = getattr(message, 'usage_metadata', None)
+        if usage_metadata:
+            # Update accumulated token usage
+            current_usage = state.get(_TOKEN_STATE_KEY, TokenUsage())
+            prompt_tokens = getattr(usage_metadata, 'prompt_token_count', 0) or 0
+            candidates_tokens = getattr(usage_metadata, 'candidates_token_count', 0) or 0
+            cached_tokens = getattr(usage_metadata, 'cached_content_token_count', 0) or 0
+
+            # Add to running total
+            state[_TOKEN_STATE_KEY] = TokenUsage(
+                input_tokens=current_usage.input_tokens + prompt_tokens,
+                output_tokens=current_usage.output_tokens + candidates_tokens,
+                cached_input_tokens=current_usage.cached_input_tokens + cached_tokens,
+            )
+
         for part in _iter_parts(message):
             if _has_tool_response(part):
                 tool_response_count += 1
+                # Count searches
+                if isinstance(part, dict):
+                    name = part.get("functionResponse", {}).get("name", "")
+                else:
+                    name = getattr(getattr(part, "function_response", None), "name", "")
+                if "search" in name.lower():
+                    state[_SEARCH_COUNT_KEY] = state.get(_SEARCH_COUNT_KEY, 0) + 1
 
     # OPTIMIZATION: Adaptive threshold based on search pattern
     # - If we have 3+ searches, that's a good parallel batch
