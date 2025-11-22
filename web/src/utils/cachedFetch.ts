@@ -121,6 +121,22 @@ export const cachedCostAPI = {
         cacheTTL: 10 * 60 * 1000 // 10 minutes - cost data changes infrequently
       }
     );
+  },
+
+  async fetchSummary(sessionId: string, options: any, baseUrl: string): Promise<any> {
+    // Note: Summary requests are POST but read-only, so we cache them by session
+    const cacheKey = `cost:summary:${sessionId}`;
+
+    return cachedFetch(
+      `${baseUrl}/api/costs/summary`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, ...options }),
+        cacheKey,
+        cacheTTL: 30 * 1000 // 30 seconds - summary changes as costs are added
+      }
+    );
   }
 };
 
