@@ -1378,23 +1378,17 @@ export async function initMapApp() {
         ? `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
         : `${filtered.length} stops • ${continentCount} continents • ${countryCount} countries • ${totalDays} days${costText}`;
     } else if (subLegName) {
-      const leg = workingData.legs?.find(l => l.name === legName);
-      const subLeg = leg?.sub_legs?.find(sl => sl.name === subLegName);
-      if (subLeg) {
-        const totalCost = calculateTotalCost(filtered, includeTransport);
-        const totalDays = calculateTotalDuration(filtered);
-        const dateRange = calculateDateRange(filtered);
-        const countryCount = countUniqueCountries(filtered);
-        const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
-        const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
+      // Show rich summary for filtered country view
+      const totalCost = calculateTotalCost(filtered, includeTransport);
+      const totalDays = calculateTotalDuration(filtered);
+      const dateRange = calculateDateRange(filtered);
+      const formattedCost = window.formatCurrency ? window.formatCurrency(totalCost) : `$${Math.round(totalCost).toLocaleString()}`;
+      const costText = showCosts ? ` • ${formattedCost}${!includeTransport ? ' (excludes transport)' : ''}` : '';
 
-        // Format: leg name • stops • countries • duration • dates • cost (if visible)
-        summaryText = dateRange
-          ? `${subLegName} • ${filtered.length} stops • ${countryCount} countries • ${totalDays} days • ${dateRange}${costText}`
-          : `${subLegName} • ${filtered.length} stops • ${countryCount} countries • ${totalDays} days${costText}`;
-      } else {
-        summaryText = `${filtered.length} stops`;
-      }
+      // Format: country name • stops • duration • dates • cost (if visible)
+      summaryText = dateRange
+        ? `${subLegName} • ${filtered.length} stops • ${totalDays} days • ${dateRange}${costText}`
+        : `${subLegName} • ${filtered.length} stops • ${totalDays} days${costText}`;
     } else {
       // Show rich summary for filtered leg view
       const totalCost = calculateTotalCost(filtered, includeTransport);
@@ -2280,6 +2274,7 @@ export async function initMapApp() {
         costSummaryHTML = totalCost > 0 ? `
           <div class="destination-cost-summary">
             <div class="cost-total">
+              <span class="cost-icon">💰</span>
               <span class="cost-amount">$${totalCost.toLocaleString()}</span>
               ${duration > 0 ? `<span class="cost-per-day">$${Math.round(totalCost / duration)}/day</span>` : ''}
             </div>
@@ -2574,24 +2569,40 @@ export async function initMapApp() {
     loadEducationSections(locations);
   }
 
+  let educationLoadingInProgress = false;
+
   async function loadEducationSections(locations) {
+    // Prevent concurrent loading
+    if (educationLoadingInProgress) {
+      return;
+    }
+
+    educationLoadingInProgress = true;
+
     // Load education data for each location
     for (const location of locations) {
       try {
         const placeholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
         if (placeholder) {
           const educationHTML = await loadEducationSection(location);
-          placeholder.outerHTML = educationHTML;
+
+          // Re-query for placeholder after async operation, as DOM might have changed
+          const currentPlaceholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
+
+          if (currentPlaceholder && currentPlaceholder.parentNode) {
+            currentPlaceholder.outerHTML = educationHTML;
+          }
         }
       } catch (error) {
         console.error(`Failed to load education for ${location.name}:`, error);
         // Keep the placeholder with error message
         const placeholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
-        if (placeholder) {
+        if (placeholder && placeholder.parentNode) {
           placeholder.innerHTML = '<div class="education-error">Unable to load education</div>';
         }
       }
     }
+    educationLoadingInProgress = false;
   }
 
   function setupDragAndDrop(container, filteredLocations) {
@@ -3593,7 +3604,7 @@ export async function initMapApp() {
       console.log('📤 Sending transport research request:', researchRequest);
 
       // Call the research API
-      const response = await fetch('http://localhost:5001/api/transport/research', {
+      const response = await fetch('/api/transport/research', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -3608,7 +3619,7 @@ export async function initMapApp() {
 
         // Save the research results to Firestore
         try {
-          const updateResponse = await fetch('http://localhost:5001/api/transport/update-research', {
+          const updateResponse = await fetch('/api/transport/update-research', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -5586,6 +5597,11 @@ export async function initMapApp() {
     const toggle = document.getElementById('education-visibility-toggle');
     body.classList.add('education-hidden');
     if (toggle) toggle.checked = false;
+  } else if (educationVisible === 'true') {
+    const body = document.body;
+    const toggle = document.getElementById('education-visibility-toggle');
+    body.classList.remove('education-hidden');
+    if (toggle) toggle.checked = true;
   }
 
   // Costs visibility (default: true/shown)

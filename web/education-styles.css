@@ -1,63 +1,117 @@
-/* Education UI Styles - Redesigned to match main app */
+/* Education UI Styles - Matches cost section patterns */
 
 /* Education Section in Destination Card */
 .education-section {
-  margin-top: 12px;
-  border-top: 1px solid #eee;
-  padding-top: 12px;
+  margin-top: 3px;
+  width: 100%;
 }
 
-.education-header {
+/* Compact Summary Row (matches destination-cost-summary style) */
+.education-summary-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.education-summary-compact:hover {
+  background: #e8f4f8;
+}
+
+.education-summary-compact.expanded {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.education-summary-left {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 500;
-  font-size: 14px;
-  color: #333;
-  cursor: pointer;
-  user-select: none;
-  padding: 4px 0;
-}
-
-.education-header:hover {
-  color: #1e88e5;
+  flex: 1;
+  min-width: 0;
 }
 
 .education-icon {
-  font-size: 16px;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
-.education-toggle {
-  margin-left: auto;
+.education-title {
+  font-weight: 700;
+  color: #2563eb;
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.education-meta-compact {
+  color: #666;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.curriculum-status-compact {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 9px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.curriculum-status-compact.status-draft {
+  background: #e9ecef;
+  color: #666;
+}
+
+.curriculum-status-compact.status-active {
+  background: #c3e6cb;
+  color: #155724;
+}
+
+.curriculum-status-compact.status-completed {
+  background: #b8daff;
+  color: #004085;
+}
+
+.education-summary-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.education-summary-right:hover {
+  background: #e8f4f8;
+  color: #2563eb;
+}
+
+.education-summary-right .toggle-icon {
   font-size: 12px;
   transition: transform 0.2s;
 }
 
-.education-section.expanded .education-toggle {
-  transform: rotate(0deg);
-}
-
-.education-section:not(.expanded) .education-toggle {
-  transform: rotate(-90deg);
-}
-
-.education-badge {
-  background: #1e88e5;
-  color: white;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  font-weight: 600;
-}
-
-.education-content {
-  margin-top: 8px;
-  padding-left: 24px;
-  display: none;
-}
-
-.education-section.expanded .education-content {
-  display: block;
+.education-summary-compact.expanded .toggle-icon {
+  transform: rotate(180deg);
 }
 
 .education-loading,
@@ -78,11 +132,14 @@
   margin-bottom: 0;
 }
 
-/* Curriculum Summary */
-.curriculum-summary {
-  margin-bottom: 8px;
+.education-empty {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+  margin: 8px 0;
 }
 
+/* Curriculum Summary */
 .curriculum-title {
   font-weight: 500;
   font-size: 13px;
@@ -121,10 +178,123 @@
   color: #004085;
 }
 
-.curriculum-count {
+/* Education Details (Expandable like cost details) */
+.education-details {
+  display: none;
+  margin-top: 8px;
+  padding: 12px;
+  padding-left: 24px;
+  background: #fafbfc;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.education-details.visible {
+  display: block;
+}
+
+.curriculum-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.curriculum-semester-label {
   font-size: 12px;
+  color: #555;
+  font-weight: 500;
+}
+
+/* Education Subsections (Pre-Trip, On-Location, Post-Trip) */
+.education-subsection {
+  margin-bottom: 12px;
+}
+
+.education-subsection:last-of-type {
+  margin-bottom: 16px;
+}
+
+.education-subsection-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+}
+
+.education-subsection-header:hover {
+  background: #f8f9fa;
+  border-color: #1e88e5;
+}
+
+.subsection-icon {
+  font-size: 14px;
+}
+
+.subsection-count {
+  background: #e9ecef;
   color: #666;
-  margin: 8px 0;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.subsection-toggle {
+  font-size: 10px;
+  color: #999;
+  transition: transform 0.2s;
+}
+
+.education-subsection-header.expanded .subsection-toggle {
+  transform: rotate(90deg);
+}
+
+.education-subsection-content {
+  display: none;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  margin-top: -4px;
+}
+
+.education-subsection-content.visible {
+  display: block;
+}
+
+/* Education Item List */
+.education-item-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.education-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.education-item .item-type {
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 /* Education Actions */
@@ -136,33 +306,38 @@
 
 .btn-generate-curriculum,
 .btn-view-curriculum {
-  border: none;
   border-radius: 4px;
-  padding: 6px 12px;
   font-size: 12px;
-  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
 }
 
 .btn-generate-curriculum {
-  background: #1e88e5;
-  color: white;
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  padding: 6px 10px;
 }
 
 .btn-generate-curriculum:hover {
-  background: #1565c0;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(30, 136, 229, 0.3);
+  background: #dbe3ff;
+  color: #1d4ed8;
 }
 
 .btn-view-curriculum {
   background: #f8f9fa;
   color: #666;
   border: 1px solid #ddd;
+  padding: 6px 12px;
+  font-weight: 500;
+  gap: 4px;
+  display: inline-flex;
 }
 
 .btn-view-curriculum:hover {

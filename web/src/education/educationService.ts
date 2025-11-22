@@ -4,15 +4,21 @@
 
 import { queryCache, CacheKeys, CacheInvalidators } from '../firestore/queryCache';
 
-// Get API base URL from config without requiring Google Maps API key
+// Get API base URL - use relative URLs to leverage Vite proxy in development
+// and same-origin requests in production
 function getApiBaseUrl(): string {
+  // In development, use empty string so requests go through Vite proxy
+  // In production, use window.location.origin for same-origin requests
   if (typeof window !== 'undefined') {
+    // Check if we're in production (has config with BASE_URL set to origin)
     const apiConfig = (window as any).API_CONFIG;
-    if (apiConfig?.BASE_URL) {
+    if (apiConfig?.BASE_URL && apiConfig.BASE_URL.startsWith('http')) {
+      // Production or explicit config - use the configured URL
       return apiConfig.BASE_URL;
     }
   }
-  return 'http://localhost:5001';
+  // Development - use empty string to make relative URLs (goes through Vite proxy)
+  return '';
 }
 
 export interface CurriculumPlan {

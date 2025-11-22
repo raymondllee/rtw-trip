@@ -388,7 +388,8 @@ app = Flask(__name__, static_folder=WEB_DIR, static_url_path='')
 CORS(app)  # Enable CORS for frontend requests
 
 # ADK API Server endpoint (you need to run: adk api_server travel_concierge)
-ADK_API_URL = "http://127.0.0.1:8000"
+ADK_API_PORT = os.environ.get('ADK_API_PORT', '8000')
+ADK_API_URL = f"http://127.0.0.1:{ADK_API_PORT}"
 APP_NAME = "travel_concierge"
 USER_ID = "web_user"
 

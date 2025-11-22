@@ -289,7 +289,7 @@ function initializeStudentForm() {
         try {
             showLoading('Creating student profile...');
 
-            const response = await fetch('http://localhost:5001/api/education/students', {
+            const response = await fetch('/api/education/students', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -350,7 +350,7 @@ function initializeStudentForm() {
         try {
             showLoading('Updating student profile...');
 
-            const response = await fetch(`http://localhost:5001/api/education/students/${studentId}`, {
+            const response = await fetch(`/api/education/students/${studentId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -422,7 +422,7 @@ function initializeStudentForm() {
     try {
         showLoading('Deleting student...');
 
-        const response = await fetch(`http://localhost:5001/api/education/students/${studentId}`, {
+        const response = await fetch(`/api/education/students/${studentId}`, {
             method: 'DELETE',
         });
 

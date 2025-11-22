@@ -56,9 +56,10 @@ export async function cachedFetch<T = any>(
 
 /**
  * Cached education API helpers
+ * Uses relative URLs to work with Vite proxy in development
  */
 export const cachedEducationAPI = {
-  async getStudents(baseUrl: string = 'http://localhost:5001'): Promise<any> {
+  async getStudents(baseUrl: string = ''): Promise<any> {
     return cachedFetch(
       `${baseUrl}/api/education/students`,
       {
@@ -68,7 +69,7 @@ export const cachedEducationAPI = {
     );
   },
 
-  async getStudent(studentId: string, baseUrl: string = 'http://localhost:5001'): Promise<any> {
+  async getStudent(studentId: string, baseUrl: string = ''): Promise<any> {
     return cachedFetch(
       `${baseUrl}/api/education/students/${studentId}`,
       {
@@ -78,7 +79,7 @@ export const cachedEducationAPI = {
     );
   },
 
-  async getDestinations(baseUrl: string = 'http://localhost:5001'): Promise<any> {
+  async getDestinations(baseUrl: string = ''): Promise<any> {
     return cachedFetch(
       `${baseUrl}/api/education/destinations`,
       {
@@ -88,7 +89,7 @@ export const cachedEducationAPI = {
     );
   },
 
-  async getStudentDashboard(studentId: string, baseUrl: string = 'http://localhost:5001'): Promise<any> {
+  async getStudentDashboard(studentId: string, baseUrl: string = ''): Promise<any> {
     return cachedFetch(
       `${baseUrl}/api/education/students/${studentId}/dashboard`,
       {

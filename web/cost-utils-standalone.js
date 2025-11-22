@@ -599,6 +599,7 @@ function generateSidebarCostSummary(costs, durationDays = 0, destinationName = '
   return `
     <div class="destination-cost-summary">
       <div class="cost-total">
+        <span class="cost-icon">💰</span>
         <span class="cost-amount">${formatCurrency(total)}</span>
         ${durationDays > 0 ? `<span class="cost-per-day">${formatCurrency(costPerDay)}/day</span>` : ''}
       </div>
@@ -802,7 +803,7 @@ function startInlineEdit(element) {
  * Uses a workaround: fetches all costs, updates the specific one, and saves back to Firestore
  */
 async function updateCostAmount(costId, newAmountUSD, currency = 'USD') {
-  const apiBaseUrl = 'http://localhost:5001';
+  const apiBaseUrl = '';
 
   // Get scenario ID from window
   const scenarioId = window.currentScenarioId;
