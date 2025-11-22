@@ -12,16 +12,15 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
 
   if (!hasCurricula) {
     return `
-      <div class="education-section expanded" data-location-id="${location.id}">
+      <div class="education-section" data-location-id="${location.id}">
         <div class="education-header">
           <span class="education-icon">📚</span>
           <span>Education</span>
         </div>
-        <div class="education-content" style="display: block;">
+        <div class="education-summary">
           <button class="btn-generate-curriculum" data-location-id="${location.id}">
             <span>✨ Generate Curriculum</span>
           </button>
-          <p class="education-hint">Create learning activities for this destination</p>
         </div>
       </div>
     `;
@@ -29,38 +28,55 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
 
   // Show existing curricula
   const mostRecent = curricula[0]; // Assuming sorted by created_at DESC
-  const totalActivities = Object.values(mostRecent.location_lessons || {})
-    .reduce((sum: number, lesson: any) => {
-      const expCount = lesson?.on_location?.experiential_activities?.length || 0;
-      const structCount = lesson?.on_location?.structured_lessons?.length || 0;
-      return sum + expCount + structCount;
-    }, 0);
+
+  // Calculate overview stats from location lessons
+  let totalActivities = 0;
+  let totalLessons = 0;
+  let totalReadings = 0;
+
+  const locationLesson = mostRecent.location_lessons?.[location.id];
+  if (locationLesson) {
+    totalActivities = (locationLesson.on_location?.experiential_activities?.length || 0);
+    totalLessons = (locationLesson.on_location?.structured_lessons?.length || 0) +
+                   (locationLesson.pre_trip?.lessons?.length || 0);
+    totalReadings = (locationLesson.pre_trip?.readings?.length || 0);
+  }
+
+  // Count items per section for badges
+  const preTripCount = (locationLesson?.pre_trip?.lessons?.length || 0) +
+                       (locationLesson?.pre_trip?.readings?.length || 0) +
+                       (locationLesson?.pre_trip?.preparation_tasks?.length || 0);
+
+  const onLocationCount = totalActivities + totalLessons;
+
+  const postTripCount = (locationLesson?.post_trip?.reflection_prompts?.length || 0) +
+                        (locationLesson?.post_trip?.synthesis_activities?.length || 0) +
+                        (locationLesson?.post_trip?.assessment_tasks?.length || 0);
 
   return `
-    <div class="education-section expanded" data-location-id="${location.id}">
-      <div class="education-header" data-toggle="education-${location.id}">
-        <span class="education-icon">📚</span>
-        <span>Education</span>
-        <span class="education-badge">${curricula.length}</span>
-        <span class="education-toggle">▼</span>
-      </div>
-      <div class="education-content" id="education-${location.id}">
-        <div class="curriculum-summary">
-          <div class="curriculum-title">${mostRecent.semester.title}</div>
-          <div class="curriculum-meta">
-            <span>📅 ${mostRecent.semester.total_weeks} weeks</span>
-            <span>📝 ${totalActivities} activities</span>
-            <span class="curriculum-status status-${mostRecent.status}">${mostRecent.status}</span>
-          </div>
+    <div class="education-section" data-location-id="${location.id}">
+      <div class="education-header education-summary-clickable" data-toggle="education-details-${location.id}">
+        <div class="education-header-left">
+          <span class="education-icon">📚</span>
+          <span>Education</span>
+          ${curricula.length > 1 ? `<span class="education-badge">${curricula.length}</span>` : ''}
         </div>
-        ${curricula.length > 1 ? `
-          <div class="curriculum-count">
-            +${curricula.length - 1} more curriculum${curricula.length > 2 ? 's' : ''}
-          </div>
-        ` : ''}
+        <div class="education-toggle-icon">▼</div>
+      </div>
+      <div class="education-summary">
+        <div class="curriculum-title">${mostRecent.semester.title}</div>
+        <div class="curriculum-meta">
+          ${totalActivities > 0 ? `<span>📝 ${totalActivities} ${totalActivities === 1 ? 'activity' : 'activities'}</span>` : ''}
+          ${totalLessons > 0 ? `<span>📖 ${totalLessons} ${totalLessons === 1 ? 'lesson' : 'lessons'}</span>` : ''}
+          ${totalReadings > 0 ? `<span>📚 ${totalReadings} ${totalReadings === 1 ? 'reading' : 'readings'}</span>` : ''}
+          <span class="curriculum-status status-${mostRecent.status}">${mostRecent.status.toUpperCase()}</span>
+        </div>
+      </div>
+      <div class="education-details" id="education-details-${location.id}">
+        ${locationLesson ? generateLocationDetailsHTML(locationLesson, location.id, preTripCount, onLocationCount, postTripCount) : '<p class="education-hint">No curriculum content for this location yet.</p>'}
         <div class="education-actions">
           <button class="btn-view-curriculum" data-curriculum-id="${mostRecent.id}">
-            <span>👁️ View</span>
+            <span>👁️ View Full Details</span>
           </button>
           <button class="btn-generate-curriculum" data-location-id="${location.id}">
             <span>✨ Generate New</span>
@@ -69,6 +85,154 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
       </div>
     </div>
   `;
+}
+
+/**
+ * Generate nested expandable sections for Pre-Trip, On-Location, Post-Trip
+ */
+function generateLocationDetailsHTML(
+  locationLesson: any,
+  locationId: string,
+  preCount: number,
+  onCount: number,
+  postCount: number
+): string {
+  return `
+    ${preCount > 0 ? `
+      <div class="education-subsection">
+        <div class="education-subsection-header" data-toggle="pre-trip-${locationId}">
+          <span class="subsection-icon">📖</span>
+          <span>Pre-Trip</span>
+          <span class="subsection-count">${preCount}</span>
+          <span class="subsection-toggle">▶</span>
+        </div>
+        <div class="education-subsection-content" id="pre-trip-${locationId}">
+          ${generatePreTripContentHTML(locationLesson.pre_trip)}
+        </div>
+      </div>
+    ` : ''}
+
+    ${onCount > 0 ? `
+      <div class="education-subsection">
+        <div class="education-subsection-header" data-toggle="on-location-${locationId}">
+          <span class="subsection-icon">📍</span>
+          <span>On-Location</span>
+          <span class="subsection-count">${onCount}</span>
+          <span class="subsection-toggle">▶</span>
+        </div>
+        <div class="education-subsection-content" id="on-location-${locationId}">
+          ${generateOnLocationContentHTML(locationLesson.on_location)}
+        </div>
+      </div>
+    ` : ''}
+
+    ${postCount > 0 ? `
+      <div class="education-subsection">
+        <div class="education-subsection-header" data-toggle="post-trip-${locationId}">
+          <span class="subsection-icon">✈️</span>
+          <span>Post-Trip</span>
+          <span class="subsection-count">${postCount}</span>
+          <span class="subsection-toggle">▶</span>
+        </div>
+        <div class="education-subsection-content" id="post-trip-${locationId}">
+          ${generatePostTripContentHTML(locationLesson.post_trip)}
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
+/**
+ * Generate Pre-Trip content list
+ */
+function generatePreTripContentHTML(preTrip: any): string {
+  if (!preTrip) return '<p class="education-empty">No pre-trip content</p>';
+
+  let html = '<ul class="education-item-list">';
+
+  // Readings
+  if (preTrip.readings?.length > 0) {
+    preTrip.readings.forEach((reading: any) => {
+      html += `<li class="education-item"><span class="item-type">📚</span> ${reading.title}</li>`;
+    });
+  }
+
+  // Lessons
+  if (preTrip.lessons?.length > 0) {
+    preTrip.lessons.forEach((lesson: any) => {
+      html += `<li class="education-item"><span class="item-type">📖</span> ${lesson.title}</li>`;
+    });
+  }
+
+  // Preparation Tasks
+  if (preTrip.preparation_tasks?.length > 0) {
+    preTrip.preparation_tasks.forEach((task: any) => {
+      html += `<li class="education-item"><span class="item-type">✓</span> ${task.title}</li>`;
+    });
+  }
+
+  html += '</ul>';
+  return html;
+}
+
+/**
+ * Generate On-Location content list
+ */
+function generateOnLocationContentHTML(onLocation: any): string {
+  if (!onLocation) return '<p class="education-empty">No on-location content</p>';
+
+  let html = '<ul class="education-item-list">';
+
+  // Experiential Activities (just show count for now since we only have IDs)
+  if (onLocation.experiential_activities?.length > 0) {
+    html += `<li class="education-item"><span class="item-type">🎯</span> ${onLocation.experiential_activities.length} experiential ${onLocation.experiential_activities.length === 1 ? 'activity' : 'activities'}</li>`;
+  }
+
+  // Structured Lessons (just show count for now since we only have IDs)
+  if (onLocation.structured_lessons?.length > 0) {
+    html += `<li class="education-item"><span class="item-type">📝</span> ${onLocation.structured_lessons.length} structured ${onLocation.structured_lessons.length === 1 ? 'lesson' : 'lessons'}</li>`;
+  }
+
+  // Field Trip Guides
+  if (onLocation.field_trip_guides?.length > 0) {
+    onLocation.field_trip_guides.forEach((guide: any) => {
+      html += `<li class="education-item"><span class="item-type">🗺️</span> ${guide.site_name}</li>`;
+    });
+  }
+
+  html += '</ul>';
+  return html;
+}
+
+/**
+ * Generate Post-Trip content list
+ */
+function generatePostTripContentHTML(postTrip: any): string {
+  if (!postTrip) return '<p class="education-empty">No post-trip content</p>';
+
+  let html = '<ul class="education-item-list">';
+
+  // Reflection Prompts
+  if (postTrip.reflection_prompts?.length > 0) {
+    postTrip.reflection_prompts.forEach((prompt: any) => {
+      html += `<li class="education-item"><span class="item-type">💭</span> ${prompt.text}</li>`;
+    });
+  }
+
+  // Synthesis Activities (just show count for now since we only have IDs)
+  if (postTrip.synthesis_activities?.length > 0) {
+    html += `<li class="education-item"><span class="item-type">🎨</span> ${postTrip.synthesis_activities.length} synthesis ${postTrip.synthesis_activities.length === 1 ? 'activity' : 'activities'}</li>`;
+  }
+
+  // Assessment Tasks
+  if (postTrip.assessment_tasks?.length > 0) {
+    postTrip.assessment_tasks.forEach((task: any) => {
+      html += `<li class="education-item"><span class="item-type">✅</span> ${task.title}</li>`;
+    });
+  }
+
+  html += '</ul>';
+  return html;
 }
 
 /**
@@ -713,21 +877,41 @@ export function initializeEducationUI(scenarioId?: string, versionId?: string) {
       }
     }
 
-    // Toggle education section
-    if (target.closest('.education-header')) {
+    // Toggle education details (main expand/collapse)
+    if (target.closest('.education-header.education-summary-clickable')) {
       e.stopPropagation(); // Prevent destination card click
-      const header = target.closest('.education-header') as HTMLElement;
+      const header = target.closest('.education-header.education-summary-clickable') as HTMLElement;
+      const toggleId = header.dataset.toggle;
+
+      if (toggleId) {
+        const detailsSection = document.getElementById(toggleId);
+        const toggleIcon = header.querySelector('.education-toggle-icon');
+
+        if (detailsSection) {
+          detailsSection.classList.toggle('visible');
+          header.classList.toggle('expanded');
+          if (toggleIcon) {
+            toggleIcon.textContent = detailsSection.classList.contains('visible') ? '▲' : '▼';
+          }
+        }
+      }
+    }
+
+    // Toggle education subsections (Pre-Trip, On-Location, Post-Trip)
+    if (target.closest('.education-subsection-header')) {
+      e.stopPropagation(); // Prevent destination card click
+      const header = target.closest('.education-subsection-header') as HTMLElement;
       const toggleId = header.dataset.toggle;
 
       if (toggleId) {
         const content = document.getElementById(toggleId);
-        const section = header.closest('.education-section');
-        const toggleIcon = header.querySelector('.education-toggle');
+        const toggleIcon = header.querySelector('.subsection-toggle');
 
-        if (content && section) {
-          section.classList.toggle('expanded');
+        if (content) {
+          content.classList.toggle('visible');
+          header.classList.toggle('expanded');
           if (toggleIcon) {
-            toggleIcon.textContent = section.classList.contains('expanded') ? '▼' : '▶';
+            toggleIcon.textContent = content.classList.contains('visible') ? '▼' : '▶';
           }
         }
       }

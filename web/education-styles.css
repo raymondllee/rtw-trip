@@ -1,4 +1,4 @@
-/* Education UI Styles - Redesigned to match main app */
+/* Education UI Styles - Redesigned to match cost section patterns */
 
 /* Education Section in Destination Card */
 .education-section {
@@ -7,38 +7,35 @@
   padding-top: 12px;
 }
 
+/* Education Header (Always Visible - Clickable) */
 .education-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   font-weight: 500;
   font-size: 14px;
   color: #333;
-  cursor: pointer;
-  user-select: none;
   padding: 4px 0;
 }
 
-.education-header:hover {
+.education-header.education-summary-clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.education-header.education-summary-clickable:hover {
   color: #1e88e5;
+}
+
+.education-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .education-icon {
   font-size: 16px;
-}
-
-.education-toggle {
-  margin-left: auto;
-  font-size: 12px;
-  transition: transform 0.2s;
-}
-
-.education-section.expanded .education-toggle {
-  transform: rotate(0deg);
-}
-
-.education-section:not(.expanded) .education-toggle {
-  transform: rotate(-90deg);
 }
 
 .education-badge {
@@ -50,14 +47,21 @@
   font-weight: 600;
 }
 
-.education-content {
-  margin-top: 8px;
-  padding-left: 24px;
-  display: none;
+.education-toggle-icon {
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.2s;
 }
 
-.education-section.expanded .education-content {
-  display: block;
+.education-header.education-summary-clickable.expanded .education-toggle-icon {
+  transform: rotate(0deg);
+}
+
+/* Education Summary (Always Visible) */
+.education-summary {
+  margin-top: 4px;
+  margin-bottom: 8px;
+  padding-left: 24px;
 }
 
 .education-loading,
@@ -78,11 +82,14 @@
   margin-bottom: 0;
 }
 
-/* Curriculum Summary */
-.curriculum-summary {
-  margin-bottom: 8px;
+.education-empty {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+  margin: 8px 0;
 }
 
+/* Curriculum Summary */
 .curriculum-title {
   font-weight: 500;
   font-size: 13px;
@@ -121,10 +128,110 @@
   color: #004085;
 }
 
-.curriculum-count {
-  font-size: 12px;
+/* Education Details (Expandable like cost details) */
+.education-details {
+  display: none;
+  margin-top: 8px;
+  padding: 12px;
+  padding-left: 24px;
+  background: #fafbfc;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.education-details.visible {
+  display: block;
+}
+
+/* Education Subsections (Pre-Trip, On-Location, Post-Trip) */
+.education-subsection {
+  margin-bottom: 12px;
+}
+
+.education-subsection:last-of-type {
+  margin-bottom: 16px;
+}
+
+.education-subsection-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+}
+
+.education-subsection-header:hover {
+  background: #f8f9fa;
+  border-color: #1e88e5;
+}
+
+.subsection-icon {
+  font-size: 14px;
+}
+
+.subsection-count {
+  background: #e9ecef;
   color: #666;
-  margin: 8px 0;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.subsection-toggle {
+  font-size: 10px;
+  color: #999;
+  transition: transform 0.2s;
+}
+
+.education-subsection-header.expanded .subsection-toggle {
+  transform: rotate(90deg);
+}
+
+.education-subsection-content {
+  display: none;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  margin-top: -4px;
+}
+
+.education-subsection-content.visible {
+  display: block;
+}
+
+/* Education Item List */
+.education-item-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.education-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.education-item .item-type {
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 /* Education Actions */
