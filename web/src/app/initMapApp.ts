@@ -2571,24 +2571,40 @@ export async function initMapApp() {
     loadEducationSections(locations);
   }
 
+  let educationLoadingInProgress = false;
+
   async function loadEducationSections(locations) {
+    // Prevent concurrent loading
+    if (educationLoadingInProgress) {
+      return;
+    }
+
+    educationLoadingInProgress = true;
+
     // Load education data for each location
     for (const location of locations) {
       try {
         const placeholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
         if (placeholder) {
           const educationHTML = await loadEducationSection(location);
-          placeholder.outerHTML = educationHTML;
+
+          // Re-query for placeholder after async operation, as DOM might have changed
+          const currentPlaceholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
+
+          if (currentPlaceholder && currentPlaceholder.parentNode) {
+            currentPlaceholder.outerHTML = educationHTML;
+          }
         }
       } catch (error) {
         console.error(`Failed to load education for ${location.name}:`, error);
         // Keep the placeholder with error message
         const placeholder = document.querySelector(`.education-section-placeholder[data-location-id="${location.id}"]`);
-        if (placeholder) {
+        if (placeholder && placeholder.parentNode) {
           placeholder.innerHTML = '<div class="education-error">Unable to load education</div>';
         }
       }
     }
+    educationLoadingInProgress = false;
   }
 
   function setupDragAndDrop(container, filteredLocations) {
@@ -5571,6 +5587,11 @@ export async function initMapApp() {
     const toggle = document.getElementById('education-visibility-toggle');
     body.classList.add('education-hidden');
     if (toggle) toggle.checked = false;
+  } else if (educationVisible === 'true') {
+    const body = document.body;
+    const toggle = document.getElementById('education-visibility-toggle');
+    body.classList.remove('education-hidden');
+    if (toggle) toggle.checked = true;
   }
 
   // Costs visibility (default: true/shown)
