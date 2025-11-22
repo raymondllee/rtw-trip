@@ -28,6 +28,7 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
 
   // Show existing curricula
   const mostRecent = curricula[0]; // Assuming sorted by created_at DESC
+  const destinationName = location?.name || location?.city || (mostRecent.semester?.title?.replace('Learning Journey: ', '') || 'Destination');
 
   // Calculate overview stats from location lessons
   let totalActivities = 0;
@@ -45,6 +46,7 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
   // Count items per section for badges
   const preTripCount = (locationLesson?.pre_trip?.lessons?.length || 0) +
                        (locationLesson?.pre_trip?.readings?.length || 0) +
+                       (locationLesson?.pre_trip?.videos?.length || 0) +
                        (locationLesson?.pre_trip?.preparation_tasks?.length || 0);
 
   const onLocationCount = totalActivities + totalLessons;
@@ -56,7 +58,6 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
   // Build compact summary for collapsed state
   const summaryParts = [];
   if (totalActivities > 0) summaryParts.push(`${totalActivities} ${totalActivities === 1 ? 'activity' : 'activities'}`);
-  if (totalLessons > 0) summaryParts.push(`${totalLessons} ${totalLessons === 1 ? 'lesson' : 'lessons'}`);
   if (totalReadings > 0) summaryParts.push(`${totalReadings} ${totalReadings === 1 ? 'reading' : 'readings'}`);
   const summaryText = summaryParts.join(' • ');
 
@@ -65,15 +66,18 @@ export function generateEducationSectionHTML(location: any, curricula: Curriculu
       <div class="education-summary-compact" data-toggle="education-details-${location.id}">
         <div class="education-summary-left">
           <span class="education-icon">📚</span>
-          <span class="education-title">${mostRecent.semester.title}</span>
+          <span class="education-title">${destinationName}</span>
           ${summaryText ? `<span class="education-meta-compact"> • ${summaryText}</span>` : ''}
-          <span class="curriculum-status-compact status-${mostRecent.status}">${mostRecent.status.toUpperCase()}</span>
         </div>
         <div class="education-summary-right">
           <span class="education-toggle-text">▾ Details</span>
         </div>
       </div>
       <div class="education-details" id="education-details-${location.id}">
+        <div class="curriculum-status-row">
+          <span class="curriculum-status-compact status-${mostRecent.status}">${mostRecent.status.toUpperCase()}</span>
+          ${mostRecent.semester?.title ? `<span class="curriculum-semester-label">${mostRecent.semester.title}</span>` : ''}
+        </div>
         ${locationLesson ? generateLocationDetailsHTML(locationLesson, location.id, preTripCount, onLocationCount, postTripCount) : '<p class="education-hint">No curriculum content for this location yet.</p>'}
         <div class="education-actions">
           <button class="btn-view-curriculum" data-curriculum-id="${mostRecent.id}">
