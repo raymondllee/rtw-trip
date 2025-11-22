@@ -3666,29 +3666,33 @@ export async function initMapApp() {
         return;
       }
 
-      const scenarioItems = await Promise.all(
-        scenarios.map(async (scenario) => {
-          const createdDate = scenario.createdAt?.toDate ? scenario.createdAt.toDate().toLocaleDateString() : 'Unknown';
-          const latestVersion = await scenarioManager.getLatestVersion(scenario.id);
-          const locationCount = latestVersion?.itineraryData?.locations?.length || 0;
-
-          return `
-            <div class="scenario-item">
-              <div class="scenario-info">
-                <div class="scenario-name">${scenario.name}</div>
-                <div class="scenario-meta">${locationCount} destinations • v${scenario.currentVersion || 1} • Created ${createdDate}</div>
-                ${scenario.description ? `<div class="scenario-description">${scenario.description}</div>` : ''}
-              </div>
-              <div class="scenario-actions-btn">
-                <button class="btn-load" onclick="loadScenarioById('${scenario.id}')">Load</button>
-                <button class="btn-versions" onclick="showVersionHistory('${scenario.id}')">History</button>
-                <button class="btn-rename" onclick="renameScenarioById('${scenario.id}', '${scenario.name.replace(/'/g, "\\'")}')">Rename</button>
-                <button class="btn-delete" onclick="deleteScenarioById('${scenario.id}')">Delete</button>
-              </div>
-            </div>
-          `;
-        })
+      // Batch fetch all latest versions to avoid N+1 query pattern
+      const latestVersionsMap = await scenarioManager.getLatestVersionsBatch(
+        scenarios.map(s => s.id)
       );
+
+      const scenarioItems = scenarios.map((scenario) => {
+        const createdDate = scenario.createdAt?.toDate ? scenario.createdAt.toDate().toLocaleDateString() : 'Unknown';
+        const cacheKey = `scenario:${scenario.id}:latest`;
+        const latestVersion = latestVersionsMap.get(cacheKey);
+        const locationCount = latestVersion?.itineraryData?.locations?.length || 0;
+
+        return `
+          <div class="scenario-item">
+            <div class="scenario-info">
+              <div class="scenario-name">${scenario.name}</div>
+              <div class="scenario-meta">${locationCount} destinations • v${scenario.currentVersion || 1} • Created ${createdDate}</div>
+              ${scenario.description ? `<div class="scenario-description">${scenario.description}</div>` : ''}
+            </div>
+            <div class="scenario-actions-btn">
+              <button class="btn-load" onclick="loadScenarioById('${scenario.id}')">Load</button>
+              <button class="btn-versions" onclick="showVersionHistory('${scenario.id}')">History</button>
+              <button class="btn-rename" onclick="renameScenarioById('${scenario.id}', '${scenario.name.replace(/'/g, "\\'")}')">Rename</button>
+              <button class="btn-delete" onclick="deleteScenarioById('${scenario.id}')">Delete</button>
+            </div>
+          </div>
+        `;
+      });
 
       scenarioList.innerHTML = scenarioItems.join('');
     } catch (error) {
@@ -4459,31 +4463,35 @@ export async function initMapApp() {
       // Fetch scenarios and latest metadata
       const scenarios = await scenarioManager.listScenarios();
 
-      // Build list items similar to updateScenarioList()
-      const scenarioItems = await Promise.all(
-        scenarios.map(async (scenario) => {
-          const createdDate = scenario.createdAt?.toDate ? scenario.createdAt.toDate().toLocaleDateString() : 'Unknown';
-          const latestVersion = await scenarioManager.getLatestVersion(scenario.id);
-          const locationCount = latestVersion?.itineraryData?.locations?.length || 0;
-
-          return `
-            <div class="scenario-item" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #eee;">
-              <div class="scenario-info">
-                <div class="scenario-name" style="font-weight:600;">${scenario.name}</div>
-                <div class="scenario-meta" style="font-size:12px; color:#666;">${locationCount} destinations • v${scenario.currentVersion || 1} • Created ${createdDate}</div>
-                ${scenario.description ? `<div class="scenario-description" style="margin-top:4px; color:#555; font-size:12px;">${scenario.description}</div>` : ''}
-              </div>
-              <div class="scenario-actions-btn" style="display:flex; gap:8px;">
-                <button onclick="loadScenarioById('${scenario.id}')" style="padding:6px 10px; background:#0070f3; color:#fff; border:none; border-radius:4px; cursor:pointer;">Load</button>
-                <button onclick="showVersionHistory('${scenario.id}')" style="padding:6px 10px; background:#666; color:#fff; border:none; border-radius:4px; cursor:pointer;">History</button>
-                <button onclick="duplicateScenario('${scenario.id}')" style="padding:6px 10px; background:#fff; color:#333; border:1px solid #eee; border-radius:4px; cursor:pointer;">Duplicate</button>
-                <button onclick="renameScenarioById('${scenario.id}', '${scenario.name.replace(/'/g, "\\'")}', true)" style="padding:6px 10px; background:#ff9800; color:#fff; border:none; border-radius:4px; cursor:pointer;">Rename</button>
-                <button onclick="deleteScenarioById('${scenario.id}')" style="padding:6px 10px; background:#fff; color:#d32f2f; border:1px solid #eee; border-radius:4px; cursor:pointer;">Delete</button>
-              </div>
-            </div>
-          `;
-        })
+      // Batch fetch all latest versions to avoid N+1 query pattern
+      const latestVersionsMap = await scenarioManager.getLatestVersionsBatch(
+        scenarios.map(s => s.id)
       );
+
+      // Build list items similar to updateScenarioList()
+      const scenarioItems = scenarios.map((scenario) => {
+        const createdDate = scenario.createdAt?.toDate ? scenario.createdAt.toDate().toLocaleDateString() : 'Unknown';
+        const cacheKey = `scenario:${scenario.id}:latest`;
+        const latestVersion = latestVersionsMap.get(cacheKey);
+        const locationCount = latestVersion?.itineraryData?.locations?.length || 0;
+
+        return `
+          <div class="scenario-item" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #eee;">
+            <div class="scenario-info">
+              <div class="scenario-name" style="font-weight:600;">${scenario.name}</div>
+              <div class="scenario-meta" style="font-size:12px; color:#666;">${locationCount} destinations • v${scenario.currentVersion || 1} • Created ${createdDate}</div>
+              ${scenario.description ? `<div class="scenario-description" style="margin-top:4px; color:#555; font-size:12px;">${scenario.description}</div>` : ''}
+            </div>
+            <div class="scenario-actions-btn" style="display:flex; gap:8px;">
+              <button onclick="loadScenarioById('${scenario.id}')" style="padding:6px 10px; background:#0070f3; color:#fff; border:none; border-radius:4px; cursor:pointer;">Load</button>
+              <button onclick="showVersionHistory('${scenario.id}')" style="padding:6px 10px; background:#666; color:#fff; border:none; border-radius:4px; cursor:pointer;">History</button>
+              <button onclick="duplicateScenario('${scenario.id}')" style="padding:6px 10px; background:#fff; color:#333; border:1px solid #eee; border-radius:4px; cursor:pointer;">Duplicate</button>
+              <button onclick="renameScenarioById('${scenario.id}', '${scenario.name.replace(/'/g, "\\'")}', true)" style="padding:6px 10px; background:#ff9800; color:#fff; border:none; border-radius:4px; cursor:pointer;">Rename</button>
+              <button onclick="deleteScenarioById('${scenario.id}')" style="padding:6px 10px; background:#fff; color:#d32f2f; border:1px solid #eee; border-radius:4px; cursor:pointer;">Delete</button>
+            </div>
+          </div>
+        `;
+      });
 
       const listHtml = scenarioItems.join('') || '<div class="empty-scenarios">No saved scenarios yet.</div>';
 
@@ -4694,17 +4702,21 @@ export async function initMapApp() {
           return;
         }
 
-        // Load scenario data with itineraries
-        const scenariosWithData = await Promise.all(
-          scenarios.map(async (scenario) => {
-            const latestVersion = await scenarioManager.getLatestVersion(scenario.id);
-            return {
-              id: scenario.id,
-              name: scenario.name,
-              itinerary: latestVersion?.itineraryData || null
-            };
-          })
+        // Batch fetch all latest versions to avoid N+1 query pattern
+        const latestVersionsMap = await scenarioManager.getLatestVersionsBatch(
+          scenarios.map(s => s.id)
         );
+
+        // Load scenario data with itineraries
+        const scenariosWithData = scenarios.map((scenario) => {
+          const cacheKey = `scenario:${scenario.id}:latest`;
+          const latestVersion = latestVersionsMap.get(cacheKey);
+          return {
+            id: scenario.id,
+            name: scenario.name,
+            itinerary: latestVersion?.itineraryData || null
+          };
+        });
 
         await costComparison.showComparisonModal(scenariosWithData.filter(s => s.itinerary));
       } catch (error) {
