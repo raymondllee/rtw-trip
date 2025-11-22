@@ -233,7 +233,7 @@ function getCategoryDisplayName(category) {
 function getTransportationIcon(transportMode) {
   const icons = {
     'plane': '✈️',
-    'train': '🚂', 
+    'train': '🚂',
     'car': '🚗',
     'bus': '🚌',
     'ferry': '🚢',
@@ -278,15 +278,15 @@ function getTransportationCost(fromLocation, toLocation, transportMode, distance
   const fromCode = getAirportCode(fromLocation);
   const toCode = getAirportCode(toLocation);
   const routeKey = `${fromCode}-${toCode}`;
-  
+
   if (knownFlightCosts[routeKey]) {
     return knownFlightCosts[routeKey] * 3; // Times 3 for 3 people
   }
-  
+
   // Estimate based on transport mode and distance
   const distanceKm = distance / 1000;
   let costPerPerson = 0;
-  
+
   switch (transportMode) {
     case 'plane':
       if (distanceKm > 8000) costPerPerson = 1200; // Long haul international
@@ -312,7 +312,7 @@ function getTransportationCost(fromLocation, toLocation, transportMode, distance
     default:
       costPerPerson = 100; // Default estimate
   }
-  
+
   return Math.round(costPerPerson * 3); // Times 3 for 3 people
 }
 
@@ -349,7 +349,7 @@ function getAirportCode(location) {
     'Galápagos': 'GPS',
     'Buenos Aires': 'EZE'
   };
-  
+
   return airportCodes[location.city] || airportCodes[location.name] || 'XXX';
 }
 
@@ -359,12 +359,12 @@ function getTransportationMode(fromLocation, toLocation, index) {
     new google.maps.LatLng(fromLocation.coordinates.lat, fromLocation.coordinates.lng),
     new google.maps.LatLng(toLocation.coordinates.lat, toLocation.coordinates.lng)
   );
-  
+
   // If locations have explicit transport mode, use it
   if (toLocation.transport_from_previous) {
     return toLocation.transport_from_previous;
   }
-  
+
   // Auto-detect based on distance and geography
   if (distance > 1000000) { // >1000km = likely flight
     return 'plane';
@@ -415,11 +415,11 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
         strokeWeight: isLocked ? 4 : 2
       }
     });
-    
+
     const clickHandler = () => {
       highlightLocation(idx, marker, loc);
     };
-    
+
     marker.addListener('click', clickHandler);
     marker.clickHandler = clickHandler;
     markers.push(marker);
@@ -432,7 +432,7 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
       for (let i = 0; i < pathCoords.length - 1; i++) {
         const fromLocation = locations[coordIndex[i]];
         const toLocation = locations[coordIndex[i + 1]];
-        
+
         // Create polyline segment
         const polyline = new google.maps.Polyline({
           path: [pathCoords[i], pathCoords[i + 1]],
@@ -443,7 +443,7 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
         });
         polyline.setMap(map);
         routingElements.push(polyline);
-        
+
         // Add transportation icon at midpoint with cost information
         const distance = google.maps.geometry.spherical.computeDistanceBetween(
           pathCoords[i],
@@ -492,7 +492,7 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
             scaledSize: new google.maps.Size(32, 32),
             anchor: new google.maps.Point(16, 16)
           },
-          title: `${fromLocation.name} → ${toLocation.name}\nTravel by ${transportMode}\nCost: ${costText}\nDistance: ${Math.round(distance/1000)}km`,
+          title: `${fromLocation.name} → ${toLocation.name}\nTravel by ${transportMode}\nCost: ${costText}\nDistance: ${Math.round(distance / 1000)}km`,
           zIndex: 1000
         });
 
@@ -531,7 +531,7 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
                   <strong style="color: #34495e;">Transport:</strong> ${transportMode.charAt(0).toUpperCase() + transportMode.slice(1)} ${statusBadge}
                 </p>
                 <p style="margin: 0; font-size: 13px; line-height: 1.5;">
-                  <strong style="color: #34495e;">Distance:</strong> ${Math.round(distance/1000)}km
+                  <strong style="color: #34495e;">Distance:</strong> ${Math.round(distance / 1000)}km
                 </p>
                 ${segment && segment.duration_hours ? `
                   <p style="margin: 0; font-size: 13px; line-height: 1.5;">
@@ -541,7 +541,7 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
                   <strong style="color: #34495e;">Total Cost:</strong> ${costText} <span style="color: #7f8c8d; font-size: 12px;">(${segment ? segment.num_travelers : 3} people)</span>
                 </p>
                 <p style="margin: 0; font-size: 13px; line-height: 1.5;">
-                  <strong style="color: #34495e;">Per Person:</strong> <span style="color: #27ae60; font-weight: 600;">$${Math.round(cost/(segment ? segment.num_travelers : 3)).toLocaleString()}</span>
+                  <strong style="color: #34495e;">Per Person:</strong> <span style="color: #27ae60; font-weight: 600;">$${Math.round(cost / (segment ? segment.num_travelers : 3)).toLocaleString()}</span>
                 </p>
                 ${confidenceInfo ? `<p style="margin: 0; font-size: 12px; color: #7f8c8d; line-height: 1.5;">${confidenceInfo}</p>` : ''}
                 ${segment && segment.notes ? `
@@ -590,7 +590,7 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
         strokeWeight: 2
       });
     }
-    
+
     marker.setIcon({
       path: google.maps.SymbolPath.CIRCLE,
       scale: 14,
@@ -599,10 +599,10 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
       strokeColor: '#ff4444',
       strokeWeight: 3
     });
-    
+
     activeMarker = marker;
     activeMarker.activityType = location.activity_type;
-    
+
     const name = location.name || '';
     const subtitle = [location.city, location.country].filter(Boolean).join(', ');
     const dr = formatDateRange(location.arrival_date, location.departure_date);
@@ -629,17 +629,17 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
       <div style="margin-top: 8px;">
         <div style="font-size: 12px; font-weight: 600; color: #333; margin-bottom: 4px;">Cost Breakdown:</div>
         ${Object.entries(destinationCosts.byCategory)
-          .filter(([_, amount]) => amount > 0)
-          .sort(([_, a], [__, b]) => b - a)
-          .map(([category, amount]) => {
-            const percentage = (amount / destinationCosts.total * 100).toFixed(1);
-            return `
+        .filter(([_, amount]) => amount > 0)
+        .sort(([_, a], [__, b]) => b - a)
+        .map(([category, amount]) => {
+          const percentage = (amount / destinationCosts.total * 100).toFixed(1);
+          return `
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 11px;">
                 <span style="color: #666;">${window.getCategoryIcon(category)} ${window.getCategoryDisplayName(category)}</span>
                 <span style="font-weight: 600; color: #333;">${window.formatCurrency(amount)} (${percentage}%)</span>
               </div>
             `;
-          }).join('')}
+        }).join('')}
       </div>
     ` : '';
 
@@ -680,9 +680,9 @@ function addMarkersAndPath(map, locations, workingData, showRouting = false) {
         });
       }
     }, 0);
-    
+
     map.panTo(marker.getPosition());
-    
+
     if (window.updateSidebarHighlight) {
       window.updateSidebarHighlight(index);
     }
@@ -967,11 +967,11 @@ export async function initMapApp() {
   let currentRoutingElements = [];
   let highlightLocationFn = null;
   let currentLocations = [];
-  
+
   // Places API variables
   let pendingInsertIndex = null;
   let autocomplete = null;
-  
+
   // Auto-save timer
   let autosaveTimer = null;
 
@@ -1192,7 +1192,7 @@ export async function initMapApp() {
     const conflicts = detectDateConflicts(locations);
     return { conflicts };
   }
-  
+
   function render(legName, subLegName = null, useRouting = false, triggerAutoSave = true) {
     refreshDataIntegrityButton();
     refreshGeographicValidationBadge();
@@ -1414,7 +1414,7 @@ export async function initMapApp() {
       sidebarSummary.textContent = summaryText;
     }
   }
-  
+
   async function updateScenarioSelector() {
     const selector = document.getElementById('scenario-selector');
     const currentValue = selector.value;
@@ -1507,7 +1507,7 @@ export async function initMapApp() {
       }
     }, 1000); // Debounce by 1 second
   }
-  
+
   async function requestCostUpdateFromAgent(destination, buttonEl, legName = '', subLegName = '', options = {}) {
     if (!destination) {
       console.warn('⚠️ Skipping cost update request - destination missing.');
@@ -1622,9 +1622,9 @@ export async function initMapApp() {
     const externalWaitEntry = options?.waitEntry || null;
     const buttonState = buttonEl
       ? {
-          text: buttonEl.textContent,
-          disabled: buttonEl.disabled,
-        }
+        text: buttonEl.textContent,
+        disabled: buttonEl.disabled,
+      }
       : null;
     const waitEntry = externalWaitEntry || (buttonEl ? waitForNextCostUpdate(destinationLabel) : null);
     const manageWaiterInternally = Boolean(waitEntry) && !externalWaitEntry && Boolean(buttonEl);
@@ -2078,6 +2078,135 @@ export async function initMapApp() {
     setupCountryNotesEditing(destinationList);
   }
 
+  // Show modal dialog for setting specific dates when locking a destination
+  function showDateLockModal(location) {
+    // Create modal overlay
+    const modal = document.createElement('div');
+    modal.className = 'date-lock-modal-overlay';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    `;
+
+    // Create modal content
+    const modalContent = document.createElement('div');
+    modalContent.className = 'date-lock-modal-content';
+    modalContent.style.cssText = `
+      background: white;
+      padding: 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      max-width: 400px;
+      width: 90%;
+    `;
+
+    const currentArrival = location.arrival_date || '';
+    const currentDeparture = location.departure_date || '';
+
+    modalContent.innerHTML = `
+      <h3 style="margin-top: 0; margin-bottom: 16px; color: #333;">Lock Dates for ${location.name}</h3>
+      <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Set specific arrival and departure dates to lock this destination.</p>
+      
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #555;">Arrival Date:</label>
+        <input type="date" id="modal-arrival-date" value="${currentArrival}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+      </div>
+      
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #555;">Departure Date:</label>
+        <input type="date" id="modal-departure-date" value="${currentDeparture}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+      </div>
+      
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button id="modal-cancel-btn" style="padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; font-size: 14px;">Cancel</button>
+        <button id="modal-confirm-btn" style="padding: 8px 16px; border: none; background: #4a90e2; color: white; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500;">Lock Dates</button>
+      </div>
+    `;
+
+    modalContent.appendChild(document.createElement('div'));
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Get input elements
+    const arrivalInput = modalContent.querySelector('#modal-arrival-date') as HTMLInputElement;
+    const departureInput = modalContent.querySelector('#modal-departure-date') as HTMLInputElement;
+    const cancelBtn = modalContent.querySelector('#modal-cancel-btn');
+    const confirmBtn = modalContent.querySelector('#modal-confirm-btn');
+
+    // Close modal function
+    const closeModal = () => {
+      modal.remove();
+    };
+
+    // Cancel button
+    cancelBtn.addEventListener('click', closeModal);
+
+    // Click outside to close
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+
+    // Confirm button
+    confirmBtn.addEventListener('click', () => {
+      const arrivalDate = arrivalInput.value;
+      const departureDate = departureInput.value;
+
+      if (!arrivalDate || !departureDate) {
+        alert('Please set both arrival and departure dates.');
+        return;
+      }
+
+      // Validate that departure is after arrival
+      const arrDate = new Date(arrivalDate + 'T00:00:00Z');
+      const depDate = new Date(departureDate + 'T00:00:00Z');
+
+      if (depDate < arrDate) {
+        alert('Departure date must be on or after arrival date.');
+        return;
+      }
+
+      // Calculate duration
+      const durationDays = Math.round((depDate - arrDate) / (24 * 60 * 60 * 1000)) + 1;
+
+      // Lock the destination with the specified dates
+      location.is_date_locked = true;
+      location.locked_arrival_date = arrivalDate;
+      location.locked_departure_date = departureDate;
+      location.arrival_date = arrivalDate;
+      location.departure_date = departureDate;
+      location.duration_days = Math.max(1, durationDays);
+
+      // Recalculate dates and check for conflicts
+      const result = recalculateDates(workingData.locations);
+      displayConflictWarnings(result.conflicts);
+
+      // Re-render to show updated UI
+      render(legFilter.value, subLegFilter.value, routingToggle.checked);
+
+      // Close modal
+      closeModal();
+    });
+
+    // ESC key to close
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeModal();
+        document.removeEventListener('keydown', handleEsc);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+  }
+
   function updateSidebar(locations) {
     const destinationList = document.getElementById('destination-list');
     const destinationCount = document.querySelector('.destination-count');
@@ -2103,7 +2232,7 @@ export async function initMapApp() {
       desc: c.description?.substring(0, 30)
     })));
 
-    
+
     // Build sidebar with add buttons between destinations
     const sidebarItems = [];
 
@@ -2150,7 +2279,7 @@ export async function initMapApp() {
             <div class="destination-cost-summary">
               <div class="cost-total">
                 <span class="cost-amount">$${totalCost.toLocaleString()}</span>
-                ${duration > 0 ? `<span class="cost-per-day">$${Math.round(totalCost/duration)}/day</span>` : ''}
+                ${duration > 0 ? `<span class="cost-per-day">$${Math.round(totalCost / duration)}/day</span>` : ''}
               </div>
               <div class="cost-breakdown-toggle">
                 <span class="toggle-icon">▼</span>
@@ -2175,10 +2304,10 @@ export async function initMapApp() {
         costBreakdownHTML = totalCost > 0 ? `
           <div class="cost-breakdown">
             ${Object.entries(destinationCosts.byCategory)
-              .filter(([_, amount]) => amount > 0)
-              .map(([category, amount]) => {
-                const percentage = (amount / totalCost * 100).toFixed(1);
-                return `
+            .filter(([_, amount]) => amount > 0)
+            .map(([category, amount]) => {
+              const percentage = (amount / totalCost * 100).toFixed(1);
+              return `
                   <div class="cost-breakdown-item">
                     <div class="cost-category">
                       <span class="cost-icon">${getCategoryIcon(category)}</span>
@@ -2190,7 +2319,7 @@ export async function initMapApp() {
                     </div>
                   </div>
                 `;
-              }).join('')}
+            }).join('')}
           </div>
         ` : '';
 
@@ -2203,12 +2332,12 @@ export async function initMapApp() {
             ${duration > 0 ? `
               <div class="cost-summary-row">
                 <span class="cost-label">Per Day:</span>
-                <span class="cost-value">$${Math.round(totalCost/duration).toLocaleString()}</span>
+                <span class="cost-value">$${Math.round(totalCost / duration).toLocaleString()}</span>
               </div>
             ` : ''}
             <div class="cost-summary-row">
               <span class="cost-label">Per Person:</span>
-              <span class="cost-value">$${Math.round(totalCost/3).toLocaleString()}</span>
+              <span class="cost-value">$${Math.round(totalCost / 3).toLocaleString()}</span>
             </div>
             <div class="cost-summary-row">
               <span class="cost-label">Items:</span>
@@ -2220,36 +2349,25 @@ export async function initMapApp() {
 
 
       // Determine if dates are locked
-    const isDateLocked = loc.is_date_locked || false;
-    const lockedClass = isDateLocked ? 'destination-locked' : '';
-    const lockIcon = isDateLocked ? '🔒' : '🔓';
+      const isDateLocked = loc.is_date_locked || false;
+      const lockedClass = isDateLocked ? 'destination-locked' : '';
+      const lockIcon = isDateLocked ? '🔒' : '🔓';
 
-    // Add duration editing state indicator for visual feedback
-    const isDurationUpdating = loc._is_duration_updating || false;
-    const durationUpdateClass = isDurationUpdating ? 'duration-updating' : '';
+      // Add duration editing state indicator for visual feedback
+      const isDurationUpdating = loc._is_duration_updating || false;
+      const durationUpdateClass = isDurationUpdating ? 'duration-updating' : '';
 
-    // Show visual feedback during duration update
-    if (isDurationUpdating) {
-      // Add updating class to duration input for visual feedback
-      const durationInput = container.querySelector(`.editable-duration[data-location-id="${loc.id}"]`);
-      if (durationInput) {
-        durationInput.classList.add('duration-updating');
+      // Show visual feedback during duration update
+      if (isDurationUpdating) {
+        // Add updating class to duration input for visual feedback
+        const durationInput = container.querySelector(`.editable-duration[data-location-id="${loc.id}"]`);
+        if (durationInput) {
+          durationInput.classList.add('duration-updating');
+        }
       }
-    }
 
-      // Date picker HTML for locked destinations
-      const datePickerHTML = isDateLocked ? `
-        <div class="locked-date-pickers" style="margin-top: 8px; display: flex; gap: 8px; font-size: 12px;">
-          <label style="display: flex; flex-direction: column;">
-            <span style="color: #666;">Arrival:</span>
-            <input type="date" class="locked-arrival-date" value="${loc.locked_arrival_date || loc.arrival_date || ''}" data-location-id="${loc.id}" style="padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
-          </label>
-          <label style="display: flex; flex-direction: column;">
-            <span style="color: #666;">Departure:</span>
-            <input type="date" class="locked-departure-date" value="${loc.locked_departure_date || loc.departure_date || ''}" data-location-id="${loc.id}" style="padding: 4px; border: 1px solid #ddd; border-radius: 4px;">
-          </label>
-        </div>
-      ` : '';
+      // No inline date pickers - we'll use a modal for date selection
+      const datePickerHTML = '';
 
       // Add the destination item
       sidebarItems.push(`
@@ -2259,7 +2377,6 @@ export async function initMapApp() {
           <div class="destination-info">
             <div class="destination-name">
               <span>${loc.name}</span>
-              <button class="date-lock-toggle" data-location-id="${loc.id}" title="${isDateLocked ? 'Unlock dates' : 'Lock dates'}" style="background: none; border: none; cursor: pointer; font-size: 16px; padding: 0;">${lockIcon}</button>
             </div>
             <div class="destination-meta">
               ${[loc.city, loc.country].filter(Boolean).join(', ')}
@@ -2268,6 +2385,7 @@ export async function initMapApp() {
               ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
             </div>
             <div class="destination-dates">
+              <button class="date-lock-toggle" data-location-id="${loc.id}" title="${isDateLocked ? 'Unlock dates (return to auto-calculated)' : 'Lock dates (set specific dates)'}" style="background: none; border: none; cursor: pointer; font-size: 12px; padding: 0; margin-right: 6px; opacity: 0.7;">${lockIcon}</button>
               ${dateRange ? `${dateRange} • ` : ''}
               <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}" ${isDateLocked ? 'disabled' : ''}> days
             </div>
@@ -2305,22 +2423,22 @@ export async function initMapApp() {
             const formattedCost = window.transportSegmentManager.formatCurrency(activeCost);
             const confidenceBadge = window.transportSegmentManager.getConfidenceBadge(segment);
 
-          // Add auto-update indicator and research status
-          const autoUpdatedIndicator = segment.auto_updated ? '<span class="auto-updated-badge" title="Costs auto-updated from research">✨</span>' : '';
-          const researchStatus = segment.booking_status === 'researched' ? 'RES' : (segment.booking_status === 'estimated' ? 'EST' : '');
-          const statusBadge = researchStatus ? `<span class="status-badge status-${segment.booking_status}">${researchStatus}</span>` : '';
+            // Add auto-update indicator and research status
+            const autoUpdatedIndicator = segment.auto_updated ? '<span class="auto-updated-badge" title="Costs auto-updated from research">✨</span>' : '';
+            const researchStatus = segment.booking_status === 'researched' ? 'RES' : (segment.booking_status === 'estimated' ? 'EST' : '');
+            const statusBadge = researchStatus ? `<span class="status-badge status-${segment.booking_status}">${researchStatus}</span>` : '';
 
-          // Show airlines if researched
-          const airlinesInfo = segment.researched_airlines && segment.researched_airlines.length > 0
-            ? `<div class="transport-airlines">${segment.researched_airlines.slice(0, 2).join(', ')}</div>`
-            : '';
+            // Show airlines if researched
+            const airlinesInfo = segment.researched_airlines && segment.researched_airlines.length > 0
+              ? `<div class="transport-airlines">${segment.researched_airlines.slice(0, 2).join(', ')}</div>`
+              : '';
 
-          // Show alternatives indicator if available (click edit to view)
-          const alternativesInfo = segment.researched_alternatives && segment.researched_alternatives.length > 0
-            ? `<span class="alternatives-indicator" title="${segment.researched_alternatives.length} alternative routes found - click ✏️ to view">🔀 ${segment.researched_alternatives.length}</span>`
-            : '';
+            // Show alternatives indicator if available (click edit to view)
+            const alternativesInfo = segment.researched_alternatives && segment.researched_alternatives.length > 0
+              ? `<span class="alternatives-indicator" title="${segment.researched_alternatives.length} alternative routes found - click ✏️ to view">🔀 ${segment.researched_alternatives.length}</span>`
+              : '';
 
-          sidebarItems.push(`
+            sidebarItems.push(`
             <div class="transport-segment ${segment.auto_updated ? 'auto-updated' : ''}" data-segment-id="${segment.id}" data-from-id="${loc.id}" data-to-id="${nextLoc.id}">
               <div class="transport-segment-line"></div>
               <div class="transport-segment-content">
@@ -2356,7 +2474,7 @@ export async function initMapApp() {
         }
       }
     });
-    
+
     destinationList.innerHTML = sidebarItems.join('');
 
     destinationList.querySelectorAll('.update-costs-btn').forEach((button) => {
@@ -2387,14 +2505,14 @@ export async function initMapApp() {
         await requestCostUpdateFromAgent(destination, button, legName, subLegName);
       });
     });
-    
+
     // Add click handlers for destinations
     destinationList.querySelectorAll('.destination-item').forEach((item, idx) => {
       item.addEventListener('click', (e) => {
-        if (e.target.classList.contains('editable-duration') || 
-            e.target.classList.contains('editable-notes') || 
-            e.target.classList.contains('drag-handle') ||
-            e.target.classList.contains('delete-destination-btn')) return;
+        if (e.target.classList.contains('editable-duration') ||
+          e.target.classList.contains('editable-notes') ||
+          e.target.classList.contains('drag-handle') ||
+          e.target.classList.contains('delete-destination-btn')) return;
         if (highlightLocationFn) {
           const marker = currentMarkers[idx];
           const location = locations[idx];
@@ -2475,11 +2593,11 @@ export async function initMapApp() {
       }
     }
   }
-  
+
   function setupDragAndDrop(container, filteredLocations) {
     let draggedElement = null;
     let draggedIndex = null;
-    
+
     container.querySelectorAll('.destination-item').forEach((item, idx) => {
       item.addEventListener('dragstart', (e) => {
         draggedElement = item;
@@ -2487,41 +2605,41 @@ export async function initMapApp() {
         item.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
       });
-      
+
       item.addEventListener('dragend', () => {
         item.classList.remove('dragging');
         container.querySelectorAll('.destination-item').forEach(el => {
           el.classList.remove('drag-over');
         });
       });
-      
+
       item.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
       });
-      
+
       item.addEventListener('dragenter', (e) => {
         e.preventDefault();
         if (item !== draggedElement) {
           item.classList.add('drag-over');
         }
       });
-      
+
       item.addEventListener('dragleave', () => {
         item.classList.remove('drag-over');
       });
-      
+
       item.addEventListener('drop', (e) => {
         e.preventDefault();
         const dropIndex = idx;
-        
+
         if (draggedIndex !== null && draggedIndex !== dropIndex) {
           const draggedLocation = filteredLocations[draggedIndex];
           const targetLocation = filteredLocations[dropIndex];
-          
+
           const globalDraggedIndex = workingData.locations.findIndex(loc => loc.id === draggedLocation.id);
           const globalTargetIndex = workingData.locations.findIndex(loc => loc.id === targetLocation.id);
-          
+
           if (globalDraggedIndex !== -1 && globalTargetIndex !== -1) {
             const movedLocation = workingData.locations.splice(globalDraggedIndex, 1)[0];
             let newInsertIndex = globalTargetIndex;
@@ -2529,7 +2647,7 @@ export async function initMapApp() {
               newInsertIndex--;
             }
             workingData.locations.splice(newInsertIndex, 0, movedLocation);
-            
+
             recalculateDates(workingData.locations);
             render(legFilter.value, subLegFilter.value, routingToggle.checked);
           }
@@ -2537,13 +2655,13 @@ export async function initMapApp() {
       });
     });
   }
-  
+
   function setupDurationEditing(container, filteredLocations) {
     container.querySelectorAll('.editable-duration').forEach(input => {
       input.addEventListener('change', (e) => {
         const locationId = e.target.dataset.locationId;
         const newDuration = parseInt(e.target.value, 10) || 1;
-        
+
         const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
         if (globalLocation) {
           // Only allow duration editing for unlocked destinations
@@ -2556,22 +2674,22 @@ export async function initMapApp() {
 
           ensureLocationCostBaseline(globalLocation);
           globalLocation.duration_days = newDuration;
-          
+
           // Recalculate dates and update UI
           const result = recalculateDates(workingData.locations);
           displayConflictWarnings(result.conflicts);
           render(legFilter.value, subLegFilter.value, routingToggle.checked);
-          
+
           console.log(`✅ Updated duration for unlocked destination "${globalLocation.name}" to ${newDuration} days`);
         }
       });
-      
+
       input.addEventListener('click', (e) => {
         e.stopPropagation();
       });
     });
   }
-  
+
   function setupNotesEditing(container, filteredLocations) {
     container.querySelectorAll('.editable-notes').forEach(textarea => {
       // Auto-resize function
@@ -2669,90 +2787,26 @@ export async function initMapApp() {
         const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
 
         if (globalLocation) {
-          // Toggle the lock state
-          globalLocation.is_date_locked = !globalLocation.is_date_locked;
-
-          // If locking, capture current dates as locked dates
           if (globalLocation.is_date_locked) {
-            globalLocation.locked_arrival_date = globalLocation.arrival_date;
-            globalLocation.locked_departure_date = globalLocation.departure_date;
-          } else {
-            // If unlocking, clear locked dates (keep them for reference but recalculate)
+            // Already locked - unlock it
+            globalLocation.is_date_locked = false;
             globalLocation.locked_arrival_date = null;
             globalLocation.locked_departure_date = null;
+
+            // Recalculate dates and check for conflicts
+            const result = recalculateDates(workingData.locations);
+            displayConflictWarnings(result.conflicts);
+
+            // Re-render to show updated UI
+            render(legFilter.value, subLegFilter.value, routingToggle.checked);
+          } else {
+            // Not locked - show modal to set dates and lock
+            showDateLockModal(globalLocation);
           }
-
-          // Recalculate dates and check for conflicts
-          const result = recalculateDates(workingData.locations);
-          displayConflictWarnings(result.conflicts);
-
-          // Re-render to show updated UI
-          render(legFilter.value, subLegFilter.value, routingToggle.checked);
         }
       });
     });
 
-    // Locked arrival date inputs
-    container.querySelectorAll('.locked-arrival-date').forEach(input => {
-      input.addEventListener('change', (e) => {
-        e.stopPropagation();
-        const locationId = input.dataset.locationId;
-        const newDate = e.target.value;
-        const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
-
-        if (globalLocation && globalLocation.is_date_locked) {
-          globalLocation.locked_arrival_date = newDate;
-          globalLocation.arrival_date = newDate; // Update the main arrival date too
-
-          // Recalculate duration based on new arrival and existing departure
-          if (globalLocation.locked_departure_date) {
-            const arrDate = new Date(newDate + 'T00:00:00Z');
-            const depDate = new Date(globalLocation.locked_departure_date + 'T00:00:00Z');
-            const durationDays = Math.round((depDate - arrDate) / (24 * 60 * 60 * 1000)) + 1;
-            globalLocation.duration_days = Math.max(1, durationDays);
-          }
-
-          const result = recalculateDates(workingData.locations);
-          displayConflictWarnings(result.conflicts);
-          render(legFilter.value, subLegFilter.value, routingToggle.checked);
-        }
-      });
-
-      input.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-    });
-
-    // Locked departure date inputs
-    container.querySelectorAll('.locked-departure-date').forEach(input => {
-      input.addEventListener('change', (e) => {
-        e.stopPropagation();
-        const locationId = input.dataset.locationId;
-        const newDate = e.target.value;
-        const globalLocation = workingData.locations.find(loc => idsEqual(loc.id, locationId));
-
-        if (globalLocation && globalLocation.is_date_locked) {
-          globalLocation.locked_departure_date = newDate;
-          globalLocation.departure_date = newDate; // Update the main departure date too
-
-          // Recalculate duration based on existing arrival and new departure
-          if (globalLocation.locked_arrival_date) {
-            const arrDate = new Date(globalLocation.locked_arrival_date + 'T00:00:00Z');
-            const depDate = new Date(newDate + 'T00:00:00Z');
-            const durationDays = Math.round((depDate - arrDate) / (24 * 60 * 60 * 1000)) + 1;
-            globalLocation.duration_days = Math.max(1, durationDays);
-          }
-
-          const result = recalculateDates(workingData.locations);
-          displayConflictWarnings(result.conflicts);
-          render(legFilter.value, subLegFilter.value, routingToggle.checked);
-        }
-      });
-
-      input.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-    });
   }
 
   function displayConflictWarnings(conflicts) {
@@ -2855,22 +2909,22 @@ export async function initMapApp() {
       }
     });
   }
-  
+
   // Add destination functionality
   function initializePlacesAPI() {
     if (!window.google || !window.google.maps.places) {
       setTimeout(initializePlacesAPI, 100);
       return;
     }
-    
+
     const searchInput = document.getElementById('location-search');
     autocomplete = new google.maps.places.Autocomplete(searchInput, {
       types: ['(cities)'],
       fields: ['place_id', 'name', 'geometry', 'formatted_address', 'address_components']
     });
-    
+
     autocomplete.bindTo('bounds', map);
-    
+
     autocomplete.addListener('place_changed', () => {
       const place = autocomplete.getPlace();
       if (place.geometry) {
@@ -2887,7 +2941,7 @@ export async function initMapApp() {
       }
     });
   }
-  
+
   // Calculate best insertion point based on geographic proximity
   function findBestInsertionIndex(newLocation) {
     if (!workingData.locations || workingData.locations.length === 0) {
@@ -2963,12 +3017,12 @@ export async function initMapApp() {
       autocomplete.setBounds(map.getBounds());
     }
   }
-  
+
   function closeAddDestinationModal() {
     document.getElementById('add-destination-modal').style.display = 'none';
     pendingInsertIndex = null;
   }
-  
+
   function generateNewLocationId() {
     const existingIds = new Set((workingData.locations || []).map(loc => normalizeId(loc.id)));
     let newId = generateDestinationId();
@@ -2997,10 +3051,10 @@ export async function initMapApp() {
     }
     return null;
   }
-  
+
   function parseAddressComponents(components) {
     const result = { city: '', country: '', region: '' };
-    
+
     components.forEach(component => {
       const types = component.types;
       if (types.includes('locality')) {
@@ -3011,7 +3065,7 @@ export async function initMapApp() {
         result.country = component.long_name;
       }
     });
-    
+
     return result;
   }
 
@@ -3298,18 +3352,18 @@ export async function initMapApp() {
     modal.style.display = 'flex';
     nameInput.focus();
   }
-  
+
   function closeSaveScenarioModal() {
     document.getElementById('save-scenario-modal').style.display = 'none';
     document.getElementById('scenario-name').value = '';
     document.getElementById('scenario-description').value = '';
   }
-  
+
   function openManageScenariosModal() {
     updateScenarioList();
     document.getElementById('manage-scenarios-modal').style.display = 'flex';
   }
-  
+
   function closeManageScenariosModal() {
     document.getElementById('manage-scenarios-modal').style.display = 'none';
   }
@@ -3643,7 +3697,7 @@ export async function initMapApp() {
     }
   }
 
-  window.loadScenarioById = async function(scenarioId) {
+  window.loadScenarioById = async function (scenarioId) {
     try {
       const scenario = await scenarioManager.getScenario(scenarioId);
       const latestVersion = await scenarioManager.getLatestVersion(scenarioId);
@@ -3676,7 +3730,7 @@ export async function initMapApp() {
     }
   };
 
-  window.deleteScenarioById = async function(scenarioId) {
+  window.deleteScenarioById = async function (scenarioId) {
     if (confirm('Delete this scenario and all its versions?')) {
       try {
         await scenarioManager.deleteScenario(scenarioId);
@@ -3702,7 +3756,7 @@ export async function initMapApp() {
     }
   };
 
-  window.renameScenarioById = async function(scenarioId, currentName, isDynamicModal = false) {
+  window.renameScenarioById = async function (scenarioId, currentName, isDynamicModal = false) {
     const newName = prompt('Enter new name for scenario:', currentName);
 
     if (newName === null) {
@@ -3736,7 +3790,7 @@ export async function initMapApp() {
     }
   };
 
-  window.duplicateScenario = async function(scenarioId) {
+  window.duplicateScenario = async function (scenarioId) {
     try {
       const scenario = await scenarioManager.getScenario(scenarioId);
       const latest = await scenarioManager.getLatestVersion(scenarioId);
@@ -3764,7 +3818,7 @@ export async function initMapApp() {
     }
   };
 
-  window.showVersionHistory = async function(scenarioId) {
+  window.showVersionHistory = async function (scenarioId) {
     try {
       const scenario = await scenarioManager.getScenario(scenarioId);
       const versions = await scenarioManager.getVersionHistory(scenarioId);
@@ -3834,9 +3888,9 @@ export async function initMapApp() {
           modal.remove();
         }
       });
-      
+
       // Delete single version
-      window.deleteVersionPrompt = async function(sId, vNum) {
+      window.deleteVersionPrompt = async function (sId, vNum) {
         if (!confirm(`Delete version v${vNum}? This cannot be undone.`)) return;
         try {
           await scenarioManager.deleteVersion(sId, vNum);
@@ -3848,7 +3902,7 @@ export async function initMapApp() {
       };
 
       // Delete unlabeled versions (keep latest by default)
-      window.deleteUnlabeledPrompt = async function(sId) {
+      window.deleteUnlabeledPrompt = async function (sId) {
         const keepLatest = confirm('Delete all unlabeled versions except the latest? Click Cancel to delete ALL unlabeled.');
         try {
           const res = await scenarioManager.deleteUnlabeledVersions(sId, keepLatest);
@@ -3865,7 +3919,7 @@ export async function initMapApp() {
     }
   };
 
-  window.nameVersionPrompt = async function(scenarioId, versionNumber) {
+  window.nameVersionPrompt = async function (scenarioId, versionNumber) {
     const name = prompt(`Enter a label for version ${versionNumber}:`);
     if (!name || !name.trim()) return;
     try {
@@ -3878,7 +3932,7 @@ export async function initMapApp() {
     }
   };
 
-  window.revertToVersion = async function(scenarioId, versionNumber) {
+  window.revertToVersion = async function (scenarioId, versionNumber) {
     if (!confirm(`Revert to version ${versionNumber}? This will create a new version with the old data.`)) {
       return;
     }
@@ -3901,11 +3955,11 @@ export async function initMapApp() {
       alert('Failed to revert to version');
     }
   };
-  
+
   function openImportScenariosModal() {
     document.getElementById('import-scenarios-modal').style.display = 'flex';
   }
-  
+
   function closeImportScenariosModal() {
     document.getElementById('import-scenarios-modal').style.display = 'none';
     document.getElementById('scenario-file').value = '';
@@ -3922,8 +3976,8 @@ export async function initMapApp() {
 
     const entry = {
       destinationLabel,
-      resolve: () => {},
-      reject: () => {}
+      resolve: () => { },
+      reject: () => { }
     };
 
     const promise = new Promise((resolve, reject) => {
@@ -4190,7 +4244,7 @@ export async function initMapApp() {
             new Error('Cost research request was not dispatched');
           waitEntry.cancel(dispatchError);
           // Swallow the rejection since we intentionally cancelled the waiter
-          waitEntry.promise.catch(() => {});
+          waitEntry.promise.catch(() => { });
           if (item) {
             const failureMessage =
               typeof dispatchError === 'string'
@@ -4293,7 +4347,7 @@ export async function initMapApp() {
     render(legName, subLegName, routingToggle.checked);
   }
 
-  legFilter.addEventListener('change', function(e) {
+  legFilter.addEventListener('change', function (e) {
     populateSubLegs(e.target.value);
     subLegFilter.value = ''; // Reset sub-leg selection
     updateMap();
@@ -4303,7 +4357,7 @@ export async function initMapApp() {
     statePersistence.saveLegSelection(e.target.value, null);
   });
 
-  subLegFilter.addEventListener('change', function(e) {
+  subLegFilter.addEventListener('change', function (e) {
     updateMap();
     // Save sub-leg selection to state
     statePersistence.saveLegSelection(legFilter.value, e.target.value || null);
@@ -4317,7 +4371,7 @@ export async function initMapApp() {
   // Country view toggle
   const countryViewToggle = document.getElementById('country-view-toggle');
   if (countryViewToggle) {
-    countryViewToggle.addEventListener('change', function(e) {
+    countryViewToggle.addEventListener('change', function (e) {
       if (e.target.checked) {
         // Show country rollup view
         renderCountryRollupView(workingData);
@@ -4327,13 +4381,13 @@ export async function initMapApp() {
       }
     });
   }
-  
+
   // Export scenario button
   const exportScenarioBtn = document.getElementById('export-scenario-btn');
   if (exportScenarioBtn) {
     exportScenarioBtn.addEventListener('click', () => {
       const dataStr = JSON.stringify(workingData, null, 2);
-      const dataBlob = new Blob([dataStr], {type: 'application/json'});
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
       const link = document.createElement('a');
       link.href = url;
@@ -4343,7 +4397,7 @@ export async function initMapApp() {
       URL.revokeObjectURL(url);
     });
   }
-  
+
   // Scenario actions dropdown toggle
   console.log('Setting up scenario actions button...');
   const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
@@ -4384,7 +4438,7 @@ export async function initMapApp() {
   if (scenarioActionsBtn && scenarioActionsDropdown) {
     document.addEventListener('click', (e) => {
       if (!scenarioActionsDropdown.contains(e.target) &&
-          !scenarioActionsBtn.contains(e.target)) {
+        !scenarioActionsBtn.contains(e.target)) {
         scenarioActionsDropdown.style.display = 'none';
         scenarioActionsBtn.classList.remove('active');
       }
@@ -4393,7 +4447,7 @@ export async function initMapApp() {
 
 
   // Dynamic Manage Scenarios modal (same pattern as Version History)
-  window.showManageScenarios = async function() {
+  window.showManageScenarios = async function () {
     try {
       // Fetch scenarios and latest metadata
       const scenarios = await scenarioManager.listScenarios();
@@ -4460,7 +4514,7 @@ export async function initMapApp() {
       });
 
       // New Scenario helper
-      window.createNewScenarioFromModal = async function() {
+      window.createNewScenarioFromModal = async function () {
         try {
           const scenarioName = prompt('Enter name for new scenario:');
           if (!scenarioName || !scenarioName.trim()) return;
@@ -4506,7 +4560,7 @@ export async function initMapApp() {
       try {
         const dropdown = document.getElementById('scenario-actions-dropdown');
         if (dropdown) dropdown.style.display = 'none';
-      } catch {}
+      } catch { }
       await window.showManageScenarios();
     });
   }
@@ -4523,18 +4577,18 @@ export async function initMapApp() {
   const manageCostsBudgetBtn = document.getElementById('manage-costs-budget-btn');
   if (manageCostsBudgetBtn) {
     manageCostsBudgetBtn.addEventListener('click', () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    scenarioActionsDropdown.style.display = 'none';
-    scenarioActionsBtn.classList.remove('active');
+      const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+      const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+      scenarioActionsDropdown.style.display = 'none';
+      scenarioActionsBtn.classList.remove('active');
 
-    if (!currentScenarioId) {
-      alert('Please save or load a scenario first');
-      return;
-    }
+      if (!currentScenarioId) {
+        alert('Please save or load a scenario first');
+        return;
+      }
 
-    // Navigate to unified cost & budget manager page
-    window.location.href = `./cost-manager.html?scenario=${currentScenarioId}`;
+      // Navigate to unified cost & budget manager page
+      window.location.href = `./cost-manager.html?scenario=${currentScenarioId}`;
     });
   }
 
@@ -4542,13 +4596,13 @@ export async function initMapApp() {
   const selectAllDestinationsBtn = document.getElementById('select-all-destinations-btn');
   if (selectAllDestinationsBtn) {
     selectAllDestinationsBtn.addEventListener('click', () => {
-    const checkboxes = document.querySelectorAll('.bulk-destination-checkbox');
-    checkboxes.forEach(cb => {
-      if (!cb.checked) {
-        cb.checked = true;
-        cb.dispatchEvent(new Event('change'));
-      }
-    });
+      const checkboxes = document.querySelectorAll('.bulk-destination-checkbox');
+      checkboxes.forEach(cb => {
+        if (!cb.checked) {
+          cb.checked = true;
+          cb.dispatchEvent(new Event('change'));
+        }
+      });
     });
   }
 
@@ -4600,21 +4654,21 @@ export async function initMapApp() {
   const geoValidationBtn = document.getElementById('geo-validation-btn');
   if (geoValidationBtn) {
     geoValidationBtn.addEventListener('click', async () => {
-    const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
-    const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
-    if (scenarioActionsDropdown) scenarioActionsDropdown.style.display = 'none';
-    if (scenarioActionsBtn) scenarioActionsBtn.classList.remove('active');
+      const scenarioActionsDropdown = document.getElementById('scenario-actions-dropdown');
+      const scenarioActionsBtn = document.getElementById('scenario-actions-btn');
+      if (scenarioActionsDropdown) scenarioActionsDropdown.style.display = 'none';
+      if (scenarioActionsBtn) scenarioActionsBtn.classList.remove('active');
 
-    // Create save callback that saves to Firestore
-    const saveToFirestore = async () => {
-      if (!currentScenarioId) {
-        throw new Error('No scenario ID - cannot save');
-      }
-      await scenarioManager.saveVersion(currentScenarioId, workingData, false);
-      console.log('✅ Geographic data saved to Firestore');
-    };
+      // Create save callback that saves to Firestore
+      const saveToFirestore = async () => {
+        if (!currentScenarioId) {
+          throw new Error('No scenario ID - cannot save');
+        }
+        await scenarioManager.saveVersion(currentScenarioId, workingData, false);
+        console.log('✅ Geographic data saved to Firestore');
+      };
 
-    await showGeographicValidationPanel(workingData, handleDataUpdate, saveToFirestore);
+      await showGeographicValidationPanel(workingData, handleDataUpdate, saveToFirestore);
     });
   }
 
@@ -4803,60 +4857,60 @@ export async function initMapApp() {
   const generateSummaryBtn = document.getElementById('generate-summary-btn');
   if (generateSummaryBtn) {
     generateSummaryBtn.addEventListener('click', async () => {
-    // Check if we have locations
-    if (!workingData.locations || workingData.locations.length === 0) {
-      alert('No locations in itinerary to generate summary');
-      return;
-    }
-
-    try {
-      // Use default options (all sections enabled, costs hidden by default)
-      const options = {
-        showCosts: false,
-        includeExecutive: true,
-        includeDetailed: true,
-        includeFinancial: true,
-        includeTimeline: true,
-        includeDestinations: true,
-        detailLevel: 'full',
-        groupBy: 'country'
-      };
-
-      // Build itinerary data from current state
-      const itineraryData = {
-        trip: workingData.trip || {},
-        locations: workingData.locations || [],
-        legs: workingData.legs || [],
-        costs: workingData.costs || [],
-        countryNotes: workingData.countryNotes || {}
-      };
-
-      // Build scenario metadata
-      let scenarioMetadata = null;
-      if (currentScenarioId) {
-        try {
-          const scenario = await scenarioManager.getScenario(currentScenarioId);
-          if (scenario) {
-            scenarioMetadata = {
-              name: scenario.name,
-              version: scenario.currentVersion,
-              updatedAt: scenario.updatedAt?.toDate?.()?.toISOString() || scenario.updatedAt
-            };
-          }
-        } catch (error) {
-          console.error('Error fetching scenario metadata:', error);
-        }
+      // Check if we have locations
+      if (!workingData.locations || workingData.locations.length === 0) {
+        alert('No locations in itinerary to generate summary');
+        return;
       }
 
-      // Generate and view summary with options
-      await summaryManager.generateAndView(itineraryData, currentScenarioId, options, scenarioMetadata);
+      try {
+        // Use default options (all sections enabled, costs hidden by default)
+        const options = {
+          showCosts: false,
+          includeExecutive: true,
+          includeDetailed: true,
+          includeFinancial: true,
+          includeTimeline: true,
+          includeDestinations: true,
+          detailLevel: 'full',
+          groupBy: 'country'
+        };
 
-      // Update view summary button state after generation
-      await updateViewSummaryButtonState();
-    } catch (error) {
-      console.error('Error generating summary:', error);
-      alert('Failed to generate summary: ' + error.message);
-    }
+        // Build itinerary data from current state
+        const itineraryData = {
+          trip: workingData.trip || {},
+          locations: workingData.locations || [],
+          legs: workingData.legs || [],
+          costs: workingData.costs || [],
+          countryNotes: workingData.countryNotes || {}
+        };
+
+        // Build scenario metadata
+        let scenarioMetadata = null;
+        if (currentScenarioId) {
+          try {
+            const scenario = await scenarioManager.getScenario(currentScenarioId);
+            if (scenario) {
+              scenarioMetadata = {
+                name: scenario.name,
+                version: scenario.currentVersion,
+                updatedAt: scenario.updatedAt?.toDate?.()?.toISOString() || scenario.updatedAt
+              };
+            }
+          } catch (error) {
+            console.error('Error fetching scenario metadata:', error);
+          }
+        }
+
+        // Generate and view summary with options
+        await summaryManager.generateAndView(itineraryData, currentScenarioId, options, scenarioMetadata);
+
+        // Update view summary button state after generation
+        await updateViewSummaryButtonState();
+      } catch (error) {
+        console.error('Error generating summary:', error);
+        alert('Failed to generate summary: ' + error.message);
+      }
     });
   }
 
@@ -4877,50 +4931,50 @@ export async function initMapApp() {
   const viewSummaryBtn = document.getElementById('view-summary-btn');
   if (viewSummaryBtn) {
     viewSummaryBtn.addEventListener('click', async () => {
-    if (!currentScenarioId) {
-      alert('Please save your scenario first before viewing summary');
-      return;
-    }
-
-    try {
-      // Check if scenario has a saved summary
-      const hasSummary = await scenarioManager.hasSummary(currentScenarioId);
-
-      if (hasSummary) {
-        // View the saved summary
-        const summary = await scenarioManager.getSummary(currentScenarioId);
-
-        // Store summary data for viewer
-        sessionStorage.setItem('summaryItineraryData', JSON.stringify({
-          trip: workingData.trip || {},
-          locations: workingData.locations || [],
-          legs: workingData.legs || [],
-          costs: workingData.costs || []
-        }));
-        sessionStorage.setItem('summaryScenarioId', currentScenarioId);
-
-        // Open with saved summary
-        const params = new URLSearchParams({
-          scenario: currentScenarioId,
-          id: 'saved'
-        });
-        window.open(`summary-viewer.html?${params.toString()}`, '_blank');
-      } else {
-        // No saved summary, offer to generate
-        const generate = confirm('This scenario does not have a saved summary yet. Generate one now?');
-        if (generate) {
-          document.getElementById('generate-summary-btn').click();
-        }
+      if (!currentScenarioId) {
+        alert('Please save your scenario first before viewing summary');
+        return;
       }
-    } catch (error) {
-      console.error('Error viewing summary:', error);
-      alert('Failed to view summary: ' + error.message);
-    }
+
+      try {
+        // Check if scenario has a saved summary
+        const hasSummary = await scenarioManager.hasSummary(currentScenarioId);
+
+        if (hasSummary) {
+          // View the saved summary
+          const summary = await scenarioManager.getSummary(currentScenarioId);
+
+          // Store summary data for viewer
+          sessionStorage.setItem('summaryItineraryData', JSON.stringify({
+            trip: workingData.trip || {},
+            locations: workingData.locations || [],
+            legs: workingData.legs || [],
+            costs: workingData.costs || []
+          }));
+          sessionStorage.setItem('summaryScenarioId', currentScenarioId);
+
+          // Open with saved summary
+          const params = new URLSearchParams({
+            scenario: currentScenarioId,
+            id: 'saved'
+          });
+          window.open(`summary-viewer.html?${params.toString()}`, '_blank');
+        } else {
+          // No saved summary, offer to generate
+          const generate = confirm('This scenario does not have a saved summary yet. Generate one now?');
+          if (generate) {
+            document.getElementById('generate-summary-btn').click();
+          }
+        }
+      } catch (error) {
+        console.error('Error viewing summary:', error);
+        alert('Failed to view summary: ' + error.message);
+      }
     });
   }
 
   // Removed standalone scenario-selector; use Manage Scenarios for switching/creating
-  
+
   // Initialize Places API
   initializePlacesAPI();
 
@@ -4954,68 +5008,68 @@ export async function initMapApp() {
   const broadSearchBtn = document.getElementById('broad-search-btn');
   if (broadSearchBtn) {
     broadSearchBtn.addEventListener('click', async () => {
-    const searchInput = document.getElementById('location-search');
-    const query = searchInput.value.trim();
+      const searchInput = document.getElementById('location-search');
+      const query = searchInput.value.trim();
 
-    if (!query) {
-      alert('Please enter a location to search for.');
-      return;
-    }
-
-    const btn = document.getElementById('broad-search-btn');
-    const originalText = btn.textContent;
-    btn.textContent = '🔍 Searching...';
-    btn.disabled = true;
-
-    try {
-      console.log(`🔍 Broad search for: "${query}"`);
-      const result = await searchLocationBroadly(query);
-
-      if (result) {
-        console.log(`✅ Found via ${result.source}:`, result);
-
-        // Store in hidden input (same format as autocomplete)
-        document.getElementById('selected-place').value = JSON.stringify({
-          place_id: result.place_id,
-          name: result.name,
-          formatted_address: result.formatted_address,
-          location: result.location,
-          address_components: result.address_components,
-          data_source: result.source  // Track where it came from
-        });
-
-        // Show source indicator
-        const indicator = document.getElementById('search-source-indicator');
-        const icon = document.getElementById('search-source-icon');
-        const text = document.getElementById('search-source-text');
-
-        if (result.source === 'text_search') {
-          icon.textContent = '🗺️ ';
-          text.textContent = `Found: ${result.name} (via Google Places Text Search)`;
-        } else if (result.source === 'geocoding') {
-          icon.textContent = '📍 ';
-          text.textContent = `Found: ${result.name} (via Google Geocoding)`;
-        }
-
-        indicator.style.display = 'block';
-        indicator.style.color = '#2e7d32';
-
-      } else {
-        console.log(`❌ No results found for "${query}"`);
-        alert(`Could not find "${query}". Try:\n• Being more specific (e.g., "Drake Passage, Antarctica")\n• Using different keywords\n• Checking spelling`);
-
-        // Clear previous selection and indicator
-        document.getElementById('selected-place').value = '';
-        document.getElementById('search-source-indicator').style.display = 'none';
+      if (!query) {
+        alert('Please enter a location to search for.');
+        return;
       }
 
-    } catch (error) {
-      console.error('Broad search error:', error);
-      alert(`Search error: ${error.message}`);
-    } finally {
-      btn.textContent = originalText;
-      btn.disabled = false;
-    }
+      const btn = document.getElementById('broad-search-btn');
+      const originalText = btn.textContent;
+      btn.textContent = '🔍 Searching...';
+      btn.disabled = true;
+
+      try {
+        console.log(`🔍 Broad search for: "${query}"`);
+        const result = await searchLocationBroadly(query);
+
+        if (result) {
+          console.log(`✅ Found via ${result.source}:`, result);
+
+          // Store in hidden input (same format as autocomplete)
+          document.getElementById('selected-place').value = JSON.stringify({
+            place_id: result.place_id,
+            name: result.name,
+            formatted_address: result.formatted_address,
+            location: result.location,
+            address_components: result.address_components,
+            data_source: result.source  // Track where it came from
+          });
+
+          // Show source indicator
+          const indicator = document.getElementById('search-source-indicator');
+          const icon = document.getElementById('search-source-icon');
+          const text = document.getElementById('search-source-text');
+
+          if (result.source === 'text_search') {
+            icon.textContent = '🗺️ ';
+            text.textContent = `Found: ${result.name} (via Google Places Text Search)`;
+          } else if (result.source === 'geocoding') {
+            icon.textContent = '📍 ';
+            text.textContent = `Found: ${result.name} (via Google Geocoding)`;
+          }
+
+          indicator.style.display = 'block';
+          indicator.style.color = '#2e7d32';
+
+        } else {
+          console.log(`❌ No results found for "${query}"`);
+          alert(`Could not find "${query}". Try:\n• Being more specific (e.g., "Drake Passage, Antarctica")\n• Using different keywords\n• Checking spelling`);
+
+          // Clear previous selection and indicator
+          document.getElementById('selected-place').value = '';
+          document.getElementById('search-source-indicator').style.display = 'none';
+        }
+
+      } catch (error) {
+        console.error('Broad search error:', error);
+        alert(`Search error: ${error.message}`);
+      } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
     });
   }
 
@@ -5033,80 +5087,80 @@ export async function initMapApp() {
   const addDestinationForm = document.getElementById('add-destination-form');
   if (addDestinationForm) {
     addDestinationForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
+      e.preventDefault();
 
-    const selectedPlaceData = document.getElementById('selected-place').value;
-    const duration = parseInt(document.getElementById('duration-input').value) || 3;
+      const selectedPlaceData = document.getElementById('selected-place').value;
+      const duration = parseInt(document.getElementById('duration-input').value) || 3;
 
-    if (!selectedPlaceData) {
-      alert('Please select a location from the suggestions.');
-      return;
-    }
-
-    try {
-      const placeData = JSON.parse(selectedPlaceData);
-
-      // If no insert index specified, calculate based on geography
-      let insertIndex = pendingInsertIndex;
-      if (insertIndex === null) {
-        insertIndex = findBestInsertionIndex(placeData.location);
-        console.log('Auto-calculated insertion index:', insertIndex);
+      if (!selectedPlaceData) {
+        alert('Please select a location from the suggestions.');
+        return;
       }
 
-      await addNewDestination(insertIndex, placeData, duration);
-    } catch (error) {
-      console.error('Error parsing place data:', error);
-      alert('Error adding destination. Please try again.');
-    }
+      try {
+        const placeData = JSON.parse(selectedPlaceData);
+
+        // If no insert index specified, calculate based on geography
+        let insertIndex = pendingInsertIndex;
+        if (insertIndex === null) {
+          insertIndex = findBestInsertionIndex(placeData.location);
+          console.log('Auto-calculated insertion index:', insertIndex);
+        }
+
+        await addNewDestination(insertIndex, placeData, duration);
+      } catch (error) {
+        console.error('Error parsing place data:', error);
+        alert('Error adding destination. Please try again.');
+      }
     });
   }
 
   const saveScenarioForm = document.getElementById('save-scenario-form');
   if (saveScenarioForm) {
     saveScenarioForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
+      e.preventDefault();
 
-    const name = document.getElementById('scenario-name').value.trim();
-    const description = document.getElementById('scenario-description').value.trim();
+      const name = document.getElementById('scenario-name').value.trim();
+      const description = document.getElementById('scenario-description').value.trim();
 
-    if (!name) {
-      alert('Please enter a scenario name.');
-      return;
-    }
-
-    try {
-      let scenario;
-
-      if (currentScenarioId) {
-        // Update existing scenario - save as new named version
-        scenario = await scenarioManager.getScenario(currentScenarioId);
-        if (scenario) {
-          // Save as named version
-          await scenarioManager.saveVersion(
-            currentScenarioId,
-            workingData,
-            true,
-            `Named: ${name}`
-          );
-        }
-      } else {
-        // Create new scenario
-        scenario = await scenarioManager.getOrCreateScenario(name, description);
-        currentScenarioId = scenario.id;
-        currentScenarioName = name;
-
-        // Save initial version
-        await scenarioManager.saveVersion(currentScenarioId, workingData, true, 'Initial version');
+      if (!name) {
+        alert('Please enter a scenario name.');
+        return;
       }
 
-      closeSaveScenarioModal();
-      updateScenarioNameDisplay();
+      try {
+        let scenario;
 
-      alert(`Scenario "${name}" has been saved successfully.`);
-    } catch (error) {
-      console.error('Error saving scenario:', error);
-      alert('Failed to save scenario. Please try again.');
-    }
+        if (currentScenarioId) {
+          // Update existing scenario - save as new named version
+          scenario = await scenarioManager.getScenario(currentScenarioId);
+          if (scenario) {
+            // Save as named version
+            await scenarioManager.saveVersion(
+              currentScenarioId,
+              workingData,
+              true,
+              `Named: ${name}`
+            );
+          }
+        } else {
+          // Create new scenario
+          scenario = await scenarioManager.getOrCreateScenario(name, description);
+          currentScenarioId = scenario.id;
+          currentScenarioName = name;
+
+          // Save initial version
+          await scenarioManager.saveVersion(currentScenarioId, workingData, true, 'Initial version');
+        }
+
+        closeSaveScenarioModal();
+        updateScenarioNameDisplay();
+
+        alert(`Scenario "${name}" has been saved successfully.`);
+      } catch (error) {
+        console.error('Error saving scenario:', error);
+        alert('Failed to save scenario. Please try again.');
+      }
     });
   }
 
@@ -5124,39 +5178,39 @@ export async function initMapApp() {
   const confirmImportBtn = document.getElementById('confirm-import-btn');
   if (confirmImportBtn) {
     confirmImportBtn.addEventListener('click', () => {
-        const fileInput = document.getElementById('scenario-file');
-        const overwrite = document.getElementById('overwrite-scenarios').checked;
+      const fileInput = document.getElementById('scenario-file');
+      const overwrite = document.getElementById('overwrite-scenarios').checked;
 
-    if (!fileInput.files.length) {
-      alert('Please select a file to import.');
-      return;
-    }
-
-    const file = fileInput.files[0];
-    const reader = new FileReader();
-
-    reader.onload = async (e) => {
-      try {
-        const success = await scenarioManager.importScenarios(e.target.result, overwrite);
-        if (success) {
-          closeImportScenariosModal();
-
-          // Reload the imported scenario
-          if (scenarioManager.currentScenarioId) {
-            await window.loadScenarioById(scenarioManager.currentScenarioId);
-          }
-
-          alert('Scenarios imported successfully!');
-        } else {
-          alert('Failed to import scenarios. Please check the file format.');
-        }
-      } catch (error) {
-        console.error('Import error:', error);
-        alert('Error importing scenarios. Please check the file format.');
+      if (!fileInput.files.length) {
+        alert('Please select a file to import.');
+        return;
       }
-    };
 
-    reader.readAsText(file);
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+
+      reader.onload = async (e) => {
+        try {
+          const success = await scenarioManager.importScenarios(e.target.result, overwrite);
+          if (success) {
+            closeImportScenariosModal();
+
+            // Reload the imported scenario
+            if (scenarioManager.currentScenarioId) {
+              await window.loadScenarioById(scenarioManager.currentScenarioId);
+            }
+
+            alert('Scenarios imported successfully!');
+          } else {
+            alert('Failed to import scenarios. Please check the file format.');
+          }
+        } catch (error) {
+          console.error('Import error:', error);
+          alert('Error importing scenarios. Please check the file format.');
+        }
+      };
+
+      reader.readAsText(file);
     });
   }
 
@@ -5376,14 +5430,14 @@ export async function initMapApp() {
   let chatInstance = null;
   if (window.TravelConciergeChat) {
     chatInstance = new window.TravelConciergeChat(handleItineraryChanges);
-    
+
     // Hook into scenario switching events
-    window.switchChatForScenario = async function(scenarioId) {
+    window.switchChatForScenario = async function (scenarioId) {
       if (!chatInstance || !scenarioId) return;
       console.log('🔄 App switching chat to scenario:', scenarioId);
       try {
         await chatInstance.switchToScenario(scenarioId);
-        
+
         // Update scenario name display
         const scenario = await scenarioManager.getScenario(scenarioId);
         if (scenario) {
@@ -5433,7 +5487,7 @@ export async function initMapApp() {
 
   // Update chat context when leg filter changes - now handled in leg filter change event above
   // Update chat context when sub-leg filter changes
-  subLegFilter.addEventListener('change', function() {
+  subLegFilter.addEventListener('change', function () {
     updateChatContext(legFilter.value, subLegFilter.value || null);
   });
 
