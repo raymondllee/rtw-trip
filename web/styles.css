@@ -1,4 +1,5 @@
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -13,7 +14,7 @@ html, body {
   padding: 12px 16px;
   border-bottom: 1px solid #eee;
   background: #f8f9fa;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .app-header h1 {
@@ -147,7 +148,7 @@ html, body {
   transform: rotate(2deg);
   cursor: grabbing;
   background: #fff;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 100;
 }
 
@@ -182,7 +183,8 @@ html, body {
 
 .destination-info {
   flex: 1;
-  min-width: 0; /* Allow text truncation */
+  min-width: 0;
+  /* Allow text truncation */
 }
 
 .destination-name {
@@ -379,11 +381,19 @@ html, body {
 .destination-list.compact-mode .destination-name {
   font-size: 13px;
   margin-bottom: 0;
+  flex: 0 0 auto;
+  margin-right: 4px;
 }
 
-.destination-list.compact-mode .destination-meta,
+.destination-list.compact-mode .destination-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+  row-gap: 0;
+}
+
 .destination-list.compact-mode .destination-badges,
-.destination-list.compact-mode .destination-dates,
 .destination-list.compact-mode .destination-notes,
 .destination-list.compact-mode .destination-cost-summary,
 .destination-list.compact-mode .destination-cost-details,
@@ -395,10 +405,28 @@ html, body {
   display: none !important;
 }
 
+.destination-list.compact-mode .destination-meta {
+  font-size: 10px;
+  margin-bottom: 0;
+  display: block;
+  flex: 0 0 auto;
+  color: #666;
+}
+
+.destination-list.compact-mode .destination-dates {
+  font-size: 9px;
+  margin-top: 0;
+  display: flex;
+  flex: 0 0 auto;
+  color: #888;
+  margin-left: auto;
+  align-items: center;
+}
+
 .destination-list.compact-mode .destination-activity {
   font-size: 10px;
   padding: 1px 6px;
-  margin-left: 8px;
+  margin-left: 4px;
 }
 
 .destination-list.compact-mode .editable-duration {
@@ -1012,7 +1040,8 @@ textarea.form-input {
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border: 1px solid #ddd;
-  z-index: 100002 !important; /* Must be above modal (100001) */
+  z-index: 100002 !important;
+  /* Must be above modal (100001) */
 }
 
 .pac-item {
@@ -1097,6 +1126,7 @@ input[type="checkbox"] {
   margin: 8px 0 0 18px;
   padding: 0;
 }
+
 .info-highlights li {
   margin: 2px 0;
 }
@@ -1222,7 +1252,8 @@ input[type="checkbox"] {
   color: #1e88e5;
 }
 
-.undock-chat-btn, .dock-chat-btn {
+.undock-chat-btn,
+.dock-chat-btn {
   background: rgba(255, 255, 255, 0.2);
   border: none;
   color: white;
@@ -1233,7 +1264,8 @@ input[type="checkbox"] {
   transition: background 0.2s;
 }
 
-.undock-chat-btn:hover, .dock-chat-btn:hover {
+.undock-chat-btn:hover,
+.dock-chat-btn:hover {
   background: rgba(255, 255, 255, 0.3);
 }
 
@@ -1292,6 +1324,7 @@ input[type="checkbox"] {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1362,7 +1395,8 @@ input[type="checkbox"] {
   flex-shrink: 0;
 }
 
-#chat-input-sidebar, #floating-chat-input {
+#chat-input-sidebar,
+#floating-chat-input {
   flex: 1;
   padding: 8px 12px;
   border: 1px solid #ddd;
@@ -1376,11 +1410,13 @@ input[type="checkbox"] {
   font-family: inherit;
 }
 
-#chat-input-sidebar:focus, #floating-chat-input:focus {
+#chat-input-sidebar:focus,
+#floating-chat-input:focus {
   border-color: #1e88e5;
 }
 
-#chat-send-btn-sidebar, #floating-send-btn {
+#chat-send-btn-sidebar,
+#floating-send-btn {
   padding: 8px 16px;
   background: #1e88e5;
   color: white;
@@ -1394,11 +1430,13 @@ input[type="checkbox"] {
   align-self: flex-end;
 }
 
-#chat-send-btn-sidebar:hover, #floating-send-btn:hover {
+#chat-send-btn-sidebar:hover,
+#floating-send-btn:hover {
   background: #1976d2;
 }
 
-#chat-send-btn-sidebar:disabled, #floating-send-btn:disabled {
+#chat-send-btn-sidebar:disabled,
+#floating-send-btn:disabled {
   background: #ccc;
   cursor: not-allowed;
 }
@@ -1991,11 +2029,11 @@ input[type="checkbox"] {
 .transport-segment-content {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px 12px;
   margin-left: 30px;
   background: #f8f9fa;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid #e0e0e0;
   transition: all 0.2s ease;
 }
@@ -2007,8 +2045,13 @@ input[type="checkbox"] {
 }
 
 .transport-segment-icon {
-  font-size: 24px;
+  font-size: 20px;
   flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .transport-segment-info {
@@ -2017,10 +2060,10 @@ input[type="checkbox"] {
 }
 
 .transport-segment-route {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: #2c3e50;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2060,10 +2103,11 @@ input[type="checkbox"] {
 .transport-segment-cost {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 6px;
+  font-size: 13px;
   font-weight: 600;
   color: #2c3e50;
+  flex-wrap: wrap;
 }
 
 .transport-segment-cost .cost-amount {
@@ -2088,6 +2132,13 @@ input[type="checkbox"] {
   font-style: italic;
 }
 
+.transport-airlines {
+  font-size: 11px;
+  color: #666;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
 .transport-segment-actions {
   display: flex;
   gap: 4px;
@@ -2096,25 +2147,27 @@ input[type="checkbox"] {
 
 .transport-edit-btn,
 .transport-research-btn {
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 6px;
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: 16px;
+  transition: all 0.15s ease;
+  opacity: 0.6;
+  line-height: 1;
 }
 
 .transport-edit-btn:hover {
-  background: #3498db;
-  border-color: #3498db;
-  transform: scale(1.05);
+  background: rgba(52, 152, 219, 0.1);
+  border-color: rgba(52, 152, 219, 0.3);
+  opacity: 1;
 }
 
 .transport-research-btn:hover {
-  background: #f39c12;
-  border-color: #f39c12;
-  transform: scale(1.05);
+  background: rgba(243, 156, 18, 0.1);
+  border-color: rgba(243, 156, 18, 0.3);
+  opacity: 1;
 }
 
 /* Compact view for transport segments */
@@ -2352,6 +2405,7 @@ textarea.form-input {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -2621,7 +2675,9 @@ textarea.form-input {
 }
 
 /* Headers */
-.md-h1, .md-h2, .md-h3 {
+.md-h1,
+.md-h2,
+.md-h3 {
   margin: 12px 0 8px 0;
   font-weight: 600;
   color: inherit;
@@ -2644,7 +2700,9 @@ textarea.form-input {
   font-size: 1.1em;
 }
 
-.md-h1:first-child, .md-h2:first-child, .md-h3:first-child {
+.md-h1:first-child,
+.md-h2:first-child,
+.md-h3:first-child {
   margin-top: 0;
 }
 
@@ -2779,20 +2837,20 @@ textarea.form-input {
   .md-h1 {
     font-size: 1.3em;
   }
-  
+
   .md-h2 {
     font-size: 1.15em;
   }
-  
+
   .md-h3 {
     font-size: 1.05em;
   }
-  
+
   .code-block {
     font-size: 12px;
     padding: 10px;
   }
-  
+
   .md-list {
     padding-left: 16px;
   }
