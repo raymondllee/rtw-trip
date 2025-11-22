@@ -2274,32 +2274,18 @@ export async function initMapApp() {
         });
 
         // Simple HTML generation without external dependencies
-        if (totalCost > 0) {
-          costSummaryHTML = `
-            <div class="destination-cost-summary">
-              <div class="cost-total">
-                <span class="cost-amount">$${totalCost.toLocaleString()}</span>
-                ${duration > 0 ? `<span class="cost-per-day">$${Math.round(totalCost / duration)}/day</span>` : ''}
-              </div>
-              <div class="cost-breakdown-toggle">
-                <span class="toggle-icon">▼</span>
-                <span class="toggle-text">Details</span>
-              </div>
+        costSummaryHTML = totalCost > 0 ? `
+          <div class="destination-cost-summary">
+            <div class="cost-total">
+              <span class="cost-amount">$${totalCost.toLocaleString()}</span>
+              ${duration > 0 ? `<span class="cost-per-day">$${Math.round(totalCost / duration)}/day</span>` : ''}
             </div>
-          `;
-        } else {
-          costSummaryHTML = `
-            <div class="destination-cost-missing">
-              <button
-                class="update-costs-btn"
-                data-destination-name="${loc.name}"
-                title="Ask AI to research costs"
-              >
-                💰 Update costs for ${loc.name}
-              </button>
+            <div class="cost-breakdown-toggle">
+              <span class="toggle-icon">▼</span>
+              <span class="toggle-text">Details</span>
             </div>
-          `;
-        }
+          </div>
+        ` : '';
 
         costBreakdownHTML = totalCost > 0 ? `
           <div class="cost-breakdown">
@@ -2398,6 +2384,17 @@ export async function initMapApp() {
             <div class="destination-notes">
               <textarea class="editable-notes" placeholder="Add notes..." data-location-id="${loc.id}">${notes}</textarea>
             </div>
+            ${!destinationCosts?.total || destinationCosts.total === 0 ? `
+            <div class="destination-cost-missing">
+              <button
+                class="update-costs-btn"
+                data-destination-name="${loc.name}"
+                title="Ask AI to research costs"
+              >
+                💰 Update costs for ${loc.name}
+              </button>
+            </div>
+            ` : ''}
             <div class="education-section-placeholder" data-location-id="${loc.id}">
               <div class="education-loading">Loading education...</div>
             </div>
@@ -4022,6 +4019,13 @@ export async function initMapApp() {
       }
       entry.resolve(result);
     };
+
+    // Add unhandled rejection handler to prevent crashes
+    promise.catch((error) => {
+      // This catch prevents unhandled promise rejections
+      // Actual error handling should be done by the caller via try-catch
+      console.warn('⚠️ Cost update wait promise rejected:', error.message);
+    });
 
     return { promise, cancel, resolve };
   }

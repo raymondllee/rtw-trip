@@ -591,21 +591,7 @@ function generateSidebarCostSummary(costs, durationDays = 0, destinationName = '
   );
 
   if (!hasCostData) {
-    if (!destinationName) {
-      return '';
-    }
-
-    return `
-      <div class="destination-cost-missing">
-        <button
-          class="update-costs-btn"
-          data-destination-name="${destinationName}"
-          title="Ask AI to research costs"
-        >
-          💰 Update costs for ${destinationName}
-        </button>
-      </div>
-    `;
+    return '';
   }
 
   const costPerDay = durationDays > 0 ? total / durationDays : 0;

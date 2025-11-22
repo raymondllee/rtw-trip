@@ -700,12 +700,16 @@
   border: 1px dashed #d4d4d8;
   border-radius: 4px;
   background: #f9fafb;
+  flex: 1 1 100%;
+  order: 6;
 }
 
 .update-costs-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
   font-size: 12px;
   font-weight: 600;
   color: #2563eb;
