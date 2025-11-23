@@ -2571,12 +2571,14 @@ For each category, provide low/mid/high estimates with sources.
             print(f"Session creation warning: {e}")
 
         # Prepare ADK payload to invoke cost_research_agent with the temporary session
+        # NOTE: We let the root agent handle delegation to cost_research_agent naturally
+        # instead of forcing a direct sub-agent call, which can cause streams to end prematurely
         adk_payload = {
             "session_id": research_session_id,  # Use temporary session to avoid context accumulation
             "app_name": APP_NAME,
             "user_id": USER_ID,
-            # Call the cost research agent directly to improve reliability
-            "agent_name": "cost_research_agent",
+            # DO NOT specify agent_name - let root agent delegate naturally
+            # "agent_name": "cost_research_agent",  # Removed - causes premature stream termination
             "new_message": {
                 "role": "user",
                 "parts": [{"text": research_prompt}],
@@ -2653,12 +2655,15 @@ For each category, provide low/mid/high estimates with sources.
                     research_result = candidate or research_result
                     print(f"[DEBUG] Set research_result from save_researched_costs, keys: {research_result.keys()}")
             elif tool_name == "DestinationCostResearch":
+                print(f"[SUCCESS] ✅ DestinationCostResearch tool called!")
                 candidate = _extract_research_from_args(raw_args)
                 print(f"[DEBUG] DestinationCostResearch candidate type: {type(candidate)}, is_dict: {isinstance(candidate, dict)}")
                 if isinstance(candidate, dict):
                     print(f"[DEBUG] Candidate keys: {candidate.keys()}")
                     research_result = candidate or research_result
-                    print(f"[DEBUG] Set research_result from DestinationCostResearch tool call")
+                    print(f"[SUCCESS] ✅ Set research_result from DestinationCostResearch tool call")
+                else:
+                    print(f"[ERROR] ❌ DestinationCostResearch candidate is not a dict: {candidate}")
 
         def _handle_tool_response(tool_resp):
             nonlocal research_result, save_tool_called
@@ -2732,11 +2737,22 @@ For each category, provide low/mid/high estimates with sources.
                     if event_count <= 5 or event_count % 10 == 0:
                         print(f"[DEBUG] Event #{event_count}: keys={list(event.keys())}")
 
+                    # Check for finishReason to see why stream might be ending
+                    if "finishReason" in event:
+                        print(f"[DEBUG] Event #{event_count} finishReason: {event['finishReason']}")
+
+                    # Check usage metadata to see if we're hitting limits
+                    if "usageMetadata" in event:
+                        usage = event.get("usageMetadata", {})
+                        print(f"[DEBUG] Event #{event_count} usage: {usage}")
+
                     # Extract text responses
                     if "content" in event and "parts" in event["content"]:
                         for part in event["content"]["parts"]:
                             if "text" in part:
                                 response_text += part["text"]
+                                if event_count <= 10:
+                                    print(f"[DEBUG] Event #{event_count} text: {part['text'][:200]}")
 
                             # Check if save_researched_costs tool was called
                             func_call = part.get("function_call") or part.get("functionCall")
