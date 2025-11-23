@@ -2709,15 +2709,28 @@ For each category, provide low/mid/high estimates with sources.
             stream=True,
             timeout=180  # Cost research may take longer due to multiple searches
         ) as r:
+            print(f"[DEBUG] ADK API Response Status: {r.status_code}")
+            if r.status_code != 200:
+                error_text = r.text[:1000]
+                print(f"[ERROR] ADK API returned non-200 status: {r.status_code}, body: {error_text}")
+                return jsonify({
+                    'status': 'error',
+                    'error': f'ADK API error: {r.status_code}',
+                    'details': error_text
+                }), 500
+
+            event_count = 0
             for chunk in r.iter_lines():
                 if not chunk:
                     continue
+                event_count += 1
                 json_string = chunk.decode("utf-8").removeprefix("data: ").strip()
                 try:
                     event = json.loads(json_string)
 
                     # DEBUG: Print all events to understand structure
-                    print(f"[DEBUG] Received event keys: {event.keys()}")
+                    if event_count <= 5 or event_count % 10 == 0:
+                        print(f"[DEBUG] Event #{event_count}: keys={list(event.keys())}")
 
                     # Extract text responses
                     if "content" in event and "parts" in event["content"]:
@@ -2749,12 +2762,18 @@ For each category, provide low/mid/high estimates with sources.
                         print(f"[DEBUG] Found top_level function_response: {top_level_response.get('name')}")
                         _handle_tool_response(top_level_response)
 
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    print(f"[WARNING] Failed to decode JSON from chunk: {json_string[:100]}... Error: {e}")
                     continue
+
+            print(f"[DEBUG] Processed {event_count} events from ADK API")
 
         # Try to extract JSON from response_text if we don't have structured data
         print(f"[DEBUG] After streaming: research_result is {'SET' if research_result else 'NOT SET'}")
         print(f"[DEBUG] After streaming: save_tool_called={save_tool_called}")
+        print(f"[DEBUG] After streaming: response_text length={len(response_text)}")
+        if response_text:
+            print(f"[DEBUG] Response text preview: {response_text[:500]}")
         if not research_result and response_text:
             print(f"[DEBUG] Attempting to extract JSON from response_text (length={len(response_text)})")
             # Look for JSON in the response text
@@ -2911,11 +2930,26 @@ For each category, provide low/mid/high estimates with sources.
                 'costs_saved': len(cost_items_created)
             })
         else:
-            print(f"⚠️ Cost research returned no structured data")
+            print(f"⚠️ Cost research returned no structured data for {destination_name}")
+            print(f"[ERROR] Diagnostic info:")
+            print(f"  - research_result: {bool(research_result)}")
+            print(f"  - save_tool_called: {save_tool_called}")
+            print(f"  - saved_via_server: {saved_via_server}")
+            print(f"  - cost_items_created: {len(cost_items_created) if cost_items_created else 0}")
+            print(f"  - response_text length: {len(response_text)}")
+            print(f"  - response_text content: {response_text[:1000] if response_text else 'EMPTY'}")
             return jsonify({
                 'status': 'partial',
                 'response_text': response_text,
-                'message': 'Research completed but no structured data returned'
+                'message': 'Research completed but no structured data returned',
+                'debug_info': {
+                    'has_research_result': bool(research_result),
+                    'save_tool_called': save_tool_called,
+                    'saved_via_server': saved_via_server,
+                    'cost_items_count': len(cost_items_created) if cost_items_created else 0,
+                    'response_text_length': len(response_text),
+                    'session_id_used': research_session_id
+                }
             })
 
     except requests.exceptions.Timeout:
