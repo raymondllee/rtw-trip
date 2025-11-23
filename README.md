@@ -17,6 +17,21 @@ An interactive around-the-world trip planning application with Google Maps visua
 - **📍 Real-time Itinerary Updates** - Modify your trip with AI assistance
 - **🔍 Smart Trip Planning** - Get personalized recommendations and booking help
 
+## 🧘 Wellness Wheel Features
+
+Integrated 7-dimension wellness assessment tool for holistic life design and personal development:
+
+- **7-Dimension Assessment** - Evaluate across Spiritual, Practical, Relational, Mental, Physical, Behavioral, and Financial dimensions
+- **3-Ring Visualization** - Track Empirical (data-driven), Situational (current state), and Aspirational (goals) perspectives
+- **Interactive Dashboard** - Beautiful wheel and grid visualizations with color-coded segments
+- **Multi-User Support** - Manage multiple users with individual wellness profiles
+- **Import/Export** - Backup and restore wellness data in JSON format
+- **Firebase Integration** - Reliable data persistence and synchronization
+- **AI-Powered Analysis** - Comprehensive wellness insights _(Phase 2 - Coming Soon)_
+
+Access the Wellness Wheel at: `http://localhost:5173/wellness-dashboard.html`
+
+
 ## 🚀 Live Demo
 
 Visit the live application: [RTW Trip Map](https://raymondllee.github.io/rtw-trip/)
@@ -151,6 +166,7 @@ Open http://localhost:5173/ in your browser.
 ### What's Running?
 
 - **Frontend** (Port 5173): Interactive map and UI
+- **Wellness Dashboard** (Port 5173): 7-dimension wellness assessment at `/wellness-dashboard.html`
 - **Flask API** (Port 5001): Backend API and itinerary management
 - **ADK API** (Port 8000): AI travel concierge agents
 
@@ -165,9 +181,14 @@ rtw-trip/
 │   │   ├── main.ts                # Frontend bootstrap (loads map + chat)
 │   │   ├── app/                   # Map + itinerary application logic
 │   │   ├── chat/                  # AI chat experience
+│   │   ├── wellness/              # Wellness wheel components
+│   │   │   ├── components/        # Wellness React components
+│   │   │   ├── services/          # Wellness data services
+│   │   │   └── constants/         # Wellness configuration
 │   │   ├── firebase/              # Firebase initialization helpers
 │   │   ├── firestore/             # Scenario/version management API
 │   │   └── types/                 # Shared TypeScript definitions
+│   ├── wellness-dashboard.html    # Wellness dashboard entry point
 │   ├── styles.css                 # Global styling
 │   └── cost-styles.css            # Cost UI styling
 ├── python/agents/travel-concierge # AI Travel Concierge

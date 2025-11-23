@@ -9,6 +9,12 @@ data/unresolved.json
 .env
 node_modules
 
+# Wellness wheel subtree (dependencies managed at root)
+wellness-wheel/node_modules/
+wellness-wheel/build/
+wellness-wheel/.env
+wellness-wheel/.env.local
+
 # Screenshots artifacts
 screenshots/
 

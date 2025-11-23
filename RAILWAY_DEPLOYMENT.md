@@ -98,7 +98,9 @@ curl https://your-app.railway.app/health
 # Should return: {"status":"healthy"}
 ```
 
-Visit your app URL in a browser to see the full interface.
+Visit your app URL in a browser to see the full interface:
+- **Trip Map**: `https://your-app.railway.app/`
+- **Wellness Dashboard**: `https://your-app.railway.app/wellness-dashboard.html`
 
 ## 🏗️ Architecture on Railway
 
@@ -113,6 +115,8 @@ Railway Container (Single Service)
 │
 └── Flask API Server (0.0.0.0:$PORT - public)
     ├── Serves static web files from /app/web
+    │   ├── index.html (Trip Map)
+    │   └── wellness-dashboard.html (Wellness Dashboard)
     ├── API endpoints (/api/*)
     ├── Health check (/health)
     └── Proxies to ADK API server internally
@@ -357,6 +361,11 @@ After successful deployment:
 - [ ] Verify app loads in browser without console errors
 - [ ] Check Firebase connection (scenarios load)
 - [ ] Test Google Maps displays correctly
+- [ ] **Test Wellness Dashboard** (navigate to `/wellness-dashboard.html`)
+  - [ ] Create a new user
+  - [ ] Complete an assessment
+  - [ ] Verify wheel and grid visualizations render
+  - [ ] Test export/import functionality
 - [ ] Verify AI chat is functional (if using)
 - [ ] Test itinerary editing features
 - [ ] Check cost tracking works

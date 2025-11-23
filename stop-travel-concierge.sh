@@ -2,9 +2,17 @@
 
 # Travel Concierge Stop Script
 # Stops all running travel concierge servers
+# Usage: ./stop-travel-concierge.sh [--cleanup]
+
+CLEANUP_ALL=false
+
+# Parse arguments
+if [[ "$1" == "--cleanup" ]] || [[ "$1" == "--all" ]]; then
+    CLEANUP_ALL=true
+fi
 
 echo "🛑 Stopping Travel Concierge Application..."
-echo "========================================"
+echo "========================================="
 
 # Function to kill processes on specific ports
 kill_port() {
@@ -42,35 +50,69 @@ kill_pid_file() {
     fi
 }
 
-# Kill processes using saved PID files
-echo ""
-echo "📋 Stopping registered services..."
+# Function to kill all processes matching a pattern
+kill_by_pattern() {
+    local pattern=$1
+    local service_name=$2
+    
+    echo "🔍 Searching for $service_name processes..."
+    local pids=$(pgrep -f "$pattern")
+    
+    if [ -n "$pids" ]; then
+        echo "🔧 Killing all $service_name processes..."
+        echo "$pids" | xargs kill -9 2>/dev/null
+        echo "✅ All $service_name processes stopped"
+    else
+        echo "ℹ️  No $service_name processes found"
+    fi
+}
 
-kill_pid_file "logs/flask.pid" "Flask API Server"
-kill_pid_file "logs/adk.pid" "ADK API Server"
-kill_pid_file "logs/frontend.pid" "Frontend Server"
-
-# Also clear ports by force (backup method)
-echo ""
-echo "🧹 Cleaning up any remaining processes..."
-kill_port 5173  # Frontend
-kill_port 5001  # Flask API
-kill_port 8000  # ADK API
+if [ "$CLEANUP_ALL" = true ]; then
+    echo ""
+    echo "🧹 CLEANUP MODE: Killing ALL app instances..."
+    echo "⚠️  This will kill all Vite, Flask API, and ADK API processes!"
+    echo ""
+    
+    # Kill all matching processes by pattern
+    kill_by_pattern "node.*vite" "Vite (Frontend)"
+    kill_by_pattern "python.*api_server.py" "Flask API"
+    kill_by_pattern "adk api_server travel_concierge" "ADK API"
+    
+    # Clean up PID files
+    rm -f logs/*.pid 2>/dev/null
+else
+    # Kill processes using saved PID files
+    echo ""
+    echo "📋 Stopping registered services..."
+    
+    kill_pid_file "logs/flask.pid" "Flask API Server"
+    kill_pid_file "logs/adk.pid" "ADK API Server"
+    kill_pid_file "logs/frontend.pid" "Frontend Server"
+    
+    # Also clear ports by force (backup method)
+    echo ""
+    echo "🧹 Cleaning up any remaining processes..."
+    kill_port 5173  # Frontend
+    kill_port 5001  # Flask API
+    kill_port 8000  # ADK API
+fi
 
 # Clean up log files (optional)
-echo ""
-read -p "🗑️  Do you want to clean up log files? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    if [ -d "logs" ]; then
-        rm -f logs/*.log
-        rm -f logs/*.pid
-        echo "✅ Log files cleaned up"
+if [ "$CLEANUP_ALL" = false ]; then
+    echo ""
+    read -p "🗑️  Do you want to clean up log files? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [ -d "logs" ]; then
+            rm -f logs/*.log
+            rm -f logs/*.pid
+            echo "✅ Log files cleaned up"
+        else
+            echo "ℹ️  No log directory found"
+        fi
     else
-        echo "ℹ️  No log directory found"
+        echo "ℹ️  Log files preserved"
     fi
-else
-    echo "ℹ️  Log files preserved"
 fi
 
 echo ""
