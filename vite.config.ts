@@ -1,8 +1,10 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  plugins: [react()],
   root: resolve(__dirname, 'web'),
   base: '/',
   server: {
@@ -24,7 +26,8 @@ export default defineConfig({
         costManager: resolve(__dirname, 'web', 'cost-manager.html'),
         bulkEdit: resolve(__dirname, 'web', 'bulk-edit.html'),
         education: resolve(__dirname, 'web', 'education-dashboard.html'),
-        student_dashboard: resolve(__dirname, 'web', 'student-dashboard.html')
+        student_dashboard: resolve(__dirname, 'web', 'student-dashboard.html'),
+        wellness: resolve(__dirname, 'web', 'wellness-dashboard.html')
       }
     }
   },

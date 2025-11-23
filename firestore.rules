@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Chat History collection
+    match /chatHistory/{chatId} {
+      allow read, write: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // Scenarios collection
+    match /scenarios/{scenarioId} {
+      allow read, write: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+
+      // Versions subcollection
+      match /versions/{versionId} {
+        allow read, write: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
+      }
+    }
+
+    // Wellness users collection
+    match /wellness_users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Wellness analyses collection
+    match /wellness_analyses/{analysisId} {
+      allow read, write: if true;
+    }
+  }
+}

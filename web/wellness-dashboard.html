@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wellness Wheel - RTW Trip</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Header style to match RTW app */
+        .wellness-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 1.5rem 2rem;
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .wellness-header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .wellness-header h1 {
+            margin: 0;
+            font-size: 1.75rem;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #wellness-root {
+            min-height: calc(100vh - 80px);
+        }
+    </style>
+</head>
+<body>
+    <div class="wellness-header">
+        <div class="wellness-header-content">
+            <h1>🌟 Wellness Wheel</h1>
+            <a href="/" class="back-btn">← Back to Trip Planning</a>
+        </div>
+    </div>
+
+    <div id="wellness-root"></div>
+
+    <!-- Load config before React app -->
+    <script src="/config.js"></script>
+    <script>
+        if (!window.RTW_CONFIG) {
+            const fallback = document.createElement('script');
+            fallback.src = '/config.production.js';
+            document.head.appendChild(fallback);
+        }
+    </script>
+
+    <script type="module" src="/src/wellness/main.tsx"></script>
+</body>
+</html>
