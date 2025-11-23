@@ -1,0 +1,18 @@
+# Development Dockerfile with nginx for React wellness wheel app
+FROM nginx:alpine
+
+# Install node and npm for development
+RUN apk add --no-cache nodejs npm
+
+# Set working directory
+WORKDIR /app
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Expose port 80
+EXPOSE 80
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
+
