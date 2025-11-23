@@ -1,0 +1,230 @@
+/* Print-specific styles for Wellness Grid */
+
+@media print {
+  @page {
+    margin: 0.4in;
+    size: letter;
+  }
+  
+  body {
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  /* Ensure all text colors are preserved */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  .print\\:hidden {
+    display: none !important;
+  }
+  
+  .print\\:block {
+    display: block !important;
+  }
+  
+  .print\\:text-xs {
+    font-size: 0.75rem !important;
+    line-height: 1rem !important;
+  }
+  
+  .print\\:text-sm {
+    font-size: 0.875rem !important;
+    line-height: 1.25rem !important;
+  }
+  
+  .print\\:text-2xl {
+    font-size: 1.5rem !important;
+    line-height: 2rem !important;
+  }
+  
+  .print\\:py-2 {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+  
+  .print\\:px-1 {
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+  }
+  
+  .print\\:mb-4 {
+    margin-bottom: 1rem !important;
+  }
+  
+  .print\\:mb-2 {
+    margin-bottom: 0.5rem !important;
+  }
+  
+  .print\\:space-y-1 > * + * {
+    margin-top: 0.25rem !important;
+  }
+  
+  .print\\:gap-1 {
+    gap: 0.25rem !important;
+  }
+  
+  .print\\:min-h-\\[100px\\] {
+    min-height: 100px !important;
+  }
+  
+  .print\\:min-h-\\[120px\\] {
+    min-height: 120px !important;
+  }
+  
+  .print\\:max-w-none {
+    max-width: none !important;
+  }
+  
+  .print\\:bg-white {
+    background-color: white !important;
+  }
+  
+  .print\\:bg-gray-100 {
+    background-color: #f3f4f6 !important;
+  }
+  
+  .print\\:bg-gray-600 {
+    background-color: #4b5563 !important;
+  }
+  
+  .print\\:text-gray-900 {
+    color: #111827 !important;
+  }
+  
+  .print\\:text-gray-800 {
+    color: #1f2937 !important;
+  }
+  
+  .print\\:text-gray-700 {
+    color: #374151 !important;
+  }
+  
+  .print\\:text-gray-600 {
+    color: #4b5563 !important;
+  }
+  
+  .print\\:border-gray-400 {
+    border-color: #9ca3af !important;
+  }
+  
+  .print\\:opacity-100 {
+    opacity: 1 !important;
+  }
+  
+  .print\\:leading-tight {
+    line-height: 1.25 !important;
+  }
+  
+  .print\\:shadow-none {
+    box-shadow: none !important;
+  }
+  
+  .print\\:scale-100 {
+    transform: scale(1) !important;
+  }
+  
+  .print\\:border-2 {
+    border-width: 2px !important;
+  }
+  
+  .print\\:mt-2 {
+    margin-top: 0.5rem !important;
+  }
+  
+  .print\\:mb-0 {
+    margin-bottom: 0 !important;
+  }
+  
+  .print\\:top-0\\.5 {
+    top: 0.125rem !important;
+  }
+  
+  .print\\:left-0\\.5 {
+    left: 0.125rem !important;
+  }
+  
+  .print\\:w-3 {
+    width: 0.75rem !important;
+  }
+  
+  .print\\:h-3 {
+    height: 0.75rem !important;
+  }
+  
+  .print\\:w-4 {
+    width: 1rem !important;
+  }
+  
+  .print\\:h-4 {
+    height: 1rem !important;
+  }
+  
+  .print\\:w-8 {
+    width: 2rem !important;
+  }
+  
+  .print\\:h-8 {
+    height: 2rem !important;
+  }
+  
+  .print\\:text-xl {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+  }
+  
+  .print\\:font-normal {
+    font-weight: 400 !important;
+  }
+  
+  .print\\:mt-0 {
+    margin-top: 0 !important;
+  }
+  
+  .print\\:mt-1 {
+    margin-top: 0.25rem !important;
+  }
+  
+  .print\\:mb-1 {
+    margin-bottom: 0.25rem !important;
+  }
+  
+  .print\\:space-y-0\\.5 > * + * {
+    margin-top: 0.125rem !important;
+  }
+  
+  .print\\:p-1 {
+    padding: 0.25rem !important;
+  }
+  
+  .print\\:p-2 {
+    padding: 0.5rem !important;
+  }
+  
+  /* Print mode specific styles */
+  .print-mode {
+    background: white !important;
+  }
+  
+  .print-mode .bg-gray-50 {
+    background: white !important;
+  }
+  
+  /* Ensure white text in print mode */
+  .print\\:text-white {
+    color: white !important;
+  }
+  
+  /* Preserve text alignment and line breaks in print */
+  .whitespace-pre-line {
+    white-space: pre-line !important;
+  }
+  
+  .text-left {
+    text-align: left !important;
+  }
+}

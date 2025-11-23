@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Development service with hot reloading
+  wellness-wheel-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - REACT_APP_GOOGLE_CLOUD_PROJECT_ID=${REACT_APP_GOOGLE_CLOUD_PROJECT_ID}
+      - REACT_APP_GOOGLE_CLOUD_LOCATION=${REACT_APP_GOOGLE_CLOUD_LOCATION}
+      - REACT_APP_GOOGLE_OAUTH_CLIENT_ID=${REACT_APP_GOOGLE_OAUTH_CLIENT_ID}
+      - REACT_APP_GOOGLE_OAUTH_CLIENT_SECRET=${REACT_APP_GOOGLE_OAUTH_CLIENT_SECRET}
+    stdin_open: true
+    tty: true
+
+  # Production build service
+  wellness-wheel-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production
+
+  # Development with nginx (alternative)
+  wellness-wheel-nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev-nginx
+    ports:
+      - "3001:80"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - REACT_APP_GOOGLE_CLOUD_PROJECT_ID=${REACT_APP_GOOGLE_CLOUD_PROJECT_ID}
+      - REACT_APP_GOOGLE_CLOUD_LOCATION=${REACT_APP_GOOGLE_CLOUD_LOCATION}
+      - REACT_APP_GOOGLE_OAUTH_CLIENT_ID=${REACT_APP_GOOGLE_OAUTH_CLIENT_ID}
+      - REACT_APP_GOOGLE_OAUTH_CLIENT_SECRET=${REACT_APP_GOOGLE_OAUTH_CLIENT_SECRET}
