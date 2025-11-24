@@ -7,6 +7,7 @@ import type { TripBudget, TripData } from '../types/trip';
 import { calculateBudgetStatus, createDefaultBudget } from '../utils/budgetTracker';
 import { getCurrencyForDestination } from '../utils/currencyMapping';
 import { getRuntimeConfig } from '../config';
+import { wellnessFirebaseService, WellnessUserData } from '../wellness/services/wellnessFirebaseService';
 
 export class BudgetManager {
   private container: HTMLElement;
@@ -23,6 +24,8 @@ export class BudgetManager {
   private tripDataAutoSaveTimer: number | null = null;
   private savingCosts: Set<string> = new Set();
   private transportSegments: any[] = [];
+  private collapsedSections: Set<string>; // Track collapsed sections
+  private availableUsers: WellnessUserData[] = []; // Available wellness users
 
   constructor(
     container: HTMLElement,
@@ -41,8 +44,26 @@ export class BudgetManager {
 
     // Fetch exchange rates on initialization
     this.fetchExchangeRates();
+    this.fetchAvailableUsers();
+
+    // Load collapsed state from localStorage
+    const savedState = localStorage.getItem('budget_collapsed_sections');
+    if (savedState) {
+      try {
+        this.collapsedSections = new Set(JSON.parse(savedState));
+      } catch (e) {
+        console.warn('Failed to parse saved collapsed sections state', e);
+        this.collapsedSections = new Set();
+      }
+    } else {
+      this.collapsedSections = new Set();
+    }
 
     this.render();
+  }
+
+  private saveCollapsedState() {
+    localStorage.setItem('budget_collapsed_sections', JSON.stringify(Array.from(this.collapsedSections)));
   }
 
   private scheduleAutoSave() {
@@ -457,9 +478,9 @@ export class BudgetManager {
     return this.transportSegments.filter(segment => {
       // Check if segment has no researched data
       const hasNoResearch = !segment.researched_cost_mid &&
-                           segment.booking_status !== 'researched' &&
-                           segment.booking_status !== 'booked' &&
-                           segment.booking_status !== 'paid';
+        segment.booking_status !== 'researched' &&
+        segment.booking_status !== 'booked' &&
+        segment.booking_status !== 'paid';
 
       // Check if research is old
       let isOldResearch = false;
@@ -504,21 +525,21 @@ export class BudgetManager {
             </div>
             <div class="segments-checklist">
               ${needsResearch.map((segment, index) => {
-                const icon = segment.transport_mode_icon || this.getTransportIcon(segment.transport_mode);
-                const fromName = segment.from_destination_name || 'Unknown';
-                const toName = segment.to_destination_name || 'Unknown';
-                const mode = segment.transport_mode || 'plane';
+      const icon = segment.transport_mode_icon || this.getTransportIcon(segment.transport_mode);
+      const fromName = segment.from_destination_name || 'Unknown';
+      const toName = segment.to_destination_name || 'Unknown';
+      const mode = segment.transport_mode || 'plane';
 
-                // Calculate research age
-                let ageInfo = '<span class="no-research-badge">No research</span>';
-                if (segment.researched_at) {
-                  const ageInDays = Math.floor(
-                    (Date.now() - new Date(segment.researched_at).getTime()) / (1000 * 60 * 60 * 24)
-                  );
-                  ageInfo = `<span class="old-research-badge">${ageInDays} days old</span>`;
-                }
+      // Calculate research age
+      let ageInfo = '<span class="no-research-badge">No research</span>';
+      if (segment.researched_at) {
+        const ageInDays = Math.floor(
+          (Date.now() - new Date(segment.researched_at).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        ageInfo = `<span class="old-research-badge">${ageInDays} days old</span>`;
+      }
 
-                return `
+      return `
                   <div class="segment-checkbox-item">
                     <label>
                       <input type="checkbox"
@@ -535,7 +556,7 @@ export class BudgetManager {
                     </label>
                   </div>
                 `;
-              }).join('')}
+    }).join('')}
             </div>
           </div>
           <div class="modal-footer">
@@ -1441,9 +1462,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     // Update exchange rate displays without full re-render
     const costs = country
       ? (this.tripData.costs || []).filter(c => {
-          const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
-          return location?.country === country;
-        })
+        const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+        return location?.country === country;
+      })
       : (this.tripData.costs || []);
 
     costs.forEach(cost => {
@@ -1623,9 +1644,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     // Build exchange rate display for all currencies used in this country
     const ratesDisplay = countryCurrencies.length > 0
       ? countryCurrencies.map(curr => {
-          const rate = this.exchangeRates[curr] || 1;
-          return `<span class="currency-rate-item">1 ${curr} = $${(1 / rate).toFixed(4)} USD</span>`;
-        }).join(' • ')
+        const rate = this.exchangeRates[curr] || 1;
+        return `<span class="currency-rate-item">1 ${curr} = $${(1 / rate).toFixed(4)} USD</span>`;
+      }).join(' • ')
       : '';
 
     return `
@@ -1648,14 +1669,14 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           </div>
         ` : ''}
         ${Object.entries(costsByDestination).map(([destName, costs]) => {
-          const firstCost = costs[0];
-          const destinationId = firstCost?.destination_id;
-          const destLocation = (this.tripData.locations || []).find(loc => loc.id === destinationId);
-          const destDays = destLocation?.duration_days || 0;
-          const destDateRange = destLocation?.arrival_date && destLocation?.departure_date
-            ? `${new Date(destLocation.arrival_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(destLocation.departure_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-            : '';
-          return `
+      const firstCost = costs[0];
+      const destinationId = firstCost?.destination_id;
+      const destLocation = (this.tripData.locations || []).find(loc => loc.id === destinationId);
+      const destDays = destLocation?.duration_days || 0;
+      const destDateRange = destLocation?.arrival_date && destLocation?.departure_date
+        ? `${new Date(destLocation.arrival_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(destLocation.departure_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+        : '';
+      return `
           <div class="destination-costs-section" data-destination-id="${destinationId}">
             <div class="destination-header">
               <span>
@@ -1690,20 +1711,20 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                 <tr class="total-row">
                   <td colspan="4"><strong>Subtotal for ${destName}</strong></td>
                   <td class="text-right"><strong>${this.formatCurrency(
-                    costs.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0)
-                  )}</strong></td>
+        costs.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0)
+      )}</strong></td>
                   <td colspan="4"></td>
                 </tr>
               </tfoot>
             </table>
           </div>
         `;
-        }).join('')}
+    }).join('')}
         <div class="country-total-row" data-country="${country}">
           <strong>Total for ${country}:</strong>
           <strong class="country-total-amount">${this.formatCurrency(
-            countryCosts.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0)
-          )}</strong>
+      countryCosts.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0)
+    )}</strong>
         </div>
         ${this.renderAddCostSection(country, countryDestinations)}
       </div>
@@ -1857,8 +1878,8 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
               <select class="new-cost-field" data-field="destination_id">
                 <option value="">Select destination...</option>
                 ${destinations.map(dest =>
-                  `<option value="${dest.id}">${dest.name || dest.city}</option>`
-                ).join('')}
+      `<option value="${dest.id}">${dest.name || dest.city}</option>`
+    ).join('')}
               </select>
             </div>
             <div class="form-group">
@@ -1933,7 +1954,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     `;
   }
 
-  private renderCategoryBreakdown(costs: Array<{category?: string, amount?: number, amount_usd?: number}>): string {
+  private renderCategoryBreakdown(costs: Array<{ category?: string, amount?: number, amount_usd?: number }>): string {
     const categoryTotals: Record<string, number> = {};
     let total = 0;
 
@@ -1956,12 +1977,39 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
       .join('');
   }
 
+  private async fetchAvailableUsers() {
+    try {
+      this.availableUsers = await wellnessFirebaseService.getAllUsers();
+      // Re-render if we have users and the UI is already mounted
+      if (this.availableUsers.length > 0 && this.container.innerHTML) {
+        this.render();
+      }
+    } catch (error) {
+      console.error('Failed to fetch wellness users:', error);
+    }
+  }
+
   private renderTravelerSection(): string {
     const numTravelers = this.tripData.num_travelers || 1;
     const composition = this.tripData.traveler_composition;
     const adults = composition?.adults || numTravelers;
     const children = composition?.children || 0;
     const accommodationPref = this.tripData.accommodation_preference || 'mid-range';
+    const selectedUserIds = this.tripData.traveler_ids || [];
+
+    const userCheckboxes = this.availableUsers.map(user => {
+      const isSelected = selectedUserIds.includes(user.userId);
+      return `
+        <div class="traveler-checkbox-item" style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <input type="checkbox" 
+                 id="user-${user.userId}" 
+                 class="traveler-user-checkbox" 
+                 data-user-id="${user.userId}"
+                 ${isSelected ? 'checked' : ''}>
+          <label for="user-${user.userId}" style="cursor: pointer;">${user.userName}</label>
+        </div>
+      `;
+    }).join('');
 
     return `
       <div class="traveler-section">
@@ -1972,6 +2020,16 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <span id="traveler-save-indicator" class="auto-save-indicator-inline"></span>
           </div>
         </div>
+        
+        ${this.availableUsers.length > 0 ? `
+          <div class="traveler-inputs" style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: 500;">Select Travelers:</label>
+            <div class="traveler-user-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;">
+              ${userCheckboxes}
+            </div>
+          </div>
+        ` : ''}
+
         <div class="traveler-inputs">
           <div class="traveler-input-group">
             <label for="adults-count">Adults:</label>
@@ -2049,12 +2107,15 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     // Count segments that need research
     const needsResearchCount = this.getSegmentsNeedingResearch(30).length;
 
+    const isCollapsed = this.collapsedSections.has('transport');
+    const collapseIcon = isCollapsed ? '▶' : '▼';
+
     return `
-      <div class="budget-edit-section transport-section">
-        <div class="section-header">
+      <div class="budget-edit-section transport-section" data-section="transport">
+        <div class="section-header section-header-collapsible" data-section="transport">
           <div class="section-header-left">
             <h4>✈️ Inter-Country Transport</h4>
-            <div class="transport-summary">
+            <div class="section-summary-inline">
               <span class="transport-total">Total: ${this.formatCurrency(transportTotal)}</span>
               ${currentBudget > 0 ? `<span class="transport-pct">(${transportPct.toFixed(1)}% of budget)</span>` : ''}
             </div>
@@ -2065,43 +2126,45 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                 🔍 Bulk Research (${needsResearchCount})
               </button>
             ` : ''}
+            <span class="section-collapse-icon">${collapseIcon}</span>
           </div>
         </div>
 
-        <div class="transport-segments-list">
-          ${this.transportSegments.map(segment => {
-            const activeCost = this.getSegmentActiveCost(segment);
-            // Use transport_mode_icon if set, otherwise derive from transport_mode
-            const icon = segment.transport_mode_icon || this.getTransportIcon(segment.transport_mode);
-            const fromName = segment.from_destination_name || 'Unknown';
-            const toName = segment.to_destination_name || 'Unknown';
-            const mode = segment.transport_mode || 'plane';
-            const distance = segment.distance_km ? `${Math.round(segment.distance_km)}km` : '';
-            const duration = segment.duration_hours || segment.researched_duration_hours;
-            const durationStr = duration ? `${duration}h` : '';
-            const airlines = segment.researched_airlines && segment.researched_airlines.length > 0
-              ? segment.researched_airlines.join(', ')
-              : '';
-            const statusBadge = this.getSegmentStatusBadge(segment);
-            const researchedDate = segment.researched_at
-              ? new Date(segment.researched_at).toLocaleDateString()
-              : '';
-            const alternatives = segment.alternatives || segment.researched_alternatives;
-            const hasAlternatives = alternatives && alternatives.length > 0;
-            const hasResearchData = segment.booking_status === 'researched' || segment.researched_cost_mid;
+        <div class="section-content" data-section="transport" style="display: ${isCollapsed ? 'none' : 'block'}">
+          <div class="transport-segments-list">
+            ${this.transportSegments.map(segment => {
+      const activeCost = this.getSegmentActiveCost(segment);
+      // Use transport_mode_icon if set, otherwise derive from transport_mode
+      const icon = segment.transport_mode_icon || this.getTransportIcon(segment.transport_mode);
+      const fromName = segment.from_destination_name || 'Unknown';
+      const toName = segment.to_destination_name || 'Unknown';
+      const mode = segment.transport_mode || 'plane';
+      const distance = segment.distance_km ? `${Math.round(segment.distance_km)}km` : '';
+      const duration = segment.duration_hours || segment.researched_duration_hours;
+      const durationStr = duration ? `${duration}h` : '';
+      const airlines = segment.researched_airlines && segment.researched_airlines.length > 0
+        ? segment.researched_airlines.join(', ')
+        : '';
+      const statusBadge = this.getSegmentStatusBadge(segment);
+      const researchedDate = segment.researched_at
+        ? new Date(segment.researched_at).toLocaleDateString()
+        : '';
+      const alternatives = segment.alternatives || segment.researched_alternatives;
+      const hasAlternatives = alternatives && alternatives.length > 0;
+      const hasResearchData = segment.booking_status === 'researched' || segment.researched_cost_mid;
 
-            // Check if research is old (>30 days)
-            let researchAge = '';
-            if (segment.researched_at) {
-              const ageInDays = Math.floor((Date.now() - new Date(segment.researched_at).getTime()) / (1000 * 60 * 60 * 24));
-              if (ageInDays > 30) {
-                researchAge = `<span class="research-old" title="Research is ${ageInDays} days old">⚠️ Old</span>`;
-              } else if (ageInDays > 7) {
-                researchAge = `<span class="research-aging" title="Research is ${ageInDays} days old">⏰</span>`;
-              }
-            }
+      // Check if research is old (>30 days)
+      let researchAge = '';
+      if (segment.researched_at) {
+        const ageInDays = Math.floor((Date.now() - new Date(segment.researched_at).getTime()) / (1000 * 60 * 60 * 24));
+        if (ageInDays > 30) {
+          researchAge = `<span class="research-old" title="Research is ${ageInDays} days old">⚠️ Old</span>`;
+        } else if (ageInDays > 7) {
+          researchAge = `<span class="research-aging" title="Research is ${ageInDays} days old">⏰</span>`;
+        }
+      }
 
-            return `
+      return `
               <div class="transport-segment-item" data-segment-id="${segment.id}">
                 <div class="segment-header">
                   <div class="segment-route">
@@ -2150,7 +2213,8 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                 </div>
               </div>
             `;
-          }).join('')}
+    }).join('')}
+          </div>
         </div>
       </div>
     `;
@@ -2168,8 +2232,8 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     const percentageUsedWithTransport = (totalSpentWithTransport / status.total_budget) * 100;
 
     const progressBarClass = percentageUsedWithTransport > 100 ? 'over-budget' :
-                            percentageUsedWithTransport > 90 ? 'warning' :
-                            percentageUsedWithTransport > 80 ? 'caution' : '';
+      percentageUsedWithTransport > 90 ? 'warning' :
+        percentageUsedWithTransport > 80 ? 'caution' : '';
     const progressWidth = Math.min(percentageUsedWithTransport, 100);
 
     // Get all categories and countries from trip data
@@ -2194,6 +2258,14 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           <div class="header-row">
             <h3>💰 Budget Management</h3>
             <div class="header-actions">
+              <div class="global-controls">
+                <button class="global-control-btn" id="expand-all-sections-btn" title="Expand all sections">
+                  <span>📂</span> Expand All
+                </button>
+                <button class="global-control-btn" id="collapse-all-sections-btn" title="Collapse all sections" style="display: none;">
+                  <span>📁</span> Collapse All
+                </button>
+              </div>
               ${hasAnyCurrencies ? `
                 <button class="btn-secondary-sm" id="refresh-all-rates-btn" title="Refresh all exchange rates (${allCurrencies.join(', ')})">
                   🔄 Refresh All Rates
@@ -2237,14 +2309,30 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
         <!-- Alerts -->
         ${status.alerts.length > 0 ? `
-          <div class="budget-alerts">
-            <h4>🔔 Alerts</h4>
-            ${status.alerts.map(alert => `
-              <div class="budget-alert alert-${alert.type}">
-                <span class="alert-icon">${this.getAlertIcon(alert.type)}</span>
-                <span class="alert-message">${alert.message}</span>
+          <div class="budget-edit-section" data-section="alerts">
+            <div class="section-header section-header-collapsible" data-section="alerts">
+              <div class="section-header-left">
+                <h4>🔔 Alerts</h4>
+                <div class="section-summary-inline">
+                  <span class="alert-count-badge" style="background: #fff3cd; color: #856404; padding: 2px 8px; border-radius: 12px; font-size: 12px;">
+                    ${status.alerts.length} alert${status.alerts.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
               </div>
-            `).join('')}
+              <div class="section-header-right">
+                <span class="section-collapse-icon">${this.collapsedSections.has('alerts') ? '▶' : '▼'}</span>
+              </div>
+            </div>
+            <div class="section-content" data-section="alerts" style="display: ${this.collapsedSections.has('alerts') ? 'none' : 'block'}">
+              <div class="budget-alerts">
+                ${status.alerts.map(alert => `
+                  <div class="budget-alert alert-${alert.type}">
+                    <span class="alert-icon">${this.getAlertIcon(alert.type)}</span>
+                    <span class="alert-message">${alert.message}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
           </div>
         ` : ''}
 
@@ -2253,20 +2341,26 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
         <!-- Budget by Country -->
         ${countries.size > 0 ? `
-          <div class="budget-edit-section">
-            <div class="section-header">
-              <h4>🌍 Budget by Country</h4>
-              <div class="mode-controls">
-                <button class="btn-xs btn-secondary" id="show-all-costs-btn" title="Expand all cost sections">📂 Show All Costs</button>
-                <button class="btn-xs btn-secondary" id="hide-all-costs-btn" title="Collapse all cost sections" style="display: none;">📁 Hide All Costs</button>
-                <span class="mode-indicator" id="country-mode-indicator">Mode: Dollar Amounts</span>
-                <div class="country-mode-selector">
-                  <button class="mode-btn active" data-mode="dollars" id="country-mode-dollars">$</button>
-                  <button class="mode-btn" data-mode="percent" id="country-mode-percent">%</button>
-                  <button class="mode-btn" data-mode="perday" id="country-mode-perday">$/day</button>
+          <div class="budget-edit-section" data-section="countries">
+            <div class="section-header section-header-collapsible" data-section="countries">
+              <div class="section-header-left">
+                <h4>🌍 Budget by Country</h4>
+              </div>
+              <div class="section-header-right">
+                <div class="mode-controls">
+                  <button class="btn-xs btn-secondary" id="show-all-costs-btn" title="Expand all cost sections">📂 Show All Costs</button>
+                  <button class="btn-xs btn-secondary" id="hide-all-costs-btn" title="Collapse all cost sections" style="display: none;">📁 Hide All Costs</button>
+                  <span class="mode-indicator" id="country-mode-indicator">Mode: Dollar Amounts</span>
+                  <div class="country-mode-selector">
+                    <button class="mode-btn active" data-mode="dollars" id="country-mode-dollars">$</button>
+                    <button class="mode-btn" data-mode="percent" id="country-mode-percent">%</button>
+                    <button class="mode-btn" data-mode="perday" id="country-mode-perday">$/day</button>
+                  </div>
                 </div>
+                <span class="section-collapse-icon">${this.collapsedSections.has('countries') ? '▶' : '▼'}</span>
               </div>
             </div>
+            <div class="section-content" data-section="countries" style="display: ${this.collapsedSections.has('countries') ? 'none' : 'block'}">
 
             <!-- Group note for countries -->
             <div class="group-note-section">
@@ -2286,18 +2380,18 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
               <div class="summary-row">
                 <span class="summary-label">Allocated to Countries:</span>
                 <span class="summary-value" id="country-total-allocated">${this.formatCurrency(
-                  Array.from(countries).reduce((sum, country) => {
-                    return sum + (this.budget?.budgets_by_country?.[country] || 0);
-                  }, 0)
-                )}</span>
+      Array.from(countries).reduce((sum, country) => {
+        return sum + (this.budget?.budgets_by_country?.[country] || 0);
+      }, 0)
+    )}</span>
                 <span class="summary-percentage" id="country-total-pct">${currentBudget > 0 ?
-                  ((Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
+          ((Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">Unallocated:</span>
                 <span class="summary-value" id="country-unallocated">${this.formatCurrency(
-                  currentBudget - Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0)
-                )}</span>
+            currentBudget - Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0)
+          )}</span>
               </div>
             </div>
 
@@ -2310,69 +2404,69 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
             <div class="budget-items-edit">
               ${Array.from(countries).map(country => {
-                const countryDays = (this.tripData.locations || [])
-                  .filter(loc => loc.country === country)
-                  .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
+            const countryDays = (this.tripData.locations || [])
+              .filter(loc => loc.country === country)
+              .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
 
-                const countryCostsArray = (this.tripData.costs || [])
-                  .filter(c => {
-                    const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
-                    return location?.country === country;
-                  });
+            const countryCostsArray = (this.tripData.costs || [])
+              .filter(c => {
+                const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+                return location?.country === country;
+              });
 
-                // Get destinations for this country for the Generate Costs button
-                const countryDestinations = (this.tripData.locations || [])
-                  .filter(loc => loc.country === country);
+            // Get destinations for this country for the Generate Costs button
+            const countryDestinations = (this.tripData.locations || [])
+              .filter(loc => loc.country === country);
 
-                // Calculate date range for country
-                const countryDates = countryDestinations
-                  .filter(loc => loc.arrival_date || loc.departure_date)
-                  .map(loc => ({
-                    arrival: loc.arrival_date ? new Date(loc.arrival_date) : null,
-                    departure: loc.departure_date ? new Date(loc.departure_date) : null
-                  }))
-                  .filter(d => d.arrival || d.departure);
+            // Calculate date range for country
+            const countryDates = countryDestinations
+              .filter(loc => loc.arrival_date || loc.departure_date)
+              .map(loc => ({
+                arrival: loc.arrival_date ? new Date(loc.arrival_date) : null,
+                departure: loc.departure_date ? new Date(loc.departure_date) : null
+              }))
+              .filter(d => d.arrival || d.departure);
 
-                let countryDateRange = '';
-                if (countryDates.length > 0) {
-                  const validArrivals = countryDates.filter(d => d.arrival).map(d => d.arrival!);
-                  const validDepartures = countryDates.filter(d => d.departure).map(d => d.departure!);
+            let countryDateRange = '';
+            if (countryDates.length > 0) {
+              const validArrivals = countryDates.filter(d => d.arrival).map(d => d.arrival!);
+              const validDepartures = countryDates.filter(d => d.departure).map(d => d.departure!);
 
-                  if (validArrivals.length > 0 && validDepartures.length > 0) {
-                    const earliestArrival = new Date(Math.min(...validArrivals.map(d => d.getTime())));
-                    const latestDeparture = new Date(Math.max(...validDepartures.map(d => d.getTime())));
-                    countryDateRange = `${earliestArrival.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${latestDeparture.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-                  }
-                }
+              if (validArrivals.length > 0 && validDepartures.length > 0) {
+                const earliestArrival = new Date(Math.min(...validArrivals.map(d => d.getTime())));
+                const latestDeparture = new Date(Math.max(...validDepartures.map(d => d.getTime())));
+                countryDateRange = `${earliestArrival.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${latestDeparture.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+              }
+            }
 
-                const countryCosts = countryCostsArray.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
-                const categoryBreakdown = this.renderCategoryBreakdown(countryCostsArray);
+            const countryCosts = countryCostsArray.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+            const categoryBreakdown = this.renderCategoryBreakdown(countryCostsArray);
 
-                const countryBudget = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
-                const budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
-                const countryPct = currentBudget > 0 ? (countryBudget / currentBudget * 100) : 0;
-                const pct = status.by_country[country]?.percentage || 0;
-                const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
-                const countryNote = this.budget?.country_notes?.[country] || '';
+            const countryBudget = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
+            const budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
+            const countryPct = currentBudget > 0 ? (countryBudget / currentBudget * 100) : 0;
+            const pct = status.by_country[country]?.percentage || 0;
+            const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
+            const countryNote = this.budget?.country_notes?.[country] || '';
 
-                // Determine which button to show: Generate Costs or View Costs
-                const hasCosts = countryCostsArray.length > 0;
-                const destinationLabel = countryDestinations.length === 1
-                  ? '1 destination'
-                  : `${countryDestinations.length} destinations`;
+            // Determine which button to show: Generate Costs or View Costs
+            const hasCosts = countryCostsArray.length > 0;
+            const destinationLabel = countryDestinations.length === 1
+              ? '1 destination'
+              : `${countryDestinations.length} destinations`;
 
-                const costsButton = hasCosts
-                  ? `<button class="costs-toggle-btn" data-country="${country}" title="View Costs">
+            const costsButton = hasCosts
+              ? `<button class="costs-toggle-btn" data-country="${country}" title="View Costs">
                        💰 View Costs (${countryCostsArray.length})
                      </button>`
-                  : `<button class="generate-costs-btn inline-generate-btn"
+              : `<button class="generate-costs-btn inline-generate-btn"
                              data-country="${country}"
                              data-destinations="${countryDestinations.map(d => d.id).join(',')}"
                              title="Generate AI cost estimates">
                        🤖 Generate Costs (${destinationLabel})
                      </button>`;
 
-                return `
+            return `
                   <div class="budget-item-edit">
                     <div class="item-header-row">
                       <div class="item-label-with-note">
@@ -2425,24 +2519,31 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                     </div>
                   </div>
                 `;
-              }).join('')}
+          }).join('')}
+            </div>
             </div>
           </div>
         ` : ''}
 
         <!-- Budget by Category -->
-        <div class="budget-edit-section">
-          <div class="section-header">
-            <h4>📊 Budget by Category</h4>
-            <div class="mode-controls">
-              <span class="mode-indicator" id="category-mode-indicator">Mode: Dollar Amounts</span>
-              <label class="toggle-switch">
-                <input type="checkbox" id="category-mode-toggle">
-                <span class="toggle-slider"></span>
-                <span class="toggle-label">Use %</span>
-              </label>
+        <div class="budget-edit-section" data-section="categories">
+          <div class="section-header section-header-collapsible" data-section="categories">
+            <div class="section-header-left">
+              <h4>📊 Budget by Category</h4>
+            </div>
+            <div class="section-header-right">
+              <div class="mode-controls">
+                <span class="mode-indicator" id="category-mode-indicator">Mode: Dollar Amounts</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="category-mode-toggle">
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-label">Use %</span>
+                </label>
+              </div>
+              <span class="section-collapse-icon">${this.collapsedSections.has('categories') ? '▶' : '▼'}</span>
             </div>
           </div>
+          <div class="section-content" data-section="categories" style="display: ${this.collapsedSections.has('categories') ? 'none' : 'block'}">
 
           <!-- Group note for categories -->
           <div class="group-note-section">
@@ -2462,18 +2563,18 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <div class="summary-row">
               <span class="summary-label">Allocated to Categories:</span>
               <span class="summary-value" id="category-total-allocated">${this.formatCurrency(
-                Array.from(categories).reduce((sum, cat) => {
-                  return sum + (this.budget?.budgets_by_category?.[cat] || 0);
-                }, 0)
-              )}</span>
+            Array.from(categories).reduce((sum, cat) => {
+              return sum + (this.budget?.budgets_by_category?.[cat] || 0);
+            }, 0)
+          )}</span>
               <span class="summary-percentage" id="category-total-pct">${currentBudget > 0 ?
-                ((Array.from(categories).reduce((sum, cat) => sum + (this.budget?.budgets_by_category?.[cat] || 0), 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
+        ((Array.from(categories).reduce((sum, cat) => sum + (this.budget?.budgets_by_category?.[cat] || 0), 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
             </div>
             <div class="summary-row">
               <span class="summary-label">Unallocated:</span>
               <span class="summary-value" id="category-unallocated">${this.formatCurrency(
-                currentBudget - Array.from(categories).reduce((sum, cat) => sum + (this.budget?.budgets_by_category?.[cat] || 0), 0)
-              )}</span>
+          currentBudget - Array.from(categories).reduce((sum, cat) => sum + (this.budget?.budgets_by_category?.[cat] || 0), 0)
+        )}</span>
             </div>
           </div>
 
@@ -2486,16 +2587,16 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
           <div class="budget-items-edit">
             ${Array.from(categories).map(cat => {
-              const catCosts = (this.tripData.costs || [])
-                .filter(c => c.category === cat)
-                .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
-              const catBudget = this.budget?.budgets_by_category?.[cat] || catCosts * 1.1;
-              const catPct = currentBudget > 0 ? (catBudget / currentBudget * 100) : 0;
-              const pct = status.by_category[cat]?.percentage || 0;
-              const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
+          const catCosts = (this.tripData.costs || [])
+            .filter(c => c.category === cat)
+            .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+          const catBudget = this.budget?.budgets_by_category?.[cat] || catCosts * 1.1;
+          const catPct = currentBudget > 0 ? (catBudget / currentBudget * 100) : 0;
+          const pct = status.by_category[cat]?.percentage || 0;
+          const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
 
-              const catNote = this.budget?.category_notes?.[cat] || '';
-              return `
+          const catNote = this.budget?.category_notes?.[cat] || '';
+          return `
                 <div class="budget-item-edit">
                   <div class="item-header-row">
                     <div class="item-label-with-note">
@@ -2536,7 +2637,8 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                   </div>
                 </div>
               `;
-            }).join('')}
+        }).join('')}
+          </div>
           </div>
         </div>
       </div>
@@ -2544,6 +2646,98 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
   }
 
   private attachEventListeners() {
+    console.log('BudgetManager: Attaching event listeners (start)');
+
+    // Section collapse/expand functionality (Added at start to ensure it loads)
+    const collapsibleHeaders = this.container.querySelectorAll('.section-header-collapsible');
+    console.log(`BudgetManager: Found ${collapsibleHeaders.length} collapsible headers`);
+
+    collapsibleHeaders.forEach(header => {
+      header.addEventListener('click', (e) => {
+        console.log('BudgetManager: Header clicked', header);
+        const target = e.target as HTMLElement;
+        // Don't collapse if clicking on a button inside the header
+        if (target.closest('button')) {
+          console.log('BudgetManager: Clicked on button, ignoring collapse');
+          return;
+        }
+
+        const section = (header as HTMLElement).dataset.section;
+        console.log(`BudgetManager: Toggling section ${section}`);
+        if (!section) return;
+
+        // Toggle collapsed state
+        if (this.collapsedSections.has(section)) {
+          this.collapsedSections.delete(section);
+        } else {
+          this.collapsedSections.add(section);
+        }
+        this.saveCollapsedState();
+
+        // Find and toggle the content
+        const content = this.container.querySelector(`.section-content[data-section="${section}"]`) as HTMLElement;
+        const icon = header.querySelector('.section-collapse-icon');
+
+        if (content) {
+          const isCollapsed = this.collapsedSections.has(section);
+          content.style.display = isCollapsed ? 'none' : 'block';
+          if (icon) {
+            icon.textContent = isCollapsed ? '▶' : '▼';
+          }
+        } else {
+          console.warn(`BudgetManager: Content not found for section ${section}`);
+        }
+      });
+    });
+
+    // Global expand all sections button
+    const expandAllSectionsBtn = this.container.querySelector('#expand-all-sections-btn');
+    const collapseAllSectionsBtn = this.container.querySelector('#collapse-all-sections-btn');
+
+    console.log('BudgetManager: Global buttons found:', !!expandAllSectionsBtn, !!collapseAllSectionsBtn);
+
+    expandAllSectionsBtn?.addEventListener('click', () => {
+      console.log('BudgetManager: Expand all clicked');
+      // Clear all collapsed sections
+      this.collapsedSections.clear();
+      this.saveCollapsedState();
+
+      // Show all section contents
+      this.container.querySelectorAll('.section-content').forEach(content => {
+        (content as HTMLElement).style.display = 'block';
+      });
+
+      // Update all collapse icons
+      this.container.querySelectorAll('.section-collapse-icon').forEach(icon => {
+        icon.textContent = '▼';
+      });
+
+      // Toggle button visibility
+      if (expandAllSectionsBtn) (expandAllSectionsBtn as HTMLElement).style.display = 'none';
+      if (collapseAllSectionsBtn) (collapseAllSectionsBtn as HTMLElement).style.display = 'inline-block';
+    });
+
+    collapseAllSectionsBtn?.addEventListener('click', () => {
+      console.log('BudgetManager: Collapse all clicked');
+      // Add all sections to collapsed set
+      const sections = ['alerts', 'transport', 'countries', 'categories'];
+      sections.forEach(section => this.collapsedSections.add(section));
+      this.saveCollapsedState();
+
+      // Hide all section contents
+      this.container.querySelectorAll('.section-content').forEach(content => {
+        (content as HTMLElement).style.display = 'none';
+      });
+
+      // Update all collapse icons
+      this.container.querySelectorAll('.section-collapse-icon').forEach(icon => {
+        icon.textContent = '▶';
+      });
+
+      // Toggle button visibility
+      if (collapseAllSectionsBtn) (collapseAllSectionsBtn as HTMLElement).style.display = 'none';
+      if (expandAllSectionsBtn) (expandAllSectionsBtn as HTMLElement).style.display = 'inline-block';
+    });
     // Create budget button
     const createBtn = this.container.querySelector('#create-budget-btn');
     createBtn?.addEventListener('click', async () => {
@@ -2565,6 +2759,41 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     // Auto-save travelers on input change
     const adultsInput = this.container.querySelector('#adults-count') as HTMLInputElement;
     const childrenInput = this.container.querySelector('#children-count') as HTMLInputElement;
+
+    // Handle user selection
+    const userCheckboxes = this.container.querySelectorAll('.traveler-user-checkbox');
+    userCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', () => {
+        const selectedCheckboxes = Array.from(this.container.querySelectorAll('.traveler-user-checkbox:checked')) as HTMLInputElement[];
+        const selectedIds = selectedCheckboxes.map(cb => cb.dataset.userId!);
+
+        // Update tripData
+        this.tripData.traveler_ids = selectedIds;
+
+        // Sync num_travelers with selected users count if users are selected
+        if (selectedIds.length > 0) {
+          this.tripData.num_travelers = selectedIds.length;
+
+          // Also update adults count to match (assuming all selected users are adults for now)
+          // We keep children separate or as is
+          if (adultsInput) {
+            adultsInput.value = String(selectedIds.length);
+            // Update composition
+            if (this.tripData.traveler_composition) {
+              this.tripData.traveler_composition.adults = selectedIds.length;
+            }
+          }
+        }
+
+        // Update badge
+        const badge = this.container.querySelector('.traveler-count-badge');
+        if (badge) {
+          badge.textContent = `${this.tripData.num_travelers} total`;
+        }
+
+        this.scheduleTripDataAutoSave();
+      });
+    });
 
     const updateTravelerCount = () => {
       if (!adultsInput || !childrenInput) return;
@@ -3843,6 +4072,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
       });
     });
 
+
+
+
     // Setup show all costs button
     const showAllBtn = this.container.querySelector('#show-all-costs-btn');
     const hideAllBtn = this.container.querySelector('#hide-all-costs-btn');
@@ -4395,8 +4627,95 @@ export const budgetManagerStyles = `
   margin-bottom: 15px;
 }
 
+.section-header-collapsible {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+  padding: 12px;
+  margin-left: -12px;
+  margin-right: -12px;
+  border-radius: 6px;
+}
+
+.section-header-collapsible:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.section-header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+}
+
+.section-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-collapse-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 10px;
+  color: #666;
+  background: rgba(0,0,0,0.05);
+  transition: all 0.2s;
+  margin-left: 8px;
+}
+
+.section-header-collapsible:hover .section-collapse-icon {
+  background: rgba(0,0,0,0.1);
+  color: #333;
+}
+
+.section-content {
+  transition: all 0.3s ease-in-out;
+  overflow: hidden;
+}
+
 .section-header h4 {
   margin: 0;
+  white-space: nowrap;
+}
+
+.section-summary-inline {
+  color: #666;
+  font-size: 14px;
+  font-weight: normal;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.global-controls {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.global-control-btn {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.global-control-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+  border-color: #ccc;
 }
 
 .mode-controls {
@@ -4501,11 +4820,12 @@ export const budgetManagerStyles = `
 }
 
 .summary-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 160px 70px;
   align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid #f0f0f0;
+  gap: 10px;
 }
 
 .summary-row:last-child {
@@ -4519,18 +4839,21 @@ export const budgetManagerStyles = `
   font-size: 14px;
 }
 
+
+
 .summary-value {
   font-weight: 700;
   color: #333;
   font-size: 16px;
   transition: color 0.2s;
+  text-align: right;
 }
 
 .summary-percentage {
   font-weight: 600;
   font-size: 14px;
-  margin-left: 10px;
   transition: color 0.2s;
+  text-align: right;
 }
 
 .budget-items-edit {

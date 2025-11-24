@@ -210,6 +210,7 @@ export interface TripData {
     children: number;
     ages?: number[];
   };
+  traveler_ids?: string[]; // IDs of selected wellness users
   accommodation_preference?: 'budget' | 'mid-range' | 'higher-end' | 'luxurious';  // Accommodation preference for cost estimation
 }
 

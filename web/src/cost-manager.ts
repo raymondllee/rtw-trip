@@ -216,16 +216,16 @@ function initGenerateCostsTab() {
 
       <div style="border: 1px solid #e0e0e0; border-radius: 8px; background: white; max-height: 500px; overflow-y: auto;">
         ${locations.map((dest, idx) => {
-          const destCosts = costs.filter(c =>
-            c.destination_id === dest.id ||
-            c.destination_id === dest.destination_id
-          );
-          const hasCosts = destCosts.length > 0;
-          const statusClass = hasCosts ? 'has-costs' : 'no-costs';
-          const statusText = hasCosts ? `✓ Has ${destCosts.length} cost${destCosts.length !== 1 ? 's' : ''}` : '✗ No costs';
-          const duration = dest.duration_days || 1;
+    const destCosts = costs.filter(c =>
+      c.destination_id === dest.id ||
+      c.destination_id === dest.destination_id
+    );
+    const hasCosts = destCosts.length > 0;
+    const statusClass = hasCosts ? 'has-costs' : 'no-costs';
+    const statusText = hasCosts ? `✓ Has ${destCosts.length} cost${destCosts.length !== 1 ? 's' : ''}` : '✗ No costs';
+    const duration = dest.duration_days || 1;
 
-          return `
+    return `
             <div class="bulk-destination-item" data-destination-index="${idx}" style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s;">
               <input type="checkbox" class="bulk-destination-checkbox" data-destination-index="${idx}" style="margin-right: 12px;">
               <div class="bulk-destination-info" style="flex: 1;">
@@ -238,7 +238,7 @@ function initGenerateCostsTab() {
               </div>
             </div>
           `;
-        }).join('')}
+  }).join('')}
       </div>
 
       <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
@@ -343,6 +343,7 @@ function initBudgetTab() {
     budget: currentVersionData.itineraryData.budget || null,
     num_travelers: currentVersionData.itineraryData.num_travelers,
     traveler_composition: currentVersionData.itineraryData.traveler_composition,
+    traveler_ids: currentVersionData.itineraryData.traveler_ids,
     accommodation_preference: currentVersionData.itineraryData.accommodation_preference
   };
 
@@ -427,6 +428,7 @@ function initBudgetTab() {
         // Update currentVersionData
         currentVersionData.itineraryData.num_travelers = updatedTripData.num_travelers;
         currentVersionData.itineraryData.traveler_composition = updatedTripData.traveler_composition;
+        currentVersionData.itineraryData.traveler_ids = updatedTripData.traveler_ids;
         currentVersionData.itineraryData.accommodation_preference = updatedTripData.accommodation_preference;
 
         // Save to Firestore
@@ -434,6 +436,7 @@ function initBudgetTab() {
         await updateDoc(versionRef, {
           'itineraryData.num_travelers': updatedTripData.num_travelers,
           'itineraryData.traveler_composition': updatedTripData.traveler_composition,
+          'itineraryData.traveler_ids': updatedTripData.traveler_ids || [],
           'itineraryData.accommodation_preference': updatedTripData.accommodation_preference,
           updatedAt: Timestamp.now()
         });
