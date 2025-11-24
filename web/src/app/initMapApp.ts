@@ -4467,6 +4467,43 @@ export async function initMapApp() {
     });
   }
 
+  // View options dropdown toggle
+  const viewOptionsBtn = document.getElementById('view-options-btn');
+  const viewOptionsDropdown = document.getElementById('view-options-dropdown');
+
+  if (viewOptionsBtn && viewOptionsDropdown) {
+    viewOptionsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isVisible = viewOptionsDropdown.style.display !== 'none';
+
+      if (isVisible) {
+        viewOptionsDropdown.style.display = 'none';
+        viewOptionsBtn.classList.remove('active');
+      } else {
+        // Position the dropdown below the button using fixed positioning
+        const rect = viewOptionsBtn.getBoundingClientRect();
+        viewOptionsDropdown.style.top = (rect.bottom + 2) + 'px';
+        viewOptionsDropdown.style.left = rect.left + 'px';
+        viewOptionsDropdown.style.display = 'block';
+        viewOptionsBtn.classList.add('active');
+      }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!viewOptionsDropdown.contains(e.target) &&
+        !viewOptionsBtn.contains(e.target)) {
+        viewOptionsDropdown.style.display = 'none';
+        viewOptionsBtn.classList.remove('active');
+      }
+    });
+
+    // Prevent dropdown from closing when clicking inside it
+    viewOptionsDropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+  }
+
 
   // Dynamic Manage Scenarios modal (same pattern as Version History)
   window.showManageScenarios = async function () {

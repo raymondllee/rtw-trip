@@ -521,6 +521,9 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .scenario-name-compact {
@@ -532,6 +535,28 @@ body {
   text-overflow: ellipsis;
   min-width: 0;
   max-width: 200px;
+  flex-shrink: 1;
+}
+
+.filter-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.view-options-group {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.action-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .filter-select-compact {
@@ -598,6 +623,92 @@ body {
 .transport-toggle input:focus-visible {
   outline: 2px solid #1e88e5;
   outline-offset: 1px;
+}
+
+.view-options-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  color: #333;
+  cursor: pointer;
+  height: 28px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  user-select: none;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.view-options-btn:hover {
+  background: #f0f2f5;
+  border-color: #999;
+}
+
+.view-options-btn.active {
+  background: #e3f2fd;
+  border-color: #1e88e5;
+  color: #1e88e5;
+}
+
+.view-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.view-text {
+  line-height: 1;
+}
+
+.view-options-dropdown {
+  position: fixed;
+  margin-top: 2px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10000 !important;
+  min-width: 180px;
+  padding: 4px 0;
+}
+
+.view-options-dropdown[style*="display: block"] {
+  display: block !important;
+}
+
+.view-option-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  transition: background 0.2s;
+  user-select: none;
+  margin: 0;
+}
+
+.view-option-item:hover {
+  background: #f5f5f5;
+}
+
+.view-option-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.view-option-item span {
+  flex: 1;
+  line-height: 1.3;
 }
 
 .add-destination-bar-btn:hover {
@@ -3153,5 +3264,73 @@ textarea.form-input {
   .main-content.map-hidden .destination-list {
     grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
     gap: 20px;
+  }
+}
+
+/* Responsive Header Controls */
+@media (max-width: 1024px) {
+  .scenario-name-compact {
+    max-width: 150px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .app-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .controls {
+    gap: 8px;
+  }
+
+  .unified-filter-section {
+    gap: 6px;
+  }
+
+  .scenario-name-compact {
+    max-width: 120px;
+    font-size: 0.85rem;
+  }
+
+  .filter-select-compact {
+    font-size: 11px;
+    min-width: 70px;
+  }
+
+  .view-text {
+    display: none;
+  }
+
+  .action-buttons-group {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .scenario-name-compact {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .filter-controls-group {
+    flex: 1 1 auto;
+  }
+
+  .view-options-group {
+    order: 3;
+  }
+
+  .action-buttons-group {
+    order: 4;
+    flex: 1 1 100%;
+    justify-content: flex-end;
+    margin-left: 0;
   }
 }

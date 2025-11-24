@@ -17,39 +17,51 @@
       <!-- Unified Filter and Scenario Section (moved to header) -->
       <div class="unified-filter-section">
         <div id="scenario-name-display" class="scenario-name-compact">Unsaved Changes</div>
-        <select id="leg-filter" class="filter-select-compact">
-          <option value="all" selected>All Legs</option>
-        </select>
-        <select id="sub-leg-filter" class="filter-select-compact" style="display: none;">
-          <option value="">All Destinations</option>
-        </select>
-        <label class="transport-toggle" for="map-visibility-toggle">
-          <input type="checkbox" id="map-visibility-toggle" checked>
-          <span>Show Map</span>
-        </label>
-        <label class="transport-toggle" for="routing-toggle">
-          <input type="checkbox" id="routing-toggle">
-          <span>Show Transport Legs</span>
-        </label>
-        <label class="transport-toggle" for="costs-visibility-toggle">
-          <input type="checkbox" id="costs-visibility-toggle" checked>
-          <span>Show Costs</span>
-        </label>
-        <label class="transport-toggle" for="education-visibility-toggle">
-          <input type="checkbox" id="education-visibility-toggle">
-          <span>Show Education</span>
-        </label>
-        <label class="transport-toggle" for="country-view-toggle">
-          <input type="checkbox" id="country-view-toggle">
-          <span>Country View</span>
-        </label>
-        <label class="transport-toggle" for="compact-mode-toggle">
-          <input type="checkbox" id="compact-mode-toggle" checked>
-          <span>Compact View</span>
-        </label>
-        <button id="add-destination-bar-btn" class="add-destination-bar-btn" title="Add destination">+ Destination</button>
-        <button id="scenario-actions-btn" class="scenario-actions-btn-compact" title="Scenario actions">⋯</button>
-        <div class="save-indicator" id="save-indicator">✓</div>
+        <div class="filter-controls-group">
+          <select id="leg-filter" class="filter-select-compact">
+            <option value="all" selected>All Legs</option>
+          </select>
+          <select id="sub-leg-filter" class="filter-select-compact" style="display: none;">
+            <option value="">All Destinations</option>
+          </select>
+        </div>
+        <div class="view-options-group">
+          <button id="view-options-btn" class="view-options-btn" title="View options">
+            <span class="view-icon">👁</span>
+            <span class="view-text">View</span>
+          </button>
+          <div class="view-options-dropdown" id="view-options-dropdown" style="display: none;">
+            <label class="view-option-item">
+              <input type="checkbox" id="map-visibility-toggle" checked>
+              <span>Show Map</span>
+            </label>
+            <label class="view-option-item">
+              <input type="checkbox" id="routing-toggle">
+              <span>Show Transport Legs</span>
+            </label>
+            <label class="view-option-item">
+              <input type="checkbox" id="costs-visibility-toggle" checked>
+              <span>Show Costs</span>
+            </label>
+            <label class="view-option-item">
+              <input type="checkbox" id="education-visibility-toggle">
+              <span>Show Education</span>
+            </label>
+            <label class="view-option-item">
+              <input type="checkbox" id="country-view-toggle">
+              <span>Country View</span>
+            </label>
+            <label class="view-option-item">
+              <input type="checkbox" id="compact-mode-toggle" checked>
+              <span>Compact View</span>
+            </label>
+          </div>
+        </div>
+        <div class="action-buttons-group">
+          <button id="add-destination-bar-btn" class="add-destination-bar-btn" title="Add destination">+ Destination</button>
+          <button id="scenario-actions-btn" class="scenario-actions-btn-compact" title="Scenario actions">⋯</button>
+          <div class="save-indicator" id="save-indicator">✓</div>
+        </div>
       </div>
     </div>
   </header>
