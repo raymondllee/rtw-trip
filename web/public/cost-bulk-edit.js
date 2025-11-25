@@ -165,6 +165,7 @@ class CostBulkEdit {
         </div>
         <div class="bulk-edit-actions">
           <span class="selection-count">0 selected</span>
+          <button class="btn btn-sm btn-primary" id="export-csv-btn">📥 Export CSV</button>
           <button class="btn btn-sm btn-danger" id="delete-selected-btn" disabled>Delete Selected</button>
         </div>
       </div>
@@ -526,6 +527,15 @@ class CostBulkEdit {
       });
     }
 
+    // Export CSV button
+    const exportCsvBtn = container.querySelector('#export-csv-btn');
+    if (exportCsvBtn && exportCsvBtn.dataset.bound !== 'true') {
+      exportCsvBtn.dataset.bound = 'true';
+      exportCsvBtn.addEventListener('click', () => {
+        this.exportToCSV();
+      });
+    }
+
     // Filters
     container.querySelectorAll('.bulk-filter').forEach(filter => {
       if (filter.dataset.bound === 'true') return;
@@ -827,6 +837,123 @@ class CostBulkEdit {
     }
 
     return result;
+  }
+
+  /**
+   * Export currently displayed costs to CSV
+   */
+  exportToCSV() {
+    // Get currently filtered costs
+    const categoryFilter = document.getElementById('filter-category')?.value || 'all';
+    const statusFilter = document.getElementById('filter-status')?.value || 'all';
+    const regionFilter = document.getElementById('filter-region')?.value || 'all';
+    const countryFilter = document.getElementById('filter-country')?.value || 'all';
+    const destinationFilter = document.getElementById('filter-destination')?.value || 'all';
+
+    const filteredCosts = this.costs.filter(cost => {
+      if (categoryFilter !== 'all' && cost.category !== categoryFilter) return false;
+      if (statusFilter !== 'all' && (cost.booking_status || cost.bookingStatus) !== statusFilter) return false;
+      if (regionFilter !== 'all') {
+        const normalizedRegion = this.normalizeFilterValue(this.getDestinationRegion(cost.destination_id));
+        if (normalizedRegion !== regionFilter) return false;
+      }
+      if (countryFilter !== 'all') {
+        const normalizedCountry = this.normalizeFilterValue(this.getDestinationCountry(cost.destination_id));
+        if (normalizedCountry !== countryFilter) return false;
+      }
+      const costDestinationId = cost.destination_id != null ? String(cost.destination_id) : '';
+      if (destinationFilter === '__none__') {
+        if (costDestinationId) return false;
+      } else if (destinationFilter !== 'all' && costDestinationId !== destinationFilter) {
+        return false;
+      }
+      return true;
+    });
+
+    // Apply sorting if active
+    let sortedCosts = [...filteredCosts];
+    if (this.sortColumn) {
+      sortedCosts = this.sortCosts(sortedCosts, this.sortColumn, this.sortDirection);
+    }
+
+    // Define CSV headers
+    const headers = [
+      'Region',
+      'Country',
+      'Destination',
+      'Category',
+      'Description',
+      'Amount (USD)',
+      'Currency',
+      'Date',
+      'Status',
+      'Notes'
+    ];
+
+    // Convert costs to CSV rows
+    const rows = sortedCosts.map(cost => {
+      const region = this.getDestinationRegion(cost.destination_id);
+      const country = this.getDestinationCountry(cost.destination_id);
+      const destination = this.getDestinationName(cost.destination_id);
+      const category = cost.category || '';
+      const description = cost.description || '';
+      const amount = cost.amount_usd || cost.amount || 0;
+      const currency = 'USD';
+      const date = cost.date || '';
+      const status = cost.booking_status || cost.bookingStatus || 'estimated';
+      const notes = cost.notes || '';
+
+      return [
+        region,
+        country,
+        destination,
+        category,
+        description,
+        amount,
+        currency,
+        date,
+        status,
+        notes
+      ];
+    });
+
+    // Build CSV content
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => this.escapeCSVCell(cell)).join(','))
+    ].join('\n');
+
+    // Create blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `costs-export-${timestamp}.csv`;
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    console.log(`✅ Exported ${sortedCosts.length} costs to ${filename}`);
+  }
+
+  /**
+   * Escape CSV cell content to handle commas, quotes, and newlines
+   */
+  escapeCSVCell(cell) {
+    const cellStr = String(cell);
+
+    // If cell contains comma, quote, or newline, wrap in quotes and escape internal quotes
+    if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+      return `"${cellStr.replace(/"/g, '""')}"`;
+    }
+
+    return cellStr;
   }
 
   // ============================================================================
