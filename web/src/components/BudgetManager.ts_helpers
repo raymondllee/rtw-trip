@@ -1,0 +1,263 @@
+  /**
+   * Get current budget data for countries
+   * Scrapes from DOM if available for real-time updates, otherwise calculates from data
+   */
+  private getCountryBudgetData(): Array<{ 
+    country: string, 
+    amount: number, 
+    percent: number, 
+    perDay: number,
+    budgetAmount: number,
+    budgetPerDay: number,
+    actualSpent: number,
+    days: number
+  }> {
+    const data: Array<{ 
+      country: string, 
+      amount: number, 
+      percent: number, 
+      perDay: number,
+      budgetAmount: number,
+      budgetPerDay: number,
+      actualSpent: number,
+      days: number
+    }> = [];
+    const totalBudgetInput = this.container.querySelector('#total-budget') as HTMLInputElement;
+    const totalBudget = totalBudgetInput ? (parseFloat(totalBudgetInput.value) || 0) : (this.budget?.total_budget_usd || 0);
+
+    // Try to get data from inputs first (for real-time updates while editing)
+    const inputs = this.container.querySelectorAll('.country-input');
+    if (inputs.length > 0) {
+      inputs.forEach(input => {
+        const el = input as HTMLInputElement;
+        const country = el.dataset.country!;
+        const days = parseFloat(el.dataset.days!) || 1;
+        const dollarValue = parseFloat(el.dataset.dollarValue!) || 0;
+        
+        // Get actual spending for this country
+        const countryCosts = (this.tripData.costs || [])
+          .filter(c => {
+            const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+            return location?.country === country;
+          })
+          .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+        
+        data.push({
+          country,
+          amount: dollarValue,
+          percent: totalBudget > 0 ? (dollarValue / totalBudget * 100) : 0,
+          perDay: days > 0 ? Math.round(dollarValue / days) : 0,
+          budgetAmount: dollarValue,
+          budgetPerDay: days > 0 ? Math.round(dollarValue / days) : 0,
+          actualSpent: countryCosts,
+          days: days
+        });
+      });
+    } else {
+      // Fallback to stored data
+      const countries = new Set<string>();
+      (this.tripData.locations || []).forEach(loc => {
+        if (loc.country) countries.add(loc.country);
+      });
+
+      countries.forEach(country => {
+        const countryCosts = (this.tripData.costs || [])
+          .filter(c => {
+            const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+            return location?.country === country;
+          })
+          .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+
+        const countryDays = (this.tripData.locations || [])
+          .filter(loc => loc.country === country)
+          .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
+
+        const amount = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
+        
+        data.push({
+          country,
+          amount,
+          percent: totalBudget > 0 ? (amount / totalBudget * 100) : 0,
+          perDay: countryDays > 0 ? Math.round(amount / countryDays) : 0,
+          budgetAmount: amount,
+          budgetPerDay: countryDays > 0 ? Math.round(amount / countryDays) : 0,
+          actualSpent: countryCosts,
+          days: countryDays
+        });
+      });
+    }
+
+    // Sort based on mode
+    if (this.countryMode === 'dollars') {
+      return data.sort((a, b) => b.amount - a.amount); // Highest first for dollars
+    } else if (this.countryMode === 'perday') {
+      return data.sort((a, b) => b.perDay - a.perDay); // Highest first for per day
+    } else {
+      return data.sort((a, b) => b.percent - a.percent); // Highest first for percent
+    }
+  }
+
+  /**
+   * Render visuals for country budget
+   */
+  private renderCountryVisuals(): string {
+    const data = this.getCountryBudgetData();
+    if (data.length === 0) return '';
+
+    // Reverse for bar chart so highest is at top (if we want that) 
+    // OR keep as is. The requirement says "ranked by $ total from least (bottom) to highest (top)"
+    // So for bar chart we want ascending order if we render from top to bottom?
+    // Actually, usually charts show highest at top. 
+    // "ranked by $ total from least (bottom) to highest (top)" implies a vertical bar chart or a list where bottom item is least.
+    // Let's assume a horizontal bar chart list where the top item is the highest value (standard ranking).
+    // Wait, "least (bottom) to highest (top)" means the list should be sorted Ascending? 
+    // If I render a list:
+    // 1. Highest
+    // 2. ...
+    // 3. Lowest
+    // That is "highest (top) to least (bottom)".
+    // The user asked for "least (bottom) to highest (top)". 
+    // So:
+    // 1. Highest
+    // ...
+    // N. Lowest
+    // This satisfies "highest (top)". 
+    // Let's stick to standard ranking: Highest at the top.
+
+    if (this.countryMode === 'percent') {
+      // Pie Chart
+      // Simple SVG Pie Chart
+      let cumulativePercent = 0;
+      const radius = 50;
+      const center = 50;
+      
+      // Calculate coordinates for pie slices
+      const slices = data.map((d, i) => {
+        const startAngle = (cumulativePercent / 100) * Math.PI * 2;
+        cumulativePercent += d.percent;
+        const endAngle = (cumulativePercent / 100) * Math.PI * 2;
+        
+        const x1 = center + radius * Math.sin(startAngle);
+        const y1 = center - radius * Math.cos(startAngle);
+        const x2 = center + radius * Math.sin(endAngle);
+        const y2 = center - radius * Math.cos(endAngle);
+        
+        // Large arc flag
+        const largeArc = d.percent > 50 ? 1 : 0;
+        
+        // Colors (cycling through a palette)
+        const colors = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#17a2b8', '#6610f2', '#fd7e14', '#20c997', '#e83e8c', '#6f42c1'];
+        const color = colors[i % colors.length];
+        
+        // Path command
+        const dPath = `M ${center} ${center} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+        
+        return `<path d="${dPath}" fill="${color}" stroke="white" stroke-width="1" title="${d.country}: ${d.percent.toFixed(1)}%"></path>`;
+      }).join('');
+
+      // Legend
+      const legend = data.map((d, i) => {
+        const colors = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#17a2b8', '#6610f2', '#fd7e14', '#20c997', '#e83e8c', '#6f42c1'];
+        const color = colors[i % colors.length];
+        return `
+          <div class="chart-legend-item">
+            <span class="legend-color" style="background-color: ${color}"></span>
+            <span class="legend-label">${d.country}</span>
+            <span class="legend-value">${d.percent.toFixed(1)}%</span>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="country-visual-chart pie-chart-container">
+          <svg viewBox="0 0 100 100" class="pie-chart-svg">
+            ${slices}
+          </svg>
+          <div class="chart-legend">
+            ${legend}
+          </div>
+        </div>
+      `;
+    } else {
+      // Bar Chart (Compact) for Dollars or Per Day
+      // "ranked by $ total from least (bottom) to highest (top)"
+      // So we want the list to be:
+      // Highest
+      // ...
+      // Lowest
+      // Wait, "least (bottom) to highest (top)" usually describes a Y-axis chart. 
+      // But for a list of bars, usually you want the biggest one first (top).
+      // If I sort Ascending, the top item is the smallest.
+      // If I sort Descending, the top item is the largest.
+      // "least (bottom) to highest (top)" -> Top = Highest. So Descending sort.
+      
+      // For $ mode, compare budget vs spent
+      // For $/day mode, compare budget per day vs actual spent per day
+      const maxVal = Math.max(...data.map(d => {
+        const budgetVal = this.countryMode === 'perday' ? d.budgetPerDay : d.budgetAmount;
+        const actualVal = this.countryMode === 'perday' ? (d.days > 0 ? d.actualSpent / d.days : 0) : d.actualSpent;
+        return Math.max(budgetVal, actualVal);
+      }));
+      
+      const bars = data.map(d => {
+        const budgetVal = this.countryMode === 'perday' ? d.budgetPerDay : d.budgetAmount;
+        const actualVal = this.countryMode === 'perday' ? (d.days > 0 ? Math.round(d.actualSpent / d.days) : 0) : d.actualSpent;
+        
+        const budgetWidthPct = maxVal > 0 ? (budgetVal / maxVal * 100) : 0;
+        const actualWidthPct = maxVal > 0 ? (actualVal / maxVal * 100) : 0;
+        
+        const budgetLabel = this.countryMode === 'perday' ? `$${budgetVal}/day` : this.formatCurrency(budgetVal);
+        const actualLabel = this.countryMode === 'perday' ? `$${actualVal}/day` : this.formatCurrency(actualVal);
+        
+        // Determine if over budget
+        const isOverBudget = actualVal > budgetVal;
+        const barColor = isOverBudget ? '#dc3545' : '#007bff';
+        
+        return `
+          <div class="chart-bar-row">
+            <div class="bar-label">${d.country}</div>
+            <div class="bar-container">
+              <div class="bar-fill-budget" style="width: ${budgetWidthPct}%"></div>
+              <div class="bar-fill-actual" style="width: ${actualWidthPct}%; background-color: ${barColor}"></div>
+            </div>
+            <div class="bar-value">${actualLabel}</div>
+          </div>
+        `;
+      }).join('');
+
+      // Legend for bar chart
+      const legend = `
+        <div class="chart-legend bar-chart-legend">
+          <div class="chart-legend-item">
+            <span class="legend-color" style="background-color: rgba(0, 123, 255, 0.2); border: 1px solid rgba(0, 123, 255, 0.4);"></span>
+            <span class="legend-label">Budget Allocated</span>
+          </div>
+          <div class="chart-legend-item">
+            <span class="legend-color" style="background-color: #007bff;"></span>
+            <span class="legend-label">Estimated Costs (Under Budget)</span>
+          </div>
+          <div class="chart-legend-item">
+            <span class="legend-color" style="background-color: #dc3545;"></span>
+            <span class="legend-label">Estimated Costs (Over Budget)</span>
+          </div>
+        </div>
+      `;
+
+      return `
+        <div class="country-visual-chart bar-chart-container">
+          ${legend}
+          ${bars}
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Update the country visuals in the DOM
+   */
+  private updateCountryVisualsDOM() {
+    const container = this.container.querySelector('#country-visuals-container');
+    if (container) {
+      container.innerHTML = this.renderCountryVisuals();
+    }
+  }

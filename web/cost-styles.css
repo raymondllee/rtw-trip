@@ -866,6 +866,43 @@
   font-size: 10px;
 }
 
+/* Bar Value Columns */
+.chart-bar-headers {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.bar-value-columns {
+  display: flex;
+  gap: 16px;
+}
+
+.bar-value-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 80px;
+}
+
+.bar-value-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.bar-value-amount {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
 /* Budget Status */
 .budget-status {
   display: flex;
@@ -943,8 +980,13 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* ============================================================================
@@ -1544,9 +1586,12 @@ textarea.inline-edit.auto-resize {
 }
 
 @keyframes pulse-warning {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
   }
+
   50% {
     box-shadow: 0 0 0 8px rgba(255, 193, 7, 0);
   }

@@ -26,6 +26,7 @@ export class BudgetManager {
   private transportSegments: any[] = [];
   private collapsedSections: Set<string>; // Track collapsed sections
   private availableUsers: WellnessUserData[] = []; // Available wellness users
+  private countryMode: 'dollars' | 'percent' | 'perday' = 'dollars';
 
   constructor(
     container: HTMLElement,
@@ -1114,6 +1115,7 @@ export class BudgetManager {
 
     for (let i = 0; i < destinations.length; i++) {
       const dest = destinations[i];
+      if (!dest) continue;
       const localCurrency = getCurrencyForDestination(dest.id, this.tripData.locations || []);
 
       // Build destination name
@@ -1432,18 +1434,17 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
   }
 
   private getCurrenciesForCountry(country: string): string[] {
-    const countryCosts = (this.tripData.costs || [])
+    const currencies = new Set<string>();
+    (this.tripData.costs || [])
       .filter(c => {
         const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
         return location?.country === country;
+      })
+      .forEach(cost => {
+        if (cost.currency && cost.currency !== 'USD') {
+          currencies.add(cost.currency);
+        }
       });
-
-    const currencies = new Set<string>();
-    countryCosts.forEach(cost => {
-      if (cost.currency && cost.currency !== 'USD') {
-        currencies.add(cost.currency);
-      }
-    });
 
     return Array.from(currencies);
   }
@@ -1954,6 +1955,358 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     `;
   }
 
+  /**
+   * Get the total budget amount
+   */
+  private getTotalBudget(): number {
+    const totalBudgetInput = this.container.querySelector('#total-budget') as HTMLInputElement;
+    return totalBudgetInput ? (parseFloat(totalBudgetInput.value) || 0) : (this.budget?.total_budget_usd || 0);
+  }
+
+  /**
+   * Get current budget data for countries
+   * Scrapes from DOM if available for real-time updates, otherwise calculates from data
+   */
+  private getCountryBudgetData(): Array<{
+    country: string,
+    amount: number,
+    percent: number,
+    perDay: number,
+    budgetAmount: number,
+    budgetPerDay: number,
+    actualSpent: number,
+    days: number
+  }> {
+    const data: Array<{
+      country: string,
+      amount: number,
+      percent: number,
+      perDay: number,
+      budgetAmount: number,
+      budgetPerDay: number,
+      actualSpent: number,
+      days: number
+    }> = [];
+    const totalBudgetInput = this.container.querySelector('#total-budget') as HTMLInputElement;
+    const totalBudget = totalBudgetInput ? (parseFloat(totalBudgetInput.value) || 0) : (this.budget?.total_budget_usd || 0);
+
+    // Try to get data from inputs first (for real-time updates while editing)
+    const inputs = this.container.querySelectorAll('.country-input');
+    if (inputs.length > 0) {
+      inputs.forEach(input => {
+        const el = input as HTMLInputElement;
+        const country = el.dataset.country!;
+        const days = parseFloat(el.dataset.days!) || 1;
+        const dollarValue = parseFloat(el.dataset.dollarValue!) || 0;
+
+        // Get actual spending for this country
+        const countryCosts = (this.tripData.costs || [])
+          .filter(c => {
+            const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+            return location?.country === country;
+          })
+          .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+
+        data.push({
+          country,
+          amount: dollarValue,
+          percent: totalBudget > 0 ? (dollarValue / totalBudget * 100) : 0,
+          perDay: days > 0 ? Math.round(dollarValue / days) : 0,
+          budgetAmount: dollarValue,
+          budgetPerDay: days > 0 ? Math.round(dollarValue / days) : 0,
+          actualSpent: countryCosts,
+          days: days
+        });
+      });
+    } else {
+      // Fallback to stored data
+      const countries = new Set<string>();
+      (this.tripData.locations || []).forEach(loc => {
+        if (loc.country) countries.add(loc.country);
+      });
+
+      countries.forEach(country => {
+        const countryCosts = (this.tripData.costs || [])
+          .filter(c => {
+            const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+            return location?.country === country;
+          })
+          .reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+
+        const countryDays = (this.tripData.locations || [])
+          .filter(loc => loc.country === country)
+          .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
+
+        const amount = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
+
+        data.push({
+          country,
+          amount,
+          percent: totalBudget > 0 ? (amount / totalBudget * 100) : 0,
+          perDay: countryDays > 0 ? Math.round(amount / countryDays) : 0,
+          budgetAmount: amount,
+          budgetPerDay: countryDays > 0 ? Math.round(amount / countryDays) : 0,
+          actualSpent: countryCosts,
+          days: countryDays
+        });
+      });
+    }
+
+    // Sort based on mode
+    if (this.countryMode === 'dollars') {
+      return data.sort((a, b) => b.amount - a.amount); // Highest first for dollars
+    } else if (this.countryMode === 'perday') {
+      return data.sort((a, b) => b.perDay - a.perDay); // Highest first for per day
+    } else {
+      return data.sort((a, b) => b.percent - a.percent); // Highest first for percent
+    }
+  }
+
+  /**
+   * Render visuals for country budget
+   */
+  private renderCountryVisuals(): string {
+    const data = this.getCountryBudgetData();
+    if (data.length === 0) return '';
+
+    if (this.countryMode === 'percent') {
+      // Bar Chart for Percentages
+      const maxPercent = Math.max(...data.map(d => {
+        const budgetPercent = d.percent;
+        const estimatedPercent = d.actualSpent > 0 ? (d.actualSpent / this.getTotalBudget()) * 100 : 0;
+        return Math.max(budgetPercent, estimatedPercent);
+      }));
+
+      // Column headers (shown once at the top)
+      const headers = `
+        <div class="chart-bar-headers">
+          <div class="bar-label"></div>
+          <div class="bar-container"></div>
+          <div class="bar-value">
+            <div class="bar-value-columns">
+              <div class="bar-value-column">
+                <div class="bar-value-header">Est</div>
+              </div>
+              <div class="bar-value-column">
+                <div class="bar-value-header">Budget</div>
+              </div>
+              <div class="bar-value-column">
+                <div class="bar-value-header">Over/Under</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const bars = data.map(d => {
+        const budgetPercent = d.percent;
+        const estimatedPercent = d.actualSpent > 0 ? (d.actualSpent / this.getTotalBudget()) * 100 : 0;
+        const variance = estimatedPercent - budgetPercent;
+
+        const budgetWidthPct = maxPercent > 0 ? (budgetPercent / maxPercent * 100) : 0;
+        const actualWidthPct = maxPercent > 0 ? (estimatedPercent / maxPercent * 100) : 0;
+
+        // Determine color based on over/under
+        const isOverBudget = estimatedPercent > budgetPercent;
+        const barColor = isOverBudget ? '#dc3545' : '#007bff';
+        const varianceColor = isOverBudget ? '#dc3545' : '#28a745';
+        const varianceSign = variance > 0 ? '+' : '';
+
+        return `
+          <div class="chart-bar-row visual-chart-item" data-country="${d.country}" style="cursor: pointer;">
+            <div class="bar-label">${d.country}</div>
+            <div class="bar-container">
+              <div class="bar-fill-budget" style="width: ${budgetWidthPct}%"></div>
+              <div class="bar-fill-actual" style="width: ${actualWidthPct}%; background-color: ${barColor}"></div>
+            </div>
+            <div class="bar-value">
+              <div class="bar-value-columns">
+                <div class="bar-value-column">
+                  <div class="bar-value-amount">${estimatedPercent.toFixed(1)}%</div>
+                </div>
+                <div class="bar-value-column">
+                  <div class="bar-value-amount">${budgetPercent.toFixed(1)}%</div>
+                </div>
+                <div class="bar-value-column">
+                  <div class="bar-value-amount" style="color: ${varianceColor}">${varianceSign}${Math.abs(variance).toFixed(1)}%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Legend for bar chart
+      const legend = `
+        <div class="chart-legend bar-chart-legend">
+          <div class="chart-legend-item">
+            <span class="legend-color" style="background-color: rgba(0, 123, 255, 0.2); border: 1px solid rgba(0, 123, 255, 0.4);"></span>
+            <span class="legend-label">Budget Allocated</span>
+          </div>
+          <div class="chart-legend-item">
+            <span class="legend-color" style="background-color: #007bff;"></span>
+            <span class="legend-label">Estimated Costs (Under Budget)</span>
+          </div>
+          <div class="chart-legend-item">
+            <span class="legend-color" style="background-color: #dc3545;"></span>
+            <span class="legend-label">Estimated Costs (Over Budget)</span>
+          </div>
+        </div>
+      `;
+
+      return `
+        <div class="country-visual-chart bar-chart-container">
+          ${legend}
+          ${headers}
+          ${bars}
+        </div>
+      `;
+    } else {
+      // Bar Chart (Compact) for Dollars or Per Day
+      // For $ mode, compare budget vs spent
+      // For $/day mode, compare budget per day vs actual spent per day
+      const maxVal = Math.max(...data.map(d => {
+        const budgetVal = this.countryMode === 'perday' ? d.budgetPerDay : d.budgetAmount;
+        const actualVal = this.countryMode === 'perday' ? (d.days > 0 ? d.actualSpent / d.days : 0) : d.actualSpent;
+        return Math.max(budgetVal, actualVal);
+      }));
+
+      // Column headers (shown once at the top)
+      const headers = `
+        <div class="chart-bar-headers">
+          <div class="bar-label"></div>
+          <div class="bar-container"></div>
+          <div class="bar-value">
+            <div class="bar-value-columns">
+              <div class="bar-value-column">
+                <div class="bar-value-header">Est</div>
+              </div>
+              <div class="bar-value-column">
+                <div class="bar-value-header">Budget</div>
+              </div>
+              <div class="bar-value-column">
+                <div class="bar-value-header">Over/Under</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const bars = data.map(d => {
+        const budgetVal = this.countryMode === 'perday' ? d.budgetPerDay : d.budgetAmount;
+        const actualVal = this.countryMode === 'perday' ? (d.days > 0 ? Math.round(d.actualSpent / d.days) : 0) : d.actualSpent;
+        const variance = actualVal - budgetVal;
+
+        const budgetWidthPct = maxVal > 0 ? (budgetVal / maxVal * 100) : 0;
+        const actualWidthPct = maxVal > 0 ? (actualVal / maxVal * 100) : 0;
+
+        const budgetLabel = this.countryMode === 'perday' ? `$${budgetVal}` : this.formatCurrency(budgetVal);
+        const actualLabel = this.countryMode === 'perday' ? `$${actualVal}` : this.formatCurrency(actualVal);
+        const varianceLabel = this.countryMode === 'perday' ? `$${Math.abs(variance)}` : this.formatCurrency(Math.abs(variance));
+
+        // Determine if over budget
+        const isOverBudget = actualVal > budgetVal;
+        const barColor = isOverBudget ? '#dc3545' : '#007bff';
+        const varianceColor = isOverBudget ? '#dc3545' : '#28a745';
+        const varianceSign = variance > 0 ? '+' : '';
+
+        return `
+          <div class="chart-bar-row visual-chart-item" data-country="${d.country}" style="cursor: pointer;">
+            <div class="bar-label">${d.country}</div>
+            <div class="bar-container">
+              <div class="bar-fill-budget" style="width: ${budgetWidthPct}%"></div>
+              <div class="bar-fill-actual" style="width: ${actualWidthPct}%; background-color: ${barColor}"></div>
+            </div>
+            <div class="bar-value">
+              <div class="bar-value-columns">
+                <div class="bar-value-column">
+                  <div class="bar-value-amount">${actualLabel}</div>
+                </div>
+                <div class="bar-value-column">
+                  <div class="bar-value-amount">${budgetLabel}</div>
+                </div>
+                <div class="bar-value-column">
+                  <div class="bar-value-amount" style="color: ${varianceColor}">${varianceSign}${varianceLabel}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Legend for bar chart
+      const legend = `
+        <div class="chart-legend bar-chart-legend">
+          <div class="chart-legend-item">
+            <span class="legend-color" style="background-color: rgba(0, 123, 255, 0.2); border: 1px solid rgba(0, 123, 255, 0.4);"></span>
+            <span class="legend-label">Budget Allocated</span>
+          </div>
+          <div class="chart-legend-item">
+            <span class="legend-color" style="background-color: #007bff;"></span>
+            <span class="legend-label">Estimated Costs (Under Budget)</span>
+          </div>
+          <div class="chart-legend-item">
+            <span class="legend-color" style="background-color: #dc3545;"></span>
+            <span class="legend-label">Estimated Costs (Over Budget)</span>
+          </div>
+        </div>
+      `;
+
+      return `
+        <div class="country-visual-chart bar-chart-container">
+          ${legend}
+          ${headers}
+          ${bars}
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Update the country visuals in the DOM
+   */
+  private updateCountryVisualsDOM() {
+    const container = this.container.querySelector('#country-visuals-container');
+    if (container) {
+      container.innerHTML = this.renderCountryVisuals();
+
+      // Attach click listeners to new visual elements
+      container.querySelectorAll('.visual-chart-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const country = (item as HTMLElement).dataset.country;
+          if (country) {
+            // Find the country section
+            const section = this.container.querySelector(`.item-costs-section[data-country="${country}"]`) as HTMLElement;
+            if (section) {
+              // Ensure it's visible
+              section.style.display = 'block';
+
+              // Update toggle button text
+              const toggleBtn = this.container.querySelector(`.costs-toggle-btn[data-country="${country}"]`) as HTMLElement;
+              if (toggleBtn) {
+                const countryCurrentCosts = (this.tripData.costs || []).filter(c => {
+                  const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+                  return location?.country === country;
+                });
+                toggleBtn.innerHTML = `💰 ▼ Hide Costs (${countryCurrentCosts.length})`;
+              }
+
+              // Scroll to it
+              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+              // Highlight it briefly
+              section.style.transition = 'background-color 0.5s';
+              section.style.backgroundColor = '#fff3cd';
+              setTimeout(() => {
+                section.style.backgroundColor = '#f8f9fa';
+              }, 1000);
+            }
+          }
+        });
+      });
+    }
+  }
+
   private renderCategoryBreakdown(costs: Array<{ category?: string, amount?: number, amount_usd?: number }>): string {
     const categoryTotals: Record<string, number> = {};
     let total = 0;
@@ -2353,14 +2706,19 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                   <span class="mode-indicator" id="country-mode-indicator">Mode: Dollar Amounts</span>
                   <div class="country-mode-selector">
                     <button class="mode-btn active" data-mode="dollars" id="country-mode-dollars">$</button>
-                    <button class="mode-btn" data-mode="percent" id="country-mode-percent">%</button>
                     <button class="mode-btn" data-mode="perday" id="country-mode-perday">$/day</button>
+                    <button class="mode-btn" data-mode="percent" id="country-mode-percent">%</button>
                   </div>
                 </div>
                 <span class="section-collapse-icon">${this.collapsedSections.has('countries') ? '▶' : '▼'}</span>
               </div>
             </div>
             <div class="section-content" data-section="countries" style="display: ${this.collapsedSections.has('countries') ? 'none' : 'block'}">
+
+            <!-- Country Visuals -->
+            <div id="country-visuals-container" class="country-visuals-section">
+              ${this.renderCountryVisuals()}
+            </div>
 
             <!-- Group note for countries -->
             <div class="group-note-section">
@@ -3161,6 +3519,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
       btn.addEventListener('click', () => {
         const newMode = (btn as HTMLElement).dataset.mode as 'dollars' | 'percent' | 'perday';
         countryMode = newMode;
+        this.countryMode = newMode; // Update class property for visuals
         const totalBudget = parseFloat(totalBudgetInput.value) || 0;
 
         // Update button states
@@ -3201,6 +3560,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         });
 
         updateCountryCalculatedDisplays();
+        this.updateCountryVisualsDOM(); // Update visuals when mode changes
       });
     });
 
@@ -3771,9 +4131,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
         const destinations = destinationIds
           .map(id => (this.tripData.locations || []).find(loc => String(loc.id) === id))
-          .filter(d => d);
+          .filter(d => !!d);
 
-        const destNames = destinations.map(d => d.name || d.city).join(', ');
+        const destNames = destinations.map(d => d!.name || d!.city).join(', ');
 
         // Show progress UI
         const originalBtn = btn as HTMLButtonElement;
@@ -4130,6 +4490,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     this.container.innerHTML = html;
     this.container.style.display = 'block';
     this.attachEventListeners();
+
+    // Update visuals after render to ensure they are populated
+    this.updateCountryVisualsDOM();
   }
 }
 
@@ -5910,6 +6273,178 @@ textarea.auto-resize {
 
 .transport-section .section-header {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+/* Country Visuals */
+.country-visuals-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.country-visual-chart {
+  width: 100%;
+}
+
+.bar-chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chart-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.bar-label {
+  width: 120px;
+  text-align: right;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar-container {
+  flex: 1;
+  height: 20px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  overflow: visible;
+  position: relative;
+}
+
+.bar-fill-budget {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(0, 123, 255, 0.2);
+  border: 1px solid rgba(0, 123, 255, 0.4);
+  border-radius: 4px;
+  min-width: 2px;
+  transition: width 0.5s ease-out;
+  z-index: 1;
+}
+
+.bar-fill-actual {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #007bff;
+  border-radius: 4px;
+  min-width: 2px;
+  transition: width 0.5s ease-out;
+  z-index: 2;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 4px;
+  min-width: 2px;
+  transition: width 0.5s ease-out;
+}
+
+.bar-value {
+  min-width: 120px;
+  font-weight: 600;
+  color: #555;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.bar-value-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.bar-value-label {
+  font-weight: 500;
+  color: #888;
+  font-size: 11px;
+}
+
+.pie-chart-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  padding: 10px;
+}
+
+.pie-chart-svg {
+  width: 180px;
+  height: 180px;
+  transform: rotate(-90deg); /* Start from top */
+}
+
+.pie-chart-svg path {
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+
+.pie-chart-svg path:hover {
+  opacity: 0.8;
+}
+
+.chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.bar-chart-legend {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  max-height: none;
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-label {
+  font-weight: 500;
+  color: #333;
+}
+
+.legend-value {
+  color: #666;
+  font-weight: 400;
+}
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
