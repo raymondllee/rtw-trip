@@ -15,6 +15,7 @@ import { getRuntimeConfig } from '../config';
 import { getLegsForData, generateDynamicLegs, getLegSummary } from '../utils/dynamicLegManager';
 import { aggregateByCountry, groupByContinent, groupByRegion, calculateCountryStats, CountryStay, RegionStay } from '../utils/countryAggregator';
 import { loadEducationSection, initializeEducationUI } from '../education/educationUI';
+import { TransportEditor } from '../components/TransportEditor';
 
 const { apiBaseUrl } = getRuntimeConfig();
 
@@ -749,6 +750,10 @@ export async function initMapApp() {
   window.costUI = costUI;
   window.costComparison = costComparison;
 
+  // Initialize Transport Editor
+  // We'll initialize it properly once transportSegmentManager is available
+  let transportEditor = null;
+
   // Helper function to merge sub_legs and costs from template into loaded data
   function mergeSubLegsFromTemplate(data) {
     if (originalData.legs && data.legs) {
@@ -852,6 +857,10 @@ export async function initMapApp() {
           await Promise.race([syncPromise, syncTimeoutPromise]);
           console.log('✅ Synced transport segments with destinations');
         }
+
+        // Initialize Transport Editor now that manager is ready
+        transportEditor = new TransportEditor(window.transportSegmentManager);
+        window.transportEditor = transportEditor;
       } catch (error) {
         console.error('Error initializing transport segments:', error);
         console.log('⚠️ Continuing without transport segments...');
@@ -3379,193 +3388,27 @@ export async function initMapApp() {
     document.getElementById('manage-scenarios-modal').style.display = 'none';
   }
 
-  // Transport segment modal functions
+  function closeManageScenariosModal() {
+    document.getElementById('manage-scenarios-modal').style.display = 'none';
+  }
+
+  // Transport segment modal functions - delegated to TransportEditor component
   function openTransportEditModal(segmentId) {
-    const segment = window.transportSegmentManager.getAllSegments().find(s => s.id === segmentId);
-    if (!segment) {
-      console.error('Transport segment not found:', segmentId);
-      return;
-    }
+    if (transportEditor) {
+      transportEditor.open(segmentId, async () => {
+        // Callback after save - refresh UI
+        const legName = legFilter ? legFilter.value : 'all';
+        const subLegName = subLegFilter ? subLegFilter.value : '';
+        const filtered = (subLegName && subLegName !== '')
+          ? filterBySubLeg(workingData, legName, subLegName)
+          : filterByLeg(workingData, legName);
+        updateSidebar(filtered);
 
-    const modal = document.getElementById('edit-transport-modal');
-    const form = document.getElementById('edit-transport-form');
-
-    // Populate form fields
-    document.getElementById('transport-route').value = `${segment.from_destination_name} → ${segment.to_destination_name}`;
-    document.getElementById('transport-mode').value = segment.transport_mode || 'plane';
-    document.getElementById('transport-cost').value = segment.estimated_cost_usd || '';
-    document.getElementById('transport-duration').value = segment.duration_hours || '';
-
-    // Researched costs
-    document.getElementById('transport-researched-low').value = segment.researched_cost_low || '';
-    document.getElementById('transport-researched-mid').value = segment.researched_cost_mid || '';
-    document.getElementById('transport-researched-high').value = segment.researched_cost_high || '';
-
-    // Actual cost
-    document.getElementById('transport-actual-cost').value = segment.actual_cost_usd || '';
-
-    // Local currency
-    document.getElementById('transport-currency-local').value = segment.currency_local || '';
-    document.getElementById('transport-amount-local').value = segment.amount_local || '';
-
-    // Research data (AI agent results)
-    document.getElementById('transport-researched-duration').value = segment.researched_duration_hours || '';
-    document.getElementById('transport-researched-stops').value = segment.researched_stops || '';
-    document.getElementById('transport-airlines').value = segment.researched_airlines ? segment.researched_airlines.join(', ') : '';
-    document.getElementById('transport-research-notes').value = segment.research_notes || '';
-    document.getElementById('transport-research-sources').value = segment.research_sources ? segment.research_sources.join(', ') : '';
-
-    // Alternative routes (full details integrated)
-    const alternativesSection = document.getElementById('transport-alternatives-section');
-    const alternativesDisplay = document.getElementById('transport-alternatives-display');
-    if (segment.researched_alternatives && segment.researched_alternatives.length > 0) {
-      alternativesSection.style.display = 'block';
-
-      // Show primary route for comparison
-      const primaryInfo = `
-        <div style="margin-bottom: 12px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
-          <strong>Primary Route:</strong> ${segment.from_destination_name} → ${segment.to_destination_name}<br>
-          <strong>Estimated Cost:</strong> $${segment.researched_cost_mid?.toFixed(0) || segment.estimated_cost_usd?.toFixed(0) || 'N/A'}
-        </div>
-      `;
-
-      const alternativesHtml = segment.researched_alternatives.map((alt, idx) => {
-        const savingsClass = alt.savings_vs_primary > 0 ? 'color: #2e7d32;' : 'color: #d32f2f;';
-        const savingsText = alt.savings_vs_primary > 0
-          ? `💰 Save $${alt.savings_vs_primary.toFixed(0)}`
-          : `💸 Extra $${Math.abs(alt.savings_vs_primary).toFixed(0)}`;
-
-        return `
-          <div style="margin-bottom: 12px; padding: 10px; background: white; border: 1px solid #e0e0e0; border-radius: 4px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <strong style="font-size: 15px;">#${idx + 1}: ${alt.from_location} → ${alt.to_location}</strong>
-              <span style="${savingsClass} font-weight: bold;">${savingsText}</span>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; margin-bottom: 8px;">
-              <div><strong>Cost Range:</strong> $${alt.cost_low?.toFixed(0) || 'N/A'} - $${alt.cost_high?.toFixed(0) || 'N/A'}</div>
-              <div><strong>Mid Cost:</strong> $${alt.cost_mid?.toFixed(0) || 'N/A'}</div>
-              ${alt.airlines && alt.airlines.length > 0 ? `
-                <div style="grid-column: 1 / -1;"><strong>Airlines:</strong> ${alt.airlines.join(', ')}</div>
-              ` : ''}
-              ${alt.typical_duration_hours ? `
-                <div><strong>Duration:</strong> ${alt.typical_duration_hours.toFixed(1)} hrs</div>
-              ` : ''}
-              ${alt.typical_stops !== undefined ? `
-                <div><strong>Stops:</strong> ${alt.typical_stops === 0 ? 'Direct' : alt.typical_stops}</div>
-              ` : ''}
-              ${alt.distance_from_original_km > 0 ? `
-                <div style="grid-column: 1 / -1;"><strong>Distance from original:</strong> ${Math.round(alt.distance_from_original_km * 0.621371)} mi</div>
-              ` : ''}
-            </div>
-
-            ${alt.notes ? `
-              <div style="font-size: 13px; color: #666; font-style: italic; padding-top: 8px; border-top: 1px solid #f0f0f0;">
-                ${alt.notes}
-              </div>
-            ` : ''}
-          </div>
-        `;
-      }).join('');
-
-      alternativesDisplay.innerHTML = primaryInfo + alternativesHtml;
+        // Trigger save
+        await autoSaveScenario();
+      });
     } else {
-      alternativesSection.style.display = 'none';
-    }
-
-    // Booking details
-    document.getElementById('transport-booking-status').value = segment.booking_status || 'estimated';
-    document.getElementById('transport-confidence').value = segment.confidence_level || 'low';
-    document.getElementById('transport-booking-reference').value = segment.booking_reference || '';
-    document.getElementById('transport-booking-link').value = segment.booking_link || '';
-
-    // Notes
-    document.getElementById('transport-notes').value = segment.notes || '';
-    document.getElementById('edit-transport-segment-id').value = segmentId;
-
-    modal.style.display = 'flex';
-  }
-
-  function closeTransportEditModal() {
-    document.getElementById('edit-transport-modal').style.display = 'none';
-  }
-
-  async function saveTransportSegment(segmentId) {
-    const mode = document.getElementById('transport-mode').value;
-    const estimatedCost = parseFloat(document.getElementById('transport-cost').value) || 0;
-    const duration = parseFloat(document.getElementById('transport-duration').value) || null;
-
-    // Researched costs
-    const researchedLow = parseFloat(document.getElementById('transport-researched-low').value) || null;
-    const researchedMid = parseFloat(document.getElementById('transport-researched-mid').value) || null;
-    const researchedHigh = parseFloat(document.getElementById('transport-researched-high').value) || null;
-
-    // Actual cost
-    const actualCost = parseFloat(document.getElementById('transport-actual-cost').value) || null;
-
-    // Local currency
-    const currencyLocal = document.getElementById('transport-currency-local').value.toUpperCase() || null;
-    const amountLocal = parseFloat(document.getElementById('transport-amount-local').value) || null;
-
-    // Research data (AI agent results)
-    const researchedDuration = parseFloat(document.getElementById('transport-researched-duration').value) || null;
-    const researchedStops = parseInt(document.getElementById('transport-researched-stops').value) || null;
-    const airlinesText = document.getElementById('transport-airlines').value;
-    const airlines = airlinesText ? airlinesText.split(',').map(a => a.trim()).filter(a => a) : [];
-    const researchNotes = document.getElementById('transport-research-notes').value;
-    const sourcesText = document.getElementById('transport-research-sources').value;
-    const sources = sourcesText ? sourcesText.split(',').map(s => s.trim()).filter(s => s) : [];
-
-    // Booking details
-    const bookingStatus = document.getElementById('transport-booking-status').value;
-    const confidenceLevel = document.getElementById('transport-confidence').value;
-    const bookingReference = document.getElementById('transport-booking-reference').value;
-    const bookingLink = document.getElementById('transport-booking-link').value;
-
-    // Notes
-    const notes = document.getElementById('transport-notes').value;
-
-    const updates = {
-      transport_mode: mode,
-      transport_mode_icon: window.transportSegmentManager.getTransportIcon(mode),
-      estimated_cost_usd: estimatedCost,
-      researched_cost_low: researchedLow,
-      researched_cost_mid: researchedMid,
-      researched_cost_high: researchedHigh,
-      actual_cost_usd: actualCost,
-      currency_local: currencyLocal,
-      amount_local: amountLocal,
-      duration_hours: duration,
-      researched_duration_hours: researchedDuration,
-      researched_stops: researchedStops,
-      researched_airlines: airlines,
-      research_notes: researchNotes,
-      research_sources: sources,
-      booking_status: bookingStatus,
-      confidence_level: confidenceLevel,
-      booking_reference: bookingReference,
-      booking_link: bookingLink,
-      notes: notes
-    };
-
-    try {
-      await window.transportSegmentManager.updateSegment(segmentId, updates, currentScenarioId);
-      console.log('✅ Transport segment updated successfully');
-      closeTransportEditModal();
-
-      // Refresh the sidebar to show updated transport segment
-      const legName = legFilter ? legFilter.value : 'all';
-      const subLegName = subLegFilter ? subLegFilter.value : '';
-      const filtered = (subLegName && subLegName !== '')
-        ? filterBySubLeg(workingData, legName, subLegName)
-        : filterByLeg(workingData, legName);
-      updateSidebar(filtered);
-
-      // Trigger save
-      await autoSaveScenario();
-    } catch (error) {
-      console.error('Error updating transport segment:', error);
-      alert('Failed to update transport segment. Please try again.');
+      console.error('Transport editor not initialized');
     }
   }
 
@@ -5086,10 +4929,7 @@ export async function initMapApp() {
     cancelImportBtn.addEventListener('click', closeImportScenariosModal);
   }
 
-  const cancelEditTransportBtn = document.getElementById('cancel-edit-transport-btn');
-  if (cancelEditTransportBtn) {
-    cancelEditTransportBtn.addEventListener('click', closeTransportEditModal);
-  }
+
 
   // Broad search button handler (uses Text Search + Geocoding for broader coverage)
   const broadSearchBtn = document.getElementById('broad-search-btn');
@@ -5160,15 +5000,6 @@ export async function initMapApp() {
     });
   }
 
-  // Close transport modal on overlay click
-  const editTransportModal = document.getElementById('edit-transport-modal');
-  if (editTransportModal) {
-    editTransportModal.addEventListener('click', (e) => {
-      if (e.target.id === 'edit-transport-modal') {
-        closeTransportEditModal();
-      }
-    });
-  }
 
   // Form submissions
   const addDestinationForm = document.getElementById('add-destination-form');

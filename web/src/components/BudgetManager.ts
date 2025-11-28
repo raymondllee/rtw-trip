@@ -8,6 +8,7 @@ import { calculateBudgetStatus, createDefaultBudget } from '../utils/budgetTrack
 import { getCurrencyForDestination } from '../utils/currencyMapping';
 import { getRuntimeConfig } from '../config';
 import { wellnessFirebaseService, WellnessUserData } from '../wellness/services/wellnessFirebaseService';
+import { TransportEditor } from './TransportEditor';
 
 export class BudgetManager {
   private container: HTMLElement;
@@ -26,7 +27,8 @@ export class BudgetManager {
   private transportSegments: any[] = [];
   private collapsedSections: Set<string>; // Track collapsed sections
   private availableUsers: WellnessUserData[] = []; // Available wellness users
-  private countryMode: 'dollars' | 'percent' | 'perday' = 'dollars';
+  private countryMode: 'dollars' | 'percent' | 'perday' = (localStorage.getItem('budget_country_mode') as 'dollars' | 'percent' | 'perday') || 'dollars';
+  private transportEditor: TransportEditor;
 
   constructor(
     container: HTMLElement,
@@ -61,6 +63,20 @@ export class BudgetManager {
     }
 
     this.render();
+
+    // Initialize transport editor
+    this.transportEditor = new TransportEditor(window.transportSegmentManager || {
+      // Fallback if manager not available (e.g. standalone mode)
+      getAllSegments: () => this.transportSegments,
+      updateSegment: async (id: string, updates: any) => {
+        const index = this.transportSegments.findIndex(s => s.id === id);
+        if (index !== -1) {
+          this.transportSegments[index] = { ...this.transportSegments[index], ...updates };
+          await this.saveAllCosts(); // Trigger save
+        }
+      },
+      getTransportIcon: (mode: string) => this.getTransportIcon(mode)
+    });
   }
 
   private saveCollapsedState() {
@@ -885,10 +901,9 @@ export class BudgetManager {
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary modal-close-btn">Close</button>
-            <a href="/?scenario=${new URLSearchParams(window.location.search).get('scenario')}#transport-${segmentId}"
-               class="btn btn-secondary" target="_blank" title="Open in main app for full editing">
-              ✏️ Edit in Main App
-            </a>
+            <button class="btn btn-secondary modal-edit-btn" data-segment-id="${segmentId}" title="Edit transport details">
+              ✏️ Edit Details
+            </button>
             <button class="btn btn-primary modal-research-btn" data-segment-id="${segmentId}">
               🤖 Re-research
             </button>
@@ -929,6 +944,16 @@ export class BudgetManager {
       researchBtn?.addEventListener('click', async () => {
         modal.remove();
         await this.researchTransportSegment(segmentId);
+      });
+
+      // Edit button
+      const editBtn = modal.querySelector('.modal-edit-btn');
+      editBtn?.addEventListener('click', () => {
+        modal.remove();
+        this.transportEditor.open(segmentId, async () => {
+          // Refresh UI after save
+          await this.render();
+        });
       });
     }
   }
@@ -1038,6 +1063,9 @@ export class BudgetManager {
     if (segment.actual_cost_usd && segment.actual_cost_usd > 0) {
       return segment.actual_cost_usd;
     }
+    if (segment.manual_cost_usd && segment.manual_cost_usd > 0) {
+      return segment.manual_cost_usd;
+    }
     if (segment.researched_cost_mid && segment.researched_cost_mid > 0) {
       return segment.researched_cost_mid;
     }
@@ -1054,18 +1082,64 @@ export class BudgetManager {
   }
 
   /**
+   * Calculate transport cost breakdown by type
+   */
+  private calculateTransportBreakdown(): { actual: number; manual: number; researched: number; estimated: number; actualCount: number; manualCount: number; researchedCount: number; estimatedCount: number } {
+    const breakdown = {
+      actual: 0,
+      manual: 0,
+      researched: 0,
+      estimated: 0,
+      actualCount: 0,
+      manualCount: 0,
+      researchedCount: 0,
+      estimatedCount: 0
+    };
+
+    this.transportSegments.forEach(segment => {
+      const cost = this.getSegmentActiveCost(segment);
+
+      // Determine which category this cost falls into (same logic as getSegmentActiveCost)
+      if (segment.actual_cost_usd && segment.actual_cost_usd > 0) {
+        breakdown.actual += cost;
+        breakdown.actualCount++;
+      } else if (segment.manual_cost_usd && segment.manual_cost_usd > 0) {
+        breakdown.manual += cost;
+        breakdown.manualCount++;
+      } else if (segment.researched_cost_mid && segment.researched_cost_mid > 0) {
+        breakdown.researched += cost;
+        breakdown.researchedCount++;
+      } else {
+        breakdown.estimated += cost;
+        breakdown.estimatedCount++;
+      }
+    });
+
+    return breakdown;
+  }
+
+  /**
    * Get status badge for a transport segment
    */
   private getSegmentStatusBadge(segment: any): string {
     const badges: Record<string, any> = {
       'estimated': { color: '#999', text: 'Est', title: 'Estimated cost' },
+      'manual': { color: '#f39c12', text: 'Manual', title: 'Manual override' },
       'researched': { color: '#3498db', text: 'Researched', title: 'AI researched cost' },
       'booked': { color: '#27ae60', text: 'Booked', title: 'Booked and confirmed' },
       'paid': { color: '#27ae60', text: 'Paid', title: 'Paid in full' },
       'completed': { color: '#27ae60', text: 'Completed', title: 'Travel completed' }
     };
 
-    const badge = badges[segment.booking_status || 'estimated'] || badges['estimated'];
+    // Determine effective status based on active cost source
+    let effectiveStatus = segment.booking_status || 'estimated';
+
+    // Override status display if manual cost is active
+    if (!segment.actual_cost_usd && segment.manual_cost_usd > 0) {
+      effectiveStatus = 'manual';
+    }
+
+    const badge = badges[effectiveStatus] || badges['estimated'];
     return `<span class="confidence-badge" style="background: ${badge.color}" title="${badge.title}">${badge.text}</span>`;
   }
 
@@ -2085,10 +2159,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           <div class="bar-value">
             <div class="bar-value-columns">
               <div class="bar-value-column">
-                <div class="bar-value-header">Est</div>
+                <div class="bar-value-header">Budget</div>
               </div>
               <div class="bar-value-column">
-                <div class="bar-value-header">Budget</div>
+                <div class="bar-value-header">Estimate</div>
               </div>
               <div class="bar-value-column">
                 <div class="bar-value-header">Over/Under</div>
@@ -2122,10 +2196,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <div class="bar-value">
               <div class="bar-value-columns">
                 <div class="bar-value-column">
-                  <div class="bar-value-amount">${estimatedPercent.toFixed(1)}%</div>
+                  <div class="bar-value-amount">${budgetPercent.toFixed(1)}%</div>
                 </div>
                 <div class="bar-value-column">
-                  <div class="bar-value-amount">${budgetPercent.toFixed(1)}%</div>
+                  <div class="bar-value-amount">${estimatedPercent.toFixed(1)}%</div>
                 </div>
                 <div class="bar-value-column">
                   <div class="bar-value-amount" style="color: ${varianceColor}">${varianceSign}${Math.abs(variance).toFixed(1)}%</div>
@@ -2179,10 +2253,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
           <div class="bar-value">
             <div class="bar-value-columns">
               <div class="bar-value-column">
-                <div class="bar-value-header">Est</div>
+                <div class="bar-value-header">Budget</div>
               </div>
               <div class="bar-value-column">
-                <div class="bar-value-header">Budget</div>
+                <div class="bar-value-header">Estimate</div>
               </div>
               <div class="bar-value-column">
                 <div class="bar-value-header">Over/Under</div>
@@ -2220,10 +2294,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <div class="bar-value">
               <div class="bar-value-columns">
                 <div class="bar-value-column">
-                  <div class="bar-value-amount">${actualLabel}</div>
+                  <div class="bar-value-amount">${budgetLabel}</div>
                 </div>
                 <div class="bar-value-column">
-                  <div class="bar-value-amount">${budgetLabel}</div>
+                  <div class="bar-value-amount">${actualLabel}</div>
                 </div>
                 <div class="bar-value-column">
                   <div class="bar-value-amount" style="color: ${varianceColor}">${varianceSign}${varianceLabel}</div>
@@ -2454,11 +2528,28 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
     }
 
     const transportTotal = this.calculateTransportTotal();
+    const breakdown = this.calculateTransportBreakdown();
     const currentBudget = this.budget?.total_budget_usd || 0;
     const transportPct = currentBudget > 0 ? (transportTotal / currentBudget * 100) : 0;
 
     // Count segments that need research
     const needsResearchCount = this.getSegmentsNeedingResearch(30).length;
+
+    // Create breakdown display
+    const breakdownParts = [];
+    if (breakdown.actualCount > 0) {
+      breakdownParts.push(`🟢 ${breakdown.actualCount} Actual`);
+    }
+    if (breakdown.manualCount > 0) {
+      breakdownParts.push(`🟠 ${breakdown.manualCount} Manual`);
+    }
+    if (breakdown.researchedCount > 0) {
+      breakdownParts.push(`🔵 ${breakdown.researchedCount} AI`);
+    }
+    if (breakdown.estimatedCount > 0) {
+      breakdownParts.push(`⚪ ${breakdown.estimatedCount} Est`);
+    }
+    const breakdownDisplay = breakdownParts.length > 0 ? ` | ${breakdownParts.join(' · ')}` : '';
 
     const isCollapsed = this.collapsedSections.has('transport');
     const collapseIcon = isCollapsed ? '▶' : '▼';
@@ -2471,6 +2562,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <div class="section-summary-inline">
               <span class="transport-total">Total: ${this.formatCurrency(transportTotal)}</span>
               ${currentBudget > 0 ? `<span class="transport-pct">(${transportPct.toFixed(1)}% of budget)</span>` : ''}
+              <span class="transport-breakdown" style="font-size: 11px; color: #666; margin-left: 8px;">${breakdownDisplay}</span>
             </div>
           </div>
           <div class="section-header-right">
@@ -2533,10 +2625,16 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                     ${hasResearchData ? `
                       <button class="btn-xs btn-secondary transport-details-btn"
                               data-segment-id="${segment.id}"
-                              title="View research details">
-                        📋 Details
+                              title="Edit details & view alternatives">
+                        ✏️ Edit
                       </button>
-                    ` : ''}
+                    ` : `
+                      <button class="btn-xs btn-secondary transport-details-btn"
+                              data-segment-id="${segment.id}"
+                              title="Edit details">
+                        ✏️ Edit
+                      </button>
+                    `}
                     <button class="btn-xs btn-primary transport-research-btn"
                             data-segment-id="${segment.id}"
                             title="Research cost with AI">
@@ -2558,7 +2656,9 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                   ` : ''}
                   ${hasAlternatives ? `
                     <div class="segment-alternatives">
-                      <span class="alternatives-badge">💡 ${alternatives.length} alternative${alternatives.length > 1 ? 's' : ''} found</span>
+                      <span class="alternatives-badge" style="cursor: pointer;" onclick="document.querySelector('.transport-details-btn[data-segment-id=\\'${segment.id}\\']').click()">
+                        🔀 ${alternatives.length} alternative${alternatives.length > 1 ? 's' : ''} available
+                      </span>
                     </div>
                   ` : ''}
                   ${segment.notes ? `<div class="segment-notes">📝 ${segment.notes}</div>` : ''}
@@ -2698,6 +2798,32 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <div class="section-header section-header-collapsible" data-section="countries">
               <div class="section-header-left">
                 <h4>🌍 Budget by Country</h4>
+                <div class="section-summary-inline">
+                  <span class="transport-total">Allocated: ${this.formatCurrency(
+      Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0)
+    )}</span>
+                  <span class="transport-pct">Est: ${this.formatCurrency(
+      Array.from(countries).reduce((sum, country) => {
+        const countryCosts = (this.tripData.costs || [])
+          .filter(c => {
+            const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+            return location?.country === country;
+          });
+        return sum + countryCosts.reduce((s, c) => s + (c.amount_usd || c.amount || 0), 0);
+      }, 0)
+    )} (${(() => {
+      const allocated = Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0);
+      const estimated = Array.from(countries).reduce((sum, country) => {
+        const countryCosts = (this.tripData.costs || [])
+          .filter(c => {
+            const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+            return location?.country === country;
+          });
+        return sum + countryCosts.reduce((s, c) => s + (c.amount_usd || c.amount || 0), 0);
+      }, 0);
+      return allocated > 0 ? ((estimated / allocated) * 100).toFixed(1) : '0.0';
+    })()}%)</span>
+                </div>
               </div>
               <div class="section-header-right">
                 <div class="mode-controls">
@@ -2729,30 +2855,6 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                         rows="2">${this.budget?.country_group_note || ''}</textarea>
             </div>
 
-            <!-- Always-visible budget summary for countries -->
-            <div class="budget-summary-box">
-              <div class="summary-row">
-                <span class="summary-label">Total Budget:</span>
-                <span class="summary-value" id="country-total-budget">${this.formatCurrency(currentBudget)}</span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Allocated to Countries:</span>
-                <span class="summary-value" id="country-total-allocated">${this.formatCurrency(
-      Array.from(countries).reduce((sum, country) => {
-        return sum + (this.budget?.budgets_by_country?.[country] || 0);
-      }, 0)
-    )}</span>
-                <span class="summary-percentage" id="country-total-pct">${currentBudget > 0 ?
-          ((Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Unallocated:</span>
-                <span class="summary-value" id="country-unallocated">${this.formatCurrency(
-            currentBudget - Array.from(countries).reduce((sum, country) => sum + (this.budget?.budgets_by_country?.[country] || 0), 0)
-          )}</span>
-              </div>
-            </div>
-
             <div id="country-allocation-status" style="display: none;" class="allocation-status">
               <div class="allocation-info">
                 <strong>Total Allocated:</strong> <span id="country-total-allocated-pct">0</span>%
@@ -2762,69 +2864,69 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
 
             <div class="budget-items-edit">
               ${Array.from(countries).map(country => {
-            const countryDays = (this.tripData.locations || [])
-              .filter(loc => loc.country === country)
-              .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
+      const countryDays = (this.tripData.locations || [])
+        .filter(loc => loc.country === country)
+        .reduce((sum, loc) => sum + (loc.duration_days || 0), 0);
 
-            const countryCostsArray = (this.tripData.costs || [])
-              .filter(c => {
-                const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
-                return location?.country === country;
-              });
+      const countryCostsArray = (this.tripData.costs || [])
+        .filter(c => {
+          const location = (this.tripData.locations || []).find(loc => loc.id === c.destination_id);
+          return location?.country === country;
+        });
 
-            // Get destinations for this country for the Generate Costs button
-            const countryDestinations = (this.tripData.locations || [])
-              .filter(loc => loc.country === country);
+      // Get destinations for this country for the Generate Costs button
+      const countryDestinations = (this.tripData.locations || [])
+        .filter(loc => loc.country === country);
 
-            // Calculate date range for country
-            const countryDates = countryDestinations
-              .filter(loc => loc.arrival_date || loc.departure_date)
-              .map(loc => ({
-                arrival: loc.arrival_date ? new Date(loc.arrival_date) : null,
-                departure: loc.departure_date ? new Date(loc.departure_date) : null
-              }))
-              .filter(d => d.arrival || d.departure);
+      // Calculate date range for country
+      const countryDates = countryDestinations
+        .filter(loc => loc.arrival_date || loc.departure_date)
+        .map(loc => ({
+          arrival: loc.arrival_date ? new Date(loc.arrival_date) : null,
+          departure: loc.departure_date ? new Date(loc.departure_date) : null
+        }))
+        .filter(d => d.arrival || d.departure);
 
-            let countryDateRange = '';
-            if (countryDates.length > 0) {
-              const validArrivals = countryDates.filter(d => d.arrival).map(d => d.arrival!);
-              const validDepartures = countryDates.filter(d => d.departure).map(d => d.departure!);
+      let countryDateRange = '';
+      if (countryDates.length > 0) {
+        const validArrivals = countryDates.filter(d => d.arrival).map(d => d.arrival!);
+        const validDepartures = countryDates.filter(d => d.departure).map(d => d.departure!);
 
-              if (validArrivals.length > 0 && validDepartures.length > 0) {
-                const earliestArrival = new Date(Math.min(...validArrivals.map(d => d.getTime())));
-                const latestDeparture = new Date(Math.max(...validDepartures.map(d => d.getTime())));
-                countryDateRange = `${earliestArrival.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${latestDeparture.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-              }
-            }
+        if (validArrivals.length > 0 && validDepartures.length > 0) {
+          const earliestArrival = new Date(Math.min(...validArrivals.map(d => d.getTime())));
+          const latestDeparture = new Date(Math.max(...validDepartures.map(d => d.getTime())));
+          countryDateRange = `${earliestArrival.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${latestDeparture.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        }
+      }
 
-            const countryCosts = countryCostsArray.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
-            const categoryBreakdown = this.renderCategoryBreakdown(countryCostsArray);
+      const countryCosts = countryCostsArray.reduce((sum, c) => sum + (c.amount_usd || c.amount || 0), 0);
+      const categoryBreakdown = this.renderCategoryBreakdown(countryCostsArray);
 
-            const countryBudget = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
-            const budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
-            const countryPct = currentBudget > 0 ? (countryBudget / currentBudget * 100) : 0;
-            const pct = status.by_country[country]?.percentage || 0;
-            const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
-            const countryNote = this.budget?.country_notes?.[country] || '';
+      const countryBudget = this.budget?.budgets_by_country?.[country] || countryCosts * 1.1;
+      const budgetPerDay = countryDays > 0 ? countryBudget / countryDays : 0;
+      const countryPct = currentBudget > 0 ? (countryBudget / currentBudget * 100) : 0;
+      const pct = status.by_country[country]?.percentage || 0;
+      const barClass = pct > 100 ? 'over-budget' : pct > 90 ? 'warning' : '';
+      const countryNote = this.budget?.country_notes?.[country] || '';
 
-            // Determine which button to show: Generate Costs or View Costs
-            const hasCosts = countryCostsArray.length > 0;
-            const destinationLabel = countryDestinations.length === 1
-              ? '1 destination'
-              : `${countryDestinations.length} destinations`;
+      // Determine which button to show: Generate Costs or View Costs
+      const hasCosts = countryCostsArray.length > 0;
+      const destinationLabel = countryDestinations.length === 1
+        ? '1 destination'
+        : `${countryDestinations.length} destinations`;
 
-            const costsButton = hasCosts
-              ? `<button class="costs-toggle-btn" data-country="${country}" title="View Costs">
+      const costsButton = hasCosts
+        ? `<button class="costs-toggle-btn" data-country="${country}" title="View Costs">
                        💰 View Costs (${countryCostsArray.length})
                      </button>`
-              : `<button class="generate-costs-btn inline-generate-btn"
+        : `<button class="generate-costs-btn inline-generate-btn"
                              data-country="${country}"
                              data-destinations="${countryDestinations.map(d => d.id).join(',')}"
                              title="Generate AI cost estimates">
                        🤖 Generate Costs (${destinationLabel})
                      </button>`;
 
-            return `
+      return `
                   <div class="budget-item-edit">
                     <div class="item-header-row">
                       <div class="item-label-with-note">
@@ -2877,7 +2979,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                     </div>
                   </div>
                 `;
-          }).join('')}
+    }).join('')}
             </div>
             </div>
           </div>
@@ -2921,10 +3023,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
             <div class="summary-row">
               <span class="summary-label">Allocated to Categories:</span>
               <span class="summary-value" id="category-total-allocated">${this.formatCurrency(
-            Array.from(categories).reduce((sum, cat) => {
-              return sum + (this.budget?.budgets_by_category?.[cat] || 0);
-            }, 0)
-          )}</span>
+      Array.from(categories).reduce((sum, cat) => {
+        return sum + (this.budget?.budgets_by_category?.[cat] || 0);
+      }, 0)
+    )}</span>
               <span class="summary-percentage" id="category-total-pct">${currentBudget > 0 ?
         ((Array.from(categories).reduce((sum, cat) => sum + (this.budget?.budgets_by_category?.[cat] || 0), 0) / currentBudget) * 100).toFixed(1) : 0}%</span>
             </div>
@@ -3203,8 +3305,10 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
       btn.addEventListener('click', (e) => {
         const target = e.target as HTMLButtonElement;
         const segmentId = target.dataset.segmentId;
-        if (segmentId) {
-          this.showTransportDetailsModal(segmentId);
+        if (segmentId && this.transportEditor) {
+          this.transportEditor.open(segmentId, async () => {
+            await this.render();
+          });
         }
       });
     });
@@ -3520,6 +3624,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         const newMode = (btn as HTMLElement).dataset.mode as 'dollars' | 'percent' | 'perday';
         countryMode = newMode;
         this.countryMode = newMode; // Update class property for visuals
+        localStorage.setItem('budget_country_mode', newMode);
         const totalBudget = parseFloat(totalBudgetInput.value) || 0;
 
         // Update button states

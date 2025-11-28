@@ -592,6 +592,10 @@ class TransportSegment(BaseModel):
         default=None,
         description="Actual booked cost in USD"
     )
+    manual_cost_usd: Optional[float] = Field(
+        default=None,
+        description="Manual budget override in USD (takes precedence over researched costs)"
+    )
     currency_local: Optional[str] = Field(
         default=None,
         description="Local currency code (ISO 4217)"
