@@ -29,6 +29,8 @@ export class BudgetManager {
   private availableUsers: WellnessUserData[] = []; // Available wellness users
   private countryMode: 'dollars' | 'percent' | 'perday' = (localStorage.getItem('budget_country_mode') as 'dollars' | 'percent' | 'perday') || 'dollars';
   private transportEditor: TransportEditor;
+  private lastSaved: Date | null = null;
+  private isSaving: boolean = false;
 
   constructor(
     container: HTMLElement,
@@ -68,11 +70,19 @@ export class BudgetManager {
     this.transportEditor = new TransportEditor(window.transportSegmentManager || {
       // Fallback if manager not available (e.g. standalone mode)
       getAllSegments: () => this.transportSegments,
-      updateSegment: async (id: string, updates: any) => {
+      updateSegment: async (id: string, updates: any, scenarioId?: string) => {
         const index = this.transportSegments.findIndex(s => s.id === id);
         if (index !== -1) {
           this.transportSegments[index] = { ...this.transportSegments[index], ...updates };
-          await this.saveAllCosts(); // Trigger save
+
+          // Update tripData and save to backend
+          this.tripData.transport_segments = this.transportSegments;
+          if (this.onTripDataUpdate) {
+            await this.onTripDataUpdate(this.tripData);
+            console.log(`✅ Transport segment ${id} saved to backend via onTripDataUpdate`);
+          } else {
+            console.warn('⚠️ onTripDataUpdate not available, segment updated in memory only');
+          }
         }
       },
       getTransportIcon: (mode: string) => this.getTransportIcon(mode)
@@ -972,7 +982,8 @@ export class BudgetManager {
     // First check if transport_segments are already in tripData
     if (this.tripData.transport_segments && this.tripData.transport_segments.length > 0) {
       this.transportSegments = this.tripData.transport_segments;
-      console.log(`✅ Loaded ${this.transportSegments.length} transport segments from tripData`);
+      this.lastSaved = new Date();
+      console.log(`✅ Loaded ${this.transportSegments.length} transport segments from tripData. Last synced: ${this.lastSaved.toLocaleTimeString()}`);
 
       // Check if any segments need cost estimates
       const needsEstimates = this.transportSegments.some(
@@ -1126,17 +1137,21 @@ export class BudgetManager {
       'estimated': { color: '#999', text: 'Est', title: 'Estimated cost' },
       'manual': { color: '#f39c12', text: 'Manual', title: 'Manual override' },
       'researched': { color: '#3498db', text: 'Researched', title: 'AI researched cost' },
+      'actual': { color: '#27ae60', text: 'Actual', title: 'Actual cost paid' },
       'booked': { color: '#27ae60', text: 'Booked', title: 'Booked and confirmed' },
       'paid': { color: '#27ae60', text: 'Paid', title: 'Paid in full' },
       'completed': { color: '#27ae60', text: 'Completed', title: 'Travel completed' }
     };
 
-    // Determine effective status based on active cost source
-    let effectiveStatus = segment.booking_status || 'estimated';
+    // Determine effective status based on cost hierarchy (actual > manual > researched > estimated)
+    let effectiveStatus = 'estimated';
 
-    // Override status display if manual cost is active
-    if (!segment.actual_cost_usd && segment.manual_cost_usd > 0) {
+    if (segment.actual_cost_usd && segment.actual_cost_usd > 0) {
+      effectiveStatus = 'actual';
+    } else if (segment.manual_cost_usd && segment.manual_cost_usd > 0) {
       effectiveStatus = 'manual';
+    } else if (segment.researched_cost_mid && segment.researched_cost_mid > 0) {
+      effectiveStatus = 'researched';
     }
 
     const badge = badges[effectiveStatus] || badges['estimated'];
@@ -2724,6 +2739,12 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                   🔄 Refresh All Rates
                 </button>
               ` : ''}
+              ${this.lastSaved ? `
+                <span class="last-saved-indicator" style="font-size: 12px; color: #666; margin-right: 10px;">
+                  ${this.isSaving ? 'Saving...' : `Last synced: ${this.lastSaved.toLocaleTimeString()}`}
+                </span>
+              ` : ''}
+              <button class="btn-secondary-sm" id="refresh-budget-btn" title="Reload data">🔄 Refresh</button>
               <span id="budget-save-indicator" class="auto-save-indicator-inline"></span>
             </div>
           </div>
@@ -4175,6 +4196,34 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
         }
       });
     });
+
+
+    // Refresh budget button
+    const refreshBtn = this.container.querySelector('#refresh-budget-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', async () => {
+        const btn = refreshBtn as HTMLButtonElement;
+        const originalText = btn.textContent;
+        btn.textContent = '🔄 Loading...';
+        btn.disabled = true;
+
+        try {
+          console.log('🔄 Manually refreshing budget data...');
+          await this.loadTransportSegments();
+          await this.render();
+          console.log('✅ Manual refresh complete');
+          btn.textContent = originalText;
+        } catch (error) {
+          console.error('Failed to refresh budget:', error);
+          btn.textContent = '❌ Error';
+          setTimeout(() => {
+            btn.textContent = originalText;
+          }, 2000);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    }
 
     // Refresh all rates button
     const refreshAllBtn = this.container.querySelector('#refresh-all-rates-btn');

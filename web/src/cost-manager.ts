@@ -431,15 +431,28 @@ function initBudgetTab() {
         currentVersionData.itineraryData.traveler_ids = updatedTripData.traveler_ids;
         currentVersionData.itineraryData.accommodation_preference = updatedTripData.accommodation_preference;
 
+        // CRITICAL: Also save transport_segments if updated
+        if (updatedTripData.transport_segments) {
+          currentVersionData.itineraryData.transport_segments = updatedTripData.transport_segments;
+        }
+
         // Save to Firestore
         const versionRef = doc(db, 'scenarios', scenarioId, 'versions', currentVersionData.id);
-        await updateDoc(versionRef, {
+        const updateData: any = {
           'itineraryData.num_travelers': updatedTripData.num_travelers,
           'itineraryData.traveler_composition': updatedTripData.traveler_composition,
           'itineraryData.traveler_ids': updatedTripData.traveler_ids || [],
           'itineraryData.accommodation_preference': updatedTripData.accommodation_preference,
           updatedAt: Timestamp.now()
-        });
+        };
+
+        // Add transport_segments to update if present
+        if (updatedTripData.transport_segments) {
+          updateData['itineraryData.transport_segments'] = updatedTripData.transport_segments;
+          console.log(`💾 Saving ${updatedTripData.transport_segments.length} transport segments to Firestore`);
+        }
+
+        await updateDoc(versionRef, updateData);
 
         console.log('✅ Traveler data saved to Firestore');
       } catch (error) {

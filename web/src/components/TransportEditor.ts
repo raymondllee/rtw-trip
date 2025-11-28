@@ -50,53 +50,87 @@ export class TransportEditor {
               </div>
             </div>
 
-            <!-- Cost Information -->
+            <!-- Cost Information with Visual Hierarchy -->
             <div class="form-section">
-              <h4 class="section-title">Cost Information</h4>
+              <h4 class="section-title">💵 Cost Information</h4>
+              <p style="font-size: 13px; color: #666; margin: 0 0 16px 0;">Costs follow a priority hierarchy: <strong>Actual</strong> (green) overrides <strong>Manual</strong> (orange), which overrides <strong>Researched</strong> (blue), which overrides <strong>Estimated</strong> (gray).</p>
 
-              <div class="form-group">
-                <label for="transport-cost">Estimated Cost (USD)</label>
-                <input type="number" id="transport-cost" class="form-input" min="0" step="1" placeholder="0">
-                <small class="form-hint">System generated estimate</small>
-              </div>
-
-              <div class="form-group" style="background: #e3f2fd; padding: 10px; border-radius: 4px; border-left: 4px solid #2196f3;">
-                <label for="transport-manual-cost" style="font-weight: 600; color: #1565c0;">Manual Budget / Override (USD)</label>
-                <input type="number" id="transport-manual-cost" class="form-input" min="0" step="1" placeholder="Override amount">
-                <small class="form-hint" style="color: #555;">Overrides estimate and research. Yields to actual cost.</small>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="transport-researched-low">Researched Low (USD)</label>
-                  <input type="number" id="transport-researched-low" class="form-input" min="0" step="1" placeholder="Low estimate">
+              <!-- Level 1: Estimated (Gray) - Lowest Priority -->
+              <div class="cost-level" style="background: #f5f5f5; padding: 12px; border-radius: 6px; border-left: 4px solid #999; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="background: #999; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">ESTIMATED</span>
+                  <span style="font-size: 13px; color: #666;">Level 1 - System Generated</span>
                 </div>
-                <div class="form-group">
-                  <label for="transport-researched-mid">Researched Mid (USD)</label>
-                  <input type="number" id="transport-researched-mid" class="form-input" min="0" step="1" placeholder="Typical cost">
-                </div>
-                <div class="form-group">
-                  <label for="transport-researched-high">Researched High (USD)</label>
-                  <input type="number" id="transport-researched-high" class="form-input" min="0" step="1" placeholder="High estimate">
+                <div class="form-group" style="margin: 0;">
+                  <label for="transport-cost" style="font-size: 13px;">Estimated Cost (USD)</label>
+                  <input type="number" id="transport-cost" class="form-input" min="0" step="1" placeholder="0">
+                  <small class="form-hint">Auto-calculated based on distance and mode</small>
                 </div>
               </div>
 
-              <div class="form-group">
-                <label for="transport-actual-cost">Actual Cost (USD)</label>
-                <input type="number" id="transport-actual-cost" class="form-input" min="0" step="1" placeholder="Booked price">
-                <small class="form-hint">Enter the actual booked price if available</small>
+              <!-- Level 2: Researched (Blue) -->
+              <div class="cost-level" style="background: #e3f2fd; padding: 12px; border-radius: 6px; border-left: 4px solid #2196f3; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="background: #2196f3; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">RESEARCHED</span>
+                  <span style="font-size: 13px; color: #1565c0;">Level 2 - AI Research</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                  <div class="form-group" style="margin: 0;">
+                    <label for="transport-researched-low" style="font-size: 13px;">Low (USD)</label>
+                    <input type="number" id="transport-researched-low" class="form-input" min="0" step="1" placeholder="Low">
+                  </div>
+                  <div class="form-group" style="margin: 0;">
+                    <label for="transport-researched-mid" style="font-size: 13px; font-weight: 600;">Mid (USD)</label>
+                    <input type="number" id="transport-researched-mid" class="form-input" min="0" step="1" placeholder="Typical" style="font-weight: 600;">
+                  </div>
+                  <div class="form-group" style="margin: 0;">
+                    <label for="transport-researched-high" style="font-size: 13px;">High (USD)</label>
+                    <input type="number" id="transport-researched-high" class="form-input" min="0" step="1" placeholder="High">
+                  </div>
+                </div>
+                <small class="form-hint" style="margin-top: 8px; display: block;">From AI research of flights, routes, and booking sites</small>
               </div>
 
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="transport-currency-local">Local Currency</label>
-                  <input type="text" id="transport-currency-local" class="form-input" maxlength="3" placeholder="e.g., EUR, JPY, THB" style="text-transform: uppercase;">
+              <!-- Level 3: Manual Override (Orange) -->
+              <div class="cost-level" style="background: #fff3e0; padding: 12px; border-radius: 6px; border-left: 4px solid #f57c00; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="background: #f57c00; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">MANUAL</span>
+                  <span style="font-size: 13px; color: #e65100;">Level 3 - Budget Override</span>
                 </div>
-                <div class="form-group">
-                  <label for="transport-amount-local">Amount (Local)</label>
-                  <input type="number" id="transport-amount-local" class="form-input" min="0" step="0.01" placeholder="Local currency amount">
+                <div class="form-group" style="margin: 0;">
+                  <label for="transport-manual-cost" style="font-size: 13px; font-weight: 600;">Manual Budget (USD)</label>
+                  <input type="number" id="transport-manual-cost" class="form-input" min="0" step="1" placeholder="Override amount" style="font-weight: 600;">
+                  <small class="form-hint">Set a custom budget target that overrides estimates and research</small>
                 </div>
               </div>
+
+              <!-- Level 4: Actual Cost (Green) - Highest Priority -->
+              <div class="cost-level" style="background: #e8f5e9; padding: 12px; border-radius: 6px; border-left: 4px solid #4caf50; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="background: #4caf50; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">ACTUAL</span>
+                  <span style="font-size: 13px; color: #2e7d32;">Level 4 - Booked Price (Highest Priority)</span>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="transport-actual-cost" style="font-size: 13px; font-weight: 600;">Actual Cost (USD)</label>
+                  <input type="number" id="transport-actual-cost" class="form-input" min="0" step="1" placeholder="Booked price" style="font-weight: 600;">
+                  <small class="form-hint">The real price you paid - overrides all other costs</small>
+                </div>
+              </div>
+
+              <!-- Local Currency (Optional) -->
+              <details style="margin-top: 16px;">
+                <summary style="cursor: pointer; font-size: 13px; font-weight: 500; color: #666; padding: 8px 0;">💱 Local Currency Details (Optional)</summary>
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 12px; padding: 12px; background: #fafafa; border-radius: 4px;">
+                  <div class="form-group" style="margin: 0;">
+                    <label for="transport-currency-local" style="font-size: 13px;">Currency</label>
+                    <input type="text" id="transport-currency-local" class="form-input" maxlength="3" placeholder="e.g., EUR" style="text-transform: uppercase;">
+                  </div>
+                  <div class="form-group" style="margin: 0;">
+                    <label for="transport-amount-local" style="font-size: 13px;">Amount (Local)</label>
+                    <input type="number" id="transport-amount-local" class="form-input" min="0" step="0.01" placeholder="Amount in local currency">
+                  </div>
+                </div>
+              </details>
             </div>
 
             <!-- Research Data (AI Agent Results) -->
@@ -414,8 +448,9 @@ export class TransportEditor {
     try {
       // Get current scenario ID from window
       const currentScenarioId = (window as any).currentScenarioId;
+      console.log(`💾 Saving transport segment ${this.currentSegmentId} with updates:`, updates);
       await this.transportSegmentManager.updateSegment(this.currentSegmentId, updates, currentScenarioId);
-      console.log('✅ Transport segment updated successfully');
+      console.log('✅ Transport segment persisted to backend successfully');
       this.close();
 
       if (this.onSaveCallback) {
