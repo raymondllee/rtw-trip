@@ -1068,18 +1068,23 @@ export class BudgetManager {
   }
 
   /**
-   * Get the active cost for a transport segment (actual > researched_mid > estimated)
+   * Get the active cost for a transport segment (actual > manual > researched_mid > estimated)
+   * Allows $0 for actual/manual costs (e.g., included in package)
    */
   private getSegmentActiveCost(segment: any): number {
-    if (segment.actual_cost_usd && segment.actual_cost_usd > 0) {
+    // Actual cost takes priority (can be $0 if included in package)
+    if (segment.actual_cost_usd !== null && segment.actual_cost_usd !== undefined) {
       return segment.actual_cost_usd;
     }
-    if (segment.manual_cost_usd && segment.manual_cost_usd > 0) {
+    // Manual override (can be $0 for budgeting)
+    if (segment.manual_cost_usd !== null && segment.manual_cost_usd !== undefined) {
       return segment.manual_cost_usd;
     }
+    // Researched mid-range cost
     if (segment.researched_cost_mid && segment.researched_cost_mid > 0) {
       return segment.researched_cost_mid;
     }
+    // Fallback to estimated cost
     return segment.estimated_cost_usd || 0;
   }
 
@@ -1137,7 +1142,8 @@ export class BudgetManager {
       'estimated': { color: '#999', text: 'Est', title: 'Estimated cost' },
       'manual': { color: '#f39c12', text: 'Manual', title: 'Manual override' },
       'researched': { color: '#3498db', text: 'Researched', title: 'AI researched cost' },
-      'actual': { color: '#27ae60', text: 'Actual', title: 'Actual cost paid' },
+      'actual': { color: '#4caf50', text: 'Actual', title: 'Actual cost paid' },
+      'included': { color: '#8e24aa', text: 'Included', title: 'Included in package (no additional cost)' },
       'booked': { color: '#27ae60', text: 'Booked', title: 'Booked and confirmed' },
       'paid': { color: '#27ae60', text: 'Paid', title: 'Paid in full' },
       'completed': { color: '#27ae60', text: 'Completed', title: 'Travel completed' }
@@ -1146,9 +1152,14 @@ export class BudgetManager {
     // Determine effective status based on cost hierarchy (actual > manual > researched > estimated)
     let effectiveStatus = 'estimated';
 
-    if (segment.actual_cost_usd && segment.actual_cost_usd > 0) {
+    // Check for $0 actual cost (included in package)
+    if (segment.actual_cost_usd === 0) {
+      effectiveStatus = 'included';
+    } else if (segment.actual_cost_usd !== null && segment.actual_cost_usd !== undefined && segment.actual_cost_usd > 0) {
       effectiveStatus = 'actual';
-    } else if (segment.manual_cost_usd && segment.manual_cost_usd > 0) {
+    } else if (segment.manual_cost_usd === 0) {
+      effectiveStatus = 'included';
+    } else if (segment.manual_cost_usd !== null && segment.manual_cost_usd !== undefined && segment.manual_cost_usd > 0) {
       effectiveStatus = 'manual';
     } else if (segment.researched_cost_mid && segment.researched_cost_mid > 0) {
       effectiveStatus = 'researched';

@@ -110,11 +110,20 @@ export class TransportEditor {
                   <span style="background: #4caf50; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">ACTUAL</span>
                   <span style="font-size: 13px; color: #2e7d32;">Level 4 - Booked Price (Highest Priority)</span>
                 </div>
-                <div class="form-group" style="margin: 0;">
+                <div class="form-group" style="margin: 0 0 12px 0;">
                   <label for="transport-actual-cost" style="font-size: 13px; font-weight: 600;">Actual Cost (USD)</label>
                   <input type="number" id="transport-actual-cost" class="form-input" min="0" step="1" placeholder="Booked price" style="font-weight: 600;">
                   <small class="form-hint">The real price you paid - overrides all other costs</small>
                 </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 10px; background: #f3e5f5; border-radius: 4px; border-left: 3px solid #8e24aa;">
+                  <input type="checkbox" id="transport-included-package" class="form-checkbox" style="margin: 0; width: 18px; height: 18px;">
+                  <label for="transport-included-package" style="margin: 0; font-size: 13px; font-weight: 500; color: #6a1b9a; cursor: pointer;">
+                    ✓ Included in Package (sets cost to $0)
+                  </label>
+                </div>
+                <small class="form-hint" style="display: block; margin-top: 8px; color: #6a1b9a;">
+                  Check this if transport is included in a tour package or cruise
+                </small>
               </div>
 
               <!-- Local Currency (Optional) -->
@@ -261,6 +270,31 @@ export class TransportEditor {
         await this.save();
       });
     }
+
+    // "Included in Package" checkbox
+    const includedCheckbox = document.getElementById('transport-included-package') as HTMLInputElement;
+    const actualCostInput = document.getElementById('transport-actual-cost') as HTMLInputElement;
+    if (includedCheckbox && actualCostInput) {
+      includedCheckbox.addEventListener('change', () => {
+        if (includedCheckbox.checked) {
+          actualCostInput.value = '0';
+          actualCostInput.readOnly = true;
+          actualCostInput.style.background = '#f3e5f5';
+        } else {
+          actualCostInput.readOnly = false;
+          actualCostInput.style.background = '';
+        }
+      });
+
+      // Also update checkbox if cost is manually set to 0
+      actualCostInput.addEventListener('input', () => {
+        if (actualCostInput.value === '0') {
+          includedCheckbox.checked = true;
+          actualCostInput.readOnly = true;
+          actualCostInput.style.background = '#f3e5f5';
+        }
+      });
+    }
   }
 
   public open(segmentId: string, onSave?: () => void) {
@@ -290,7 +324,25 @@ export class TransportEditor {
     (document.getElementById('transport-researched-high') as HTMLInputElement).value = segment.researched_cost_high || '';
 
     // Actual cost
-    (document.getElementById('transport-actual-cost') as HTMLInputElement).value = segment.actual_cost_usd || '';
+    (document.getElementById('transport-actual-cost') as HTMLInputElement).value =
+      segment.actual_cost_usd !== null && segment.actual_cost_usd !== undefined ? segment.actual_cost_usd.toString() : '';
+
+    // Set "Included in Package" checkbox if actual cost is $0
+    const includedCheckbox = document.getElementById('transport-included-package') as HTMLInputElement;
+    const actualCostInput = document.getElementById('transport-actual-cost') as HTMLInputElement;
+    if (segment.actual_cost_usd === 0) {
+      if (includedCheckbox) includedCheckbox.checked = true;
+      if (actualCostInput) {
+        actualCostInput.readOnly = true;
+        actualCostInput.style.background = '#f3e5f5';
+      }
+    } else {
+      if (includedCheckbox) includedCheckbox.checked = false;
+      if (actualCostInput) {
+        actualCostInput.readOnly = false;
+        actualCostInput.style.background = '';
+      }
+    }
 
     // Local currency
     (document.getElementById('transport-currency-local') as HTMLInputElement).value = segment.currency_local || '';
@@ -388,7 +440,11 @@ export class TransportEditor {
 
     const mode = (document.getElementById('transport-mode') as HTMLInputElement).value;
     const estimatedCost = parseFloat((document.getElementById('transport-cost') as HTMLInputElement).value) || 0;
-    const manualCost = parseFloat((document.getElementById('transport-manual-cost') as HTMLInputElement).value) || null;
+
+    // Manual cost - allow 0 for budgeting
+    const manualCostValue = (document.getElementById('transport-manual-cost') as HTMLInputElement).value;
+    const manualCost = manualCostValue === '' ? null : parseFloat(manualCostValue);
+
     const duration = parseFloat((document.getElementById('transport-duration') as HTMLInputElement).value) || null;
 
     // Researched costs
@@ -396,8 +452,9 @@ export class TransportEditor {
     const researchedMid = parseFloat((document.getElementById('transport-researched-mid') as HTMLInputElement).value) || null;
     const researchedHigh = parseFloat((document.getElementById('transport-researched-high') as HTMLInputElement).value) || null;
 
-    // Actual cost
-    const actualCost = parseFloat((document.getElementById('transport-actual-cost') as HTMLInputElement).value) || null;
+    // Actual cost - allow 0 for included-in-package segments
+    const actualCostValue = (document.getElementById('transport-actual-cost') as HTMLInputElement).value;
+    const actualCost = actualCostValue === '' ? null : parseFloat(actualCostValue);
 
     // Local currency
     const currencyLocal = (document.getElementById('transport-currency-local') as HTMLInputElement).value.toUpperCase() || null;
