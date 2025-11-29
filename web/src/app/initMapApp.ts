@@ -2379,17 +2379,19 @@ export async function initMapApp() {
               ${dateRange ? `${dateRange} • ` : ''}
               <input type="number" class="editable-duration" value="${duration}" min="1" max="365" data-location-id="${loc.id}" ${isDateLocked ? 'disabled' : ''}> days
             </div>
-            <div class="destination-badges">
-              ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
-            </div>
             ${datePickerHTML}
             ${costSummaryHTML}
             <div class="destination-cost-details" id="cost-details-${loc.id}">
               ${costBreakdownHTML}
               ${costDetailsHTML}
             </div>
-            <div class="destination-notes">
-              <textarea class="editable-notes" placeholder="Add notes..." data-location-id="${loc.id}">${notes}</textarea>
+            <div class="destination-footer-row">
+              <div class="destination-badges">
+                ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
+              </div>
+              <div class="destination-notes">
+                <textarea class="editable-notes" placeholder="Add notes..." data-location-id="${loc.id}">${notes}</textarea>
+              </div>
             </div>
             ${!destinationCosts?.total || destinationCosts.total === 0 ? `
             <div class="destination-cost-missing">
@@ -2427,10 +2429,8 @@ export async function initMapApp() {
             const formattedCost = window.transportSegmentManager.formatCurrency(activeCost);
             const confidenceBadge = window.transportSegmentManager.getConfidenceBadge(segment);
 
-            // Add auto-update indicator and research status
+            // Add auto-update indicator
             const autoUpdatedIndicator = segment.auto_updated ? '<span class="auto-updated-badge" title="Costs auto-updated from research">✨</span>' : '';
-            const researchStatus = segment.booking_status === 'researched' ? 'RES' : (segment.booking_status === 'estimated' ? 'EST' : '');
-            const statusBadge = researchStatus ? `<span class="status-badge status-${segment.booking_status}">${researchStatus}</span>` : '';
 
             // Show airlines if researched
             const airlinesInfo = segment.researched_airlines && segment.researched_airlines.length > 0
@@ -2456,14 +2456,13 @@ export async function initMapApp() {
                   </div>
                   <div class="transport-segment-cost">
                     <span class="cost-amount">${formattedCost}</span>
-                    ${statusBadge}
                     ${confidenceBadge}
                     ${autoUpdatedIndicator}
                   </div>
                   ${airlinesInfo}
                   ${segment.notes ? `<div class="transport-segment-notes">${segment.notes}</div>` : ''}
                 </div>
-                <div class="transport-segment-actions">
+                <div class="transport-segment-actions" style="opacity: 0; transition: opacity 0.2s;">
                   ${alternativesInfo}
                   <button class="transport-edit-btn" data-segment-id="${segment.id}" title="Edit transport">✏️</button>
                   <button class="transport-research-btn" data-segment-id="${segment.id}" title="AI Research costs">🤖</button>

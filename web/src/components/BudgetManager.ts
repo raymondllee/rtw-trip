@@ -2674,7 +2674,7 @@ IMPORTANT: Return ONLY the JSON array, no markdown formatting, no explanation te
                     ${statusBadge}
                     ${researchAge}
                   </div>
-                  ${airlines ? `<div class="segment-airlines">✈️ ${airlines}</div>` : ''}
+                  ${segment.research_notes ? `<div class="segment-research-notes">💡 ${segment.research_notes}</div>` : ''}
                   ${segment.researched_cost_low && segment.researched_cost_high ? `
                     <div class="segment-range">
                       Range: ${this.formatCurrency(segment.researched_cost_low)} - ${this.formatCurrency(segment.researched_cost_high)}
@@ -6717,7 +6717,8 @@ textarea.auto-resize {
   color: #007bff;
 }
 
-.segment-airlines {
+.segment-airlines,
+.segment-research-notes {
   color: #666;
   font-size: 12px;
 }

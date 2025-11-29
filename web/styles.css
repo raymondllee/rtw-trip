@@ -123,10 +123,14 @@ body {
 }
 
 .destination-item {
-  padding: 6px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 8px 12px;
+  margin: 4px 12px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   cursor: grab;
-  transition: background-color 0.2s, transform 0.2s;
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
   user-select: none;
   display: flex;
   align-items: flex-start;
@@ -135,12 +139,15 @@ body {
 }
 
 .destination-item:hover {
-  background: #f8f9fa;
+  background: #fafbfc;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border-color: #bbb;
 }
 
 .destination-item.active {
   background: #e3f2fd;
-  border-left: 3px solid #1e88e5;
+  border: 2px solid #1e88e5;
+  box-shadow: 0 2px 8px rgba(30, 136, 229, 0.2);
 }
 
 .destination-item.dragging {
@@ -212,13 +219,20 @@ body {
   flex: 0 0 auto;
 }
 
+.destination-footer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 100%;
+  margin-top: 4px;
+}
+
 .destination-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 0;
-  flex: 0 0 100%;
-  order: 4;
+  flex: 0 0 auto;
 }
 
 .destination-dates {
@@ -267,9 +281,8 @@ body {
 
 .destination-notes {
   margin-top: 0;
-  flex: 1 1 auto;
-  min-width: 150px;
-  order: 5;
+  flex: 1;
+  min-width: 0;
 }
 
 .editable-notes,
@@ -290,6 +303,7 @@ body {
   line-height: 1.3;
   box-sizing: border-box;
 }
+
 
 .editable-notes:hover,
 .editable-country-notes:hover {
@@ -415,6 +429,7 @@ body {
 .destination-list.compact-mode .update-costs-btn,
 .destination-list.compact-mode .cost-category,
 .destination-list.compact-mode .education-section-placeholder,
+.destination-list.compact-mode .education-section,
 .destination-list.compact-mode .locked-date-pickers {
   display: none !important;
 }
@@ -496,7 +511,8 @@ body {
 }
 
 .destination-list.compact-mode .transport-segment {
-  padding: 4px 8px;
+  margin: 0;
+  padding: 0;
 }
 
 .destination-list.compact-mode .transport-segment-icon {
@@ -2137,8 +2153,8 @@ input[type="checkbox"] {
 
 .transport-segment {
   position: relative;
-  margin: 8px 0;
-  padding: 0 12px;
+  margin: 0;
+  padding: 0;
 }
 
 .transport-segment-line {
@@ -2149,18 +2165,18 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  margin-left: 30px;
-  background: #f8f9fa;
+  padding: 8px 12px;
+  margin: 4px 12px;
+  background: #f4f9ff;
   border-radius: 6px;
   border: 1px solid #e0e0e0;
   transition: all 0.2s ease;
 }
 
 .transport-segment-content:hover {
-  background: #f0f2f5;
-  border-color: #3498db;
-  box-shadow: 0 2px 6px rgba(52, 152, 219, 0.1);
+  background: #f5f5f5;
+  border-color: #d0d0d0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .transport-segment-icon {
@@ -2262,6 +2278,10 @@ input[type="checkbox"] {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+}
+
+.transport-segment:hover .transport-segment-actions {
+  opacity: 1 !important;
 }
 
 .transport-edit-btn,
@@ -3088,7 +3108,6 @@ textarea.form-input {
 
 /* View preferences: Compact mode transport legs */
 .destination-list.compact-mode .transport-airlines,
-.destination-list.compact-mode .transport-edit-btn,
 .destination-list.compact-mode .transport-research-btn,
 .destination-list.compact-mode .alternatives-indicator,
 .destination-list.compact-mode .status-badge {
@@ -3245,14 +3264,14 @@ textarea.form-input {
 /* Responsive adjustments when map is hidden */
 @media (min-width: 769px) {
   .main-content.map-hidden .sidebar {
-    padding: 0 20px;
+    padding: 0 4px;
   }
 
   .main-content.map-hidden .destination-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 16px;
-    padding: 16px 0;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    padding: 12px 0;
   }
 
   .main-content.map-hidden .destination-card {
@@ -3262,8 +3281,8 @@ textarea.form-input {
 
 @media (min-width: 1200px) {
   .main-content.map-hidden .destination-list {
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
   }
 }
 
