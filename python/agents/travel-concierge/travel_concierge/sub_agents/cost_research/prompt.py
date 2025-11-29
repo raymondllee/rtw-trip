@@ -243,7 +243,6 @@ Return a complete JSON object with these fields:
     "notes": "Helpful tips and booking advice",
     "researched_at": "2025-01-15T10:30:00Z"
   },
-  "flights": { ...same structure... },
   "food_daily": { ...same structure... },
   "transport_daily": { ...same structure... },
   "activities": { ...same structure... },
@@ -256,7 +255,8 @@ Return a complete JSON object with these fields:
 ```
 
 **IMPORTANT:**
-- All 5 categories are REQUIRED
+- All 4 categories are REQUIRED (accommodation, food_daily, transport_daily, activities)
+- Do NOT include "flights" - inter-destination flights are tracked separately via TransportSegment
 - All numeric values must be valid floats (no null values)
 - currency_local MUST be a valid 3-letter ISO 4217 code (USD, EUR, JPY, GBP, THB, CNY, etc.) - NEVER "N/A" or null
 - Use ISO 8601 timestamps for researched_at
