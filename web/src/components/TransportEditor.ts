@@ -45,7 +45,7 @@ export class TransportEditor {
 
                 <div class="form-group">
                   <label for="transport-duration">Duration (hours)</label>
-                  <input type="number" id="transport-duration" class="form-input" min="0" step="0.5" placeholder="e.g., 2.5">
+                  <input type="number" id="transport-duration" class="form-input" min="0" step="0.01" placeholder="e.g., 2.5">
                 </div>
               </div>
             </div>
@@ -149,7 +149,7 @@ export class TransportEditor {
               <div class="form-row">
                 <div class="form-group">
                   <label for="transport-researched-duration">Duration (hours)</label>
-                  <input type="number" id="transport-researched-duration" class="form-input" min="0" step="0.5" placeholder="Flight duration">
+                  <input type="number" id="transport-researched-duration" class="form-input" min="0" step="0.01" placeholder="Flight duration">
                   <small class="form-hint">From AI research</small>
                 </div>
                 <div class="form-group">

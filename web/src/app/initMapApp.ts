@@ -2387,7 +2387,7 @@ export async function initMapApp() {
             </div>
             <div class="destination-footer-row">
               <div class="destination-badges">
-                ${loc.activity_type ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
+                ${(loc.activity_type === 'arrival' || loc.activity_type === 'departure') ? `<div class="destination-activity" style="background: ${getActivityColor(loc.activity_type)}">${loc.activity_type}</div>` : ''}
               </div>
               <div class="destination-notes">
                 <textarea class="editable-notes" placeholder="Add notes..." data-location-id="${loc.id}">${notes}</textarea>
@@ -3488,8 +3488,46 @@ export async function initMapApp() {
 
         alert(`✅ Research complete! $${costMid.toFixed(0)} estimated (${airlines}). Found ${alternatives} alternative routes.`);
 
-        // The segment will be updated via polling mechanism
-        // The frontend polls /api/itinerary/changes every 2 seconds and will pick up the update
+        // Update local state immediately
+        const updatedData = {
+          transport_mode: research.transport_mode || 'plane',
+          transport_mode_icon: window.transportSegmentManager.getTransportIcon(research.transport_mode || 'plane'),
+          researched_cost_low: research.cost_low,
+          researched_cost_mid: research.cost_mid,
+          researched_cost_high: research.cost_high,
+          researched_duration_hours: research.typical_duration_hours,
+          researched_stops: research.typical_stops || 0,
+          researched_airlines: research.airlines || [],
+          researched_alternatives: research.alternatives || [],
+          research_sources: research.sources || [],
+          research_notes: research.booking_tips || '',
+          booking_status: 'researched',
+          confidence_level: research.confidence || 'medium',
+          auto_updated: true,
+          updated_at: new Date().toISOString()
+        };
+
+        if (window.transportSegmentManager.updateLocalSegment(segmentId, updatedData)) {
+          console.log('✅ Local segment updated, refreshing UI...');
+          // Force sidebar update to show new costs/badges
+          const legFilter = document.getElementById('leg-filter') as HTMLSelectElement;
+          const subLegFilter = document.getElementById('sub-leg-filter') as HTMLSelectElement;
+          const routingToggle = document.getElementById('routing-toggle') as HTMLInputElement;
+
+          if (typeof render === 'function') {
+            render(
+              legFilter ? legFilter.value : 'all',
+              subLegFilter ? subLegFilter.value : '',
+              routingToggle ? routingToggle.checked : true
+            );
+          } else {
+            // Fallback if render is not available (should not happen inside initMapApp)
+            console.warn('render function not found, reloading page...');
+            window.location.reload();
+          }
+        } else {
+          console.warn('⚠️ Failed to update local segment state');
+        }
 
       } else {
         console.warn('⚠️ Partial research result:', result);

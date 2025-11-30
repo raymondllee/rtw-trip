@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { FirestoreScenarioManager } from './firestore/scenarioManager';
 import { BudgetManager, budgetManagerStyles } from './components/BudgetManager';
+import { TransportEditor } from './components/TransportEditor';
 import { db } from '../firebase-config';
 import { updateDoc, doc, Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
@@ -8,6 +9,7 @@ import { updateDoc, doc, Timestamp } from 'https://www.gstatic.com/firebasejs/10
 declare global {
   interface Window {
     CostBulkEdit: any;
+    transportSegmentManager: any;
   }
 }
 
@@ -25,33 +27,54 @@ let currentScenario = null;
 let currentVersionData = null;
 let bulkEditor = null;
 let budgetManager = null;
+let transportEditor = null;
 
+// Tab switching
 // Tab switching
 function initTabSwitching() {
   const tabButtons = document.querySelectorAll('.tab-button');
   const tabContents = document.querySelectorAll('.tab-content');
 
+  const activateTab = (tabName) => {
+    // Update active states
+    tabButtons.forEach(btn => {
+      if (btn.dataset.tab === tabName) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+    tabContents.forEach(content => {
+      if (content.id === `tab-${tabName}`) content.classList.add('active');
+      else content.classList.remove('active');
+    });
+
+    // Initialize tab content on first view
+    if (tabName === 'budget' && !budgetManager) {
+      initBudgetTab();
+    } else if (tabName === 'edit-costs' && !bulkEditor) {
+      initEditCostsTab();
+    } else if (tabName === 'generate-costs') {
+      initGenerateCostsTab();
+    }
+
+    // Persist to localStorage
+    localStorage.setItem('costManagerActiveTab', tabName);
+  };
+
   tabButtons.forEach(button => {
     button.addEventListener('click', () => {
       const tabName = button.dataset.tab;
-
-      // Update active states
-      tabButtons.forEach(btn => btn.classList.remove('active'));
-      tabContents.forEach(content => content.classList.remove('active'));
-
-      button.classList.add('active');
-      document.getElementById(`tab-${tabName}`).classList.add('active');
-
-      // Initialize tab content on first view
-      if (tabName === 'budget' && !budgetManager) {
-        initBudgetTab();
-      } else if (tabName === 'edit-costs' && !bulkEditor) {
-        initEditCostsTab();
-      } else if (tabName === 'generate-costs') {
-        initGenerateCostsTab();
-      }
+      activateTab(tabName);
     });
   });
+
+  // Restore active tab from localStorage
+  const savedTab = localStorage.getItem('costManagerActiveTab');
+  if (savedTab) {
+    const tabExists = document.getElementById(`tab-${savedTab}`);
+    if (tabExists) {
+      // Small delay to ensure DOM is fully ready if needed, though here it should be fine
+      activateTab(savedTab);
+    }
+  }
 }
 
 // Initialize Edit Costs Tab (Tab 1)
@@ -64,33 +87,130 @@ async function initEditCostsTab() {
       throw new Error('CostBulkEdit class not loaded. Ensure cost-bulk-edit.js is loaded before cost-manager.ts');
     }
 
-    // Create instance
-    bulkEditor = new window.CostBulkEdit('');
+    // Initialize Bulk Editor
+    bulkEditor = new window.CostBulkEdit();
     bulkEditor.setSessionId(scenarioId);
-    bulkEditor.setDestinations(currentVersionData.itineraryData.locations || []);
+    bulkEditor.setDestinations(currentVersionData.itineraryData.locations);
 
-    // Generate IDs for costs that don't have them
-    let costs = currentVersionData.itineraryData.costs || [];
-    let needsIdFix = false;
-    costs = costs.map((cost, index) => {
-      if (!cost.id) {
-        needsIdFix = true;
-        const destId = cost.destination_id || 'unknown';
-        const category = cost.category || 'other';
-        const id = `${destId}_${category}_${index}`;
-        return { ...cost, id };
+    // Initialize Transport Editor if needed
+    if (!transportEditor) {
+      if (window.transportSegmentManager) {
+        console.log('✅ Initializing TransportEditor...');
+        transportEditor = new TransportEditor(window.transportSegmentManager);
+
+        // Listen for edit requests from bulk editor
+        window.addEventListener('edit-transport-segment', (e: any) => {
+          console.log('📨 Received edit-transport-segment event:', e.detail);
+          const { segmentId } = e.detail;
+          if (transportEditor) {
+            transportEditor.open(segmentId, async () => {
+              // On save, refresh the table
+              console.log('🔄 Transport segment updated, refreshing table...');
+              await initEditCostsTab(); // Re-fetch and re-render
+            });
+          } else {
+            console.error('❌ TransportEditor is not initialized when event received');
+          }
+        });
+
+        // Listen for research requests
+        window.addEventListener('research-transport-segment', async (e: any) => {
+          console.log('📨 Received research-transport-segment event:', e.detail);
+          const { segmentId } = e.detail;
+
+          if (window.transportSegmentManager) {
+            const btn = document.querySelector(`.research-transport-btn[data-segment-id="${segmentId}"]`) as HTMLButtonElement;
+            if (btn) {
+              btn.disabled = true;
+              btn.innerHTML = '⏳';
+            }
+
+            try {
+              const scenarioId = new URLSearchParams(window.location.search).get('scenario');
+              if (!scenarioId) throw new Error('No scenario ID found');
+
+              await window.transportSegmentManager.researchSegment(segmentId, scenarioId);
+
+              // Refresh table
+              console.log('✅ Research complete, refreshing table...');
+              await initEditCostsTab();
+            } catch (error) {
+              console.error('❌ Research failed:', error);
+              alert('Research failed. Check console for details.');
+              if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '🤖';
+              }
+            }
+          }
+        });
+      } else {
+        console.warn('⚠️ window.transportSegmentManager not found, cannot initialize TransportEditor');
       }
-      return cost;
-    });
-
-    if (needsIdFix) {
-      console.warn('⚠️ Generated IDs for costs without IDs.');
     }
 
-    bulkEditor.costs = costs;
+    // Override fetchCosts to use our local data + transport segments
+    bulkEditor.fetchCosts = async () => {
+      // Generate IDs for costs that don't have them
+      let costs = currentVersionData.itineraryData.costs || [];
+      let needsIdFix = false;
+      costs = costs.map((cost, index) => {
+        if (!cost.id) {
+          needsIdFix = true;
+          const destId = cost.destination_id || 'unknown';
+          const category = cost.category || 'other';
+          const id = `${destId}_${category}_${index}`;
+          return { ...cost, id, modality: 'local' };
+        }
+        return { ...cost, modality: cost.modality || 'local' };
+      });
 
-    // Render the table
-    tabPanel.innerHTML = `
+      if (needsIdFix) {
+        console.warn('⚠️ Generated IDs for costs without IDs.');
+      }
+
+      // --- INTEGRATE TRANSPORT SEGMENTS ---
+      const transportSegments = currentVersionData.itineraryData.transport_segments || [];
+
+      // Sync to manager so TransportEditor can find them
+      if (window.transportSegmentManager) {
+        window.transportSegmentManager.setSegments(transportSegments);
+      }
+
+      const locationMap = new Map((currentVersionData.itineraryData.locations || []).map(l => [l.id, l]));
+
+      const transportCosts = transportSegments.map(segment => {
+        const fromLoc = locationMap.get(segment.from_destination_id);
+        const toLoc = locationMap.get(segment.to_destination_id);
+        const fromName = fromLoc ? (fromLoc.name || fromLoc.city) : 'Unknown';
+        const toName = toLoc ? (toLoc.name || toLoc.city) : 'Unknown';
+        const mode = segment.transport_mode || 'transport';
+
+        // Determine status
+        let status = 'estimated';
+        if (segment.actual_cost_usd > 0) status = 'paid';
+        else if (segment.booking_status) status = segment.booking_status;
+
+        return {
+          id: segment.id,
+          destination_id: segment.to_destination_id, // Associate with destination
+          category: 'transport',
+          modality: mode,
+          description: `Transport: ${fromName} -> ${toName} (${mode})`,
+          amount_usd: window.transportSegmentManager ? window.transportSegmentManager.getActiveCost(segment) : (segment.estimated_cost_usd || 0),
+          currency: 'USD',
+          date: segment.date || null,
+          booking_status: status,
+          notes: segment.notes || '',
+          _isTransportSegment: true,
+          _originalSegment: segment
+        };
+      });
+
+      bulkEditor.costs = [...costs, ...transportCosts];
+
+      // Render the table
+      tabPanel.innerHTML = `
       <div class="bulk-edit-toolbar" id="bulk-edit-toolbar"></div>
       <div class="bulk-edit-table-wrapper" id="table-container"></div>
       <div class="stats-bar" id="stats-bar">
@@ -112,49 +232,82 @@ async function initEditCostsTab() {
       </div>
     `;
 
-    const toolbar = document.getElementById('bulk-edit-toolbar');
-    if (toolbar) {
-      toolbar.innerHTML = bulkEditor.createBulkEditToolbar();
-    }
+      const toolbar = document.getElementById('bulk-edit-toolbar');
+      if (toolbar) {
+        toolbar.innerHTML = bulkEditor.createBulkEditToolbar();
+      }
 
-    const container = document.getElementById('table-container');
-    bulkEditor.columnWidths.clear();
-    bulkEditor.resizeHandlersInitialized = false;
+      const container = document.getElementById('table-container');
+      bulkEditor.columnWidths.clear();
+      bulkEditor.resizeHandlersInitialized = false;
 
-    container.innerHTML = bulkEditor.createBulkEditTable();
-    bulkEditor.renderTableRows();
-    bulkEditor.updateSelectionCount();
+      container.innerHTML = bulkEditor.createBulkEditTable();
+      // Apply filters (which will call renderTableRows)
+      bulkEditor.applyFilters();
+      bulkEditor.updateSelectionCount();
 
-    updateEditCostsStats();
+      updateEditCostsStats();
 
-    // Setup save button
-    const saveBtn = document.getElementById('save-all-btn');
-    if (saveBtn) {
-      saveBtn.addEventListener('click', async () => {
-        if (bulkEditor.editedCosts.size === 0) {
-          alert('No changes to save');
-          return;
-        }
+      // Setup save button
+      const saveBtn = document.getElementById('save-all-btn');
+      if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+          if (bulkEditor.editedCosts.size === 0) {
+            alert('No changes to save');
+            return;
+          }
 
-        saveBtn.disabled = true;
-        const originalText = saveBtn.textContent;
-        saveBtn.textContent = 'Saving...';
+          saveBtn.disabled = true;
+          const originalText = saveBtn.textContent;
+          saveBtn.textContent = 'Saving...';
 
-        try {
-          const updates = Array.from(bulkEditor.editedCosts.values());
-          await bulkEditor.bulkUpdateCosts(updates);
-          alert(`Successfully saved ${updates.length} change(s)!`);
-          bulkEditor.editedCosts.clear();
-          updateEditCostsStats();
-          saveBtn.textContent = originalText;
-        } catch (error) {
-          alert('Failed to save: ' + error.message);
-          saveBtn.textContent = originalText;
-        } finally {
-          saveBtn.disabled = false;
-        }
-      });
-    }
+          try {
+            const allUpdates = Array.from(bulkEditor.editedCosts.values());
+            const regularUpdates = allUpdates.filter(c => !c._isTransportSegment);
+            const transportUpdates = allUpdates.filter(c => c._isTransportSegment);
+
+            // 1. Save regular costs
+            if (regularUpdates.length > 0) {
+              await bulkEditor.bulkUpdateCosts(regularUpdates);
+            }
+
+            // 2. Save transport segments
+            if (transportUpdates.length > 0 && window.transportSegmentManager) {
+              console.log(`💾 Saving ${transportUpdates.length} transport segments...`);
+              for (const update of transportUpdates) {
+                const segmentId = update.id;
+                const segmentUpdates = {
+                  manual_cost_usd: parseFloat(update.amount_usd || update.amount || 0),
+                  booking_status: update.booking_status,
+                  notes: update.notes,
+                  date: update.date
+                };
+
+                // If destination changed, we might need to handle that, but for now we ignore it 
+                // as it's complex to re-route segments.
+
+                await window.transportSegmentManager.updateSegment(segmentId, segmentUpdates, scenarioId);
+              }
+            }
+
+            alert(`Successfully saved ${allUpdates.length} change(s)!`);
+            bulkEditor.editedCosts.clear();
+            updateEditCostsStats();
+            saveBtn.textContent = originalText;
+          } catch (error) {
+            console.error('Save failed:', error);
+            alert('Failed to save: ' + error.message);
+            saveBtn.textContent = originalText;
+          } finally {
+            saveBtn.disabled = false;
+          }
+        });
+      }
+
+    }; // End of fetchCosts override
+
+    // Trigger initial load
+    await bulkEditor.fetchCosts();
 
   } catch (error) {
     console.error('Failed to initialize edit costs tab:', error);

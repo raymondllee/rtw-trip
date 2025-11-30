@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -124,12 +125,7 @@
       width: 100%;
     }
 
-    #tab-analysis .tab-panel {
-      padding: 24px;
-      max-width: 1400px;
-      margin: 0 auto;
-      width: 100%;
-    }
+
 
     .stub-message {
       display: flex;
@@ -174,6 +170,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="cost-manager-page">
     <div class="page-header">
@@ -192,14 +189,11 @@
       <button class="tab-button active" data-tab="budget">
         💵 Budget Management
       </button>
-      <button class="tab-button" data-tab="generate-costs">
-        🤖 Generate Costs (AI)
-      </button>
       <button class="tab-button" data-tab="edit-costs">
         📊 Review & Edit Costs
       </button>
-      <button class="tab-button" data-tab="analysis">
-        📈 Cost Analysis
+      <button class="tab-button" data-tab="generate-costs">
+        🤖 Bulk Generate Costs (AI)
       </button>
     </div>
 
@@ -234,22 +228,14 @@
       </div>
     </div>
 
-    <!-- Tab 4: Cost Analysis (Stub) -->
-    <div id="tab-analysis" class="tab-content">
-      <div class="tab-panel">
-        <div class="stub-message">
-          <h2>📈 Cost Analysis</h2>
-          <p>
-            Advanced cost analytics and visualizations coming soon. This feature will include:
-            cost trends over time, destination comparisons, category breakdowns, and budget variance analysis.
-          </p>
-        </div>
-      </div>
-    </div>
+
   </div>
 
   <!-- Load configuration -->
   <script src="./config.js"></script>
+
+  <!-- Load transport segment manager -->
+  <script src="/transport-segment-manager.js"></script>
 
   <!-- Load cost bulk edit class from public folder -->
   <script src="/cost-bulk-edit.js"></script>
@@ -257,4 +243,5 @@
   <!-- Load modules -->
   <script type="module" src="/src/cost-manager.ts"></script>
 </body>
+
 </html>

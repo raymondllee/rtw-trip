@@ -14,7 +14,67 @@ class CostBulkEdit {
     this.sortColumn = null;
     this.sortDirection = 'asc';
     this.columnWidths = new Map();
+    this.columnWidths = new Map();
     this.resizeHandlersInitialized = false;
+    this.saveTimeouts = new Map(); // For debouncing auto-saves
+
+
+    // Default visible columns
+    this.allColumns = [
+      { id: 'checkbox', label: '', alwaysVisible: true },
+      { id: 'region', label: 'Region' },
+      { id: 'country', label: 'Country' },
+      { id: 'destination', label: 'Destination' },
+      { id: 'category', label: 'Category' },
+      { id: 'modality', label: 'Modality' },
+      { id: 'description', label: 'Description' },
+      { id: 'amount', label: 'Amount (USD)' },
+      { id: 'currency', label: 'Currency' },
+      { id: 'date', label: 'Date' },
+      { id: 'status', label: 'Status' },
+      { id: 'notes', label: 'Notes' },
+      { id: 'actions', label: 'Actions', alwaysVisible: true }
+    ];
+
+    // Load visible columns from localStorage or default to all
+    const savedColumns = localStorage.getItem('costManagerVisibleColumns');
+    if (savedColumns) {
+      this.visibleColumns = new Set(JSON.parse(savedColumns));
+    } else {
+      this.visibleColumns = new Set(this.allColumns.map(c => c.id));
+    }
+
+    // Load saved filters
+    this.savedFilters = this.loadFilterPreferences();
+  }
+
+  /**
+   * Load filter preferences from localStorage
+   */
+  loadFilterPreferences() {
+    try {
+      const saved = localStorage.getItem('costManagerFilters');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.warn('Failed to load filter preferences:', e);
+      return {};
+    }
+  }
+
+  /**
+   * Save filter preferences to localStorage
+   */
+  saveFilterPreferences() {
+    const container = this.container || document;
+    const filters = {
+      category: container.querySelector('#filter-category')?.value || 'all',
+      status: container.querySelector('#filter-status')?.value || 'all',
+      region: container.querySelector('#filter-region')?.value || 'all',
+      country: container.querySelector('#filter-country')?.value || 'all',
+      destination: container.querySelector('#filter-destination')?.value || 'all',
+      scope: container.querySelector('#filter-transport-scope')?.value || 'all'
+    };
+    localStorage.setItem('costManagerFilters', JSON.stringify(filters));
   }
 
   /**
@@ -58,7 +118,10 @@ class CostBulkEdit {
 
       // Render rows after modal is in DOM (this also attaches event listeners)
       console.log('Rendering table rows...');
-      this.renderTableRows();
+
+      // Apply saved filters initially
+      this.applyFilters();
+
       console.log('✅ Bulk edit modal ready with', this.costs.length, 'costs');
     } catch (error) {
       console.error('❌ Failed to load costs:', error);
@@ -89,6 +152,48 @@ class CostBulkEdit {
           <button class="btn btn-primary" id="bulk-save-btn">Save All Changes</button>
         </div>
       </div>
+        .bulk-edit-table-container {
+          overflow-x: auto;
+        }
+        .actions-col {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 2px;
+          white-space: nowrap;
+          width: 260px !important;
+          min-width: 260px !important;
+        }
+        .actions-col .btn-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0;
+          padding: 2px 4px;
+          width: 28px;
+          height: 28px;
+        }
+        .country-cell, .destination-cell, .category-cell {
+          max-width: 120px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .description-cell {
+          max-width: 250px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .bulk-edit-table tfoot {
+          background-color: #f8f9fa;
+          font-weight: bold;
+          border-top: 2px solid #dee2e6;
+        }
+        .bulk-edit-table tfoot td {
+          padding: 12px 8px;
+        }
+      </style>
     `;
 
     // Close on outside click
@@ -145,10 +250,10 @@ class CostBulkEdit {
       <div class="bulk-edit-toolbar">
         <div class="bulk-edit-filters">
           <select id="filter-category" class="bulk-filter">
-            ${categories.map(cat => `<option value="${cat}">${cat === 'all' ? 'All Categories' : this.getCategoryIcon(cat) + ' ' + this.capitalize(cat)}</option>`).join('')}
+            ${categories.map(cat => `<option value="${cat}" ${this.savedFilters.category === cat ? 'selected' : ''}>${cat === 'all' ? 'All Categories' : this.getCategoryIcon(cat) + ' ' + this.capitalize(cat)}</option>`).join('')}
           </select>
           <select id="filter-status" class="bulk-filter">
-            ${statuses.map(status => `<option value="${status}">${status === 'all' ? 'All Statuses' : this.capitalize(status)}</option>`).join('')}
+            ${statuses.map(status => `<option value="${status}" ${this.savedFilters.status === status ? 'selected' : ''}>${status === 'all' ? 'All Statuses' : this.capitalize(status)}</option>`).join('')}
           </select>
           <select id="filter-region" class="bulk-filter">
             <option value="all">All Regions</option>
@@ -162,6 +267,28 @@ class CostBulkEdit {
             <option value="all">All Destinations</option>
             ${destinationOptions}${unassignedDestinationOption}
           </select>
+          <select id="filter-transport-scope" class="bulk-filter">
+            <option value="all" ${this.savedFilters.scope === 'all' ? 'selected' : ''}>All Scopes</option>
+            <option value="inter-destination" ${this.savedFilters.scope === 'inter-destination' ? 'selected' : ''}>Inter-destination</option>
+            <option value="local" ${this.savedFilters.scope === 'local' ? 'selected' : ''}>Local</option>
+          </select>
+          
+          <!-- Column Visibility Dropdown -->
+          <div class="dropdown" style="position: relative; display: inline-block;">
+            <button class="btn btn-sm btn-secondary dropdown-toggle" id="columns-dropdown-btn">
+              👁️ Columns
+            </button>
+            <div class="dropdown-menu" id="columns-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ccc; border-radius: 4px; padding: 8px; z-index: 1000; min-width: 150px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+              ${this.allColumns.filter(c => !c.alwaysVisible).map(col => `
+                <div style="margin-bottom: 4px;">
+                  <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" class="column-toggle" data-column="${col.id}" ${this.visibleColumns.has(col.id) ? 'checked' : ''} style="margin-right: 8px;">
+                    ${col.label}
+                  </label>
+                </div>
+              `).join('')}
+            </div>
+          </div>
         </div>
         <div class="bulk-edit-actions">
           <span class="selection-count">0 selected</span>
@@ -185,52 +312,73 @@ class CostBulkEdit {
                 <input type="checkbox" id="select-all-checkbox" title="Select All">
                 <div class="resize-handle"></div>
               </th>
+              ${this.visibleColumns.has('region') ? `
               <th class="sortable resizable" data-sort="region">
                 Region
                 <div class="resize-handle"></div>
-              </th>
+              </th>` : ''}
+              ${this.visibleColumns.has('country') ? `
               <th class="sortable resizable" data-sort="country">
                 Country
                 <div class="resize-handle"></div>
-              </th>
+              </th>` : ''}
+              ${this.visibleColumns.has('destination') ? `
               <th class="sortable resizable" data-sort="destination">
                 Destination
                 <div class="resize-handle"></div>
-              </th>
+              </th>` : ''}
+              ${this.visibleColumns.has('category') ? `
               <th class="sortable resizable" data-sort="category">
                 Category
                 <div class="resize-handle"></div>
-              </th>
+              </th>` : ''}
+              ${this.visibleColumns.has('modality') ? `
+              <th class="sortable resizable" data-sort="modality">
+                Modality
+                <div class="resize-handle"></div>
+              </th>` : ''}
+              ${this.visibleColumns.has('description') ? `
               <th class="sortable resizable" data-sort="description">
                 Description
                 <div class="resize-handle"></div>
-              </th>
+              </th>` : ''}
+              ${this.visibleColumns.has('amount') ? `
               <th class="sortable numeric resizable" data-sort="amount">
                 Amount (USD)
                 <div class="resize-handle"></div>
-              </th>
+              </th>` : ''}
+              ${this.visibleColumns.has('currency') ? `
               <th class="resizable">
                 Currency
                 <div class="resize-handle"></div>
-              </th>
+              </th>` : ''}
+              ${this.visibleColumns.has('date') ? `
               <th class="sortable resizable" data-sort="date">
                 Date
                 <div class="resize-handle"></div>
-              </th>
+              </th>` : ''}
+              ${this.visibleColumns.has('status') ? `
               <th class="sortable resizable" data-sort="status">
                 Status
                 <div class="resize-handle"></div>
-              </th>
+              </th>` : ''}
+              ${this.visibleColumns.has('notes') ? `
               <th class="resizable">
                 Notes
                 <div class="resize-handle"></div>
+              </th>` : ''}
+              <th class="actions-col resizable">
+                Actions
+                <div class="resize-handle"></div>
               </th>
-              <th class="actions-col">Actions</th>
             </tr>
           </thead>
           <tbody id="bulk-edit-tbody">
             ${this.costs.length === 0 ? '<tr><td colspan="12" class="empty-state">No costs to display</td></tr>' : ''}
           </tbody>
+          <tfoot id="bulk-edit-tfoot">
+            <!-- Totals will be injected here -->
+          </tfoot>
         </table>
       </div>
     `;
@@ -268,6 +416,48 @@ class CostBulkEdit {
 
     // Attach event listeners
     this.attachRowEventListeners();
+
+    // Update totals
+    this.updateTotals(filteredCosts);
+  }
+
+  /**
+   * Update totals footer
+   */
+  updateTotals(costs) {
+    const tfoot = document.getElementById('bulk-edit-tfoot');
+    if (!tfoot) return;
+
+    const totalAmount = costs.reduce((sum, cost) => sum + (cost.amount_usd || cost.amount || 0), 0);
+
+    // Create a row that matches the visible columns
+    let html = '<tr>';
+
+    // Checkbox col
+    html += '<td></td>';
+
+    // Add cells for visible columns
+    if (this.visibleColumns.has('region')) html += '<td></td>';
+    if (this.visibleColumns.has('country')) html += '<td></td>';
+    if (this.visibleColumns.has('destination')) html += '<td></td>';
+    if (this.visibleColumns.has('category')) html += '<td></td>';
+    if (this.visibleColumns.has('modality')) html += '<td></td>';
+    if (this.visibleColumns.has('description')) html += '<td style="text-align: right;">Total:</td>';
+
+    if (this.visibleColumns.has('amount')) {
+      html += `<td class="numeric">${this.formatCurrency(totalAmount)}</td>`;
+    }
+
+    if (this.visibleColumns.has('currency')) html += '<td></td>';
+    if (this.visibleColumns.has('date')) html += '<td></td>';
+    if (this.visibleColumns.has('status')) html += '<td></td>';
+    if (this.visibleColumns.has('notes')) html += '<td></td>';
+
+    // Actions col
+    html += '<td></td>';
+
+    html += '</tr>';
+    tfoot.innerHTML = html;
   }
 
   /**
@@ -309,6 +499,10 @@ class CostBulkEdit {
         case 'status':
           aVal = a.booking_status || a.bookingStatus || '';
           bVal = b.booking_status || b.bookingStatus || '';
+          break;
+        case 'modality':
+          aVal = a.modality || '';
+          bVal = b.modality || '';
           break;
         default:
           return 0;
@@ -382,40 +576,56 @@ class CostBulkEdit {
         <td class="checkbox-col">
           <input type="checkbox" class="row-checkbox" ${isSelected ? 'checked' : ''}>
         </td>
-        <td class="readonly-cell region-cell">${this.escapeHtml(region)}</td>
-        <td class="readonly-cell country-cell">${this.escapeHtml(country)}</td>
+        ${this.visibleColumns.has('region') ? `<td class="readonly-cell region-cell">${this.escapeHtml(region)}</td>` : ''}
+        ${this.visibleColumns.has('country') ? `<td class="readonly-cell country-cell">${this.escapeHtml(country)}</td>` : ''}
+        ${this.visibleColumns.has('destination') ? `
         <td class="editable-cell destination-cell">
           <select class="inline-edit" data-field="destination_id">
             <option value="">—</option>
             ${this.destinations.map(dest => `<option value="${dest.id}" ${displayCost.destination_id === dest.id ? 'selected' : ''}>${this.escapeHtml(dest.name || dest.city || 'Unknown')}</option>`).join('')}
           </select>
-        </td>
+        </td>` : ''}
+        ${this.visibleColumns.has('category') ? `
         <td class="editable-cell category-cell">
           <select class="inline-edit" data-field="category">
             ${categories.map(cat => `<option value="${cat}" ${displayCost.category === cat ? 'selected' : ''}>${this.getCategoryIcon(cat)} ${this.capitalize(cat)}</option>`).join('')}
           </select>
-        </td>
-        <td class="editable-cell">
+        </td>` : ''}
+        ${this.visibleColumns.has('modality') ? `
+        <td class="readonly-cell modality-cell" style="text-align: center;">
+          ${this.getModalityIcon(displayCost.modality)}
+        </td>` : ''}
+        ${this.visibleColumns.has('description') ? `
+        <td class="editable-cell description-cell">
           <input type="text" class="inline-edit" data-field="description" value="${this.escapeHtml(displayCost.description || '')}" placeholder="Description">
-        </td>
+        </td>` : ''}
+        ${this.visibleColumns.has('amount') ? `
         <td class="editable-cell numeric">
           <input type="number" class="inline-edit" data-field="amount" value="${displayCost.amount_usd || displayCost.amount || 0}" step="0.01" min="0">
-        </td>
+        </td>` : ''}
+        ${this.visibleColumns.has('currency') ? `
         <td class="readonly-cell" style="color: #666; font-size: 12px;">
           USD
-        </td>
+        </td>` : ''}
+        ${this.visibleColumns.has('date') ? `
         <td class="editable-cell">
           <input type="date" class="inline-edit" data-field="date" value="${displayCost.date || ''}">
-        </td>
+        </td>` : ''}
+        ${this.visibleColumns.has('status') ? `
         <td class="editable-cell">
           <select class="inline-edit" data-field="booking_status">
             ${statuses.map(status => `<option value="${status}" ${(displayCost.booking_status || displayCost.bookingStatus || 'estimated') === status ? 'selected' : ''}>${this.capitalize(status)}</option>`).join('')}
           </select>
-        </td>
+        </td>` : ''}
+        ${this.visibleColumns.has('notes') ? `
         <td class="editable-cell notes-cell">
           <textarea class="inline-edit auto-resize" data-field="notes" placeholder="Notes...">${this.escapeHtml(displayCost.notes || '')}</textarea>
-        </td>
+        </td>` : ''}
         <td class="actions-col">
+          ${cost._isTransportSegment ? `
+            <button class="btn-icon research-transport-btn" title="AI Research" data-segment-id="${cost.id}">🤖</button>
+            <button class="btn-icon edit-transport-btn" title="Edit Transport Details" data-segment-id="${cost.id}">✏️</button>
+          ` : ''}
           <button class="btn-icon delete-row-btn" title="Delete" data-cost-id="${cost.id}">🗑️</button>
         </td>
       </tr>
@@ -429,7 +639,10 @@ class CostBulkEdit {
     const table = document.getElementById('bulk-edit-table');
     if (!table) return;
 
-    const container = table.closest('.bulk-edit-modal') || document;
+    // Find container for scoped lookups
+    this.container = table.closest('.bulk-edit-content') || table.closest('.tab-panel') || document;
+
+    const container = this.container; // Use the scoped container instead of document/modal lookup
 
     if (!this.resizeHandlersInitialized) {
       this.setupColumnResizing(container);
@@ -490,11 +703,17 @@ class CostBulkEdit {
 
     // Inline edits
     table.querySelectorAll('.inline-edit').forEach(input => {
-      input.addEventListener('change', (e) => {
+      // Use 'input' for text/number/textarea to auto-save while typing (debounced)
+      // Use 'change' for selects to save immediately on selection
+      const eventType = (input.tagName === 'SELECT' || input.type === 'checkbox') ? 'change' : 'input';
+
+      input.addEventListener(eventType, (e) => {
         const row = e.target.closest('.bulk-edit-row');
         const costId = row.dataset.costId;
         const field = e.target.dataset.field;
         const value = e.target.value;
+
+        console.log(`📝 Field changed: ${field} = ${value} (Event: ${eventType})`);
 
         this.updateCostField(costId, field, value);
         row.classList.add('edited');
@@ -512,6 +731,32 @@ class CostBulkEdit {
         if (confirm('Are you sure you want to delete this cost?')) {
           this.deleteCost(costId, container);
         }
+      });
+    });
+
+    // Research Transport Buttons
+    table.querySelectorAll('.research-transport-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const segmentId = btn.dataset.segmentId;
+        console.log('🤖 Research transport clicked for segment:', segmentId);
+
+        // Dispatch event for parent to handle
+        const event = new CustomEvent('research-transport-segment', {
+          detail: { segmentId }
+        });
+        window.dispatchEvent(event);
+      });
+    });
+
+    // Edit transport buttons
+    table.querySelectorAll('.edit-transport-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const segmentId = e.target.dataset.segmentId;
+        console.log('✏️ Edit transport clicked for segment:', segmentId);
+        window.dispatchEvent(new CustomEvent('edit-transport-segment', {
+          detail: { segmentId: segmentId }
+        }));
       });
     });
 
@@ -549,6 +794,7 @@ class CostBulkEdit {
           const currentRegion = container.querySelector('#filter-region')?.value || 'all';
           this.updateDestinationFilterOptions(currentRegion, filter.value, container);
         }
+        this.saveFilterPreferences();
         this.applyFilters();
       });
     });
@@ -574,7 +820,8 @@ class CostBulkEdit {
         th.classList.add(`sort-${this.sortDirection}`);
 
         // Re-render with new sort
-        this.renderTableRows();
+        // Re-render with new sort (use applyFilters to maintain current filters)
+        this.applyFilters();
       });
     });
 
@@ -591,6 +838,59 @@ class CostBulkEdit {
       // Resize on input
       textarea.addEventListener('input', autoResize);
     });
+
+    // Columns Dropdown Logic
+    const columnsBtn = container.querySelector('#columns-dropdown-btn');
+    const columnsMenu = container.querySelector('#columns-dropdown-menu');
+
+    if (columnsBtn && !columnsBtn.dataset.bound) {
+      columnsBtn.dataset.bound = 'true';
+      columnsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isVisible = columnsMenu.style.display === 'block';
+        columnsMenu.style.display = isVisible ? 'none' : 'block';
+      });
+
+      // Close on outside click
+      document.addEventListener('click', (e) => {
+        if (!columnsBtn.contains(e.target) && !columnsMenu.contains(e.target)) {
+          columnsMenu.style.display = 'none';
+        }
+      });
+    }
+
+    // Column Toggles
+    container.querySelectorAll('.column-toggle').forEach(toggle => {
+      if (toggle.dataset.bound) return;
+      toggle.dataset.bound = 'true';
+      toggle.addEventListener('change', (e) => {
+        const columnId = e.target.dataset.column;
+        this.toggleColumn(columnId, e.target.checked);
+      });
+    });
+  }
+
+  /**
+   * Toggle column visibility
+   */
+  toggleColumn(columnId, isVisible) {
+    if (isVisible) {
+      this.visibleColumns.add(columnId);
+    } else {
+      this.visibleColumns.delete(columnId);
+    }
+
+    // Save to localStorage
+    localStorage.setItem('costManagerVisibleColumns', JSON.stringify(Array.from(this.visibleColumns)));
+
+    // Re-render table (full re-render needed to update headers and cells)
+    const container = this.container || document;
+    const tableContainer = container.querySelector('.bulk-edit-table-container');
+    if (tableContainer) {
+      // We need to rebuild the whole table structure to update headers
+      tableContainer.outerHTML = this.createBulkEditTable();
+      this.renderTableRows(); // This will re-attach listeners
+    }
   }
 
   /**
@@ -638,6 +938,105 @@ class CostBulkEdit {
       saveBtn.textContent = `Save ${this.editedCosts.size} Change${this.editedCosts.size !== 1 ? 's' : ''}`;
       saveBtn.classList.add('btn-warning');
     }
+
+    // Trigger auto-save
+    this.triggerAutoSave(costId);
+  }
+
+  /**
+   * Trigger auto-save for a cost
+   */
+  triggerAutoSave(costId) {
+    // Clear existing timeout
+    if (this.saveTimeouts.has(costId)) {
+      clearTimeout(this.saveTimeouts.get(costId));
+    }
+
+    // Set new timeout (1 second debounce)
+    const timeoutId = setTimeout(() => {
+      this.saveSingleCost(costId);
+      this.saveTimeouts.delete(costId);
+    }, 1000);
+
+    this.saveTimeouts.set(costId, timeoutId);
+
+    // Show saving indicator on the row
+    const row = document.querySelector(`.bulk-edit-row[data-cost-id="${costId}"]`);
+    if (row) {
+      row.classList.add('saving');
+    }
+  }
+
+  /**
+   * Save a single cost
+   */
+  async saveSingleCost(costId) {
+    const editedCost = this.editedCosts.get(costId);
+    if (!editedCost) {
+      console.warn(`⚠️ No edited cost found for ${costId}`);
+      return;
+    }
+
+    console.log(`💾 Auto-saving cost ${costId}...`, {
+      isTransport: editedCost._isTransportSegment,
+      hasManager: !!window.transportSegmentManager,
+      editedCost: { ...editedCost }
+    });
+
+    try {
+      if (editedCost._isTransportSegment && window.transportSegmentManager) {
+        console.log('🚌 Saving transport segment via manager...');
+        // Map fields for transport segment
+        const updates = {
+          ...editedCost,
+          cost: editedCost.amount_usd || editedCost.amount // Ensure cost is mapped
+        };
+        console.log('   Updates payload:', updates);
+        await window.transportSegmentManager.updateSegment(costId, updates, this.sessionId);
+        console.log('✅ Manager updateSegment completed');
+      } else {
+        console.log('💰 Saving regular cost via bulkUpdateCosts...');
+        // Reuse bulk update endpoint but for single item
+        await this.bulkUpdateCosts([editedCost]);
+      }
+
+      // Remove from edited map since it's saved
+      this.editedCosts.delete(costId);
+
+      // Update original cost in this.costs
+      const index = this.costs.findIndex(c => c.id === costId);
+      if (index !== -1) {
+        this.costs[index] = { ...editedCost };
+      }
+
+      // Update UI
+      const row = document.querySelector(`.bulk-edit-row[data-cost-id="${costId}"]`);
+      if (row) {
+        row.classList.remove('saving', 'edited');
+        row.classList.add('saved');
+        setTimeout(() => row.classList.remove('saved'), 2000);
+      }
+
+      // Update save button
+      const saveBtn = document.getElementById('bulk-save-btn');
+      if (saveBtn) {
+        if (this.editedCosts.size === 0) {
+          saveBtn.textContent = 'Save All Changes';
+          saveBtn.classList.remove('btn-warning');
+        } else {
+          saveBtn.textContent = `Save ${this.editedCosts.size} Change${this.editedCosts.size !== 1 ? 's' : ''}`;
+        }
+      }
+
+      // Refresh totals if amount changed
+      this.updateTotals(this.costs); // Note: this might be expensive if we re-calc all, but safe for now
+
+      console.log(`✅ Auto-save complete for ${costId}`);
+    } catch (error) {
+      console.error(`❌ Auto-save failed for ${costId}:`, error);
+      const row = document.querySelector(`.bulk-edit-row[data-cost-id="${costId}"]`);
+      if (row) row.classList.add('error');
+    }
   }
 
   /**
@@ -660,15 +1059,32 @@ class CostBulkEdit {
    * Apply filters to table
    */
   applyFilters() {
-    const categoryFilter = document.getElementById('filter-category')?.value || 'all';
-    const statusFilter = document.getElementById('filter-status')?.value || 'all';
-    const regionFilter = document.getElementById('filter-region')?.value || 'all';
-    const countryFilter = document.getElementById('filter-country')?.value || 'all';
-    const destinationFilter = document.getElementById('filter-destination')?.value || 'all';
+    const container = this.container || document;
+    const categoryFilter = container.querySelector('#filter-category')?.value || 'all';
+    const statusFilter = container.querySelector('#filter-status')?.value || 'all';
+    const regionFilter = container.querySelector('#filter-region')?.value || 'all';
+    const countryFilter = container.querySelector('#filter-country')?.value || 'all';
+    const destinationFilter = container.querySelector('#filter-destination')?.value || 'all';
+    const scopeFilter = container.querySelector('#filter-transport-scope')?.value || 'all';
+
+    console.log('🔍 applyFilters:', {
+      category: categoryFilter,
+      scope: scopeFilter,
+      status: statusFilter,
+      container: container === document ? 'document' : (container.className || 'element')
+    });
 
     const filteredCosts = this.costs.filter(cost => {
       if (categoryFilter !== 'all' && cost.category !== categoryFilter) return false;
       if (statusFilter !== 'all' && (cost.booking_status || cost.bookingStatus) !== statusFilter) return false;
+
+      // Scope Filter
+      if (scopeFilter !== 'all') {
+        const isInterDestination = cost._isTransportSegment === true;
+        if (scopeFilter === 'inter-destination' && !isInterDestination) return false;
+        if (scopeFilter === 'local' && isInterDestination) return false;
+      }
+
       if (regionFilter !== 'all') {
         const normalizedRegion = this.normalizeFilterValue(this.getDestinationRegion(cost.destination_id));
         if (normalizedRegion !== regionFilter) return false;
@@ -844,15 +1260,24 @@ class CostBulkEdit {
    */
   exportToCSV() {
     // Get currently filtered costs
-    const categoryFilter = document.getElementById('filter-category')?.value || 'all';
-    const statusFilter = document.getElementById('filter-status')?.value || 'all';
-    const regionFilter = document.getElementById('filter-region')?.value || 'all';
-    const countryFilter = document.getElementById('filter-country')?.value || 'all';
-    const destinationFilter = document.getElementById('filter-destination')?.value || 'all';
+    const container = this.container || document;
+    const categoryFilter = container.querySelector('#filter-category')?.value || 'all';
+    const statusFilter = container.querySelector('#filter-status')?.value || 'all';
+    const regionFilter = container.querySelector('#filter-region')?.value || 'all';
+    const countryFilter = container.querySelector('#filter-country')?.value || 'all';
+    const destinationFilter = container.querySelector('#filter-destination')?.value || 'all';
+    const scopeFilter = container.querySelector('#filter-transport-scope')?.value || 'all';
 
     const filteredCosts = this.costs.filter(cost => {
       if (categoryFilter !== 'all' && cost.category !== categoryFilter) return false;
       if (statusFilter !== 'all' && (cost.booking_status || cost.bookingStatus) !== statusFilter) return false;
+
+      if (scopeFilter !== 'all') {
+        const isInterDestination = cost._isTransportSegment === true;
+        if (scopeFilter === 'inter-destination' && !isInterDestination) return false;
+        if (scopeFilter === 'local' && isInterDestination) return false;
+      }
+
       if (regionFilter !== 'all') {
         const normalizedRegion = this.normalizeFilterValue(this.getDestinationRegion(cost.destination_id));
         if (normalizedRegion !== regionFilter) return false;
@@ -882,6 +1307,7 @@ class CostBulkEdit {
       'Country',
       'Destination',
       'Category',
+      'Modality',
       'Description',
       'Amount (USD)',
       'Currency',
@@ -908,6 +1334,7 @@ class CostBulkEdit {
         country,
         destination,
         category,
+        cost.modality || '',
         description,
         amount,
         currency,
@@ -970,6 +1397,20 @@ class CostBulkEdit {
       other: '📌'
     };
     return icons[category] || '📌';
+  }
+
+  getModalityIcon(modality) {
+    if (!modality) return '';
+    const icons = {
+      'plane': '✈️',
+      'train': '🚂',
+      'car': '🚗',
+      'bus': '🚌',
+      'ferry': '🚢',
+      'walking': '🚶',
+      'local': '📍'
+    };
+    return icons[modality.toLowerCase()] || modality;
   }
 
   capitalize(str) {

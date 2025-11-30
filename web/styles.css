@@ -264,7 +264,7 @@ body {
   padding: 1px 3px;
   font-size: 11px;
   color: #888;
-  width: 45px;
+  width: 35px;
   text-align: center;
 }
 
@@ -3108,7 +3108,6 @@ textarea.form-input {
 
 /* View preferences: Compact mode transport legs */
 .destination-list.compact-mode .transport-airlines,
-.destination-list.compact-mode .transport-research-btn,
 .destination-list.compact-mode .alternatives-indicator,
 .destination-list.compact-mode .status-badge {
   display: none !important;

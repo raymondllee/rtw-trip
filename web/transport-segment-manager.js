@@ -32,6 +32,20 @@ class TransportSegmentManager {
   }
 
   /**
+   * Get all loaded segments
+   */
+  getAllSegments() {
+    return this.segments;
+  }
+
+  /**
+   * Set segments manually (e.g. from parent data)
+   */
+  setSegments(segments) {
+    this.segments = segments || [];
+  }
+
+  /**
    * Sync transport segments based on current location order
    */
   async syncSegments(scenarioId, locations) {
@@ -106,6 +120,81 @@ class TransportSegmentManager {
           );
         }
       }
+    }
+  }
+
+  /**
+   * Update local segment data without API call
+   * Used when we already have the updated data from another source
+   */
+  updateLocalSegment(segmentId, data) {
+    const index = this.segments.findIndex(s => s.id === segmentId);
+    if (index !== -1) {
+      // Merge updates into existing segment
+      this.segments[index] = { ...this.segments[index], ...data };
+      console.log(`✅ TransportSegmentManager: Updated local segment ${segmentId}`);
+      return true;
+    }
+    console.warn(`⚠️ TransportSegmentManager: Segment ${segmentId} not found for local update`);
+    return false;
+  }
+
+  /**
+   * Research a transport segment using AI
+   */
+  async researchSegment(segmentId, scenarioId, segmentData = null) {
+    try {
+      const segment = segmentData || this.segments.find(s => s.id === segmentId);
+      if (!segment) throw new Error('Segment not found');
+
+      console.log(`🤖 Researching segment: ${segment.from_destination_name} -> ${segment.to_destination_name}`);
+
+      const response = await fetch(`${this.apiBaseUrl}/api/transport/research`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: scenarioId, // API expects session_id which maps to scenario_id usually
+          segment_id: segmentId,
+          from_destination_name: segment.from_destination_name,
+          to_destination_name: segment.to_destination_name,
+          from_country: segment.from_country || '',
+          to_country: segment.to_country || '',
+          departure_date: segment.date || ''
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Research failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const result = data.research_result || data;
+
+      // Prepare updates
+      const updates = {
+        researched_cost_low: result.researched_cost_low || result.cost_low,
+        researched_cost_mid: result.researched_cost_mid || result.cost_mid,
+        researched_cost_high: result.researched_cost_high || result.cost_high,
+        researched_airlines: result.researched_airlines || result.airlines,
+        researched_duration_hours: result.researched_duration_hours || result.duration_hours,
+        researched_stops: result.researched_stops ?? result.typical_stops,
+        researched_alternatives: result.alternatives,
+        booking_status: 'researched',
+        researched_at: new Date().toISOString()
+      };
+
+      // Update local segment
+      this.updateLocalSegment(segmentId, updates);
+
+      // Persist to backend
+      console.log('💾 Persisting research results to backend...');
+      await this.updateSegment(segmentId, updates, scenarioId);
+      console.log('✅ Research results persisted');
+
+      return result;
+    } catch (error) {
+      console.error('Error researching transport segment:', error);
+      throw error;
     }
   }
 
