@@ -22,6 +22,9 @@ if (!scenarioId) {
   window.location.href = '/';
 }
 
+// Set global scenario ID for components that rely on it (like TransportEditor)
+(window as any).currentScenarioId = scenarioId;
+
 const scenarioManager = new FirestoreScenarioManager();
 let currentScenario = null;
 let currentVersionData = null;
@@ -104,9 +107,10 @@ async function initEditCostsTab() {
           const { segmentId } = e.detail;
           if (transportEditor) {
             transportEditor.open(segmentId, async () => {
-              // On save, refresh the table
+              // On save, refresh the table without resetting filters
               console.log('🔄 Transport segment updated, refreshing table...');
-              await initEditCostsTab(); // Re-fetch and re-render
+              await bulkEditor.fetchCosts();
+              bulkEditor.renderTableRows(); // Re-render with current filters
             });
           } else {
             console.error('❌ TransportEditor is not initialized when event received');
@@ -131,9 +135,10 @@ async function initEditCostsTab() {
 
               await window.transportSegmentManager.researchSegment(segmentId, scenarioId);
 
-              // Refresh table
+              // Refresh table without resetting filters
               console.log('✅ Research complete, refreshing table...');
-              await initEditCostsTab();
+              await bulkEditor.fetchCosts();
+              bulkEditor.renderTableRows();
             } catch (error) {
               console.error('❌ Research failed:', error);
               alert('Research failed. Check console for details.');
@@ -213,23 +218,6 @@ async function initEditCostsTab() {
       tabPanel.innerHTML = `
       <div class="bulk-edit-toolbar" id="bulk-edit-toolbar"></div>
       <div class="bulk-edit-table-wrapper" id="table-container"></div>
-      <div class="stats-bar" id="stats-bar">
-        <div class="stat-item">
-          <span>Total Costs:</span>
-          <span class="stat-value" id="total-costs">0</span>
-        </div>
-        <div class="stat-item">
-          <span>Total Amount:</span>
-          <span class="stat-value" id="total-amount">$0</span>
-        </div>
-        <div class="stat-item">
-          <span>Unsaved Changes:</span>
-          <span class="stat-value" id="unsaved-changes">0</span>
-        </div>
-        <div class="stat-item" style="margin-left: auto;">
-          <button class="btn btn-primary" id="save-all-btn">Save All Changes</button>
-        </div>
-      </div>
     `;
 
       const toolbar = document.getElementById('bulk-edit-toolbar');
@@ -245,64 +233,6 @@ async function initEditCostsTab() {
       // Apply filters (which will call renderTableRows)
       bulkEditor.applyFilters();
       bulkEditor.updateSelectionCount();
-
-      updateEditCostsStats();
-
-      // Setup save button
-      const saveBtn = document.getElementById('save-all-btn');
-      if (saveBtn) {
-        saveBtn.addEventListener('click', async () => {
-          if (bulkEditor.editedCosts.size === 0) {
-            alert('No changes to save');
-            return;
-          }
-
-          saveBtn.disabled = true;
-          const originalText = saveBtn.textContent;
-          saveBtn.textContent = 'Saving...';
-
-          try {
-            const allUpdates = Array.from(bulkEditor.editedCosts.values());
-            const regularUpdates = allUpdates.filter(c => !c._isTransportSegment);
-            const transportUpdates = allUpdates.filter(c => c._isTransportSegment);
-
-            // 1. Save regular costs
-            if (regularUpdates.length > 0) {
-              await bulkEditor.bulkUpdateCosts(regularUpdates);
-            }
-
-            // 2. Save transport segments
-            if (transportUpdates.length > 0 && window.transportSegmentManager) {
-              console.log(`💾 Saving ${transportUpdates.length} transport segments...`);
-              for (const update of transportUpdates) {
-                const segmentId = update.id;
-                const segmentUpdates = {
-                  manual_cost_usd: parseFloat(update.amount_usd || update.amount || 0),
-                  booking_status: update.booking_status,
-                  notes: update.notes,
-                  date: update.date
-                };
-
-                // If destination changed, we might need to handle that, but for now we ignore it 
-                // as it's complex to re-route segments.
-
-                await window.transportSegmentManager.updateSegment(segmentId, segmentUpdates, scenarioId);
-              }
-            }
-
-            alert(`Successfully saved ${allUpdates.length} change(s)!`);
-            bulkEditor.editedCosts.clear();
-            updateEditCostsStats();
-            saveBtn.textContent = originalText;
-          } catch (error) {
-            console.error('Save failed:', error);
-            alert('Failed to save: ' + error.message);
-            saveBtn.textContent = originalText;
-          } finally {
-            saveBtn.disabled = false;
-          }
-        });
-      }
 
     }; // End of fetchCosts override
 

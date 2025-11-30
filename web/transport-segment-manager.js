@@ -172,9 +172,9 @@ class TransportSegmentManager {
 
       // Prepare updates
       const updates = {
-        researched_cost_low: result.researched_cost_low || result.cost_low,
-        researched_cost_mid: result.researched_cost_mid || result.cost_mid,
-        researched_cost_high: result.researched_cost_high || result.cost_high,
+        researched_cost_low: Math.round(result.researched_cost_low || result.cost_low || 0),
+        researched_cost_mid: Math.round(result.researched_cost_mid || result.cost_mid || 0),
+        researched_cost_high: Math.round(result.researched_cost_high || result.cost_high || 0),
         researched_airlines: result.researched_airlines || result.airlines,
         researched_duration_hours: result.researched_duration_hours || result.duration_hours,
         researched_stops: result.researched_stops ?? result.typical_stops,

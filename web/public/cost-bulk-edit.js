@@ -22,7 +22,7 @@ class CostBulkEdit {
     // Default visible columns
     this.allColumns = [
       { id: 'checkbox', label: '', alwaysVisible: true },
-      { id: 'region', label: 'Region' },
+      { id: 'region', label: 'Continent' },
       { id: 'country', label: 'Country' },
       { id: 'destination', label: 'Destination' },
       { id: 'category', label: 'Category' },
@@ -256,7 +256,7 @@ class CostBulkEdit {
             ${statuses.map(status => `<option value="${status}" ${this.savedFilters.status === status ? 'selected' : ''}>${status === 'all' ? 'All Statuses' : this.capitalize(status)}</option>`).join('')}
           </select>
           <select id="filter-region" class="bulk-filter">
-            <option value="all">All Regions</option>
+            <option value="all">All Continents</option>
             ${regionOptions}
           </select>
           <select id="filter-country" class="bulk-filter">
@@ -314,7 +314,7 @@ class CostBulkEdit {
               </th>
               ${this.visibleColumns.has('region') ? `
               <th class="sortable resizable" data-sort="region">
-                Region
+                Continent
                 <div class="resize-handle"></div>
               </th>` : ''}
               ${this.visibleColumns.has('country') ? `
@@ -428,7 +428,7 @@ class CostBulkEdit {
     const tfoot = document.getElementById('bulk-edit-tfoot');
     if (!tfoot) return;
 
-    const totalAmount = costs.reduce((sum, cost) => sum + (cost.amount_usd || cost.amount || 0), 0);
+    const totalAmount = Math.round(costs.reduce((sum, cost) => sum + (cost.amount_usd || cost.amount || 0), 0));
 
     // Create a row that matches the visible columns
     let html = '<tr>';
@@ -537,11 +537,13 @@ class CostBulkEdit {
 
   /**
    * Get destination region from ID
+   * Returns continent if available, otherwise region
    */
   getDestinationRegion(destinationId) {
     if (!destinationId) return '—';
     const dest = this.destinations.find(d => d.id === destinationId);
-    return dest ? (dest.region || '—') : '—';
+    if (!dest) return '—';
+    return dest.continent || dest.region || '—';
   }
 
   /**
@@ -601,7 +603,7 @@ class CostBulkEdit {
         </td>` : ''}
         ${this.visibleColumns.has('amount') ? `
         <td class="editable-cell numeric">
-          <input type="number" class="inline-edit" data-field="amount" value="${displayCost.amount_usd || displayCost.amount || 0}" step="0.01" min="0">
+          <input type="number" class="inline-edit" data-field="amount" value="${Math.round(displayCost.amount_usd || displayCost.amount || 0)}" step="1" min="0">
         </td>` : ''}
         ${this.visibleColumns.has('currency') ? `
         <td class="readonly-cell" style="color: #666; font-size: 12px;">
@@ -928,7 +930,8 @@ class CostBulkEdit {
 
     // Special handling: if amount changes, also update amount_usd
     if (field === 'amount') {
-      editedCost.amount_usd = parseFloat(value) || 0;
+      editedCost.amount_usd = Math.round(parseFloat(value) || 0);
+      editedCost.amount = editedCost.amount_usd; // Keep both in sync
       console.log(`💰 Updated amount: ${value} → amount_usd: ${editedCost.amount_usd}`);
     }
 
@@ -1534,7 +1537,8 @@ class CostBulkEdit {
     const normalizedCountry = countryValue;
 
     const matchingDestinations = this.destinations.filter(dest => {
-      const destRegion = this.normalizeFilterValue(dest.region);
+      const rawRegion = dest.continent != null ? String(dest.continent).trim() : (dest.region != null ? String(dest.region).trim() : '');
+      const destRegion = this.normalizeFilterValue(rawRegion);
       if (normalizedRegion !== 'all' && destRegion !== normalizedRegion) return false;
 
       const destCountry = this.normalizeFilterValue(dest.country);
@@ -1572,7 +1576,7 @@ class CostBulkEdit {
     const regions = new Map();
 
     this.destinations.forEach(dest => {
-      const rawRegion = dest.region != null ? String(dest.region).trim() : '';
+      const rawRegion = dest.continent != null ? String(dest.continent).trim() : (dest.region != null ? String(dest.region).trim() : '');
       const value = this.normalizeFilterValue(rawRegion);
       const label = rawRegion ? rawRegion : 'Unassigned';
       if (!regions.has(value)) {
@@ -1599,7 +1603,7 @@ class CostBulkEdit {
     const targetRegion = regionValue;
 
     this.destinations.forEach(dest => {
-      const rawRegion = dest.region != null ? String(dest.region).trim() : '';
+      const rawRegion = dest.continent != null ? String(dest.continent).trim() : (dest.region != null ? String(dest.region).trim() : '');
       const destinationRegion = this.normalizeFilterValue(rawRegion);
       if (targetRegion !== 'all' && destinationRegion !== targetRegion) {
         return;

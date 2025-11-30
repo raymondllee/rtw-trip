@@ -1305,8 +1305,8 @@ export class BudgetManager {
       const lines = [];
       lines.push(`${index + 1}. ${dest.name}${dest.city ? ` (${dest.city})` : ''}, ${country}`);
 
-      if (dest.region) {
-        lines.push(`   Region: ${dest.region}`);
+      if (dest.continent) {
+        lines.push(`   Continent: ${dest.continent}`);
       }
 
       if (dest.arrivalDate || dest.departureDate || dest.durationDays) {

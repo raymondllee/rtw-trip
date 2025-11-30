@@ -63,7 +63,7 @@ export class TransportEditor {
                 </div>
                 <div class="form-group" style="margin: 0;">
                   <label for="transport-cost" style="font-size: 13px;">Estimated Cost (USD)</label>
-                  <input type="number" id="transport-cost" class="form-input" min="0" step="1" placeholder="0">
+                  <input type="number" id="transport-cost" class="form-input" min="0" step="0.01" placeholder="0">
                   <small class="form-hint">Auto-calculated based on distance and mode</small>
                 </div>
               </div>
@@ -77,15 +77,15 @@ export class TransportEditor {
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
                   <div class="form-group" style="margin: 0;">
                     <label for="transport-researched-low" style="font-size: 13px;">Low (USD)</label>
-                    <input type="number" id="transport-researched-low" class="form-input" min="0" step="1" placeholder="Low">
+                    <input type="number" id="transport-researched-low" class="form-input" min="0" step="0.01" placeholder="Low">
                   </div>
                   <div class="form-group" style="margin: 0;">
                     <label for="transport-researched-mid" style="font-size: 13px; font-weight: 600;">Mid (USD)</label>
-                    <input type="number" id="transport-researched-mid" class="form-input" min="0" step="1" placeholder="Typical" style="font-weight: 600;">
+                    <input type="number" id="transport-researched-mid" class="form-input" min="0" step="0.01" placeholder="Typical" style="font-weight: 600;">
                   </div>
                   <div class="form-group" style="margin: 0;">
                     <label for="transport-researched-high" style="font-size: 13px;">High (USD)</label>
-                    <input type="number" id="transport-researched-high" class="form-input" min="0" step="1" placeholder="High">
+                    <input type="number" id="transport-researched-high" class="form-input" min="0" step="0.01" placeholder="High">
                   </div>
                 </div>
                 <small class="form-hint" style="margin-top: 8px; display: block;">From AI research of flights, routes, and booking sites</small>
@@ -99,7 +99,7 @@ export class TransportEditor {
                 </div>
                 <div class="form-group" style="margin: 0;">
                   <label for="transport-manual-cost" style="font-size: 13px; font-weight: 600;">Manual Budget (USD)</label>
-                  <input type="number" id="transport-manual-cost" class="form-input" min="0" step="1" placeholder="Override amount" style="font-weight: 600;">
+                  <input type="number" id="transport-manual-cost" class="form-input" min="0" step="0.01" placeholder="Override amount" style="font-weight: 600;">
                   <small class="form-hint">Set a custom budget target that overrides estimates and research</small>
                 </div>
               </div>
@@ -112,7 +112,7 @@ export class TransportEditor {
                 </div>
                 <div class="form-group" style="margin: 0 0 12px 0;">
                   <label for="transport-actual-cost" style="font-size: 13px; font-weight: 600;">Actual Cost (USD)</label>
-                  <input type="number" id="transport-actual-cost" class="form-input" min="0" step="1" placeholder="Booked price" style="font-weight: 600;">
+                  <input type="number" id="transport-actual-cost" class="form-input" min="0" step="0.01" placeholder="Booked price" style="font-weight: 600;">
                   <small class="form-hint">The real price you paid - overrides all other costs</small>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; padding: 10px; background: #f3e5f5; border-radius: 4px; border-left: 3px solid #8e24aa;">
@@ -481,12 +481,12 @@ export class TransportEditor {
     const updates = {
       transport_mode: mode,
       transport_mode_icon: this.transportSegmentManager.getTransportIcon(mode),
-      estimated_cost_usd: estimatedCost,
-      manual_cost_usd: manualCost,
-      researched_cost_low: researchedLow,
-      researched_cost_mid: researchedMid,
-      researched_cost_high: researchedHigh,
-      actual_cost_usd: actualCost,
+      estimated_cost_usd: Math.round(estimatedCost),
+      manual_cost_usd: manualCost !== null ? Math.round(manualCost) : null,
+      researched_cost_low: researchedLow !== null ? Math.round(researchedLow) : null,
+      researched_cost_mid: researchedMid !== null ? Math.round(researchedMid) : null,
+      researched_cost_high: researchedHigh !== null ? Math.round(researchedHigh) : null,
+      actual_cost_usd: actualCost !== null ? Math.round(actualCost) : null,
       currency_local: currencyLocal,
       amount_local: amountLocal,
       duration_hours: duration,
